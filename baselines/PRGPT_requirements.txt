@@ -1,0 +1,9 @@
+numpy
+scipy
+torch
+infomap
+sdp-clustering
+munkres
+#graph-tool (C++ library wrapped in Python, which are not installable via pip)
+# it used only for generate new pre-trained data
+# install: apt-get install python3-graph-tool
