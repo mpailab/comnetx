@@ -1,0 +1,16 @@
+# Description:
+#   This package contains hashing methods available in ScaNN.
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],
+)
+
+# Generated Files
+# ========================================================================
+
+# Libraries
+# ========================================================================
+
+# Unit Tests
+# ========================================================================
