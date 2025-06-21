@@ -12,7 +12,7 @@ parser.add_argument('--debug', type=bool, default=True, help='print debug messag
 parser.add_argument('--n', type=int, default=1000000, help='number of vertices in matrix')
 parser.add_argument('--clust', type=int, default=3, help='number of clusters')
 parser.add_argument('--device', type=str, default='cpu')
-parser.add_argument('--dencity', type=float, default=0.001)
+parser.add_argument('--density', type=float, default=0.001)
 args = parser.parse_args()
 
 def sparse_conv(Q, ind1, ind2, device):
@@ -73,6 +73,23 @@ def generate_random_csr_tensor(n, nnz, numb_clust, dtype=torch.double, device='c
     cluster_sizes = [random.randint(1, nmbr_vrtcs_clstr) for _ in range(numb_clust)]
     return csr_tensor, cluster_sizes
 
+def save_tensor(tsr):
+    row_indices = []
+    for row in range(tsr.size(0)):
+        start = crow_indices[row].item()
+        end = crow_indices[row + 1].item()
+        count = end - start
+        row_indices.extend([row] * count)
+
+    row_indices = torch.tensor(row_indices, dtype=torch.int32)
+    col_indices = tsr.col_indices()
+    vals = tsr.values()
+    torch.save({'row': row_indices, 'col': col_indices, 'value': vals, 'size': tsr.size()}, 'torch_sparse_tensor.pt')
+
+def load_tensor(filepath):
+    loaded_tensor = torch.load(filepath)
+    return loaded_tensor
+
 if __name__ == '__main__':
     if args.device == 'cuda' and not torch.cuda.is_available():
         raise RuntimeError("cuda is not available")
@@ -81,7 +98,7 @@ if __name__ == '__main__':
     print('Using device:', device)
     start_time = time.time()
     #Q, cluster_sizes= alt_gen(args.n, args.clust, device)
-    Q, cluster_sizes = generate_random_csr_tensor(n = args.n, nnz = int(args.n*args.dencity), numb_clust=args.clust, device = args.device)
+    Q, cluster_sizes = generate_random_csr_tensor(n = args.n, nnz = int(args.n*args.density), numb_clust=args.clust, device = args.device)
     after_gen_time = time.time()
     gen_time = after_gen_time - start_time
     print(f"Generate time: {gen_time:.6f} seconds")

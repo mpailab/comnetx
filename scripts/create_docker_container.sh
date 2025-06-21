@@ -2,7 +2,7 @@
 
 NAME=""
 DOCKER=docker
-IMAGE="tensorflow/tensorflow:latest"
+IMAGE="pytorch/pytorch:2.5.1-cpu"
 REUSE=0
 
 function usage {
@@ -41,7 +41,7 @@ do
             shift
             ;;
         -v)
-            IMAGE="tensorflow/tensorflow:latest-gpu"
+            IMAGE="pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel"
             shift
             ;;
         -h)
@@ -74,8 +74,11 @@ then
 fi 
 
 printf "  create $NAME as "
-$DOCKER create --gpus all -it \
+$DOCKER create --gpus all -it --shm-size=2g \
+    -e TERM=xterm-256color \
+    --entrypoint /bin/bash \
     -v /auto/datasets/graphs:/auto/datasets/graphs \
+    -w / \
     -v /home/$USER:/home/$USER \
     -v /home/$USER/.bashrc:/root/.bashrc --name $NAME -h $NAME $IMAGE
 
