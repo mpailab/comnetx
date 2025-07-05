@@ -1,0 +1,5 @@
+dimacs10-uk-2007-05;http://konect.cc/networks/dimacs10-uk-2007-05;105153952;3301876564;static;undirected;unweighted
+friendster;http://konect.cc/networks/friendster;68349466;2586147869;static;undirected;unweighted
+twitter_mpi;http://konect.cc/networks/twitter_mpi;52579682;1963263821;static;directed;unweighted
+twitter;http://konect.cc/networks/twitter;41652230;1468365182;static;directed;unweighted
+wikipedia_link_en;http://konect.cc/networks/wikipedia_link_en;13593032;437217424;static;directed;unweighted
