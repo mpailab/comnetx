@@ -1,10 +1,17 @@
 import torch
 from torch_geometric.datasets import Planetoid, Reddit
-from ogb.nodeproppred import PygNodePropPredDataset
+
 import pandas as pd
 import numpy as np
 import scipy.sparse as sp
-import os
+import os.path
+from ogb.nodeproppred import PygNodePropPredDataset
+
+import time
+import json
+
+KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
+KONECT_INFO = "./konect-datasets-info"
 
 class Dataset:
     """Dataset treatment"""
@@ -103,3 +110,44 @@ class Dataset:
 
         self.features = None
         self.label = None
+    
+    def _load_konect(self, batch_num = 1):
+        """
+        Load dynamic dataset from KONECT collection
+
+        Parameters
+        ----------
+        batch_num : 1, 10, 100, 1000, 10000, 100000
+            Default: 1
+        """
+        filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batch_num}_batches")
+        with open(filepath) as _:
+            first_string = _.readline()
+            num_nodes = int(first_string.split()[0])
+            max_index = num_nodes - 1
+            edges_num = int(first_string.split()[1])
+        i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        adjs = []
+        for num in range(batch_num):
+            mask = (t == num)
+            adj_index = np.vstack((i[mask], j[mask]))
+            adj = torch.sparse_coo_tensor(adj_index, w[mask], size=(num_nodes, num_nodes)).coalesce()
+            adjs.append(adj)
+        self.adj = torch.stack(adjs) # 3-dimensional tensor
+
+def list_konect_datasets():
+    with open(os.path.join(KONECT_INFO, "dynamic.json")) as _:
+        info = json.load(_)
+    with open(os.path.join(KONECT_INFO, "static.json")) as _:
+        info.update(json.load(_))
+    datasets = list(info.keys())
+    datasets.sort(key = lambda x: info[x]["m"])
+    for dataset in datasets:
+        #print(dataset, info[dataset]["n"], info[dataset]["m"], info[dataset]["d"], info[dataset]["w"])
+        print(dataset, info[dataset]["n"], info[dataset]["m"], sep="\t")
+
+if __name__ == "__main__":
+    dataset = "dblp_coauthor"
+    ds = Dataset(dataset, KONECT_PATH)
+    #ds._load_konect(batch_num = 10)
+    list_konect_datasets()
