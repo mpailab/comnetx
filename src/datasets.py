@@ -1,6 +1,8 @@
 import torch
 from torch_geometric.datasets import Planetoid, Reddit
 
+from ogb.nodeproppred import PygNodePropPredDataset
+import tempfile
 import pandas as pd
 import numpy as np
 import scipy.sparse as sp
@@ -38,42 +40,57 @@ class Dataset:
             Default: coo
         """
 
+        filenames = {
+            "features": f"{self.name.lower()}_feat.npy",
+            "labels": f"{self.name.lower()}_label.npy",
+            "adj": f"{self.name.lower()}_adj.npy"
+        }
+
         if "youtube-u-growth" in self.name:
             self._load_youtube_u_growth()
         elif self.name.lower() in {"cora", "citeseer", "pubmed", "reddit"} or self.name.startswith("ogbn-"):
-            self._load_magi()
+            for key, filename in filenames.items():
+                full_path = os.path.join(self.path, filename)
+                if not os.path.isfile(full_path):
+                    print(f"file not found: {filename}")
+                    print("Downloading files...")
+                    self._save_magi()
+                    break
+            self._load_npy_format()
+        elif self.name.lower() in {"acm", "bat", "dblp", "eat", "uat"}:
+            self._load_npy_format()
         else:
             raise ValueError(f"Unsupported dataset: {self.name}")
 
         if tensor_type == "dense":
-            return self.adj.to_dense()
+            return self.adj.to_dense(), self.features, self.label
         elif tensor_type == "coo":
-            return self.adj.coalesce()
+            return self.adj.coalesce(), self.features, self.label
         elif tensor_type == "csr":
-            return self.adj.to_sparse_csr()
+            return self.adj.to_sparse_csr(), self.features, self.label
         elif tensor_type == "csc":
-            return self.adj.to_sparse_csc()
+            return self.adj.to_sparse_csc(), self.features, self.label
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
 
     def _load_magi(self):
         name = self.name.lower()
-        
-        if name in {"cora", "citeseer", "pubmed"}:
-            dataset = Planetoid(root=self.path, name=name.capitalize())
-            data = dataset[0]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            if name in {"cora", "citeseer", "pubmed"}:
+                dataset = Planetoid(root=tmpdir, name=name.capitalize())
+                data = dataset[0]
 
-        elif name == "reddit":
-            dataset = Reddit(root=self.path)
-            data = dataset[0]
+            elif name == "reddit":
+                dataset = Reddit(root=tmpdir)
+                data = dataset[0]
 
-        elif name.startswith("ogbn-"):
-            dataset = PygNodePropPredDataset(name=name, root=self.path)
-            split_idx = dataset.get_idx_split()
-            data = dataset[0]
-            data.y = data.y.view(-1)
-        else:
-            raise ValueError(f"Unknown MAGI-compatible dataset: {self.name}")
+            elif name.startswith("ogbn-"):
+                dataset = PygNodePropPredDataset(name=name, root=tmpdir)
+                split_idx = dataset.get_idx_split()
+                data = dataset[0]
+                data.y = data.y.view(-1)
+            else:
+                raise ValueError(f"Unknown MAGI-compatible dataset: {self.name}")
 
         edge_index = data.edge_index
         num_nodes = data.num_nodes if hasattr(data, "num_nodes") else data.x.size(0)
@@ -82,6 +99,48 @@ class Dataset:
 
         self.features = data.x
         self.label = data.y
+
+    def _save_magi(self):
+        self._load_magi()
+        save_dir = self.path + '/' + self.name.lower()
+        os.makedirs(self.path, exist_ok=True)
+
+        np.save(os.path.join(save_dir + '_feat.npy'), self.features.numpy())
+        np.save(os.path.join(save_dir + '_label.npy'), self.label.numpy())
+
+        adj = self.adj.coalesce()
+        """
+        adj_dict = {
+            'row': adj.indices()[0].numpy(),
+            'col': adj.indices()[1].numpy(),
+            'data': adj.values().numpy(),
+            'shape': adj.shape
+        }
+        """
+        adj_dense = adj.to_dense().numpy()
+        np.save(os.path.join(save_dir + '_adj.npy'), adj_dense)
+        #np.save(os.path.join(save_dir + '_adj.npy'), adj_dict)
+
+    def _load_npy_format(self):  #Drobyshev
+        self.features = np.load(self.path + '/' + self.name.lower() + '_feat.npy')
+        self.label = np.load(self.path + '/' + self.name.lower() + '_label.npy')
+
+        adj_raw = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True)
+        print("TYPE:", type(adj_raw), "SHAPE:", getattr(adj_raw, 'shape', None))
+        adj_data = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True)
+        coo = adj_data.nonzero()
+        values = adj_data[coo]
+
+        indices = torch.tensor(coo, dtype=torch.long)
+        values = torch.tensor(values, dtype=torch.float)
+        shape = adj_data.shape
+
+        self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
+        #adj_data = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True).item()
+        #indices = torch.tensor([adj_data['row'], adj_data['col']], dtype=torch.long)
+        #values = torch.tensor(adj_data['data'], dtype=torch.float)
+        #shape = tuple(adj_data['shape'])
+        self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
 
     def _load_youtube_u_growth(self):
         filepath = os.path.join(self.path, self.name)
