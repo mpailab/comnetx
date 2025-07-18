@@ -41,7 +41,7 @@ parser.add_argument('--batchsize', type=int, default=2048, help='')
 
 # dataset para
 parser.add_argument('--dataset_path', type=str, default='../../../test/graphs/small/reddit')
-#parser.add_argument('--dataset', type=str, default='ogbn-arxiv')
+parser.add_argument('--dataset_name', type=str, default='Reddit')
 
 # model para
 parser.add_argument('--hidden_channels', type=str, default='512,256')
@@ -78,25 +78,33 @@ def train():
         print('random seed : ', randint, '\n', args)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    loader = Dataset(dataset_name="Reddit", path=args.dataset_path)
+    loader = Dataset(dataset_name=args.dataset_name, path=args.dataset_path)
     adj, x, y = loader.load(tensor_type="coo")
     num_features =  x.size()[-1]
     print("features = ", num_features, "label = ", y.size())
     edge_index = adj.indices()
     num_nodes = adj.size(0)
     edge_index_loops, _ = add_remaining_self_loops(edge_index, num_nodes=num_nodes)
-    new_values = torch.ones(edge_index_loops.size(1))
-    print("tensor size = ", adj.shape, "nnz = ", adj._nnz())
-
 
     edge_index = to_undirected(add_remaining_self_loops(edge_index)[0])
 
+    new_values = torch.ones(edge_index.size(1))
+    print("tensor size = ", adj.shape, "nnz = ", adj._nnz())
+
     N, E, num_features = x.shape[0], edge_index.shape[-1], x.shape[-1]
+
+    
+    print("edge_index[0].shape:", edge_index[0].shape)
+    print("edge_index[1].shape:", edge_index[1].shape)
+    print("new_values.shape:", new_values.shape)
+    print("N:", N)
+
     adj = SparseTensor(row=edge_index[0], col=edge_index[1], value=new_values, sparse_sizes=(N, N))
     print("N = ", N, "E = ",  E, "num_features = ", num_features)
     print(f"Loading {loader.name} is over, num_nodes: {N: d}, num_edges: {E: d}, "
           f"num_feats: {num_features: d}, time costs: {time.time()-ts: .2f}")
 
+    
     hidden = list(map(int, args.hidden_channels.split(',')))
     if args.projection == '':
         projection = None
@@ -133,7 +141,9 @@ def train():
         model.parameters(), lr=args.lr, weight_decay=args.wd)
 
     dataset2n_clusters = {'ogbn-arxiv': 40, 'Reddit': 41,
-                          'ogbn-products': 47, 'ogbn-papers100M': 172}
+                          'ogbn-products': 47, 'ogbn-papers100M': 172, 
+                          'Acm': 3, 'Bat': 8, 'Dblp': 4, 'Eat': 5, 'Uat': 5,
+                          'Cora': 7, 'Citeseer': 6, 'Photo': 8, 'Computers': 10}
     n_clusters = dataset2n_clusters[loader.name]
 
     x = x.to(device)
@@ -179,15 +189,15 @@ def train():
 
     with torch.no_grad():
         model.eval()
-        z = []
+        z_all = torch.zeros((y.size(0), hidden[-1]))
         for count, ((batch_size, n_id, adjs), _, batch) in enumerate(tqdm(test_loader)):
             if len(hidden) == 1:
                 adjs = [adjs]
             adjs = [adj.to(device) for adj in adjs]
             out = model(x[n_id].to(device), adjs=adjs)
-            z.append(out.detach().cpu().float())
-        z = torch.cat(z, dim=0)
-        z = F.normalize(z, p=2, dim=1)
+            z_all[n_id[:batch_size]] = out.detach().cpu()
+    
+    z = F.normalize(z_all, p=2, dim=1)
 
     ts_clustering = time.time()
     print(f'Start clustering, num_clusters: {n_clusters: d}')

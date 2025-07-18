@@ -122,20 +122,23 @@ class Dataset:
         #np.save(os.path.join(save_dir + '_adj.npy'), adj_dict)
 
     def _load_npy_format(self):  #Drobyshev
-        self.features = np.load(self.path + '/' + self.name.lower() + '_feat.npy')
-        self.label = np.load(self.path + '/' + self.name.lower() + '_label.npy')
+        self.path = os.path.abspath(self.path)
+        print("dataset_path = ", self.path)
+        features = np.load(self.path + '/' + self.name.lower() + '_feat.npy')
+        labels = np.load(self.path + '/' + self.name.lower() + '_label.npy')
+        self.features = torch.tensor(features, dtype=torch.float)
+        self.label = torch.tensor(labels, dtype=torch.long)
 
-        adj_raw = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True)
-        print("TYPE:", type(adj_raw), "SHAPE:", getattr(adj_raw, 'shape', None))
         adj_data = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True)
-        coo = adj_data.nonzero()
-        values = adj_data[coo]
+        rows, cols = adj_data.nonzero()
+        values_np = adj_data[rows, cols]
+        indices_np = np.vstack((rows, cols))
 
-        indices = torch.tensor(coo, dtype=torch.long)
-        values = torch.tensor(values, dtype=torch.float)
+        indices = torch.from_numpy(indices_np).long()
+        values = torch.from_numpy(values_np).float()
         shape = adj_data.shape
+        
 
-        self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
         #adj_data = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True).item()
         #indices = torch.tensor([adj_data['row'], adj_data['col']], dtype=torch.long)
         #values = torch.tensor(adj_data['data'], dtype=torch.float)
