@@ -78,17 +78,21 @@ class Metrics:
         
         return modularity.item()
 
-    def modularity_magi(adjacency, cluster):
+    def modularity_magi_prob(adjacency, assignments):
+        
         device = adjacency.device()
         row, col = adjacency.storage.row(), adjacency.storage.col()
         assignments = assignments.to(device)
-        m = adjacency.storage.value().sum() / 2  
+        m = adjacency.storage.value().sum() / 2 
 
-        same_cluster = (cluster[row] == cluster[col]).float()
-        D = torch.zeros_like(cluster, dtype=torch.float).scatter_add_(0, row, adjacency.storage.value())
+        prob_same_cluster = (assignments[row] * assignments[col]).sum(dim=1)
         
-        L_c = (adjacency.storage.value() * same_cluster).sum()
-        D_c = (D * same_cluster).sum()
+        L_c = (adjacency.storage.value() * prob_same_cluster).sum()
+        
+        degrees = torch.zeros_like(assignments[:, 0]).scatter_add_(
+            0, row, adjacency.storage.value())
+        
+        D_c = (degrees.unsqueeze(1) * assignments).sum()
         
         return (L_c - D_c**2 / (4 * m)) / m
 
