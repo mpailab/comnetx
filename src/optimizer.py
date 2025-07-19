@@ -122,3 +122,9 @@ if __name__ == "__main__":
     print("batch: ", batch)
     nodes = opt.upgrade_graph(batch)
     print("nodes:", nodes.to_dense())
+
+# (n1,n2,...,nk)
+
+# v (1,1)
+# |
+# u (1,1) - w (1,2)

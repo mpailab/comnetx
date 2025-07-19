@@ -15,12 +15,11 @@ import json
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
 KONECT_INFO = "./konect-datasets-info"
 
+# TODO (to drobyshev) make dataset dict
+
 class Dataset:
     """Dataset treatment"""
 
-    # TODO (to konovalov) add batch supportion
-    # TODO (to uporova) add loader for npy and npz formats
-    # TODO (to drobyshev) add loader for magi format
 
     def __init__(self, dataset_name : str, path: str = "./datasets"):
         self.name = dataset_name
@@ -29,7 +28,7 @@ class Dataset:
         self.features = None
         self.label = None
 
-    def load(self, tensor_type : str = "coo") -> torch.Tensor:
+    def load(self, tensor_type : str = "coo", dymamic = False) -> torch.Tensor:
         """
         Load dataset
 
@@ -38,6 +37,10 @@ class Dataset:
         tensor_type : str
             Type of output tensor: coo, csr, csc, dense
             Default: coo
+
+        Returns
+        -------
+        TODO (to drobyshev) add comment for shape of output tensor
         """
 
         filenames = {
