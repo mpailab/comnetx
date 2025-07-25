@@ -142,7 +142,7 @@ def train():
 
     dataset2n_clusters = {'ogbn-arxiv': 40, 'Reddit': 41,
                           'ogbn-products': 47, 'ogbn-papers100M': 172, 
-                          'Acm': 3, 'Bat': 8, 'Dblp': 4, 'Eat': 5, 'Uat': 5,
+                          'Acm': 3, 'Bat': 8, 'Dblp': 4, 'Eat': 4, 'Uat': 5,
                           'Cora': 7, 'Citeseer': 6, 'Photo': 8, 'Computers': 10}
     n_clusters = dataset2n_clusters[loader.name]
 

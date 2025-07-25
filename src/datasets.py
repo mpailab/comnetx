@@ -122,11 +122,11 @@ class Dataset:
         """
         adj_dense = adj.to_dense().numpy()
         np.save(os.path.join(save_dir + '_adj.npy'), adj_dense)
-        #np.save(os.path.join(save_dir + '_adj.npy'), adj_dict)
+        #np.save(os.path.join(save_dir + '_adj.npy'), adj_dict, allow_pickle=True)
 
     def _load_npy_format(self):  #Drobyshev
         self.path = os.path.abspath(self.path)
-        print("dataset_path = ", self.path)
+
         features = np.load(self.path + '/' + self.name.lower() + '_feat.npy')
         labels = np.load(self.path + '/' + self.name.lower() + '_label.npy')
         self.features = torch.tensor(features, dtype=torch.float)
@@ -168,7 +168,7 @@ class Dataset:
         row = torch.tensor(pd.concat([edges['row'], edges['col']]).values, dtype=torch.long)
         col = torch.tensor(pd.concat([edges['col'], edges['row']]).values, dtype=torch.long)
 
-        edge_index = torch.stack([row, col])  # shape: [2, num_edges * 2]
+        edge_index = torch.stack([row, col])
         values = torch.ones(edge_index.shape[1], dtype=torch.float32)
 
         self.adj = torch.sparse_coo_tensor(edge_index, values, size=(num_nodes, num_nodes)).coalesce()
