@@ -19,7 +19,7 @@ If we need more details, run
 ```shell
 $ pytest -v
 ```
-### Speed test
+### Run specific tests
 
 File test_dataset.py contains tests for dataset loading which is executed when pytest runs with option `-m short`.
 File test_training.py contains tests for dataset loading which is executed when pytest runs with option `-m long`.
