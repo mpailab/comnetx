@@ -87,8 +87,9 @@ class Optimizer:
             baselines.magi(A)
 
     @staticmethod
-    def aggregation(A, C):
-        pass
+    def aggregation(adj, coms):
+        with coms.float() as x:
+            return x.matmul(adj.matmul(x.t()))
 
     @staticmethod
     def cut_off(communities, nodes):
