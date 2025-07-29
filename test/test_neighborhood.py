@@ -4,7 +4,7 @@ from optimizer import Optimizer
 import torch
 
 A = torch.tensor([
-    [1, 0, 0, 0],
+    [0, 1, 0, 0],
     [0, 0, 1, 0],
     [0, 0, 0, 1],
     [0, 0, 0, 0]
@@ -12,6 +12,6 @@ A = torch.tensor([
 
 initial_nodes = torch.tensor([False, False, True, False])
 
-k = 0
+k = 2
 nodes_new = Optimizer.neighborhood(A, initial_nodes, k)
 print(nodes_new)
