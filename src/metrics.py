@@ -17,11 +17,10 @@ class Metrics:
 
     def modularity_dmon_slow(adjacency, assignments):
         assignments_pool = assignments / tf.math.reduce_sum(assignments, axis=0)
-        
         degrees = tf.sparse.reduce_sum(adjacency, axis=0)
         degrees = tf.reshape(degrees, (-1, 1))
         m = tf.math.reduce_sum(degrees)  
-        
+
         graph_pooled = tf.transpose(tf.sparse.sparse_dense_matmul(adjacency, assignments))
         graph_pooled = tf.matmul(graph_pooled, assignments)
         
@@ -33,10 +32,27 @@ class Metrics:
         
         return modularity
     
+    def modularity_dmon_slow_torch_copy(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+        assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
+        degrees = adjacency.sum(dim=1)
+        degrees = degrees.view(-1, 1)
+        m = degrees.sum()
+
+        graph_pooled = adjacency.matmul(assignments).t()
+        graph_pooled = torch.matmul(graph_pooled, assignments)
+        
+        ca = torch.matmul(assignments.t(), degrees)
+        cb = torch.matmul(degrees.t(), assignments)
+        normalizer = torch.matmul(ca, cb) / (2 * m)
+        
+        modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
+        
+        return modularity.item()
+    
     def modularity_dmon_slow_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
         assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
-
-        degrees = adjacency.sum(dim=1).view(-1, 1)
+        degrees = adjacency.sum(dim=1)
+        degrees = degrees.view(-1, 1)
         m = degrees.sum()
 
         graph_pooled = torch.matmul(assignments.t(), adjacency.matmul(assignments))
@@ -102,64 +118,46 @@ class Metrics:
 # if __name__ == "__main__":
 #     N, K = 1000000, 100
 
-#     features = tf.random.normal((N, 10))
-#     indices = tf.random.uniform((200, 2), 0, N, dtype=tf.int64)
-#     values = tf.ones(200)
-#     adjacency = tf.sparse.SparseTensor(indices, values, dense_shape=(N, N))
-    
-#     mlp_output = tf.random.normal((N, K))
-#     assignments = tf.nn.softmax(mlp_output, axis=1)
-    
-#     start_time = tf.timestamp()
-#     mod_value = Metrics.modularity_dmon_slow(adjacency, assignments)
-#     compute_time = tf.timestamp() - start_time
-#     print(f"\nComputation time: {compute_time.numpy():.6f} sec")
-#     print(f"Modularity value: {mod_value.numpy():.4f}")
+#     features_tf = tf.random.normal((N, 10))
+#     indices_tf = tf.random.uniform((200, 2), 0, N, dtype=tf.int64)
+#     values_tf = tf.ones(200)
+#     adjacency_tf = tf.sparse.SparseTensor(indices_tf, values_tf, dense_shape=(N, N))
+#     mlp_output_tf = tf.random.normal((N, K))
+#     assignments_tf = tf.nn.softmax(mlp_output_tf, axis=1)
 
-#     start_time = tf.timestamp()
-#     mod_value = Metrics.modularity_dmon_fast(adjacency, assignments)
-#     compute_time = tf.timestamp() - start_time
-#     print(f"\nComputation time: {compute_time.numpy():.6f} sec")
-#     print(f"Modularity value: {mod_value.numpy():.4f}")
+#     indices_np = indices_tf.numpy()
+#     values_np = values_tf.numpy()
 
-if __name__ == "__main__":
-    N, K = 1000000, 100
+#     adjacency_torch = SparseTensor(
+#         row=torch.from_numpy(indices_np[:, 0]).long(),
+#         col=torch.from_numpy(indices_np[:, 1]).long(),
+#         value=torch.from_numpy(values_np).float(),
+#         sparse_sizes=(N, N)
+#     )
 
-    features_tf = tf.random.normal((N, 10))
-    indices_tf = tf.random.uniform((200, 2), 0, N, dtype=tf.int64)
-    values_tf = tf.ones(200)
-    adjacency_tf = tf.sparse.SparseTensor(indices_tf, values_tf, dense_shape=(N, N))
-    mlp_output_tf = tf.random.normal((N, K))
-    assignments_tf = tf.nn.softmax(mlp_output_tf, axis=1)
+#     assignments_torch = torch.from_numpy(assignments_tf.numpy()).float()
 
-    indices_np = indices_tf.numpy()
-    values_np = values_tf.numpy()
+#     start_time = time.time()
+#     mod_value = Metrics.modularity_dmon_slow(adjacency_tf, assignments_tf)
+#     compute_time = time.time() - start_time
+#     print(f"tf slow method: {compute_time:.6f}, Modularity: {mod_value.numpy():.4f}")
 
-    adjacency_torch = SparseTensor(
-        row=torch.from_numpy(indices_np[:, 0]).long(),
-        col=torch.from_numpy(indices_np[:, 1]).long(),
-        value=torch.from_numpy(values_np).float(),
-        sparse_sizes=(N, N)
-    )
+#     start_time = time.time()
+#     mod_value = Metrics.modularity_dmon_fast(adjacency_tf, assignments_tf)
+#     compute_time = time.time() - start_time
+#     print(f"tf fast method: {compute_time:.6f}, Modularity: {mod_value.numpy():.4f}")
 
-    assignments_torch = torch.from_numpy(assignments_tf.numpy()).float()
+#     start_time = time.time()
+#     mod_value = Metrics.modularity_dmon_slow_torch_copy(adjacency_torch, assignments_torch)
+#     compute_time = time.time() - start_time
+#     print(f"torch_copy slow method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
 
-    start_time = time.time()
-    mod_value = Metrics.modularity_dmon_slow(adjacency_tf, assignments_tf)
-    compute_time = time.time() - start_time
-    print(f"tf slow method: {compute_time:.6f}, Modularity: {mod_value.numpy():.4f}")
+#     start_time = time.time()
+#     mod_value = Metrics.modularity_dmon_slow_torch(adjacency_torch, assignments_torch)
+#     compute_time = time.time() - start_time
+#     print(f"torch slow method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
 
-    start_time = time.time()
-    mod_value = Metrics.modularity_dmon_fast(adjacency_tf, assignments_tf)
-    compute_time = time.time() - start_time
-    print(f"tf fast method: {compute_time:.6f}, Modularity: {mod_value.numpy():.4f}")
-
-    start_time = time.time()
-    mod_value = Metrics.modularity_dmon_slow_torch(adjacency_torch, assignments_torch)
-    compute_time = time.time() - start_time
-    print(f"torch slow method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
-
-    start_time = time.time()
-    mod_value = Metrics.modularity_dmon_fast_torch(adjacency_torch, assignments_torch)
-    compute_time = time.time() - start_time
-    print(f"torch fast method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
+#     start_time = time.time()
+#     mod_value = Metrics.modularity_dmon_fast_torch(adjacency_torch, assignments_torch)
+#     compute_time = time.time() - start_time
+#     print(f"torch fast method: {compute_time:.6f}, Modularity: {mod_value:.4f}")

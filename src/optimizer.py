@@ -1,8 +1,4 @@
-# External imports
 import torch
-
-# Internal imports
-import baselines
 
 class Optimizer:
     
@@ -14,9 +10,6 @@ class Optimizer:
         # matrix of weighted edges - FloatTensor n x n
         self.A = A
         n = self.A.size()[0]
-
-        # Node features
-        self.X = None # TODO (to konoval) add features supportion
 
         # sum of elements of A in each column  FloatTensor n x 1
         self.D_in = self.A.sum(dim=0).to_dense()
@@ -45,19 +38,11 @@ class Optimizer:
         return matrix
 
     def upgrade_graph(self, batch):
-        """
-        Change the graph based on the current batch of updates.
-
-        Parameters
-        ----------
-        batch : torch.Tensor of the shape (n,3)
-            List of edges with weights given in the form (i,j,w), 
-            where i and j are node numbers and w is the changing edge weight. 
-        """
+        # batch: [(i, j, w), ...]
 
         n = self.A.size()[0]
-        i, j, w = list(zip(*batch)) # FIXME (to konovalov) use torch hsplit
-        new_nodes = set(filter(lambda x: x not in self.index_converter, i+j)) # FIXME (to konovalov) use torch features
+        i, j, w = list(zip(*batch))
+        new_nodes = set(filter(lambda x: x not in self.index_converter, i+j))
         k = len(new_nodes)
         # set indexes (n, n+1, ...) to new nodes
         self.index_converter.update(zip(new_nodes, range(n, n+k)))
@@ -78,18 +63,50 @@ class Optimizer:
         return torch.sparse_coo_tensor([nodes], torch.ones(len(nodes), dtype=bool), size = (n+k,)) # affected_nodes_mask
 
     @staticmethod
-    def neighborhood(nodes, step = 1):
+    def neighborhood(A, nodes, step=1):
+        """
+        Breadth-First Search method 
+        
+        Parametrs:
+            A (torch.Tensor): adjacency (n x n).
+            nodes (torch.Tensor): binary vector (n,)
+            step (int)
+
+        Return:
+            torch.Tensor: new binary mask with new nodes.
+        """
+        n = A.size(0)
+        A_sparse = A.to_sparse()
+
+        # BFS initialization
+        visited = nodes.clone()
+        current_frontier = nodes.clone()
+        
+        # BFS
+        for k in range(step):
+            next_frontier = torch.zeros(n, dtype=torch.bool)
+            
+            for node in torch.where(current_frontier)[0]:
+                neighbors = A_sparse[node]._indices()[0]
+                next_frontier[neighbors] = True
+
+            next_frontier = next_frontier & (~visited)
+            visited = visited | next_frontier
+            current_frontier = next_frontier
+
+            if not current_frontier.any():
+                break
+        
+        new_nodes = nodes | current_frontier
+        return visited
+
+    @staticmethod
+    def fast_optimizer_for_small_graph(A):
         pass
 
     @staticmethod
-    def fast_optimizer_for_small_graph(A, method : str = "magi"):
-        if method == "magi":
-            baselines.magi(A)
-
-    @staticmethod
-    def aggregation(adj, coms):
-        with coms.float() as x:
-            return x.matmul(adj.matmul(x.t()))
+    def aggregation(A, C):
+        pass
 
     @staticmethod
     def cut_off(communities, nodes):
@@ -101,16 +118,6 @@ class Optimizer:
         return matrix[:, cmask][lmask]
 
     def run(self, batch):
-        """
-        Apply Optimizer to the current graph update
-
-        Parameters
-        ----------
-        batch : torch.Tensor of the shape (n,3)
-            List of edges with weights given in the form (i,j,w), 
-            where i and j are node numbers and w is the changing edge weight. 
-        """
-
         nodes = self.upgrade_graph(batch)
         nodes = self.neighborhood(nodes) # BoolTensor n x 1
 
