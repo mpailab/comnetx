@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
-from datasets import Dataset
+from datasets import Dataset, KONECT_PATH
 
 
 @pytest.fixture
@@ -74,7 +74,7 @@ def test_load_OGDB_dataset(temp_dataset_dir):
 
 @pytest.mark.short
 def test_load_youtube_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="out.youtube-u-growth", path="graphs/small/youtube-u-growth")
+    loader = Dataset(dataset_name="youtube-u-growth", path=KONECT_PATH)
     tensor, features, label = loader.load(tensor_type="coo")
 
     assert isinstance(tensor, torch.Tensor)
