@@ -13,7 +13,7 @@ import time
 import json
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
-KONECT_INFO = "./konect-datasets-info"
+KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "konect-datasets-info"))
 
 # TODO (to drobyshev) make dataset dict
 
@@ -206,13 +206,22 @@ def list_konect_datasets():
     with open(os.path.join(KONECT_INFO, "static.json")) as _:
         info.update(json.load(_))
     datasets = list(info.keys())
+    max_name_len = max(map(len, datasets))
+    max_n_strlen = max(map(lambda x: len(str(info[x]["n"])), datasets))
+    max_m_strlen = max(map(lambda x: len(str(info[x]["m"])), datasets))
+    max_w_strlen = max(map(lambda x: len(str(info[x]["w"])), datasets))
+    max_d_strlen = max(map(lambda x: len(str(info[x]["d"])), datasets))
     datasets.sort(key = lambda x: info[x]["m"])
     for dataset in datasets:
-        #print(dataset, info[dataset]["n"], info[dataset]["m"], info[dataset]["d"], info[dataset]["w"])
-        print(dataset, info[dataset]["n"], info[dataset]["m"], sep="\t")
+        pstring = f"{dataset:<{max_name_len}}"
+        pstring += f" {info[dataset]["n"]:<{max_n_strlen}}"
+        pstring += f" {info[dataset]["m"]:<{max_m_strlen}}"
+        pstring += f" {info[dataset]["d"]:<{max_d_strlen}}"
+        pstring += f" {info[dataset]["w"]:<{max_w_strlen}}"
+        print(pstring, sep="\t")
 
 if __name__ == "__main__":
     dataset = "dblp_coauthor"
-    ds = Dataset(dataset, KONECT_PATH)
+    #ds = Dataset(dataset, KONECT_PATH)
     #ds._load_konect(batch_num = 10)
     list_konect_datasets()
