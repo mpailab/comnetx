@@ -28,7 +28,7 @@ class Dataset:
         self.features = None
         self.label = None
 
-    def load(self, tensor_type : str = "coo", dymamic = False) -> torch.Tensor:
+    def load(self, tensor_type : str = "coo", batches = None) -> torch.Tensor:
         """
         Load dataset
 
@@ -49,7 +49,18 @@ class Dataset:
             "adj": f"{self.name.lower()}_adj.npy"
         }
 
-        if "youtube-u-growth" in self.name:
+        with open(os.path.join(KONECT_INFO, "dynamic.json")) as _:
+            konect_info = json.load(_)
+        with open(os.path.join(KONECT_INFO, "static.json")) as _:
+            konect_info.update(json.load(_))
+
+        if self.name in konect_info:
+            if batches == None:
+                self._load_konect(batches_num = 1)
+                self.adj = self.adj[0]
+            else:
+                self._load_konect(batches_num = batches)
+        elif "youtube-u-growth" in self.name:
             self._load_youtube_u_growth()
         elif self.name.lower() in {"cora", "citeseer", "pubmed", "reddit"} or self.name.startswith("ogbn-"):
             for key, filename in filenames.items():
@@ -75,6 +86,8 @@ class Dataset:
             return self.adj.to_sparse_csc(), self.features, self.label
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
+        
+        return self.adj, self.features, self.label
 
     def _load_magi(self):
         name = self.name.lower()
@@ -147,45 +160,17 @@ class Dataset:
         #values = torch.tensor(adj_data['data'], dtype=torch.float)
         #shape = tuple(adj_data['shape'])
         self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
-
-    def _load_youtube_u_growth(self):
-        filepath = os.path.join(self.path, self.name)
-
-        edges = pd.read_csv(
-            filepath,
-            sep=r"\s+",
-            comment="%",
-            header=None,
-            names=["src", "dst", "weight", "timestamp"]
-        )
-
-        edges['row'] = edges[["src", "dst"]].min(axis=1)
-        edges['col'] = edges[["src", "dst"]].max(axis=1)
-        edges = edges.drop_duplicates(subset=["row", "col"])
-
-        num_nodes = max(edges['row'].max(), edges['col'].max()) + 1
-
-        row = torch.tensor(pd.concat([edges['row'], edges['col']]).values, dtype=torch.long)
-        col = torch.tensor(pd.concat([edges['col'], edges['row']]).values, dtype=torch.long)
-
-        edge_index = torch.stack([row, col])
-        values = torch.ones(edge_index.shape[1], dtype=torch.float32)
-
-        self.adj = torch.sparse_coo_tensor(edge_index, values, size=(num_nodes, num_nodes)).coalesce()
-
-        self.features = None
-        self.label = None
     
-    def _load_konect(self, batch_num = 1):
+    def _load_konect(self, batches_num = 1):
         """
         Load dynamic dataset from KONECT collection
 
         Parameters
         ----------
-        batch_num : 1, 10, 100, 1000, 10000, 100000
+        batches_num : 1, 10, 100, 1000, 10000, 100000
             Default: 1
         """
-        filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batch_num}_batches")
+        filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_num}_batches")
         with open(filepath) as _:
             first_string = _.readline()
             num_nodes = int(first_string.split()[0])
@@ -193,7 +178,7 @@ class Dataset:
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
         adjs = []
-        for num in range(batch_num):
+        for num in range(batches_num):
             mask = (t == num)
             adj_index = np.vstack((i[mask], j[mask]))
             adj = torch.sparse_coo_tensor(adj_index, w[mask], size=(num_nodes, num_nodes)).coalesce()
@@ -223,5 +208,5 @@ def list_konect_datasets():
 if __name__ == "__main__":
     dataset = "dblp_coauthor"
     #ds = Dataset(dataset, KONECT_PATH)
-    #ds._load_konect(batch_num = 10)
+    #ds._load_konect(batches_num = 10)
     list_konect_datasets()
