@@ -199,10 +199,10 @@ def list_konect_datasets():
     datasets.sort(key = lambda x: info[x]["m"])
     for dataset in datasets:
         pstring = f"{dataset:<{max_name_len}}"
-        pstring += f" {info[dataset]["n"]:<{max_n_strlen}}"
-        pstring += f" {info[dataset]["m"]:<{max_m_strlen}}"
-        pstring += f" {info[dataset]["d"]:<{max_d_strlen}}"
-        pstring += f" {info[dataset]["w"]:<{max_w_strlen}}"
+        pstring += f" {info[dataset]['n']:<{max_n_strlen}}"
+        pstring += f" {info[dataset]['m']:<{max_m_strlen}}"
+        pstring += f" {info[dataset]['d']:<{max_d_strlen}}"
+        pstring += f" {info[dataset]['w']:<{max_w_strlen}}"
         print(pstring, sep="\t")
 
 if __name__ == "__main__":
