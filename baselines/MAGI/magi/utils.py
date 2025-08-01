@@ -84,7 +84,7 @@ def clustering(feature, n_clusters, true_labels, kmeans_device='cpu', batch_size
     cm = clustering_metrics(true_labels, predict_labels)
     acc, nmi, adjscore, fms, f1_macro, f1_micro = cm.evaluationClusterModelFromLabel(
         tqdm)
-    return acc, nmi, adjscore, f1_macro, f1_micro
+    return predict_labels, acc, nmi, adjscore, f1_macro, f1_micro
 
 
 def get_mask(adj):
