@@ -53,15 +53,15 @@ class Dataset:
             konect_info = json.load(_)
         with open(os.path.join(KONECT_INFO, "static.json")) as _:
             konect_info.update(json.load(_))
+        
 
         if self.name in konect_info:
+            is_directed = konect_info[self.name]['d'] == 'directed'
             if batches == None:
-                self._load_konect(batches_num = 1)
+                self._load_konect(batches_num = 1, is_directed = is_directed)
                 self.adj = self.adj[0]
             else:
-                self._load_konect(batches_num = batches)
-        elif "youtube-u-growth" in self.name:
-            self._load_youtube_u_growth()
+                self._load_konect(batches_num = batches, is_directed = is_directed)
         elif self.name.lower() in {"cora", "citeseer", "pubmed", "reddit"} or self.name.startswith("ogbn-"):
             for key, filename in filenames.items():
                 full_path = os.path.join(self.path, filename)
@@ -161,7 +161,7 @@ class Dataset:
         #shape = tuple(adj_data['shape'])
         self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
     
-    def _load_konect(self, batches_num = 1):
+    def _load_konect(self, batches_num = 1, is_directed = True):
         """
         Load dynamic dataset from KONECT collection
 
@@ -182,6 +182,8 @@ class Dataset:
             mask = (t == num)
             adj_index = np.vstack((i[mask], j[mask]))
             adj = torch.sparse_coo_tensor(adj_index, w[mask], size=(num_nodes, num_nodes)).coalesce()
+            if not is_directed:
+                adj = adj + torch.t(adj)
             adjs.append(adj)
         self.adj = torch.stack(adjs) # 3-dimensional tensor
 
