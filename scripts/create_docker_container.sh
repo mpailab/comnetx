@@ -84,3 +84,9 @@ $DOCKER create --gpus all -it --shm-size=2g \
 
 printf "  start "
 $DOCKER start $NAME
+
+SCRIPT_DIR="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+echo "[INFO] Installing packages in container..."
+$DOCKER exec -w "$PROJECT_ROOT" "$NAME" bash ./scripts/install_packages.sh

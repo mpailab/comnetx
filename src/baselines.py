@@ -52,7 +52,7 @@ def magi(adj : torch.Tensor,
     edge_index = adj.indices() if hasattr(adj, 'indices') else adj
     edge_index = to_undirected(add_remaining_self_loops(edge_index)[0])
     new_values = torch.ones(edge_index.size(1), device=device)
-    adj_sparse = SparseTensor(row=edge_index[0], col=edge_index[1], value=new_values, sparse_sizes=(N, N))
+    adj_sparse = SparseTensor(row=edge_index[0].to(device), col=edge_index[1].to(device), value=new_values, sparse_sizes=(N, N))
 
     hidden = list(map(int, args.hidden_channels.split(',')))
     if args.projection == '':
@@ -71,7 +71,7 @@ def magi(adj : torch.Tensor,
                                    batch_size=args.batchsize,
                                    shuffle=True,
                                    drop_last=True,
-                                   num_workers=6)
+                                   num_workers=0)
 
     test_loader = NeighborSampler(edge_index, adj_sparse,
                                   is_train=False,
@@ -80,7 +80,7 @@ def magi(adj : torch.Tensor,
                                   batch_size=512,
                                   shuffle=False,
                                   drop_last=False,
-                                  num_workers=6)
+                                  num_workers=0)
 
     encoder = Encoder(num_features, hidden_channels=hidden,
                       dropout=args.dropout, ns=args.ns).to(device)

@@ -201,7 +201,7 @@ def train():
 
     ts_clustering = time.time()
     print(f'Start clustering, num_clusters: {n_clusters: d}')
-    acc, nmi, ari, f1_macro, f1_micro = clustering(z, n_clusters, y.numpy(), kmeans_device=args.kmeans_device,
+    lbls, acc, nmi, ari, f1_macro, f1_micro = clustering(z, n_clusters, y.numpy(), kmeans_device=args.kmeans_device,
                                                    batch_size=args.kmeans_batch, tol=1e-4, device=device, spectral_clustering=False)
 
     print(f'Finish clustering, acc: {acc:.4f}, nmi: {nmi:.4f}, ari: {ari:.4f}, f1_macro: {f1_macro:.4f}, '

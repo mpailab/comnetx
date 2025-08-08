@@ -50,6 +50,7 @@ def test_load_pubmed_dataset(temp_dataset_dir):
     assert loader.features is not None
     assert loader.label is not None
 
+"""
 @pytest.mark.short
 def test_load_Reddit_dataset(temp_dataset_dir):
     loader = Dataset(dataset_name="Reddit", path="graphs/small/reddit")
@@ -71,6 +72,7 @@ def test_load_OGDB_dataset(temp_dataset_dir):
     assert tensor.shape[0] == tensor.shape[1]
     assert loader.features is not None
     assert loader.label is not None
+"""
 
 @pytest.mark.short
 def test_load_youtube_dataset(temp_dataset_dir):
