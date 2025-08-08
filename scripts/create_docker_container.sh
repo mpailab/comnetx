@@ -2,7 +2,7 @@
 
 NAME=""
 DOCKER=docker
-IMAGE="pytorch/pytorch:2.5.1-cpu"
+IMAGE="pytorch/pytorch:2.1.0-cpu"
 REUSE=0
 
 function usage {
@@ -41,7 +41,7 @@ do
             shift
             ;;
         -v)
-            IMAGE="pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel"
+            IMAGE="pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel"
             shift
             ;;
         -h)
