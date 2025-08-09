@@ -77,42 +77,65 @@ class Optimizer:
         nodes = list(set(i+j)) # affected_nodes
         return torch.sparse_coo_tensor([nodes], torch.ones(len(nodes), dtype=bool), size = (n+k,)) # affected_nodes_mask
 
-    @staticmethod
+    # @staticmethod
+    # def neighborhood(A, nodes, step=1):
+    #     """
+    #     Parametrs:
+    #         A (torch.sparse_coo): adjacency (n x n).
+    #         nodes (torch.Tensor): binary vector (n,)
+    #         step (int)
+
+    #     Return:
+    #         torch.Tensor: new binary mask with new nodes.
+    #     """
+
+    #     n = A.size(0)
+
+    #     # BFS initialization
+    #     visited = nodes.clone()
+    #     current_frontier = nodes.clone()
+        
+    #     # BFS
+    #     for k in range(step):
+    #         next_frontier = torch.zeros(n, dtype=torch.bool)
+            
+    #         for node in torch.where(current_frontier)[0]:
+    #             neighbors = A[node]._indices()[0]
+    #             next_frontier[neighbors] = True
+
+    #         next_frontier = next_frontier & (~visited)
+    #         visited = visited | next_frontier
+    #         current_frontier = next_frontier
+
+    #         if not current_frontier.any():
+    #             break
+        
+    #     return visited
+
     def neighborhood(A, nodes, step=1):
         """
         Breadth-First Search method 
         
         Parametrs:
-            A (torch.Tensor): adjacency (n x n).
+            A (torch.sparse_coo): adjacency (n x n).
             nodes (torch.Tensor): binary vector (n,)
             step (int)
 
         Return:
             torch.Tensor: new binary mask with new nodes.
         """
-        n = A.size(0)
-        A_sparse = A.to_sparse()
-
-        # BFS initialization
         visited = nodes.clone()
-        current_frontier = nodes.clone()
-        
-        # BFS
+        A_c = A.coalesce() 
+
         for k in range(step):
-            next_frontier = torch.zeros(n, dtype=torch.bool)
-            
-            for node in torch.where(current_frontier)[0]:
-                neighbors = A_sparse[node]._indices()[0]
-                next_frontier[neighbors] = True
-
-            next_frontier = next_frontier & (~visited)
-            visited = visited | next_frontier
-            current_frontier = next_frontier
-
-            if not current_frontier.any():
+            if not visited.any():
                 break
-        
-        new_nodes = nodes | current_frontier
+
+            new_frontier_mask = visited[A_c.indices()[0]]
+            neighbors = A_c.indices()[1][new_frontier_mask]
+            
+            visited[neighbors] = True
+            
         return visited
 
     @staticmethod
