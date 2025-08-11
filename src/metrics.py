@@ -65,7 +65,7 @@ class Metrics:
         
         return modularity.item()
 
-    def modularity_dmon_tf(adjacency: tf.sparse.SparseTensor, assignments: tf.Tensor):
+    def modularity_dmon_tf(adjacency: tf.sparse.SparseTensor, assignments: tf.Tensor) -> float:
         """
         Args:
             adjacency: tf.SparseTensor [n_nodes, n_nodes]

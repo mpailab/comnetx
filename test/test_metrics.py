@@ -8,7 +8,7 @@ sys.path.append("src")
 from metrics import Metrics
 
 
-N, K = 1000000, 100
+N, K = 10, 3
 
 SIZE = 1
 time_arr = torch.zeros(5,SIZE)
