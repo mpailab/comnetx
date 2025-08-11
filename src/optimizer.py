@@ -77,41 +77,6 @@ class Optimizer:
         nodes = list(set(i+j)) # affected_nodes
         return torch.sparse_coo_tensor([nodes], torch.ones(len(nodes), dtype=bool), size = (n+k,)) # affected_nodes_mask
 
-    # @staticmethod
-    # def neighborhood(A, nodes, step=1):
-    #     """
-    #     Parametrs:
-    #         A (torch.sparse_coo): adjacency (n x n).
-    #         nodes (torch.Tensor): binary vector (n,)
-    #         step (int)
-
-    #     Return:
-    #         torch.Tensor: new binary mask with new nodes.
-    #     """
-
-    #     n = A.size(0)
-
-    #     # BFS initialization
-    #     visited = nodes.clone()
-    #     current_frontier = nodes.clone()
-        
-    #     # BFS
-    #     for k in range(step):
-    #         next_frontier = torch.zeros(n, dtype=torch.bool)
-            
-    #         for node in torch.where(current_frontier)[0]:
-    #             neighbors = A[node]._indices()[0]
-    #             next_frontier[neighbors] = True
-
-    #         next_frontier = next_frontier & (~visited)
-    #         visited = visited | next_frontier
-    #         current_frontier = next_frontier
-
-    #         if not current_frontier.any():
-    #             break
-        
-    #     return visited
-
     def neighborhood(A, nodes, step=1):
         """
         Breadth-First Search method 
