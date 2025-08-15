@@ -6,9 +6,15 @@ import numpy as np
 import random
 import time
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "baselines")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "baselines", "PRGPT")))
+#print(torch.cuda.is_available())
+torch.cuda.set_device(0)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#print("Used divice:", device)
+
+PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.append(os.path.join(PROJECT_PATH, "src"))
+sys.path.append(os.path.join(PROJECT_PATH, "baselines"))
+sys.path.append(os.path.join(PROJECT_PATH, "baselines", "PRGPT"))
 
 from datasets import Dataset, KONECT_PATH
 from PRGPT.modules.X1 import MDL_X1, get_edge_ind_est
@@ -16,19 +22,33 @@ from PRGPT.PRGPT_static import get_sp_GCN_sup, get_sp_adj, get_rand_proj_mat, ra
 from PRGPT.PRGPT_static import get_init_res, InfoMap_rfn, locale_rfn, clus_reorder
 from PRoCD.utils import get_mod_mtc
 
-torch.cuda.set_device(0)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print("Used divice:", device)
+def reorder_to_tensor(clus_res, num_clus, zero_base = True):
+    num_nodes = len(clus_res)
+    plus = 0 if zero_base else 1
+    src, dst = [], []
+    for node, label in enumerate(clus_res):
+        src.append(label)
+        dst.append(node + plus)
+    ind = torch.tensor([src, dst], dtype = torch.int32)
+    val = torch.ones(ind.shape[1], dtype = torch.bool)
+    res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = bool)
+    return res
 
-if __name__ == '__main__':
-    # ====================
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--kd', type=str, default="facebook-wosn-links")
-    args = parser.parse_args()
-    dataset = args.kd
-    print("Dataset:", dataset)
+def rough_prgpt(adj : torch.Tensor, 
+#                device=None,
+                refine=None):
+    
+    """
+    PRGPT method "as is"
 
-    # ====================
+    Parameters
+    ----------
+    refine : str
+        Type of refine algorithm: InfoMap, Locale
+        Default: None
+
+    """
+    
     # Layer configurations & parameter settings
     emb_dim = 32 # Embedding dimensionality
     num_feat_lyr = 2 # Number of MLP layers in feat extraction module
@@ -36,10 +56,9 @@ if __name__ == '__main__':
     num_MLP_lyr_tmp = 4 # Number of MLP layers in binary classifier
 
     # ====================
-    ds = Dataset(dataset, KONECT_PATH)
-    ds.load()
-    inx = ds.adj.coalesce().indices()
+    inx = adj.coalesce().indices()
     tst_edges = list(zip(inx[0].tolist(), inx[1].tolist()))
+    tst_edges = list(filter(lambda x: x[0] >= x[1], tst_edges))
 
     # ====================
     if np.min(tst_edges) == 1:
@@ -50,7 +69,7 @@ if __name__ == '__main__':
         tst_edges = [(el[0]-1, el[1]-1) for el in tst_edges]
     tst_num_nodes = np.max(np.max(tst_edges)) + 1
     tst_num_edges = len(tst_edges)
-    # ========== the dataset is considered unweighted !!!
+    # ==========
     tst_degs = [0 for _ in range(tst_num_nodes)]
     tst_src_idxs = []
     tst_dst_idxs = []
@@ -67,7 +86,7 @@ if __name__ == '__main__':
     # ====================
     # Load the pre-trained model
     mdl = MDL_X1(emb_dim, num_feat_lyr, num_GNN_lyr, num_MLP_lyr_tmp, drop_rate=0.0).to(device)
-    mdl_pars_path = os.path.join(os.path.dirname(__file__), "..", "baselines", "PRGPT", "chpt", "X1_mdl_100.pt")
+    mdl_pars_path = os.path.join(PROJECT_PATH, "baselines", "PRGPT", "chpt", "X1_mdl_100.pt")
     mdl.load_state_dict(torch.load(mdl_pars_path))
     mdl.eval()
 
@@ -121,39 +140,35 @@ if __name__ == '__main__':
     # ==========
     time_e = time.time()
     init_time = time_e - time_s
-
-    # =====================
-    # Online refinement via InfoMap
-    time_s = time.time()
-    clus_res_IM = InfoMap_rfn(init_edges, init_node_map, init_num_nodes, clus_res_init, tst_num_nodes)
-    time_e = time.time()
-    rfn_time_IM = time_e - time_s
-    # =====================
-    # Online refinement via Locale
-    time_s = time.time()
-    clus_res_Lcl = locale_rfn(init_graph, init_node_map, clus_res_init, tst_num_nodes, rand_seed=0)
-    time_e = time.time()
-    rfn_time_Lcl = time_e - time_s
-
-    # ====================
-    # Evaluation for PR-GPT w/ InfoMap
-    time_IM = feat_time + FFP_time + init_time + rfn_time_IM
-    clus_res_IM, num_clus_IM = clus_reorder(tst_num_nodes, clus_res_IM)
-    # ====================
-    # Evaluation for PR-GPT w/ Locale
-    time_Lcl = feat_time + FFP_time + init_time + rfn_time_Lcl
-    clus_res_Lcl, num_clus_Lcl = clus_reorder(tst_num_nodes, clus_res_Lcl)
-
-    # ====================
     clus_res_init_, num_clus_est = clus_reorder(tst_num_nodes, clus_res_init)
     mod_init = get_mod_mtc(tst_edges, clus_res_init_, num_clus_est)
     print('INIT EST-K %d MOD %.4f' % (num_clus_est, mod_init))
-    # ==========
-    mod_IM = get_mod_mtc(tst_edges, clus_res_IM, num_clus_IM)
-    print('InfoMap EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
-        % (num_clus_est, mod_IM, time_IM, feat_time, FFP_time, init_time, rfn_time_IM))
-    # ==========
-    mod_Lcl = get_mod_mtc(tst_edges, clus_res_Lcl, num_clus_Lcl)
-    print('Locale EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
-        % (num_clus_est, mod_Lcl, time_Lcl, feat_time, FFP_time, init_time, rfn_time_Lcl))
-    print()
+    clus_res = clus_res_init_
+    if refine == "infomap":
+        # Online refinement via InfoMap
+        time_s = time.time()
+        clus_res_IM = InfoMap_rfn(init_edges, init_node_map, init_num_nodes, clus_res_init, tst_num_nodes)
+        time_e = time.time()
+        rfn_time_IM = time_e - time_s
+        # Evaluation for PR-GPT w/ InfoMap
+        time_IM = feat_time + FFP_time + init_time + rfn_time_IM
+        clus_res_IM, num_clus_IM = clus_reorder(tst_num_nodes, clus_res_IM)
+        mod_IM = get_mod_mtc(tst_edges, clus_res_IM, num_clus_IM)
+        print('InfoMap EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
+            % (num_clus_est, mod_IM, time_IM, feat_time, FFP_time, init_time, rfn_time_IM))
+        return reorder_to_tensor(clus_res_IM, num_clus_est, zero_base)
+    elif refine == "locale":
+        # Online refinement via Locale
+        time_s = time.time()
+        clus_res_Lcl = locale_rfn(init_graph, init_node_map, clus_res_init, tst_num_nodes, rand_seed=0)
+        time_e = time.time()
+        rfn_time_Lcl = time_e - time_s
+        # Evaluation for PR-GPT w/ Locale
+        time_Lcl = feat_time + FFP_time + init_time + rfn_time_Lcl
+        clus_res_Lcl, num_clus_Lcl = clus_reorder(tst_num_nodes, clus_res_Lcl)
+        mod_Lcl = get_mod_mtc(tst_edges, clus_res_Lcl, num_clus_Lcl)
+        print('Locale EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
+            % (num_clus_est, mod_Lcl, time_Lcl, feat_time, FFP_time, init_time, rfn_time_Lcl))
+        return reorder_to_tensor(clus_res_Lcl, num_clus_est, zero_base)
+    else:
+        return reorder_to_tensor(clus_res_init_, num_clus_est, zero_base)
