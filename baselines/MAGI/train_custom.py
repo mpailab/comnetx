@@ -21,6 +21,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 from datasets import Dataset
 import debugpy
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src")))
+from metrics import Metrics
+
+
 """
 debugpy.listen(("0.0.0.0", 5678))
 print("Жду подключения отладчика на порту 5678...")
@@ -204,9 +208,15 @@ def train():
     lbls, acc, nmi, ari, f1_macro, f1_micro = clustering(z, n_clusters, y.numpy(), kmeans_device=args.kmeans_device,
                                                    batch_size=args.kmeans_batch, tol=1e-4, device=device, spectral_clustering=False)
 
+    assignments = F.one_hot(torch.tensor(lbls, dtype=torch.long), num_classes=n_clusters).float()
+    mod_score = Metrics.modularity_magi_prob(adj, assignments)
+
     print(f'Finish clustering, acc: {acc:.4f}, nmi: {nmi:.4f}, ari: {ari:.4f}, f1_macro: {f1_macro:.4f}, '
           f'f1_micro: {f1_micro:.4f}, clustering time cost: {time.time() - ts_clustering:.2f}')
-    return acc, nmi, ari, f1_macro, f1_micro
+
+    print(f'Modularity: {mod_score.item():.4f}')
+
+    return acc, nmi, ari, f1_macro, f1_micro, mod_score.item()
 
 
 def run(runs=1, result=None):
@@ -219,7 +229,7 @@ def run(runs=1, result=None):
     ACC, NMI, ARI, F1_MA, F1_MI = [], [], [], [], []
     for i in range(runs):
         print(f'\n----------------------runs {i+1: d} start')
-        acc, nmi, adjscore, f1_macro, f1_micro = train()
+        acc, nmi, adjscore, f1_macro, f1_micro, mod_score = train()
         print(f'\n----------------------runs {i + 1: d} over')
         if result:
             with open(result, 'a', encoding='utf-8-sig', newline='') as f_w:

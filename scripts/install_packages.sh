@@ -17,19 +17,33 @@
 
 set -e
 
-echo "[INFO] Installing dependencies..."
+echo "[INFO] Installing system dependencies..."
+
+# --- Базовые утилиты ---
+apt-get update && apt-get install -y --no-install-recommends \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+
+echo "[INFO] Installing Python dependencies..."
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
 REQUIREMENTS_PATH="$PROJECT_ROOT/baselines/PRGPT/requirements.txt"
+REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd -P )"
 
-# new
-pip install pybind11 # for sdp-clustering !!!
-pip install sdp-clustering
-pip install -r "$REQUIREMENTS_PATH"
-# torch.__version__  вместо 2.1.0+cu118
-pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-2.1.0+cu118.html
-pip install ogb matplotlib pytest tensorflow debugpy 
+git config --global --add safe.directory "$REPO_ROOT"
+
+# --- Устанавливаем pybind11 заранее ---
+pip install --no-cache-dir pybind11
+
+# --- Ставим зависимости проекта ---
+pip install --no-cache-dir -r "$REQUIREMENTS_PATH"
+
+# --- Дополнительные пакеты ---
+pip install --no-cache-dir \
+    torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric \
+    -f https://data.pyg.org/whl/torch-2.1.0+cu118.html \
+    ogb matplotlib pytest tensorflow debugpy
 
 echo "[INFO] Done!"

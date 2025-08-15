@@ -2,7 +2,7 @@
 
 NAME=""
 DOCKER=docker
-IMAGE="pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel"
+IMAGE="diaduskaau/comnetx:latest"
 REUSE=0
 SHM_SIZE="2g"
 
@@ -23,14 +23,12 @@ if [ "$VALID_ARGUMENTS" != "0" ]; then
     usage
 fi
 
-# echo "PARSED_ARGUMENTS is $PARSED_ARGUMENTS"
 eval set -- "$PARSED_ARGUMENTS"
 while :
 do
     case "$1" in
         -n)
-            if [ "$NAME" != "" ]
-            then
+            if [ "$NAME" != "" ]; then
                 echo "Conflict names: $NAME and $2 - this should not happen."
                 usage
             fi
@@ -59,19 +57,24 @@ do
     esac
 done
 
-if [ $# -ne 0 ]
-then
+if [ $# -ne 0 ]; then
     echo "Unexpected arguments: $@ - this should not happen."
     usage
 fi
 
+if $DOCKER ps -a --format '{{.Names}}' | grep -q "^$NAME$"; then
+    if [ $REUSE -eq 0 ]; then
+        echo "[ERROR] Container '$NAME' already exists. Use -r to recreate."
+        exit 1
+    fi
+fi
+
 echo "$DOCKER"
-if [ $REUSE -eq 1 ]
-then
+if [ $REUSE -eq 1 ]; then
     printf "  stop "
-    $DOCKER stop $NAME
+    $DOCKER stop $NAME || true
     printf "  remove "
-    $DOCKER rm $NAME
+    $DOCKER rm $NAME || true
 fi 
 
 printf "  create $NAME as "
@@ -86,8 +89,18 @@ $DOCKER create --gpus all -it --shm-size=$SHM_SIZE \
 printf "  start "
 $DOCKER start $NAME
 
-SCRIPT_DIR="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+$DOCKER exec -it $NAME /bin/bash
 
-echo "[INFO] Installing packages in container..."
-$DOCKER exec -w "$PROJECT_ROOT" "$NAME" bash ./scripts/install_packages.sh
+read -p "Сохранить изменения в образ $IMAGE? (y/N): " SAVE
+if [[ "$SAVE" =~ ^[Yy]$ ]]; then
+    echo "[INFO] Делаю commit..."
+    $DOCKER commit $NAME $IMAGE
+
+    read -p "Отправить обновлённый образ в Docker Hub? (y/N): " PUSH
+    if [[ "$PUSH" =~ ^[Yy]$ ]]; then
+        echo "[INFO] Пушу образ на Docker Hub..."
+        $DOCKER push $IMAGE
+    fi
+fi
+
+echo "[INFO] Готово."
