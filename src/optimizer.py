@@ -1,12 +1,14 @@
 # External imports
 import torch
+import os
 
 # Internal imports
 import baselines
+import datasets
 
 class Optimizer:
     
-    def __init__(self, A, C = None, elements_type = torch.int32):
+    def __init__(self, A, X:torch.Tensor = None, C = None, elements_type = torch.int32):
 
         # Main type for tensor elements #TODO
         self.elements_type = elements_type
@@ -14,6 +16,10 @@ class Optimizer:
         # matrix of weighted edges - FloatTensor n x n
         self.A = A
         n = self.A.size()[0]
+
+        # matrix of features - FloatTensor n x k
+        if X is not None:
+            self.X = X
 
         # Node features
         self.X = None # TODO (to konoval) add features supportion
@@ -139,9 +145,12 @@ class Optimizer:
         return visited
 
     @staticmethod
-    def fast_optimizer_for_small_graph(A, method : str = "magi"):
+    def fast_optimizer_for_small_graph(A, X, labels: torch.Tensor = None, method : str = "magi"):
         if method == "magi":
-            baselines.magi(A)
+            labels = baselines.magi(A, X, labels)
+            #print(labels)
+
+        return None
 
     @staticmethod
     def aggregation(adj, coms):
@@ -155,7 +164,9 @@ class Optimizer:
 
     @staticmethod
     def submatrix(matrix, lmask, cmask):
-        return matrix[:, cmask][lmask]
+        dense_matrix = matrix.to_dense() if matrix.is_sparse else matrix
+        return dense_matrix[:, cmask][lmask]
+        #return matrix[:, cmask][lmask]
 
     def run(self, batch):
         """
@@ -169,12 +180,16 @@ class Optimizer:
         """
 
         nodes = self.upgrade_graph(batch)
-        nodes = self.neighborhood(nodes) # BoolTensor n x 1
+        nodes = self.neighborhood(self.A, nodes) # BoolTensor n x 1
 
         # search affected communities
-        affected_communities_mask = self.C[:, nodes].any(dim=1) # BoolTensor n x 1
-        affected_communities = self.C[affected_communities_mask]
-        no_affected_communities = self.C[affected_communities_mask.logical_not()]
+        C_dense = self.C.to_dense()
+        affected_communities_mask = C_dense[:, nodes].any(dim=1)
+        #affected_communities_mask = self.C[:, nodes].any(dim=1) # BoolTensor n x 1
+        #affected_communities = self.C[affected_communities_mask]
+        affected_communities = C_dense[affected_communities_mask]
+        #no_affected_communities = self.C[affected_communities_mask.logical_not()]
+        no_affected_communities = C_dense[affected_communities_mask.logical_not()]
         nodes_in_affected_communities = affected_communities.any(dim=0)
 
         # go to submatrix
@@ -185,6 +200,8 @@ class Optimizer:
         splitted_communities = self.cut_off(affected_communities, nodes)
         
         # aggregation
+        print("submatrix: ", submatrix)
+        print("splitted comunities: ", splitted_communities)
         aggregated_submatrix = self.aggregation(submatrix, splitted_communities)
 
         # fast algorithm for small matrix
@@ -197,6 +214,12 @@ class Optimizer:
         self.C = torch.cat((no_affected_communities, new_communities))
 
 if __name__ == "__main__":
+
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = datasets.Dataset("cora", path=data_dir + "/cora")
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]])
     #A = torch.tensor([[1,2,3,4], [10,20,30,40], [100,200,300,400], [1000,2000,3000,4000]])
     print(A)
@@ -204,8 +227,15 @@ if __name__ == "__main__":
     opt = Optimizer(A)
     batch = [(0, 0, 1), (0, 1, 1), (0, 2, 1), (10, 13, 1)]
     print("batch: ", batch)
-    nodes = opt.upgrade_graph(batch)
-    print("nodes:", nodes.to_dense())
+    nodes = opt.upgrade_graph(batch).to_dense()
+    print("nodes:", nodes)
+    opt.neighborhood(opt.A, nodes)
+
+
+    opt.fast_optimizer_for_small_graph(adj, features, labels, "magi")
+
+
+    opt.run(batch)
 
 # (n1,n2,...,nk)
 

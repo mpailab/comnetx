@@ -103,7 +103,7 @@ def train():
         out = model(x, edge_index)
         out = scale(out)
         out = F.normalize(out, p=2, dim=1).detach().cpu()
-        acc, nmi, ari, f1_macro, f1_micro = clustering(
+        lbls, acc, nmi, ari, f1_macro, f1_micro = clustering(
             out.numpy(), n_clusters, y.numpy(), spectral_clustering=True)
 
     print(

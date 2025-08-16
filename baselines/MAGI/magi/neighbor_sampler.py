@@ -107,6 +107,7 @@ class NeighborSampler(torch.utils.data.DataLoader):
         rowptr, col, _ = self.adj.csr()
 
         # stage one
+        random_nodes = random_nodes.to(self.adj.device())
         random_nodes_repeat = random_nodes.repeat(self.wt)
         rw1 = self.adj.random_walk(random_nodes_repeat, self.wl)[:, 1:]
         if not isinstance(rw1, torch.Tensor):
@@ -118,7 +119,7 @@ class NeighborSampler(torch.utils.data.DataLoader):
             nodes = rw_nodes[rw_times > rw_times.float().mean()].tolist()
             batch += nodes
         batch += random_nodes.tolist()
-        batch = torch.tensor(batch).unique()
+        batch = torch.tensor(batch).unique().to(self.adj.device())
 
         # stage two
         batch_size = batch.shape[0]
@@ -164,7 +165,8 @@ class NeighborSampler(torch.utils.data.DataLoader):
         adjs = []
         n_id = batch
         for size in self.sizes:
-            adj_t, n_id = self.adj_t.sample_adj(n_id, size, replace=False)
+            n_id_cpu = n_id.to("cpu") 
+            adj_t, n_id = self.adj_t.sample_adj(n_id_cpu, size, replace=False)
             e_id = adj_t.storage.value()
             size = adj_t.sparse_sizes()[::-1]
             if self.__val__ is not None:
