@@ -34,13 +34,13 @@ REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd -P )"
 
 git config --global --add safe.directory "$REPO_ROOT"
 
-# --- Устанавливаем pybind11 заранее ---
+# install pybind for sdp-clustering
 pip install --no-cache-dir pybind11
 
-# --- Ставим зависимости проекта ---
+# install requirements for PRGPT
 pip install --no-cache-dir -r "$REQUIREMENTS_PATH"
 
-# --- Дополнительные пакеты ---
+# install libraries for MAGI
 pip install --no-cache-dir \
     torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric \
     -f https://data.pyg.org/whl/torch-2.1.0+cu118.html \
