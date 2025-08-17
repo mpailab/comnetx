@@ -77,11 +77,13 @@ fi
 printf "  create $NAME as "
 $DOCKER create --gpus all -it --shm-size=$SHM_SIZE \
     -e TERM=xterm-256color \
+    -e LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH \
     --entrypoint /bin/bash \
     -v /auto/datasets/graphs:/auto/datasets/graphs \
-    -w / \
     -v /home/$USER:/home/$USER \
-    -v /home/$USER/.bashrc:/root/.bashrc --name $NAME -h $NAME $IMAGE
+    -v /home/$USER/.bashrc:/root/.bashrc \
+    -w / \
+    --name $NAME -h $NAME $IMAGE
 
 printf "  start "
 $DOCKER start $NAME
