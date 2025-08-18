@@ -6,7 +6,8 @@ import torch.nn.functional as F
 from torch_geometric.utils import to_undirected, add_remaining_self_loops
 from torch_sparse import SparseTensor
 
-magi_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../baselines/MAGI"))
+PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+magi_root = os.path.join(PROJECT_PATH, "baselines", "MAGI")
 if magi_root not in sys.path:
     sys.path.insert(0, magi_root)
 

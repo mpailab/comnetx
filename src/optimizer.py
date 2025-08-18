@@ -3,7 +3,8 @@ import torch
 import os
 
 # Internal imports
-import baselines
+from baselines.magi import magi
+from baselines.rough_PRGPT import rough_prgpt 
 import datasets
 
 class Optimizer:
@@ -22,7 +23,7 @@ class Optimizer:
             self.X = X
 
         # Node features
-        self.X = None # TODO (to konoval) add features supportion
+        self.X = None # TODO (to konoval) add features support
 
         # sum of elements of A in each column  FloatTensor n x 1
         self.D_in = self.A.sum(dim=0).to_dense()
@@ -31,7 +32,7 @@ class Optimizer:
 
         # communities - BoolTensor k x n
         if C is None:
-            # C = torch.eye(4, dtype=bool).to_sparse()
+            # C = torch.eye(n, dtype=bool).to_sparse()
             w = torch.ones(n, dtype=bool)
             i = torch.stack((torch.arange(n), torch.arange(n)))
             C = torch.sparse_coo_tensor(i, w, size=(n, n))
@@ -83,46 +84,12 @@ class Optimizer:
         nodes = list(set(i+j)) # affected_nodes
         return torch.sparse_coo_tensor([nodes], torch.ones(len(nodes), dtype=bool), size = (n+k,)) # affected_nodes_mask
 
-    # @staticmethod
-    # def neighborhood(A, nodes, step=1):
-    #     """
-    #     Parametrs:
-    #         A (torch.sparse_coo): adjacency (n x n).
-    #         nodes (torch.Tensor): binary vector (n,)
-    #         step (int)
-
-    #     Return:
-    #         torch.Tensor: new binary mask with new nodes.
-    #     """
-
-    #     n = A.size(0)
-
-    #     # BFS initialization
-    #     visited = nodes.clone()
-    #     current_frontier = nodes.clone()
-        
-    #     # BFS
-    #     for k in range(step):
-    #         next_frontier = torch.zeros(n, dtype=torch.bool)
-            
-    #         for node in torch.where(current_frontier)[0]:
-    #             neighbors = A[node]._indices()[0]
-    #             next_frontier[neighbors] = True
-
-    #         next_frontier = next_frontier & (~visited)
-    #         visited = visited | next_frontier
-    #         current_frontier = next_frontier
-
-    #         if not current_frontier.any():
-    #             break
-        
-    #     return visited
-
+    @staticmethod
     def neighborhood(A, nodes, step=1):
         """
         Breadth-First Search method 
         
-        Parametrs:
+        Parameters:
             A (torch.sparse_coo): adjacency (n x n).
             nodes (torch.Tensor): binary vector (n,)
             step (int)
@@ -145,12 +112,13 @@ class Optimizer:
         return visited
 
     @staticmethod
-    def fast_optimizer_for_small_graph(A, X, labels: torch.Tensor = None, method : str = "magi"):
+    def fast_optimizer_for_small_graph(A, X, method : str, labels: torch.Tensor = None):
         if method == "magi":
-            labels = baselines.magi(A, X, labels)
-            #print(labels)
-
-        return None
+            labels = magi(A, X, labels)
+            res = labels
+        elif method == "prgpt":
+            res = rough_prgpt(A, labels, refine="infomax")
+        return res
 
     @staticmethod
     def aggregation(adj, coms):
@@ -158,8 +126,20 @@ class Optimizer:
             return x.matmul(adj.matmul(x.t()))
 
     @staticmethod
-    def cut_off(communities, nodes):
-        # The result is nonempty communities without nodes + 1-elements communities for each node
+    def cut_off(communities : torch.Tensor, nodes: torch.Tensor):
+        """
+        Return new communities binary matrix:
+        1) "вырезает" из communities все узлы из nodes;
+        2) удаляет пустые сообщетсва;
+        3) добавляет одноэлементые сообщества для каждого узла из nodes.
+
+        Parameters:
+            communities (torch.sparse_coo): binary matrix (k x n)
+            nodes (torch.Tensor): binary vector (n,)
+
+        Return:
+            torch.Tensor: binary matrix (k x n)
+        """
         pass
 
     @staticmethod
@@ -180,7 +160,7 @@ class Optimizer:
         """
 
         nodes = self.upgrade_graph(batch)
-        nodes = self.neighborhood(self.A, nodes) # BoolTensor n x 1
+        nodes = self.neighborhood(self.A, nodes.to_dense()) # BoolTensor n x 1
 
         # search affected communities
         C_dense = self.C.to_dense()
@@ -205,20 +185,15 @@ class Optimizer:
         aggregated_submatrix = self.aggregation(submatrix, splitted_communities)
 
         # fast algorithm for small matrix
-        new_communities = self.fast_optimizer_for_small_graph(aggregated_submatrix)
+        communities_for_aggregated_matrix = self.fast_optimizer_for_small_graph(aggregated_submatrix, None, "prgpt")
 
-        # go to origin matrix
-        # new_communities = ... (вернуться к "разжатым сообществам")
+        # go to communities for origin matrix
+        new_communities = communities_for_aggregated_matrix.matmul(splitted_communities)
 
         # go to new communities
         self.C = torch.cat((no_affected_communities, new_communities))
 
 if __name__ == "__main__":
-
-    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
-    dataset = datasets.Dataset("cora", path=data_dir + "/cora")
-    adj, features, labels = dataset.load(tensor_type="coo")
-
 
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]])
     #A = torch.tensor([[1,2,3,4], [10,20,30,40], [100,200,300,400], [1000,2000,3000,4000]])
@@ -227,15 +202,18 @@ if __name__ == "__main__":
     opt = Optimizer(A)
     batch = [(0, 0, 1), (0, 1, 1), (0, 2, 1), (10, 13, 1)]
     print("batch: ", batch)
-    nodes = opt.upgrade_graph(batch).to_dense()
-    print("nodes:", nodes)
-    opt.neighborhood(opt.A, nodes)
-
-
-    opt.fast_optimizer_for_small_graph(adj, features, labels, "magi")
-
-
     opt.run(batch)
+
+
+    # opt.neighborhood(opt.A, nodes)
+    
+    # data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    # dataset = datasets.Dataset("cora", path=data_dir + "/cora")
+    # adj, features, labels = dataset.load(tensor_type="coo")
+    # opt.fast_optimizer_for_small_graph(adj, features, labels, "magi")
+
+
+    #opt.run(batch)
 
 # (n1,n2,...,nk)
 
