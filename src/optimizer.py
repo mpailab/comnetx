@@ -128,10 +128,9 @@ class Optimizer:
     @staticmethod
     def cut_off(communities : torch.Tensor, nodes: torch.Tensor):
         """
-        Return new communities binary matrix:
-        1) "вырезает" из communities все узлы из nodes;
-        2) удаляет пустые сообщетсва;
-        3) добавляет одноэлементые сообщества для каждого узла из nodes.
+        Return a new community binary matrix by zeroing the node indices of nodes, 
+        removing empty communities, and adding single-element communities 
+        for each node in nodes.
 
         Parameters:
             communities (torch.sparse_coo): binary matrix (k x n)
@@ -140,7 +139,19 @@ class Optimizer:
         Return:
             torch.Tensor: binary matrix (k x n)
         """
-        pass
+
+        # Reset the node indexes of nodes from communities
+        coms = communities * (~ nodes)
+
+        # Remove empty communities
+        non_zero_coms_mask = (coms.sum(dim=1) != 0)
+        filtered_coms = coms[non_zero_coms_mask]
+
+        # Adds single-element communities for each node from nodes.
+        n = nodes.shape[0]
+        resulted_coms = torch.cat((torch.eye(n, n)[nodes], filtered_coms), dim=0)
+
+        return resulted_coms
 
     @staticmethod
     def submatrix(matrix, lmask, cmask):
