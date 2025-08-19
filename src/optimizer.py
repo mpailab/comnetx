@@ -9,10 +9,7 @@ import datasets
 
 class Optimizer:
     
-    def __init__(self, A, X:torch.Tensor = None, C = None, elements_type = torch.int32):
-
-        # Main type for tensor elements #TODO
-        self.elements_type = elements_type
+    def __init__(self, A : torch.Tensor, X : torch.Tensor = None, C : torch.Tensor = None):
 
         # matrix of weighted edges - FloatTensor n x n
         self.A = A
@@ -117,13 +114,14 @@ class Optimizer:
             labels = magi(A, X, labels)
             res = labels
         elif method == "prgpt":
-            res = rough_prgpt(A, labels, refine="infomax")
+            res = rough_prgpt(A.to_sparse(), refine="infomax")
         return res
 
     @staticmethod
     def aggregation(adj, coms):
-        with coms.float() as x:
-            return x.matmul(adj.matmul(x.t()))
+        coms = coms.type(adj.dtype)
+        tmp = torch.sparse.mm(adj, coms.t())
+        return torch.sparse.mm(coms, tmp)
 
     @staticmethod
     def cut_off(communities : torch.Tensor, nodes: torch.Tensor):
@@ -144,12 +142,12 @@ class Optimizer:
         coms = communities * (~ nodes)
 
         # Remove empty communities
-        non_zero_coms_mask = (coms.sum(dim=1) != 0)
+        non_zero_coms_mask = coms.any(dim=1)
         filtered_coms = coms[non_zero_coms_mask]
 
-        # Adds single-element communities for each node from nodes.
+        # Adds single-element communities for each node from nodes
         n = nodes.shape[0]
-        resulted_coms = torch.cat((torch.eye(n, n)[nodes], filtered_coms), dim=0)
+        resulted_coms = torch.cat((torch.eye(n, n)[nodes], filtered_coms), dim=0).bool()
 
         return resulted_coms
 
@@ -158,8 +156,56 @@ class Optimizer:
         dense_matrix = matrix.to_dense() if matrix.is_sparse else matrix
         return dense_matrix[:, cmask][lmask]
         #return matrix[:, cmask][lmask]
+    
+    @staticmethod
+    def bool_mm(t1, t2):
+        t1_int = t1.type(torch.int8)
+        t2_int = t2.type(torch.int8)
+        return torch.sparse.mm(t1_int, t2_int).bool()
 
-    def run(self, batch):
+    def run(self, nodes : torch.Tensor):
+        """
+        Run Optimizer on nodes
+
+        Parameters
+        ----------
+        nodes : torch.Tensor
+        """
+
+        # search affected communities
+        affected_communities_mask = self.C.to_dense()[:, nodes].any(dim=1)
+        affected_communities = self.C.to_dense()[affected_communities_mask]
+        no_affected_communities = self.C.to_dense()[affected_communities_mask.logical_not()]
+        nodes_in_affected_communities = affected_communities.any(dim=0)
+
+        # go to submatrix
+        submatrix = self.submatrix(self.A, nodes_in_affected_communities, nodes_in_affected_communities)
+        print("submatrix:", submatrix, sep = "\n")
+        communities_for_submatrix = affected_communities[:, nodes_in_affected_communities]
+        print("communities_for_submatrix:", communities_for_submatrix, sep = "\n")
+        nodes_in_submatrix = nodes[nodes_in_affected_communities]
+        
+        # split affected communities
+        splitted_communities_for_submatrix = self.cut_off(communities_for_submatrix, nodes_in_submatrix)
+        
+        # aggregation     
+        aggregated_submatrix = self.aggregation(submatrix, splitted_communities_for_submatrix)
+
+        # fast algorithm for small matrix
+        communities_for_aggregated_matrix = self.fast_optimizer_for_small_graph(aggregated_submatrix, None, "prgpt")
+
+        # go to communities for submatrix
+        new_communities_for_submatrix = self.bool_mm(communities_for_aggregated_matrix, splitted_communities_for_submatrix)
+        # go to communities for origin matrix
+        n = nodes_in_affected_communities.shape[0]
+        k = new_communities_for_submatrix.shape[0]
+        mask = nodes_in_affected_communities.repeat(k, 1)
+        new_communities = torch.zeros(n, dtype = torch.bool).masked_scatter(mask, new_communities_for_submatrix)
+
+        # go to new communities
+        self.C = torch.cat((no_affected_communities, new_communities))
+    
+    def apply(self, batch):
         """
         Apply Optimizer to the current graph update
 
@@ -172,60 +218,8 @@ class Optimizer:
 
         nodes = self.upgrade_graph(batch)
         nodes = self.neighborhood(self.A, nodes.to_dense()) # BoolTensor n x 1
-
-        # search affected communities
-        C_dense = self.C.to_dense()
-        affected_communities_mask = C_dense[:, nodes].any(dim=1)
-        #affected_communities_mask = self.C[:, nodes].any(dim=1) # BoolTensor n x 1
-        #affected_communities = self.C[affected_communities_mask]
-        affected_communities = C_dense[affected_communities_mask]
-        #no_affected_communities = self.C[affected_communities_mask.logical_not()]
-        no_affected_communities = C_dense[affected_communities_mask.logical_not()]
-        nodes_in_affected_communities = affected_communities.any(dim=0)
-
-        # go to submatrix
-        # affected_communities = self.submatrix(affected_communities, nodes_in_affected_communities, nodes_in_affected_communities)
-        submatrix = self.submatrix(self.A, nodes_in_affected_communities, nodes_in_affected_communities)
-
-        # split affected communities
-        splitted_communities = self.cut_off(affected_communities, nodes)
-        
-        # aggregation
-        print("submatrix: ", submatrix)
-        print("splitted comunities: ", splitted_communities)
-        aggregated_submatrix = self.aggregation(submatrix, splitted_communities)
-
-        # fast algorithm for small matrix
-        communities_for_aggregated_matrix = self.fast_optimizer_for_small_graph(aggregated_submatrix, None, "prgpt")
-
-        # go to communities for origin matrix
-        new_communities = communities_for_aggregated_matrix.matmul(splitted_communities)
-
-        # go to new communities
-        self.C = torch.cat((no_affected_communities, new_communities))
-
-if __name__ == "__main__":
-
-    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]])
-    #A = torch.tensor([[1,2,3,4], [10,20,30,40], [100,200,300,400], [1000,2000,3000,4000]])
-    print(A)
-    A = A.to_sparse()
-    opt = Optimizer(A)
-    batch = [(0, 0, 1), (0, 1, 1), (0, 2, 1), (10, 13, 1)]
-    print("batch: ", batch)
-    opt.run(batch)
-
-
-    # opt.neighborhood(opt.A, nodes)
+        self.run(nodes)
     
-    # data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
-    # dataset = datasets.Dataset("cora", path=data_dir + "/cora")
-    # adj, features, labels = dataset.load(tensor_type="coo")
-    # opt.fast_optimizer_for_small_graph(adj, features, labels, "magi")
-
-
-    #opt.run(batch)
-
 # (n1,n2,...,nk)
 
 # v (1,1)
