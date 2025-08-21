@@ -6,6 +6,7 @@ import os
 from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import datasets
+from sparse_utils import add_zero_lines_and_columns, to_submatrix, sparse_eye, bool_mm
 
 class Optimizer:
     
@@ -15,12 +16,8 @@ class Optimizer:
         self.A = A
         n = self.A.size()[0]
 
-        # matrix of features - FloatTensor n x k
-        if X is not None:
-            self.X = X
-
         # Node features
-        self.X = None # TODO (to konoval) add features support
+        self.X = X # TODO (to konoval) add features support
 
         # sum of elements of A in each column  FloatTensor n x 1
         self.D_in = self.A.sum(dim=0).to_dense()
@@ -29,24 +26,13 @@ class Optimizer:
 
         # communities - BoolTensor k x n
         if C is None:
-            # C = torch.eye(n, dtype=bool).to_sparse()
-            w = torch.ones(n, dtype=bool)
-            i = torch.stack((torch.arange(n), torch.arange(n)))
-            C = torch.sparse_coo_tensor(i, w, size=(n, n))
+            C = sparse_eye(n, dtype=bool)
         self.C = C
 
         self.index_converter = {i:i for i in range(n)} # from old node indexes (in batches) to new (in matrix A)
 
     def modularity(gamma = 1):
         pass
-
-    @staticmethod
-    def add_zero_lines_and_columns(matrix, line_num, col_num):
-        zero_columns = torch.sparse_coo_tensor(size=(matrix.size()[0], col_num))
-        matrix = torch.cat((matrix, zero_columns), dim=1)
-        zero_lines = torch.sparse_coo_tensor(size=(line_num, matrix.size()[1]))
-        matrix = torch.cat((matrix, zero_lines), dim=0)
-        return matrix
 
     def upgrade_graph(self, batch):
         """
@@ -71,12 +57,12 @@ class Optimizer:
         update_C = torch.sparse_coo_tensor([range(n, n+k), range(n, n+k)], [True for x in range(k)], (n+k, n+k))
         
         # change A, add new lines and columns if necessary
-        self.A = self.add_zero_lines_and_columns(self.A, k, k) + update_A
+        self.A = add_zero_lines_and_columns(self.A, k, k) + update_A
         # correct D_in and D_out
         self.D_in = torch.cat((self.D_in, torch.zeros(k))) + update_A.sum(dim=0)
         self.D_out = torch.cat((self.D_out, torch.zeros(k))) + update_A.sum(dim=1)
         # correct C by adding new 1-element communities
-        self.C = self.add_zero_lines_and_columns(self.C, k, k) + update_C
+        self.C = add_zero_lines_and_columns(self.C, k, k) + update_C
 
         nodes = list(set(i+j)) # affected_nodes
         return torch.sparse_coo_tensor([nodes], torch.ones(len(nodes), dtype=bool), size = (n+k,)) # affected_nodes_mask
@@ -94,6 +80,7 @@ class Optimizer:
         Return:
             torch.Tensor: new binary mask with new nodes.
         """
+        # FIXME don't work for sparse A
         visited = nodes.clone()
         A_c = A.coalesce() 
 
@@ -141,7 +128,7 @@ class Optimizer:
         # Reset the node indexes of nodes from communities
         coms = communities * (~ nodes)
 
-        # Remove empty communities
+        # Remove empty communities # TODO don't work for sparse coms!
         non_zero_coms_mask = coms.any(dim=1)
         filtered_coms = coms[non_zero_coms_mask]
 
@@ -150,19 +137,7 @@ class Optimizer:
         resulted_coms = torch.cat((torch.eye(n, n)[nodes], filtered_coms), dim=0).bool()
 
         return resulted_coms
-
-    @staticmethod
-    def submatrix(matrix, lmask, cmask):
-        dense_matrix = matrix.to_dense() if matrix.is_sparse else matrix
-        return dense_matrix[:, cmask][lmask]
-        #return matrix[:, cmask][lmask]
     
-    @staticmethod
-    def bool_mm(t1, t2):
-        t1_int = t1.type(torch.int8)
-        t2_int = t2.type(torch.int8)
-        return torch.sparse.mm(t1_int, t2_int).bool()
-
     def run(self, nodes : torch.Tensor):
         """
         Run Optimizer on nodes
@@ -172,14 +147,14 @@ class Optimizer:
         nodes : torch.Tensor
         """
 
-        # search affected communities
+        # search affected communities # FIXME don't use to_dense()
         affected_communities_mask = self.C.to_dense()[:, nodes].any(dim=1)
         affected_communities = self.C.to_dense()[affected_communities_mask]
         no_affected_communities = self.C.to_dense()[affected_communities_mask.logical_not()]
         nodes_in_affected_communities = affected_communities.any(dim=0)
 
         # go to submatrix
-        submatrix = self.submatrix(self.A, nodes_in_affected_communities, nodes_in_affected_communities)
+        submatrix = to_submatrix(self.A, nodes_in_affected_communities, nodes_in_affected_communities)
         print("submatrix:", submatrix, sep = "\n")
         communities_for_submatrix = affected_communities[:, nodes_in_affected_communities]
         print("communities_for_submatrix:", communities_for_submatrix, sep = "\n")
@@ -195,7 +170,7 @@ class Optimizer:
         communities_for_aggregated_matrix = self.fast_optimizer_for_small_graph(aggregated_submatrix, None, "prgpt")
 
         # go to communities for submatrix
-        new_communities_for_submatrix = self.bool_mm(communities_for_aggregated_matrix, splitted_communities_for_submatrix)
+        new_communities_for_submatrix = bool_mm(communities_for_aggregated_matrix, splitted_communities_for_submatrix)
         # go to communities for origin matrix
         n = nodes_in_affected_communities.shape[0]
         k = new_communities_for_submatrix.shape[0]
