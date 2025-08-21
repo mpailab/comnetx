@@ -25,16 +25,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 from metrics import Metrics
 
 
-"""
-debugpy.listen(("0.0.0.0", 5678))
-print("Жду подключения отладчика на порту 5678...")
-debugpy.wait_for_client()
-"""
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--verbose', type=bool, default=True)
-parser.add_argument('--runs', type=int, default=1)
+parser.add_argument('--runs', type=int, default=4)
 parser.add_argument('--max_duration', type=int,
                     default=60, help='max duration time')
 parser.add_argument('--kmeans_device', type=str,
