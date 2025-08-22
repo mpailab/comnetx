@@ -5,7 +5,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from baselines import magi
+from baselines.magi import magi
 from datasets import Dataset
 
 
