@@ -33,14 +33,14 @@ def magi(adj : torch.Tensor,
             max_duration = 60
             kmeans_device = 'cpu'
             kmeans_batch = -1
-            hidden_channels = '1024,256'  # в magi этот параметр называется hidden_channels
+            hidden_channels = '1024,256'
             size = '10,10'
             wt = 20
             wl = 5
             tau = 0.5
             ns = 0.5
-            lr = 0.01
-            epochs = 100
+            lr = 0.05
+            epochs = 400
             projection = ""
             wd = 0
             dropout = 0
@@ -122,8 +122,10 @@ def magi(adj : torch.Tensor,
             total_loss += loss.item()
             batches += 1
 
+            print(f'(T) | Epoch {epoch:02d}, loss: {loss:.4f}, examples: {batch_size:d}')
+                      
         avg_loss = total_loss / batches if batches > 0 else 0
-        print(f"Epoch [{epoch+1}/{args.epochs}], Average Loss: {avg_loss:.4f}")
+        #print(f"Epoch [{epoch+1}/{args.epochs}], Average Loss: {avg_loss:.4f}")
 
     model.eval()
     z_all = torch.zeros((N, hidden[-1]), device=device)
@@ -136,7 +138,7 @@ def magi(adj : torch.Tensor,
 
     embeddings = F.normalize(z_all, p=2, dim=1)
 
-    num_clusters, new_labels = find_best_k_with_modularity(adj_sparse, embeddings, range(2, 21), device=torch.device('cuda:0'))
+    num_clusters, new_labels = find_best_k_with_modularity(adj_sparse, embeddings, range(2, 40), device=torch.device('cuda:0'))
     if not isinstance(new_labels, torch.Tensor):
         new_labels = torch.tensor(new_labels, dtype=torch.long, device=device)
     else:

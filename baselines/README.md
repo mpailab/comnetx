@@ -1,9 +1,11 @@
 # Base solutions
 
 PRGPT
+undirected, unweighted graphs
 https://github.com/KuroginQin/PRGPT
 
 PRoCD
+undirected, unweighted graphs
 https://github.com/KuroginQin/PRoCD
 
 DMON - baselines/DMON/graph_embedding/dmon
