@@ -6,7 +6,7 @@ import os
 from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import datasets
-from sparse_utils import add_zero_lines_and_columns, to_submatrix, sparse_eye, bool_mm
+from sparse_utils import *
 
 class Optimizer:
     
@@ -111,7 +111,7 @@ class Optimizer:
         return torch.sparse.mm(coms, tmp)
 
     @staticmethod
-    def cut_off(communities : torch.Tensor, nodes: torch.Tensor):
+    def cut_off(communities : torch.Tensor, nodes: torch.Tensor, sparse: bool = False):
         """
         Return a new community binary matrix by zeroing the node indices of nodes, 
         removing empty communities, and adding single-element communities 
@@ -124,19 +124,36 @@ class Optimizer:
         Return:
             torch.Tensor: binary matrix (k x n)
         """
+        if sparse:
 
-        # Reset the node indexes of nodes from communities
-        coms = communities * (~ nodes)
+            # Reset the node indexes of nodes from communities
+            coms = reset_columns_coo_tensor(communities, torch.nonzero(~ nodes))
 
-        # Remove empty communities # TODO don't work for sparse coms!
-        non_zero_coms_mask = coms.any(dim=1)
-        filtered_coms = coms[non_zero_coms_mask]
+            # Remove empty communities
+            filtered_coms = remove_zero_rows(coms)
 
-        # Adds single-element communities for each node from nodes
-        n = nodes.shape[0]
-        resulted_coms = torch.cat((torch.eye(n, n)[nodes], filtered_coms), dim=0).bool()
+            # Adds single-element communities for each node from nodes
+            node_indices = torch.nonzero(nodes)
+            n = node_indices.size()[0]
+            ind = torch.tensor([range(n), node_indices], dtype = torch.int32)
+            val = torch.ones(n, dtype = torch.bool)
+            single_communities = torch.sparse_coo_tensor(ind, val, (n, nodes.size()[0]),
+                                                         dtype = torch.bool)
+            return cat_coo_tensors(single_communities, filtered_coms)
 
-        return resulted_coms
+        else:
+
+            # Reset the node indexes of nodes from communities
+            coms = communities * (~ nodes)
+
+            # Remove empty communities
+            non_zero_coms_mask = coms.any(dim=1)
+            filtered_coms = coms[non_zero_coms_mask]
+
+            # Adds single-element communities for each node from nodes
+            n = nodes.shape[0]
+            single_communities = torch.eye(n, n)[nodes]
+            return torch.cat((single_communities, filtered_coms), dim=0).bool()
     
     def run(self, nodes : torch.Tensor):
         """
