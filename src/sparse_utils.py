@@ -1,9 +1,11 @@
 import torch
 
 
-def reset_columns_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
+def reset_columns_coo_tensor(coo_tensor : torch.Tensor, 
+                             indices : torch.Tensor, 
+                             invert : bool = False):
     """
-    Slice columns of sparse torch tensor in coo format by indices
+    Reset columns of sparse torch tensor in coo format by indices
 
     Parameters
     ----------
@@ -11,6 +13,8 @@ def reset_columns_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
         Tensor of the shape (k x n)
     indices : torch.Tensor
         List of column indices (n, )
+    invert : bool
+        Reset all columns whose indexes do not belong to indices
     
     Returns
     -------
@@ -18,14 +22,18 @@ def reset_columns_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
     """
     column_indices_of_elements = coo_tensor.indices()[1]
     mask = torch.isin(column_indices_of_elements, indices)
+    if invert:
+        mask = ~mask
     return torch.sparse_coo_tensor(coo_tensor.indices()[:, mask], 
                                    coo_tensor.values()[mask],
                                    coo_tensor.size()).coalesce()
 
 
-def reset_rows_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
+def reset_rows_coo_tensor(coo_tensor : torch.Tensor, 
+                          indices : torch.Tensor, 
+                          invert : bool = False):
     """
-    Slice rows of sparse torch tensor in coo format by indices
+    Reset rows of sparse torch tensor in coo format by indices
 
     Parameters
     ----------
@@ -33,6 +41,8 @@ def reset_rows_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
         Tensor of the shape (k x n)
     indices : torch.Tensor
         List of row indices (n, )
+    invert : bool
+        Reset all rows whose indexes do not belong to indices
     
     Returns
     -------
@@ -40,6 +50,8 @@ def reset_rows_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
     """
     row_indices_of_elements = coo_tensor.indices()[0]
     mask = torch.isin(row_indices_of_elements, indices)
+    if invert:
+        mask = ~mask
     return torch.sparse_coo_tensor(coo_tensor.indices()[mask, :], 
                                    coo_tensor.values()[mask],
                                    coo_tensor.size()).coalesce()
@@ -119,6 +131,42 @@ def remove_zero_rows(coo_tensor : torch.Tensor):
                                                    new_size).coalesce()
 
     return reindexed_coo_tensor
+
+
+def slice_columns_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
+    """
+    Slice columns of sparse torch tensor in coo format by indices
+
+    Parameters
+    ----------
+    coo_tensor : torch.sparse_coo
+        Tensor of the shape (k x n)
+    indices : torch.Tensor
+        List of column indices (n, )
+    
+    Returns
+    -------
+        torch.sparse_coo
+    """
+    return remove_zero_columns(reset_columns_coo_tensor(coo_tensor, indices, invert=True))
+
+
+def slice_rows_coo_tensor(coo_tensor : torch.Tensor, indices : torch.Tensor):
+    """
+    Slice rows of sparse torch tensor in coo format by indices
+
+    Parameters
+    ----------
+    coo_tensor : torch.sparse_coo
+        Tensor of the shape (k x n)
+    indices : torch.Tensor
+        List of row indices (n, )
+    
+    Returns
+    -------
+        torch.sparse_coo
+    """
+    return remove_zero_rows(reset_rows_coo_tensor(coo_tensor, indices, invert=True))
 
 
 def cat_coo_tensors(coo_tensor1 : torch.Tensor, coo_tensor2 : torch.Tensor, dim : int = 0):
