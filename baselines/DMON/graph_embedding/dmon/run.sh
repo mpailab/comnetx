@@ -22,4 +22,4 @@ source ./bin/activate
 
 pip install -r graph_embedding/dmon/requirements.txt
 
-python -m graph_embedding.dmon.train --epochs=2 --graph_path=graph_embedding/dmon/data/cora.npz
+python -m graph_embedding.dmon.train --n_epochs=5 --graph_path=graph_embedding/dmon/data/cora.npz
