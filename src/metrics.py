@@ -15,64 +15,71 @@ class Metrics:
     def __init__(self):
         pass
 
-    def modularity_dmon_slow(adjacency, assignments):
-        assignments_pool = assignments / tf.math.reduce_sum(assignments, axis=0)
-        degrees = tf.sparse.reduce_sum(adjacency, axis=0)
-        degrees = tf.reshape(degrees, (-1, 1))
-        m = tf.math.reduce_sum(degrees)  
+    # def modularity_dmon_slow_tf(adjacency, assignments):
+    #     assignments_pool = assignments / tf.math.reduce_sum(assignments, axis=0)
+    #     degrees = tf.sparse.reduce_sum(adjacency, axis=0)
+    #     degrees = tf.reshape(degrees, (-1, 1))
+    #     m = tf.math.reduce_sum(degrees)  
 
-        graph_pooled = tf.transpose(tf.sparse.sparse_dense_matmul(adjacency, assignments))
-        graph_pooled = tf.matmul(graph_pooled, assignments)
+    #     graph_pooled = tf.transpose(tf.sparse.sparse_dense_matmul(adjacency, assignments))
+    #     graph_pooled = tf.matmul(graph_pooled, assignments)
         
-        ca = tf.matmul(assignments, degrees, transpose_a=True)
-        cb = tf.matmul(degrees, assignments, transpose_a=True)
-        normalizer = tf.matmul(ca, cb) / 2 / m
+    #     ca = tf.matmul(assignments, degrees, transpose_a=True)
+    #     cb = tf.matmul(degrees, assignments, transpose_a=True)
+    #     normalizer = tf.matmul(ca, cb) / 2 / m
         
-        modularity = tf.linalg.trace(graph_pooled - normalizer) / 2 / m
+    #     modularity = tf.linalg.trace(graph_pooled - normalizer) / 2 / m
         
-        return modularity
+    #     return modularity
     
-    def modularity_dmon_slow_torch_copy(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
-        assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
-        degrees = adjacency.sum(dim=1)
-        degrees = degrees.view(-1, 1)
-        m = degrees.sum()
+    # def modularity_dmon_slow_torch_copy(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+    #     assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
+    #     degrees = adjacency.sum(dim=1)
+    #     degrees = degrees.view(-1, 1)
+    #     m = degrees.sum()
 
-        graph_pooled = adjacency.matmul(assignments).t()
-        graph_pooled = torch.matmul(graph_pooled, assignments)
+    #     graph_pooled = adjacency.matmul(assignments).t()
+    #     graph_pooled = torch.matmul(graph_pooled, assignments)
         
-        ca = torch.matmul(assignments.t(), degrees)
-        cb = torch.matmul(degrees.t(), assignments)
-        normalizer = torch.matmul(ca, cb) / (2 * m)
+    #     ca = torch.matmul(assignments.t(), degrees)
+    #     cb = torch.matmul(degrees.t(), assignments)
+    #     normalizer = torch.matmul(ca, cb) / (2 * m)
         
-        modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
+    #     modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
         
-        return modularity.item()
+    #     return modularity.item()
     
-    def modularity_dmon_slow_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
-        assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
-        degrees = adjacency.sum(dim=1)
-        degrees = degrees.view(-1, 1)
-        m = degrees.sum()
+    # def modularity_dmon_slow_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+    #     assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
+    #     degrees = adjacency.sum(dim=1)
+    #     degrees = degrees.view(-1, 1)
+    #     m = degrees.sum()
 
-        graph_pooled = torch.matmul(assignments.t(), adjacency.matmul(assignments))
+    #     graph_pooled = torch.matmul(assignments.t(), adjacency.matmul(assignments))
         
-        ca = torch.matmul(assignments.t(), degrees)
-        cb = torch.matmul(degrees.t(), assignments)
-        normalizer = torch.matmul(ca, cb) / (2 * m)
+    #     ca = torch.matmul(assignments.t(), degrees)
+    #     cb = torch.matmul(degrees.t(), assignments)
+    #     normalizer = torch.matmul(ca, cb) / (2 * m)
         
-        modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
+    #     modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
         
-        return modularity.item()
+    #     return modularity.item()
 
-    def modularity_dmon_fast(adjacency, assignments):
+    def modularity_dmon_tf(adjacency: tf.sparse.SparseTensor, assignments: tf.Tensor) -> float:
+        """
+        Args:
+            adjacency: tf.SparseTensor [n_nodes, n_nodes]
+            assignments: tf.Tensor [n_nodes, n_clusters]
+            
+        Returns:
+            modularity: float 
+        """
         degrees = tf.sparse.reduce_sum(adjacency, axis=0)
         m = tf.reduce_sum(degrees)
         inv_2m = 1.0 / (2 * m) 
         degrees = tf.reshape(degrees, (-1, 1))
         
         a_s = tf.sparse.sparse_dense_matmul(adjacency, assignments)
-        
         graph_pooled = tf.matmul(a_s, assignments, transpose_a=True)
         
         s_d = tf.matmul(assignments, degrees, transpose_a=True)
@@ -82,7 +89,16 @@ class Metrics:
         
         return modularity
 
-    def modularity_dmon_fast_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+
+    def modularity_dmon_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+        """
+        Args:
+            adjacency: torch.SparseTensor [n_nodes, n_nodes]
+            assignments: torch.Tensor [n_nodes, n_clusters]
+            
+        Returns:
+            modularity: float 
+        """
         degrees = adjacency.sum(dim=1).view(-1, 1)
         m = degrees.sum()
         inv_2m = 1.0 / (2 * m)
@@ -97,67 +113,37 @@ class Metrics:
         
         return modularity.item()
 
-    def modularity_magi_prob(adjacency, assignments):
-        
-        device = adjacency.device()
-        row, col = adjacency.storage.row(), adjacency.storage.col()
-        assignments = assignments.to(device)
-        m = adjacency.storage.value().sum() / 2 
-
-        prob_same_cluster = (assignments[row] * assignments[col]).sum(dim=1)
-        
-        L_c = (adjacency.storage.value() * prob_same_cluster).sum()
-        
-        degrees = torch.zeros_like(assignments[:, 0]).scatter_add_(
-            0, row, adjacency.storage.value())
-        
-        D_c = (degrees.unsqueeze(1) * assignments).sum()
-        
-        return (L_c - D_c**2 / (4 * m)) / m
-
-# if __name__ == "__main__":
-#     N, K = 1000000, 100
-
-#     features_tf = tf.random.normal((N, 10))
-#     indices_tf = tf.random.uniform((200, 2), 0, N, dtype=tf.int64)
-#     values_tf = tf.ones(200)
-#     adjacency_tf = tf.sparse.SparseTensor(indices_tf, values_tf, dense_shape=(N, N))
-#     mlp_output_tf = tf.random.normal((N, K))
-#     assignments_tf = tf.nn.softmax(mlp_output_tf, axis=1)
-
-#     indices_np = indices_tf.numpy()
-#     values_np = values_tf.numpy()
-
-#     adjacency_torch = SparseTensor(
-#         row=torch.from_numpy(indices_np[:, 0]).long(),
-#         col=torch.from_numpy(indices_np[:, 1]).long(),
-#         value=torch.from_numpy(values_np).float(),
-#         sparse_sizes=(N, N)
-#     )
-
-#     assignments_torch = torch.from_numpy(assignments_tf.numpy()).float()
-
-#     start_time = time.time()
-#     mod_value = Metrics.modularity_dmon_slow(adjacency_tf, assignments_tf)
-#     compute_time = time.time() - start_time
-#     print(f"tf slow method: {compute_time:.6f}, Modularity: {mod_value.numpy():.4f}")
-
-#     start_time = time.time()
-#     mod_value = Metrics.modularity_dmon_fast(adjacency_tf, assignments_tf)
-#     compute_time = time.time() - start_time
-#     print(f"tf fast method: {compute_time:.6f}, Modularity: {mod_value.numpy():.4f}")
-
-#     start_time = time.time()
-#     mod_value = Metrics.modularity_dmon_slow_torch_copy(adjacency_torch, assignments_torch)
-#     compute_time = time.time() - start_time
-#     print(f"torch_copy slow method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
-
-#     start_time = time.time()
-#     mod_value = Metrics.modularity_dmon_slow_torch(adjacency_torch, assignments_torch)
-#     compute_time = time.time() - start_time
-#     print(f"torch slow method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
-
-#     start_time = time.time()
-#     mod_value = Metrics.modularity_dmon_fast_torch(adjacency_torch, assignments_torch)
-#     compute_time = time.time() - start_time
-#     print(f"torch fast method: {compute_time:.6f}, Modularity: {mod_value:.4f}")
+    def modularity(adjacency, assignments) -> float:
+        """
+        Args:
+            adjacency: tf.sparse.SparseTensor or SparseTensor [n_nodes, n_nodes]
+            assignments: tf.Tensor or torch.Tensor [n_nodes, n_clusters]
+            
+        Returns:
+            modularity: float 
+        """
+        if isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor):
+            degrees = adjacency.sum(dim=1)
+            m = degrees.sum()
+            inv_2m = 1.0 / (2 * m)
+            degrees.view(-1, 1)
+            a_s = adjacency.matmul(assignments)
+            graph_pooled = torch.matmul(a_s.t(), assignments)
+            s_d = torch.matmul(assignments.t(), degrees)
+            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
+            # modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
+            modularity = torch.trace(graph_pooled - normalizer) * inv_2m
+            return modularity.item()
+        elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
+            degrees = tf.sparse.reduce_sum(adjacency, axis=0)
+            m = tf.reduce_sum(degrees)
+            inv_2m = 1.0 / (2 * m) 
+            degrees = tf.reshape(degrees, (-1, 1))
+            a_s = tf.sparse.sparse_dense_matmul(adjacency, assignments)
+            graph_pooled = tf.matmul(a_s, assignments, transpose_a=True)
+            s_d = tf.matmul(assignments, degrees, transpose_a=True)
+            normalizer = tf.matmul(s_d, s_d, transpose_b=True) * inv_2m
+            modularity = tf.linalg.trace(graph_pooled - normalizer) * inv_2m
+            return modularity
+        else:
+            raise TypeError("Unsupported type")
