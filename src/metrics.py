@@ -15,55 +15,55 @@ class Metrics:
     def __init__(self):
         pass
 
-    def modularity_dmon_slow_tf(adjacency, assignments):
-        assignments_pool = assignments / tf.math.reduce_sum(assignments, axis=0)
-        degrees = tf.sparse.reduce_sum(adjacency, axis=0)
-        degrees = tf.reshape(degrees, (-1, 1))
-        m = tf.math.reduce_sum(degrees)  
+    # def modularity_dmon_slow_tf(adjacency, assignments):
+    #     assignments_pool = assignments / tf.math.reduce_sum(assignments, axis=0)
+    #     degrees = tf.sparse.reduce_sum(adjacency, axis=0)
+    #     degrees = tf.reshape(degrees, (-1, 1))
+    #     m = tf.math.reduce_sum(degrees)  
 
-        graph_pooled = tf.transpose(tf.sparse.sparse_dense_matmul(adjacency, assignments))
-        graph_pooled = tf.matmul(graph_pooled, assignments)
+    #     graph_pooled = tf.transpose(tf.sparse.sparse_dense_matmul(adjacency, assignments))
+    #     graph_pooled = tf.matmul(graph_pooled, assignments)
         
-        ca = tf.matmul(assignments, degrees, transpose_a=True)
-        cb = tf.matmul(degrees, assignments, transpose_a=True)
-        normalizer = tf.matmul(ca, cb) / 2 / m
+    #     ca = tf.matmul(assignments, degrees, transpose_a=True)
+    #     cb = tf.matmul(degrees, assignments, transpose_a=True)
+    #     normalizer = tf.matmul(ca, cb) / 2 / m
         
-        modularity = tf.linalg.trace(graph_pooled - normalizer) / 2 / m
+    #     modularity = tf.linalg.trace(graph_pooled - normalizer) / 2 / m
         
-        return modularity
+    #     return modularity
     
-    def modularity_dmon_slow_torch_copy(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
-        assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
-        degrees = adjacency.sum(dim=1)
-        degrees = degrees.view(-1, 1)
-        m = degrees.sum()
+    # def modularity_dmon_slow_torch_copy(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+    #     assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
+    #     degrees = adjacency.sum(dim=1)
+    #     degrees = degrees.view(-1, 1)
+    #     m = degrees.sum()
 
-        graph_pooled = adjacency.matmul(assignments).t()
-        graph_pooled = torch.matmul(graph_pooled, assignments)
+    #     graph_pooled = adjacency.matmul(assignments).t()
+    #     graph_pooled = torch.matmul(graph_pooled, assignments)
         
-        ca = torch.matmul(assignments.t(), degrees)
-        cb = torch.matmul(degrees.t(), assignments)
-        normalizer = torch.matmul(ca, cb) / (2 * m)
+    #     ca = torch.matmul(assignments.t(), degrees)
+    #     cb = torch.matmul(degrees.t(), assignments)
+    #     normalizer = torch.matmul(ca, cb) / (2 * m)
         
-        modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
+    #     modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
         
-        return modularity.item()
+    #     return modularity.item()
     
-    def modularity_dmon_slow_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
-        assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
-        degrees = adjacency.sum(dim=1)
-        degrees = degrees.view(-1, 1)
-        m = degrees.sum()
+    # def modularity_dmon_slow_torch(adjacency: SparseTensor, assignments: torch.Tensor) -> float:
+    #     assignments_pool = assignments / assignments.sum(dim=0, keepdim=True)
+    #     degrees = adjacency.sum(dim=1)
+    #     degrees = degrees.view(-1, 1)
+    #     m = degrees.sum()
 
-        graph_pooled = torch.matmul(assignments.t(), adjacency.matmul(assignments))
+    #     graph_pooled = torch.matmul(assignments.t(), adjacency.matmul(assignments))
         
-        ca = torch.matmul(assignments.t(), degrees)
-        cb = torch.matmul(degrees.t(), assignments)
-        normalizer = torch.matmul(ca, cb) / (2 * m)
+    #     ca = torch.matmul(assignments.t(), degrees)
+    #     cb = torch.matmul(degrees.t(), assignments)
+    #     normalizer = torch.matmul(ca, cb) / (2 * m)
         
-        modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
+    #     modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) / (2 * m)
         
-        return modularity.item()
+    #     return modularity.item()
 
     def modularity_dmon_tf(adjacency: tf.sparse.SparseTensor, assignments: tf.Tensor) -> float:
         """

@@ -79,11 +79,13 @@ for i in range(SIZE):
     )
     assignments_torch = torch.from_numpy(assignments_tf.numpy()).float()
 
+    # torch version
     start_time = time.time()
     mod_value = Metrics.modularity(adjacency_torch, assignments_torch)
     print("mod. = ", mod_value)
     time_arr[1,i] = time.time() - start_time
 
+    # tensorflow version
     start_time = time.time()
     mod_value = Metrics.modularity(adjacency_tf, assignments_tf)
     print("mod. = ", mod_value)
