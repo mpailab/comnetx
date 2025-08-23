@@ -31,7 +31,7 @@ def reorder_to_tensor(clus_res, num_clus, zero_base = True):
         dst.append(node + plus)
     ind = torch.tensor([src, dst], dtype = torch.int32)
     val = torch.ones(ind.shape[1], dtype = torch.bool)
-    res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = bool)
+    res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = torch.bool)
     return res
 
 def rough_prgpt(adj : torch.Tensor, 
@@ -94,16 +94,17 @@ def rough_prgpt(adj : torch.Tensor,
     idxs, vals = get_sp_adj(tst_edges)
     idxs_tnr = torch.LongTensor(idxs).to(device)
     vals_tnr = torch.FloatTensor(vals).to(device)
-    ptn_sp_adj_tnr = torch.sparse.FloatTensor(idxs_tnr.t(), vals_tnr,
-                                                torch.Size([tst_num_nodes, tst_num_nodes])).to(device)
+    ptn_sp_adj_tnr = torch.sparse_coo_tensor(idxs_tnr.t(), vals_tnr, 
+                                             torch.Size([tst_num_nodes, tst_num_nodes]), 
+                                             dtype=torch.float, device=device)
 
     # ==========
     idxs, vals = get_sp_GCN_sup(tst_edges, tst_degs)
     idxs_tnr = torch.LongTensor(idxs).to(device)
     vals_tnr = torch.FloatTensor(vals).to(device)
-    sup_tnr = torch.sparse.FloatTensor(idxs_tnr.t(), vals_tnr,
-                                        torch.Size([tst_num_nodes,
-                                                    tst_num_nodes])).to(device)
+    sup_tnr = torch.sparse_coo_tensor(idxs_tnr.t(), vals_tnr, 
+                                      torch.Size([tst_num_nodes, tst_num_nodes]), 
+                                      dtype=torch.float, device=device)
     
     # ====================
     # Feat ext via Gaussian rand proj
