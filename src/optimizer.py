@@ -6,30 +6,41 @@ import os
 from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import datasets
-from sparse_utils import *
-
 class Optimizer:
     
-    def __init__(self, A : torch.Tensor, X : torch.Tensor = None, C : torch.Tensor = None):
+    def __init__(self, 
+                 adj_matrix : torch.Tensor, 
+                 features : torch.Tensor | None = None, 
+                 communities : torch.Tensor | None = None,
+                 subcoms_num : int = 1,
+                 subcoms_depth : int = 1):
+        """
 
-        # matrix of weighted edges - FloatTensor n x n
-        self.A = A
-        n = self.A.size()[0]
+        Parameters
+        ----------
+        communities : torch.Tensor of the shape (3,m)
+            Each column in this tensor has the form (i,j,k), where 
+                i is a community number, 
+                j is a node number that belongs to the community i,
+                k is a level of the community i. 
+        """
+        
+        self.nodes_num = adj_matrix.size()[0]
+        self.subcoms_num = subcoms_num
+        self.subcoms_depth = subcoms_depth
+        
+        self.adj = adj_matrix
 
-        # Node features
-        self.X = X # TODO (to konoval) add features support
+        if features is None:
+            self.features = torch.zeros((self.nodes_num,1), dtype=adj_matrix.dtype)
+        else:
+            self.features = features
 
-        # sum of elements of A in each column  FloatTensor n x 1
-        self.D_in = self.A.sum(dim=0).to_dense()
-        # sum of elements of A in each line FloatTensor n x 1
-        self.D_out = self.A.sum(dim=1).to_dense()
+        if communities is None:
+            self.coms = torch.eye(self.nodes_num, dtype=torch.int32).repeat(self.subcoms_depth)
+        else:
+            self.coms = communities
 
-        # communities - BoolTensor k x n
-        if C is None:
-            C = sparse_eye(n, dtype=bool)
-        self.C = C
-
-        self.index_converter = {i:i for i in range(n)} # from old node indexes (in batches) to new (in matrix A)
 
     def modularity(gamma = 1):
         pass
@@ -94,108 +105,79 @@ class Optimizer:
             visited[neighbors] = True
             
         return visited
+    
+    def local_algorithm(self,
+                        adj, 
+                        features, 
+                        method : str, 
+                        labels: torch.Tensor | None = None) -> torch.Tensor:
+        
+        if self.subcoms_depth == 1:
+            if method == "magi":
+                labels = magi(adj, features, labels)
+                res = labels
 
-    @staticmethod
-    def fast_optimizer_for_small_graph(A, X, method : str, labels: torch.Tensor = None):
-        if method == "magi":
-            labels = magi(A, X, labels)
-            res = labels
-        elif method == "prgpt":
-            res = rough_prgpt(A.to_sparse(), refine="infomax")
-        return res
+            elif method == "prgpt":
+                res = rough_prgpt(adj.to_sparse(), refine="infomax")
 
-    @staticmethod
-    def aggregation(adj, coms):
-        coms = coms.type(adj.dtype)
-        tmp = torch.sparse.mm(adj, coms.t())
-        return torch.sparse.mm(coms, tmp)
-
-    @staticmethod
-    def cut_off(communities : torch.Tensor, nodes: torch.Tensor, sparse: bool = False):
-        """
-        Return a new community binary matrix by zeroing the node indices of nodes, 
-        removing empty communities, and adding single-element communities 
-        for each node in nodes.
-
-        Parameters:
-            communities (torch.sparse_coo): binary matrix (k x n)
-            nodes (torch.Tensor): binary vector (n,)
-
-        Return:
-            torch.Tensor: binary matrix (k x n)
-        """
-        if sparse:
-
-            # Reset the node indexes of nodes from communities
-            coms = reset_columns_coo_tensor(communities, torch.nonzero(~ nodes))
-
-            # Remove empty communities
-            filtered_coms = remove_zero_rows(coms)
-
-            # Adds single-element communities for each node from nodes
-            node_indices = torch.nonzero(nodes)
-            n = node_indices.size()[0]
-            ind = torch.tensor([range(n), node_indices], dtype = torch.int32)
-            val = torch.ones(n, dtype = torch.bool)
-            single_communities = torch.sparse_coo_tensor(ind, val, (n, nodes.size()[0]),
-                                                         dtype = torch.bool)
-            return cat_coo_tensors(single_communities, filtered_coms)
+            else:
+                raise ValueError("Unsupported baseline method name")
+            
+            return res.indices()
 
         else:
+            raise ValueError("Unsupported nesting depth of subcommunities")
 
-            # Reset the node indexes of nodes from communities
-            coms = communities * (~ nodes)
-
-            # Remove empty communities
-            non_zero_coms_mask = coms.any(dim=1)
-            filtered_coms = coms[non_zero_coms_mask]
-
-            # Adds single-element communities for each node from nodes
-            n = nodes.shape[0]
-            single_communities = torch.eye(n, n)[nodes]
-            return torch.cat((single_communities, filtered_coms), dim=0).bool()
+    @staticmethod
+    def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
+        return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
     
-    def run(self, nodes : torch.Tensor):
+    
+    def run(self, nodes_mask : torch.Tensor):
         """
         Run Optimizer on nodes
 
         Parameters
         ----------
-        nodes : torch.Tensor
+        nodes_mask : torch.Tensor
         """
+        nodes = torch.nonzero(nodes_mask)
+        coms_nodes_mask = torch.isin(self.coms[1], nodes)
 
-        # search affected communities # FIXME don't use to_dense()
-        affected_communities_mask = self.C.to_dense()[:, nodes].any(dim=1)
-        affected_communities = self.C.to_dense()[affected_communities_mask]
-        no_affected_communities = self.C.to_dense()[affected_communities_mask.logical_not()]
-        nodes_in_affected_communities = affected_communities.any(dim=0)
-
-        # go to submatrix
-        submatrix = to_submatrix(self.A, nodes_in_affected_communities, nodes_in_affected_communities)
-        print("submatrix:", submatrix, sep = "\n")
-        communities_for_submatrix = affected_communities[:, nodes_in_affected_communities]
-        print("communities_for_submatrix:", communities_for_submatrix, sep = "\n")
-        nodes_in_submatrix = nodes[nodes_in_affected_communities]
+        # Search affected communities
+        communities = self.coms[0, coms_nodes_mask].unique()
+        communities_mask = torch.isin(self.coms[0], communities)
+        coms = self.coms[:, communities_mask]
+        ext_coms = self.coms[:, ~communities_mask]
         
-        # split affected communities
-        splitted_communities_for_submatrix = self.cut_off(communities_for_submatrix, nodes_in_submatrix)
+        # Split affected communities
+        flat_coms = torch.tensor([range(nodes.size()[0]), nodes], dtype = torch.int32)
+        for level in range(1, self.subcoms_depth):
+            level_mask = coms[2] == level
+            level_communities = coms[0, coms_nodes_mask and level_mask].unique()
+            mask = ~torch.isin(coms[0], level_communities) and level_mask
+            flat_coms = torch.cat((flat_coms, coms[:2, mask]), dim=1)
+
+        # Reindexing communities
+        reindexing = torch.unique(flat_coms[0])
+        reindexing_map = { j.item(): i for i, j in enumerate(reindexing) }
+        flat_coms[0] = torch.tensor([ reindexing_map[i.item()] for i in flat_coms[0] ])
+
+        # Aggregate adjacency and features matrices
+        p = torch.sparse_coo_tensor(flat_coms, 
+                                    torch.ones(flat_coms.size()[1], dtype=self.adj.dtype),
+                                    [reindexing.size()[0], self.nodes_num]).coalesce()
+        adj = self.aggregate(self.adj, p)
+        features = self.aggregate(self.features, p)
+
+        # Apply local algorithm for aggregated matrices
+        coms = self.local_algorithm(adj, features, "prgpt")
+
+        # Restoring the community of the original graph
+        self.coms = torch.cat((torch.tensor([[ reindexing[i.item()] for i in coms[0] ],
+                                             [ reindexing[i.item()] for i in coms[1] ],
+                                             coms[2]]), ext_coms), dim=1)
         
-        # aggregation     
-        aggregated_submatrix = self.aggregation(submatrix, splitted_communities_for_submatrix)
-
-        # fast algorithm for small matrix
-        communities_for_aggregated_matrix = self.fast_optimizer_for_small_graph(aggregated_submatrix, None, "prgpt")
-
-        # go to communities for submatrix
-        new_communities_for_submatrix = bool_mm(communities_for_aggregated_matrix, splitted_communities_for_submatrix)
-        # go to communities for origin matrix
-        n = nodes_in_affected_communities.shape[0]
-        k = new_communities_for_submatrix.shape[0]
-        mask = nodes_in_affected_communities.repeat(k, 1)
-        new_communities = torch.zeros(n, dtype = torch.bool).masked_scatter(mask, new_communities_for_submatrix)
-
-        # go to new communities
-        self.C = torch.cat((no_affected_communities, new_communities))
     
     def apply(self, batch):
         """
@@ -211,9 +193,3 @@ class Optimizer:
         nodes = self.upgrade_graph(batch)
         nodes = self.neighborhood(self.A, nodes.to_dense()) # BoolTensor n x 1
         self.run(nodes)
-    
-# (n1,n2,...,nk)
-
-# v (1,1)
-# |
-# u (1,1) - w (1,2)
