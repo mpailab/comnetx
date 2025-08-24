@@ -7,7 +7,7 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from optimizer import Optimizer
-from sparse_utils import *
+import sparse
 
 @pytest.mark.short
 def test_cut_off():
@@ -23,7 +23,7 @@ def test_cut_off_sparse():
     nodes = torch.tensor([0, 0, 1, 0]).bool()
     res = Optimizer.cut_off(coms, nodes, True)
     true_res = torch.tensor([[0, 0, 1, 0], [1, 1, 0, 0]]).bool().to_sparse_coo()
-    assert are_coo_tensors_equal(true_res, res)
+    assert sparse.equal(true_res, res)
 
 @pytest.mark.short
 def test_aggregation():
@@ -44,3 +44,12 @@ def test_run():
     opt.run(nodes)
     print()
     print(opt.C.to_dense().int())
+
+def test_run_sparse():
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse()
+    C = SparseTensor([[1, 1, 1, 0], [0, 0, 0, 1]], dtype = torch.bool)
+    nodes = torch.tensor([0, 0, 1, 0]).bool()
+    opt = Optimizer(A, C = C)
+    opt.run(nodes)
+    print()
+    # print(opt.C.to_dense().int())
