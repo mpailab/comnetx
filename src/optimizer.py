@@ -5,7 +5,9 @@ import os
 # Internal imports
 from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
+import sparse
 import datasets
+
 class Optimizer:
     
     def __init__(self, 
@@ -25,6 +27,7 @@ class Optimizer:
                 k is a level of the community i. 
         """
         
+        self.size = adj_matrix.size()
         self.nodes_num = adj_matrix.size()[0]
         self.subcoms_num = subcoms_num
         self.subcoms_depth = subcoms_depth
@@ -151,7 +154,7 @@ class Optimizer:
         ext_coms = self.coms[:, ~communities_mask]
         
         # Split affected communities
-        flat_coms = torch.tensor([range(nodes.size()[0]), nodes], dtype = torch.int32)
+        flat_coms = torch.tensor([range(self.nodes_num), nodes], dtype = torch.int32)
         for level in range(1, self.subcoms_depth):
             level_mask = coms[2] == level
             level_communities = coms[0, coms_nodes_mask and level_mask].unique()
@@ -164,19 +167,21 @@ class Optimizer:
         flat_coms[0] = torch.tensor([ reindexing_map[i.item()] for i in flat_coms[0] ])
 
         # Aggregate adjacency and features matrices
-        p = torch.sparse_coo_tensor(flat_coms, 
-                                    torch.ones(flat_coms.size()[1], dtype=self.adj.dtype),
-                                    [reindexing.size()[0], self.nodes_num]).coalesce()
-        adj = self.aggregate(self.adj, p)
-        features = self.aggregate(self.features, p)
+        reduce_ptn = sparse.tensor(flat_coms, 
+                                   (reindexing.size()[0], self.nodes_num),
+                                   self.adj.dtype)
+        adj = self.aggregate(self.adj, reduce_ptn)
+        features = self.aggregate(self.features, reduce_ptn)
+        del reduce_ptn
 
         # Apply local algorithm for aggregated matrices
         coms = self.local_algorithm(adj, features, "prgpt")
 
         # Restoring the community of the original graph
-        self.coms = torch.cat((torch.tensor([[ reindexing[i.item()] for i in coms[0] ],
-                                             [ reindexing[i.item()] for i in coms[1] ],
-                                             coms[2]]), ext_coms), dim=1)
+        coms = torch.tensor([[ reindexing[i.item()] for i in coms[0] ],
+                             [ reindexing[i.item()] for i in coms[1] ],
+                             coms[2]])
+        self.coms = torch.cat((sparse.mm(coms, flat_coms, self.size), ext_coms), dim=1)
         
     
     def apply(self, batch):

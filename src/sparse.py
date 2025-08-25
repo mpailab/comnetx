@@ -2,6 +2,17 @@ import torch
 from typing import Any
 
 
+def tensor(indices : torch.Tensor, size : torch.types._size, dtype : torch.dtype):
+    return torch.sparse_coo_tensor(indices, 
+                                   torch.ones(indices.size()[1], dtype=dtype),
+                                   size).coalesce()
+
+
+def mm(indices1 : torch.Tensor, indices2 : torch.Tensor, size : torch.Size):
+    return torch.sparse.mm(tensor(indices1, size, torch.int8), 
+                           tensor(indices2, size, torch.int8)).indices()
+
+
 def reset(tensor : torch.Tensor, 
           key : int | slice | torch.Tensor,
           dim : int = 0,
