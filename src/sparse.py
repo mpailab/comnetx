@@ -13,6 +13,12 @@ def mm(indices1 : torch.Tensor, indices2 : torch.Tensor, size : torch.Size):
                            tensor(indices2, size, torch.int8)).indices()
 
 
+def ext_range(tensor : torch.Tensor, size : int):
+    A = tensor.repeat(1,size)
+    B = torch.arange(0,size).repeat_interleave(tensor.size()[1]).unsqueeze(0)
+    return torch.cat((A, B), dim=0)
+
+
 def reset(tensor : torch.Tensor, 
           key : int | slice | torch.Tensor,
           dim : int = 0,

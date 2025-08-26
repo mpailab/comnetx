@@ -40,7 +40,10 @@ class Optimizer:
             self.features = features
 
         if communities is None:
-            self.coms = torch.eye(self.nodes_num, dtype=torch.int32).repeat(self.subcoms_depth)
+            n = self.nodes_num
+            self.coms = torch.stack((torch.arange(0,n,dtype=torch.long).repeat(n), 
+                                     torch.arange(0,n,dtype=torch.long).repeat(n),
+                                     torch.arange(0,n,dtype=torch.long).repeat_interleave(n)))
         else:
             self.coms = communities
 
@@ -144,46 +147,74 @@ class Optimizer:
         ----------
         nodes_mask : torch.Tensor
         """
+
+        # Find indices of affected nodes
         nodes = torch.nonzero(nodes_mask)
-        coms_nodes_mask = torch.isin(self.coms[1], nodes)
 
-        # Search affected communities
-        communities = self.coms[0, coms_nodes_mask].unique()
-        communities_mask = torch.isin(self.coms[0], communities)
-        coms = self.coms[:, communities_mask]
-        ext_coms = self.coms[:, ~communities_mask]
-        
-        # Split affected communities
-        flat_coms = torch.tensor([range(self.nodes_num), nodes], dtype = torch.int32)
-        for level in range(1, self.subcoms_depth):
-            level_mask = coms[2] == level
-            level_communities = coms[0, coms_nodes_mask and level_mask].unique()
-            mask = ~torch.isin(coms[0], level_communities) and level_mask
-            flat_coms = torch.cat((flat_coms, coms[:2, mask]), dim=1)
+        # Find pairs of all indices (i,l), where i is affected community on level l
+        communities = self.coms[0:3:2, torch.isin(self.coms[1], nodes)].unique(dim=1)
 
-        # Reindexing communities
-        reindexing = torch.unique(flat_coms[0])
-        reindexing_map = { j.item(): i for i, j in enumerate(reindexing) }
-        flat_coms[0] = torch.tensor([ reindexing_map[i.item()] for i in flat_coms[0] ])
+        # Find mask of all triples (i,j,l) called affected community triples,  
+        # where i is affected community at the level l and j is its node
+        mask = (self.coms[0:3:2].unsqueeze(2) == communities.unsqueeze(1))
+        affected_mask = torch.sum(mask[0] * mask[1], dim=1, dtype=torch.bool)
 
-        # Aggregate adjacency and features matrices
-        reduce_ptn = sparse.tensor(flat_coms, 
-                                   (reindexing.size()[0], self.nodes_num),
-                                   self.adj.dtype)
-        adj = self.aggregate(self.adj, reduce_ptn)
-        features = self.aggregate(self.features, reduce_ptn)
-        del reduce_ptn
+        # Find mask of all triples (i,j,Last) called remaining community triples,
+        # where i is affected community at the highest level L and j is its node
+        remaining_mask = (self.coms[2] == self.subcoms_depth-1) and ~nodes_mask
 
-        # Apply local algorithm for aggregated matrices
-        coms = self.local_algorithm(adj, features, "prgpt")
+        # Remove all affected community triples except for the remaining ones
+        coms = self.coms[:, ~affected_mask or remaining_mask]
 
-        # Restoring the community of the original graph
-        coms = torch.tensor([[ reindexing[i.item()] for i in coms[0] ],
-                             [ reindexing[i.item()] for i in coms[1] ],
-                             coms[2]])
-        self.coms = torch.cat((sparse.mm(coms, flat_coms, self.size), ext_coms), dim=1)
-        
-    
+        # Complete the missing community triples from higher levels
+        prev_mask = affected_mask and (self.coms[2] == 0)
+        for l in range(1, self.subcoms_depth):
+            level_mask = affected_mask and (self.coms[2] == l)
+            level_coms = self.coms[:2, ~level_mask and prev_mask]
+            coms = torch.cat((coms, sparse.ext_range(level_coms, l)), dim=1)
+            prev_mask = level_mask
+
+        # Propagate remaining community triples to lower levels and
+        # add singleton communities for affected nodes at all levels
+        remain_coms = sparse.ext_range(self.coms[:2, remaining_mask], 
+                                       self.subcoms_depth-1)
+        singleton_coms = sparse.ext_range(torch.tensor([nodes, nodes], dtype = torch.int32), 
+                                          self.subcoms_depth)
+        coms = torch.cat((coms, remain_coms, singleton_coms), dim=1)
+
+        ext_nodes = self.coms[1,affected_mask].unique()
+        ext_nodes_mask = torch.isin(coms[1], ext_nodes)
+        self.coms = coms[:, ~ext_nodes_mask]
+
+        for l in range(self.subcoms_depth):
+            level_mask = (coms[2] == l)
+
+            # Get affected communites at the level l
+            old_coms = coms[:2, ext_nodes_mask and level_mask]
+
+            # Reindexing communities
+            reindexing = torch.unique(old_coms[0])
+            reindexing_map = { j.item(): i for i, j in enumerate(reindexing) }
+            old_coms[0] = torch.tensor([ reindexing_map[i.item()] for i in old_coms[0] ])
+
+            # Aggregate adjacency and features matrices
+            reduce_ptn = sparse.tensor(old_coms, (reindexing.size()[0], self.nodes_num),
+                                       self.adj.dtype)
+            adj = self.aggregate(self.adj, reduce_ptn)
+            features = self.aggregate(self.features, reduce_ptn)
+            del reduce_ptn
+
+            # Apply local algorithm for aggregated graph
+            new_coms = self.local_algorithm(adj, features, "prgpt")
+
+            # Restoring the community of the original graph
+            new_coms = torch.tensor([[ reindexing[i.item()] for i in new_coms[0] ],
+                                     [ reindexing[i.item()] for i in new_coms[1] ],
+                                     torch.full((new_coms.size()[1],), l)], dtype=torch.long)
+            res_coms = sparse.mm(new_coms, old_coms, self.size)
+            self.coms = torch.cat((self.coms, res_coms), dim=1)
+
+
     def apply(self, batch):
         """
         Apply Optimizer to the current graph update
