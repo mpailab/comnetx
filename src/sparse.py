@@ -19,6 +19,14 @@ def ext_range(tensor : torch.Tensor, size : int):
     return torch.cat((A, B), dim=0)
 
 
+def reset_matrix(tensor : torch.Tensor, 
+                 indices : torch.Tensor) -> torch.Tensor:
+    mask = torch.isin(tensor.indices(), indices).min(0).values
+    return torch.sparse_coo_tensor(tensor.indices()[:, mask], 
+                                   tensor.values()[mask],
+                                   tensor.size()).coalesce()
+
+
 def reset(tensor : torch.Tensor, 
           key : int | slice | torch.Tensor,
           dim : int = 0,

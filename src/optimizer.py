@@ -116,23 +116,21 @@ class Optimizer:
                         adj, 
                         features, 
                         method : str, 
+                        limited : bool,
                         labels: torch.Tensor | None = None) -> torch.Tensor:
         
-        if self.subcoms_depth == 1:
-            if method == "magi":
-                labels = magi(adj, features, labels)
-                res = labels
+        if method == "magi":
+            labels = magi(adj, features, labels)
+            res = labels
 
-            elif method == "prgpt":
-                res = rough_prgpt(adj.to_sparse(), refine="infomax")
-
-            else:
-                raise ValueError("Unsupported baseline method name")
-            
-            return res.indices()
+        elif method == "prgpt":
+            res = rough_prgpt(adj.to_sparse(), refine="infomax")
 
         else:
-            raise ValueError("Unsupported nesting depth of subcommunities")
+            raise ValueError("Unsupported baseline method name")
+        
+        return res.indices()
+
 
     @staticmethod
     def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
@@ -151,16 +149,22 @@ class Optimizer:
         # Find indices of affected nodes
         nodes = torch.nonzero(nodes_mask)
 
-        # Find pairs of all indices (i,l), where i is affected community on level l
+        # Find pairs of all indices (i,l), where i is an affected community at the level l
         communities = self.coms[0:3:2, torch.isin(self.coms[1], nodes)].unique(dim=1)
 
         # Find mask of all triples (i,j,l) called affected community triples,  
-        # where i is affected community at the level l and j is its node
+        # where i is an affected community at the level l and j is its node
         mask = (self.coms[0:3:2].unsqueeze(2) == communities.unsqueeze(1))
         affected_mask = torch.sum(mask[0] * mask[1], dim=1, dtype=torch.bool)
 
-        # Find mask of all triples (i,j,Last) called remaining community triples,
-        # where i is affected community at the highest level L and j is its node
+        # Find nodes in all affected communities
+        ext_nodes = self.coms[1,affected_mask].unique()
+
+        # TODO: Perhaps, to save memory, it is worth pruning the matrices self.adj, 
+        # self.coms and self.features for nodes from ext_nodes using reindexing
+
+        # Find mask of all triples (i,j,L) called remaining community triples,
+        # where i is an affected community at the highest level L and j is its node
         remaining_mask = (self.coms[2] == self.subcoms_depth-1) and ~nodes_mask
 
         # Remove all affected community triples except for the remaining ones
@@ -182,15 +186,18 @@ class Optimizer:
                                           self.subcoms_depth)
         coms = torch.cat((coms, remain_coms, singleton_coms), dim=1)
 
-        ext_nodes = self.coms[1,affected_mask].unique()
+        # Reset adjacency matrix
+        adj = sparse.reset_matrix(self.adj, ext_nodes)
+
+        # Store communities of unaffected nodes
         ext_nodes_mask = torch.isin(coms[1], ext_nodes)
         self.coms = coms[:, ~ext_nodes_mask]
+        coms = coms[:, ext_nodes_mask]
 
         for l in range(self.subcoms_depth):
-            level_mask = (coms[2] == l)
 
             # Get affected communites at the level l
-            old_coms = coms[:2, ext_nodes_mask and level_mask]
+            old_coms = coms[:2, coms[2] == l]
 
             # Reindexing communities
             reindexing = torch.unique(old_coms[0])
@@ -198,21 +205,27 @@ class Optimizer:
             old_coms[0] = torch.tensor([ reindexing_map[i.item()] for i in old_coms[0] ])
 
             # Aggregate adjacency and features matrices
-            reduce_ptn = sparse.tensor(old_coms, (reindexing.size()[0], self.nodes_num),
-                                       self.adj.dtype)
-            adj = self.aggregate(self.adj, reduce_ptn)
-            features = self.aggregate(self.features, reduce_ptn)
-            del reduce_ptn
+            aggr_ptn = sparse.tensor(old_coms, (reindexing.size()[0], self.nodes_num), adj.dtype)
+            aggr_adj = self.aggregate(adj, aggr_ptn)
+            aggr_features = torch.sparse.mm(aggr_ptn, self.features)
+            del aggr_ptn
 
             # Apply local algorithm for aggregated graph
-            new_coms = self.local_algorithm(adj, features, "prgpt")
+            new_coms = self.local_algorithm(aggr_adj, aggr_features, "prgpt", l > 0)
 
             # Restoring the community of the original graph
             new_coms = torch.tensor([[ reindexing[i.item()] for i in new_coms[0] ],
                                      [ reindexing[i.item()] for i in new_coms[1] ],
                                      torch.full((new_coms.size()[1],), l)], dtype=torch.long)
             res_coms = sparse.mm(new_coms, old_coms, self.size)
-            self.coms = torch.cat((self.coms, res_coms), dim=1)
+
+            # Store new communities at the level l
+            new_coms = torch.cat((new_coms, torch.full((new_coms.size()[1],), l)), dim=0)
+            self.coms = torch.cat((self.coms, new_coms), dim=1)
+
+            # Cut off adjacency matrix
+            cut_ptn = sparse.tensor(res_coms, self.size, adj.dtype)
+            adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
 
 
     def apply(self, batch):
