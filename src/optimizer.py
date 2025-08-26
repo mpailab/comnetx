@@ -15,7 +15,8 @@ class Optimizer:
                  features : torch.Tensor | None = None, 
                  communities : torch.Tensor | None = None,
                  subcoms_num : int = 1,
-                 subcoms_depth : int = 1):
+                 subcoms_depth : int = 1,
+                 method : str = "prgpt:infomap"):
         """
 
         Parameters
@@ -32,7 +33,7 @@ class Optimizer:
         self.subcoms_num = subcoms_num
         self.subcoms_depth = subcoms_depth
         
-        self.adj = adj_matrix
+        self.adj = adj_matrix.float() # FIXME add any type support
 
         if features is None:
             self.features = torch.zeros((self.nodes_num,1), dtype=adj_matrix.dtype)
@@ -45,7 +46,11 @@ class Optimizer:
                                      torch.arange(0,n,dtype=torch.long).repeat(n),
                                      torch.arange(0,n,dtype=torch.long).repeat_interleave(n)))
         else:
+            #TODO reindexing of the communities numbers such that the following condition holds:
+            # if c is a community number, the node c belongs to the community community c;
             self.coms = communities
+        
+        self.method = method
 
 
     def modularity(gamma = 1):
@@ -114,17 +119,19 @@ class Optimizer:
     
     def local_algorithm(self,
                         adj, 
-                        features, 
-                        method : str, 
+                        features,
                         limited : bool,
                         labels: torch.Tensor | None = None) -> torch.Tensor:
         
-        if method == "magi":
+        if self.method == "magi":
             labels = magi(adj, features, labels)
             res = labels
 
-        elif method == "prgpt":
-            res = rough_prgpt(adj.to_sparse(), refine="infomax")
+        elif self.method == "prgpt:infomap":
+            res = rough_prgpt(adj.to_sparse(), refine="infomap")
+            
+        elif self.method == "prgpt:locale":
+            res = rough_prgpt(adj.to_sparse(), refine="locale")
 
         else:
             raise ValueError("Unsupported baseline method name")
@@ -165,16 +172,16 @@ class Optimizer:
 
         # Find mask of all triples (i,j,L) called remaining community triples,
         # where i is an affected community at the highest level L and j is its node
-        remaining_mask = (self.coms[2] == self.subcoms_depth-1) and ~nodes_mask
+        remaining_mask = torch.logical_and(self.coms[2] == self.subcoms_depth-1, ~nodes_mask)
 
         # Remove all affected community triples except for the remaining ones
-        coms = self.coms[:, ~affected_mask or remaining_mask]
+        coms = self.coms[:, torch.logical_or(~affected_mask, remaining_mask)]
 
         # Complete the missing community triples from higher levels
-        prev_mask = affected_mask and (self.coms[2] == 0)
+        prev_mask = torch.logical_and(affected_mask, self.coms[2] == 0)
         for l in range(1, self.subcoms_depth):
-            level_mask = affected_mask and (self.coms[2] == l)
-            level_coms = self.coms[:2, ~level_mask and prev_mask]
+            level_mask = torch.logical_and(affected_mask, self.coms[2] == l)
+            level_coms = self.coms[:2, torch.logical_and(~level_mask, prev_mask)]
             coms = torch.cat((coms, sparse.ext_range(level_coms, l)), dim=1)
             prev_mask = level_mask
 
@@ -211,7 +218,7 @@ class Optimizer:
             del aggr_ptn
 
             # Apply local algorithm for aggregated graph
-            new_coms = self.local_algorithm(aggr_adj, aggr_features, "prgpt", l > 0)
+            new_coms = self.local_algorithm(aggr_adj, aggr_features, l > 0)
 
             # Restoring the community of the original graph
             new_coms = torch.tensor([[ reindexing[i.item()] for i in new_coms[0] ],

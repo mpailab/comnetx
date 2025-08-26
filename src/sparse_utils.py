@@ -9,22 +9,6 @@ def add_zero_lines_and_columns(matrix : torch.Tensor, line_num : int, col_num : 
     matrix = torch.cat((matrix, zero_lines), dim=0)
     return matrix
 
-def to_submatrix(matrix : torch.Tensor, lmask, cmask):
-    """
-    Go to submatrix
-
-    Parameters
-    ----------
-    matrix (torch.sparse_coo) : matrix (k x n)
-    lmask (torch.Tensor) : mask for lines (k, )
-    cmask (torch.Tensor) : mask for columns (n, )
-    
-    Return:
-        torch.sparse_coo: submatrix
-    """
-    # FIXME don't use to_dense()
-    return matrix.to_dense()[:, cmask][lmask].to_sparse()
-
 def sparse_eye(n : int, dtype=int):
     """Create eye sparse matrix"""
     w = torch.ones(n, dtype=dtype)
