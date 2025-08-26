@@ -28,7 +28,7 @@ def test_aggregate_2():
 
 def test_run():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse()
-    communities = torch.tensor([[1, 1, 1, 0], [0, 1, 2, 3], [0, 0, 0, 3]])
+    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
     opt = Optimizer(A, communities = communities)
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)
