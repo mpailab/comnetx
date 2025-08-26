@@ -27,7 +27,7 @@ def test_aggregate_2():
     assert torch.equal(true_res.to_dense(), res.to_dense())
 
 def test_run():
-    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse()
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
     opt = Optimizer(A, communities = communities)
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
@@ -35,4 +35,4 @@ def test_run():
     print("nodes_mask:", nodes_mask)
     opt.run(nodes_mask)
     print()
-    print(opt.communities.to_dense())
+    print(opt.coms.to_dense())

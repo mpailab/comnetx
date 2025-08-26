@@ -9,8 +9,9 @@ def tensor(indices : torch.Tensor, size : torch.types._size, dtype : torch.dtype
 
 
 def mm(indices1 : torch.Tensor, indices2 : torch.Tensor, size : torch.Size):
-    return torch.sparse.mm(tensor(indices1, size, torch.int8), 
-                           tensor(indices2, size, torch.int8)).indices()
+    # FIXME add bool type support
+    return torch.sparse.mm(tensor(indices1, size, torch.float), 
+                           tensor(indices2, size, torch.float)).indices()
 
 
 def ext_range(tensor : torch.Tensor, size : int):

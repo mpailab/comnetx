@@ -30,9 +30,10 @@ def reorder_to_tensor(clus_res, num_clus, zero_base = True):
         src.append(label)
         dst.append(node + plus)
     ind = torch.tensor([src, dst], dtype = torch.int32)
-    val = torch.ones(ind.shape[1], dtype = torch.bool)
-    res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = torch.bool)
-    return res
+    return ind
+    # val = torch.ones(ind.shape[1], dtype = torch.bool)
+    # res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = torch.bool)
+    # return res
 
 def rough_prgpt(adj : torch.Tensor, 
 #                device=None,

@@ -36,9 +36,9 @@ class Optimizer:
         self.adj = adj_matrix.float() # FIXME add any type support
 
         if features is None:
-            self.features = torch.zeros((self.nodes_num,1), dtype=adj_matrix.dtype)
+            self.features = torch.zeros((self.nodes_num,1), dtype=self.adj.dtype)
         else:
-            self.features = features
+            self.features = features.float() # FIXME add any type support
 
         if communities is None:
             n = self.nodes_num
@@ -136,12 +136,7 @@ class Optimizer:
         else:
             raise ValueError("Unsupported baseline method name")
         
-        return res.indices()
-
-
-    @staticmethod
-    def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
-        return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
+        return res
     
     
     def run(self, nodes_mask : torch.Tensor):
@@ -154,7 +149,7 @@ class Optimizer:
         """
 
         # Find indices of affected nodes
-        nodes = torch.nonzero(nodes_mask)
+        nodes = torch.nonzero(nodes_mask).squeeze(1)
 
         # Find pairs of all indices (i,l), where i is an affected community at the level l
         communities = self.coms[0:3:2, torch.isin(self.coms[1], nodes)].unique(dim=1)
@@ -189,8 +184,7 @@ class Optimizer:
         # add singleton communities for affected nodes at all levels
         remain_coms = sparse.ext_range(self.coms[:2, remaining_mask], 
                                        self.subcoms_depth-1)
-        singleton_coms = sparse.ext_range(torch.tensor([nodes, nodes], dtype = torch.int32), 
-                                          self.subcoms_depth)
+        singleton_coms = sparse.ext_range(torch.stack((nodes, nodes)), self.subcoms_depth)
         coms = torch.cat((coms, remain_coms, singleton_coms), dim=1)
 
         # Reset adjacency matrix
@@ -213,7 +207,7 @@ class Optimizer:
 
             # Aggregate adjacency and features matrices
             aggr_ptn = sparse.tensor(old_coms, (reindexing.size()[0], self.nodes_num), adj.dtype)
-            aggr_adj = self.aggregate(adj, aggr_ptn)
+            aggr_adj = torch.sparse.mm(aggr_ptn, torch.sparse.mm(adj, aggr_ptn.t()))
             aggr_features = torch.sparse.mm(aggr_ptn, self.features)
             del aggr_ptn
 
@@ -222,12 +216,11 @@ class Optimizer:
 
             # Restoring the community of the original graph
             new_coms = torch.tensor([[ reindexing[i.item()] for i in new_coms[0] ],
-                                     [ reindexing[i.item()] for i in new_coms[1] ],
-                                     torch.full((new_coms.size()[1],), l)], dtype=torch.long)
+                                     [ reindexing[i.item()] for i in new_coms[1] ]])
             res_coms = sparse.mm(new_coms, old_coms, self.size)
 
             # Store new communities at the level l
-            new_coms = torch.cat((new_coms, torch.full((new_coms.size()[1],), l)), dim=0)
+            new_coms = torch.cat((new_coms, torch.full((1,new_coms.size()[1]), l)), dim=0)
             self.coms = torch.cat((self.coms, new_coms), dim=1)
 
             # Cut off adjacency matrix
