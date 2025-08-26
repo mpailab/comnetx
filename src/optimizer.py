@@ -137,6 +137,11 @@ class Optimizer:
             raise ValueError("Unsupported baseline method name")
         
         return res
+
+
+    @staticmethod
+    def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
+        return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
     
     
     def run(self, nodes_mask : torch.Tensor):
@@ -207,7 +212,7 @@ class Optimizer:
 
             # Aggregate adjacency and features matrices
             aggr_ptn = sparse.tensor(old_coms, (reindexing.size()[0], self.nodes_num), adj.dtype)
-            aggr_adj = torch.sparse.mm(aggr_ptn, torch.sparse.mm(adj, aggr_ptn.t()))
+            aggr_adj = self.aggregate(adj, aggr_ptn)
             aggr_features = torch.sparse.mm(aggr_ptn, self.features)
             del aggr_ptn
 
