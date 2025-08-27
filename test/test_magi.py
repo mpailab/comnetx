@@ -2,13 +2,16 @@ import os
 import torch
 import numpy as np
 import sys
+import torch, gc
+import pytest
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from baselines.magi import magi
 from datasets import Dataset
 
-
+@pytest.mark.long
 def test_magi_on_cora():
     data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset("cora", path=data_dir + "/cora")
@@ -20,7 +23,9 @@ def test_magi_on_cora():
     assert new_labels.shape[0] == labels.shape[0]
     assert new_labels.dtype in (torch.int64, torch.long)
     assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
 
+@pytest.mark.long    
 def test_magi_on_citeseer():
     data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset("citeseer", path=data_dir + "/citeseer")
@@ -32,7 +37,9 @@ def test_magi_on_citeseer():
     assert new_labels.shape[0] == labels.shape[0]
     assert new_labels.dtype in (torch.int64, torch.long)
     assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
 
+@pytest.mark.long
 def test_magi_on_eat():
     data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset("eat", path=data_dir + "/eat")
@@ -44,6 +51,7 @@ def test_magi_on_eat():
     assert new_labels.shape[0] == labels.shape[0]
     assert new_labels.dtype in (torch.int64, torch.long)
     assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
 
 def test_features():
     data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")

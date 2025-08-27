@@ -15,10 +15,10 @@ def facebook_dataset():
     ds.load()
     return ds
 
-def test_rough_prgpt_infomax_on_facebook(facebook_dataset):
-    rough_prgpt(facebook_dataset.adj, refine="infomax")
+def test_rough_prgpt_infomap_on_facebook(facebook_dataset):
+    rough_prgpt(facebook_dataset.adj, refine="infomap")
 
-def test_rough_prgpt_infomax_on_facebook(facebook_dataset):
+def test_rough_prgpt_locale_on_facebook(facebook_dataset):
     rough_prgpt(facebook_dataset.adj, refine="locale")
 
 @pytest.mark.short

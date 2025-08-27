@@ -37,7 +37,7 @@ def test_run_prgpt():
     print()
     print(opt.coms.to_dense())
 
-# FIXME don't work
+@pytest.mark.long
 def test_run_magi():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
