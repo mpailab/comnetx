@@ -56,38 +56,24 @@ class Optimizer:
     def modularity(gamma = 1):
         pass
 
-    def upgrade_graph(self, batch):
+    def upgrade_graph(self,
+                      batch_update: torch.Tensor):
         """
         Change the graph based on the current batch of updates.
 
         Parameters
         ----------
-        batch : torch.Tensor of the shape (n,3)
-            List of edges with weights given in the form (i,j,w), 
-            where i and j are node numbers and w is the changing edge weight. 
+        batch_update : torch.Tensor of the shape (n, n)
         """
 
-        n = self.A.size()[0]
-        i, j, w = list(zip(*batch)) # FIXME (to konovalov) use torch hsplit
-        new_nodes = set(filter(lambda x: x not in self.index_converter, i+j)) # FIXME (to konovalov) use torch features
-        k = len(new_nodes)
-        # set indexes (n, n+1, ...) to new nodes
-        self.index_converter.update(zip(new_nodes, range(n, n+k)))
-        i = [self.index_converter[x] for x in i]
-        j = [self.index_converter[x] for x in j]
-        update_A = torch.sparse_coo_tensor([i, j], w, (n+k, n+k))
-        update_C = torch.sparse_coo_tensor([range(n, n+k), range(n, n+k)], [True for x in range(k)], (n+k, n+k))
+        batch_size = batch_update.size()
+        if self.size != batch_size:
+            raise(f"Unsuitable batch size: {batch_size}. {self.size} is required.")
         
-        # change A, add new lines and columns if necessary
-        self.A = add_zero_lines_and_columns(self.A, k, k) + update_A
-        # correct D_in and D_out
-        self.D_in = torch.cat((self.D_in, torch.zeros(k))) + update_A.sum(dim=0)
-        self.D_out = torch.cat((self.D_out, torch.zeros(k))) + update_A.sum(dim=1)
-        # correct C by adding new 1-element communities
-        self.C = add_zero_lines_and_columns(self.C, k, k) + update_C
+        self.adj += batch_update.type(self.adj.dtype)
+        affected_nodes = batch_update.indices().unique()
 
-        nodes = list(set(i+j)) # affected_nodes
-        return torch.sparse_coo_tensor([nodes], torch.ones(len(nodes), dtype=bool), size = (n+k,)) # affected_nodes_mask
+        return affected_nodes
 
     @staticmethod
     def neighborhood(A, nodes, step=1):
