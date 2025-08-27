@@ -22,7 +22,7 @@ from metrics import Metrics
 
 def magi(adj : torch.Tensor, 
          features : torch.Tensor, 
-         labels : torch.Tensor = None, 
+         labels : torch.Tensor | None = None, 
          n_clusters : int = -1, 
          device=None, 
          args=None):

@@ -30,9 +30,10 @@ def reorder_to_tensor(clus_res, num_clus, zero_base = True):
         src.append(label)
         dst.append(node + plus)
     ind = torch.tensor([src, dst], dtype = torch.int32)
-    val = torch.ones(ind.shape[1], dtype = torch.bool)
-    res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = torch.bool)
-    return res
+    return ind
+    # val = torch.ones(ind.shape[1], dtype = torch.bool)
+    # res = torch.sparse_coo_tensor(ind, val, size=(num_clus, num_nodes + plus), dtype = torch.bool)
+    # return res
 
 def rough_prgpt(adj : torch.Tensor, 
 #                device=None,
@@ -44,7 +45,7 @@ def rough_prgpt(adj : torch.Tensor,
     Parameters
     ----------
     refine : str
-        Type of refine algorithm: InfoMap, Locale
+        Type of refine algorithm: infomap, locale
         Default: None
 
     """
@@ -145,7 +146,9 @@ def rough_prgpt(adj : torch.Tensor,
     mod_init = get_mod_mtc(tst_edges, clus_res_init_, num_clus_est)
     print('INIT EST-K %d MOD %.4f' % (num_clus_est, mod_init))
     clus_res = clus_res_init_
-    if refine == "infomap":
+    if refine is None:
+        return reorder_to_tensor(clus_res_init_, num_clus_est, zero_base)
+    elif refine == "infomap":
         # Online refinement via InfoMap
         time_s = time.time()
         clus_res_IM = InfoMap_rfn(init_edges, init_node_map, init_num_nodes, clus_res_init, tst_num_nodes)
@@ -172,4 +175,4 @@ def rough_prgpt(adj : torch.Tensor,
             % (num_clus_est, mod_Lcl, time_Lcl, feat_time, FFP_time, init_time, rfn_time_Lcl))
         return reorder_to_tensor(clus_res_Lcl, num_clus_est, zero_base)
     else:
-        return reorder_to_tensor(clus_res_init_, num_clus_est, zero_base)
+        raise ValueError(f"Unsupported refine method: {refine}")
