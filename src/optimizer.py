@@ -125,19 +125,16 @@ class Optimizer:
         
         if self.method == "magi":
             labels = magi(adj, features, labels)
-            res = labels
+            return labels.indices()
 
         elif self.method == "prgpt:infomap":
-            res = rough_prgpt(adj.to_sparse(), refine="infomap")
+            return rough_prgpt(adj.to_sparse(), refine="infomap")
             
         elif self.method == "prgpt:locale":
-            res = rough_prgpt(adj.to_sparse(), refine="locale")
+            return rough_prgpt(adj.to_sparse(), refine="locale")
 
         else:
             raise ValueError("Unsupported baseline method name")
-        
-        return res
-
 
     @staticmethod
     def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
