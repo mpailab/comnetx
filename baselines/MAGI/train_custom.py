@@ -22,19 +22,10 @@ from datasets import Dataset
 import debugpy
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src")))
-from metrics import Metrics
-
-
-"""
-debugpy.listen(("0.0.0.0", 5678))
-print("Жду подключения отладчика на порту 5678...")
-debugpy.wait_for_client()
-"""
-
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--verbose', type=bool, default=True)
-parser.add_argument('--runs', type=int, default=1)
+parser.add_argument('--verbose', action='store_true', help='Enable verbose output')
+parser.add_argument('--runs', type=int, default=4)
 parser.add_argument('--max_duration', type=int,
                     default=60, help='max duration time')
 parser.add_argument('--kmeans_device', type=str,
@@ -66,15 +57,81 @@ parser.add_argument('--wd', type=float, default=0)
 parser.add_argument('--epochs', type=int, default=100)
 args = parser.parse_args()
 
+def modularity_magi_prob(adjacency : torch.Tensor, 
+                         assignments : torch.Tensor):
+    
+    """
+    Compute the modularity score for given assignments of nodes in a graph.
+
+    Parameters
+    ----------
+    adjacency : torch.Tensor
+        Adjacency matrix, shape [N, N].
+
+    assignments : torch.Tensor
+        One-hot encoded cluster assignments, shape: [N, num_clusters].
+
+    Returns
+    -------
+    float
+        The modularity score.
+    """
+
+    device = adjacency.device()
+    row, col = adjacency.storage.row(), adjacency.storage.col()
+    assignments = assignments.to(device)
+    m = adjacency.storage.value().sum() / 2 
+
+    prob_same_cluster = (assignments[row] * assignments[col]).sum(dim=1)
+    
+    L_c = (adjacency.storage.value() * prob_same_cluster).sum()
+    
+    degrees = torch.zeros_like(assignments[:, 0]).scatter_add_(
+        0, row, adjacency.storage.value())
+    
+    D_c = (degrees.unsqueeze(1) * assignments).sum()
+    
+    return (L_c - D_c**2 / (4 * m)) / m
+
 def sparse_equal(t1, t2):
+
+    """
+    Check equality of two sparse tensors.
+
+    Parameters
+    ----------
+    t1, t2 : torch.Tensor
+        Tensors to compare.
+
+    Returns
+    -------
+    bool
+    """
+
     if t1.shape != t2.shape:
         return False
-    # Приводим к одинаковому порядку
     t1 = t1.coalesce()
     t2 = t2.coalesce()
     return (torch.equal(t1.indices(), t2.indices()), torch.allclose(t1.values(), t2.values()))
 
 def train():
+
+    """
+    Train the MAGI model.
+
+    Returns
+    -------
+    tuple
+        Tuple, containing:
+        - acc : float - clustering accuracy
+        - nmi : float - normalized mutual information
+        - ari : float - adjusted rand index
+        - f1_macro : float - F1 score (macro)
+        - f1_micro : float - F1 score (micro)
+        - mod_score : float - modularity score of the clustering
+    """
+
+    print("Debug: start train")
     ts = time.time()
     randint = random.randint(1, 1000000)
     setup_seed(randint)
@@ -160,7 +217,6 @@ def train():
         total_loss = total_examples = 0
 
         for (batch_size, n_id, adjs), adj_batch, batch in train_loader:
-            # `adjs` holds a list of `(edge_index, e_id, size)` tuples.
             if len(hidden) == 1:
                 adjs = [adjs]
             adjs = [adj.to(device) for adj in adjs]
@@ -209,7 +265,7 @@ def train():
                                                    batch_size=args.kmeans_batch, tol=1e-4, device=device, spectral_clustering=False)
 
     assignments = F.one_hot(torch.tensor(lbls, dtype=torch.long), num_classes=n_clusters).float()
-    mod_score = Metrics.modularity_magi_prob(adj, assignments)
+    mod_score = modularity_magi_prob(adj, assignments)
 
     print(f'Finish clustering, acc: {acc:.4f}, nmi: {nmi:.4f}, ari: {ari:.4f}, f1_macro: {f1_macro:.4f}, '
           f'f1_micro: {f1_micro:.4f}, clustering time cost: {time.time() - ts_clustering:.2f}')
@@ -220,6 +276,25 @@ def train():
 
 
 def run(runs=1, result=None):
+
+    """
+    Run multiple training sessions.
+
+    Parameters
+    ----------
+    runs : int
+        Number of training runs.
+        Default=1
+        
+    result : str or None
+        Path to CSV file to store results.
+        Default=None
+
+    Returns
+    -------
+    None
+    """
+
     if result:
         with open(result, 'w', encoding='utf-8-sig', newline='') as f_w:
             writer = csv.writer(f_w)

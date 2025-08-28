@@ -44,6 +44,6 @@ pip install --no-cache-dir -r "$REQUIREMENTS_PATH"
 pip install --no-cache-dir \
     torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric \
     -f https://data.pyg.org/whl/torch-2.1.0+cu118.html \
-    ogb matplotlib pytest tensorflow debugpy
+    ogb matplotlib tensorflow==2.14.0 pytest debugpy
 
 echo "[INFO] Done!"

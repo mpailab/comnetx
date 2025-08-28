@@ -227,7 +227,9 @@ class Optimizer:
         
         if self.method == "magi":
             labels = magi(adj, features, labels)
-            return labels.indices()
+            num_nodes = labels.size(0)
+            reorder_tensor = torch.stack([labels, torch.arange(num_nodes, device=labels.device)])
+            return reorder_tensor
 
         elif self.method == "prgpt:infomap":
             return rough_prgpt(adj.to_sparse(), refine="infomap")

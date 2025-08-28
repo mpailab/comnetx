@@ -27,19 +27,51 @@ def magi(adj : torch.Tensor,
          device=None, 
          args=None):
 
+    """
+    MAGI method
+
+    Parameters
+    ----------
+    adj : torch.Tensor
+        Adjacency matrix, shape [N, N].
+
+    features: torch.Tensor
+        Features matrix, shape [N, K].
+
+    labels: torch.Tensor or None, optional
+        Ground-truth node labels.
+        Default: None 
+
+    n_clusters: int, optional
+        Number of clusters.
+        Default: -1 
+
+    device: torch.device or None, optional
+        Device for computing: 'cuda', 'cpu'
+        Default: None 
+
+    args: 
+        Hyperparameters for MAGI training. If None, default parameters are used.
+
+    Returns
+    -------
+    torch.Tensor
+        Predicted cluster assignments for all nodes, shape [N].
+    """
+
     if args is None:
         class Args:
             batchsize = 2048
             max_duration = 60
             kmeans_device = 'cpu'
             kmeans_batch = -1
-            hidden_channels = '1024,256'  # в magi этот параметр называется hidden_channels
+            hidden_channels = '1024,256'
             size = '10,10'
             wt = 20
             wl = 5
             tau = 0.5
             ns = 0.5
-            lr = 0.01
+            lr = 0.05
             epochs = 100
             projection = ""
             wd = 0
@@ -52,7 +84,11 @@ def magi(adj : torch.Tensor,
     print("device: ", device)
 
     features = features.to(device)
-    labels = labels.to(device)
+    if labels is None:
+        num_nodes = adj.size(0)
+        labels = torch.arange(num_nodes, device=device)
+    else:
+        labels = labels.to(device)
 
     N, num_features = features.shape[0], features.shape[-1]
 
@@ -122,8 +158,9 @@ def magi(adj : torch.Tensor,
             total_loss += loss.item()
             batches += 1
 
+            print(f'(T) | Epoch {epoch:02d}, loss: {loss:.4f}, examples: {batch_size:d}')
+                      
         avg_loss = total_loss / batches if batches > 0 else 0
-        print(f"Epoch [{epoch+1}/{args.epochs}], Average Loss: {avg_loss:.4f}")
 
     model.eval()
     z_all = torch.zeros((N, hidden[-1]), device=device)
@@ -136,7 +173,13 @@ def magi(adj : torch.Tensor,
 
     embeddings = F.normalize(z_all, p=2, dim=1)
 
-    num_clusters, new_labels = find_best_k_with_modularity(adj_sparse, embeddings, range(2, 21), device=torch.device('cuda:0'))
+    k_max = min(40, adj_sparse.sparse_sizes()[0])
+    k_min = min(2, k_max)
+    if k_max <= k_min:
+        num_clusters = k_max
+        new_labels = torch.zeros(adj_sparse.sparse_sizes()[0], dtype=torch.long, device=device)
+    else:
+        num_clusters, new_labels = find_best_k_with_modularity(adj_sparse, embeddings, range(k_min, k_max), device=device)
     if not isinstance(new_labels, torch.Tensor):
         new_labels = torch.tensor(new_labels, dtype=torch.long, device=device)
     else:
@@ -145,14 +188,42 @@ def magi(adj : torch.Tensor,
     return new_labels
 
 
-def find_best_k_with_modularity(adj_sparse, embeddings, k_range, device=torch.device('cuda:0')):
+def find_best_k_with_modularity(adj_sparse : torch.Tensor,
+                                embeddings : torch.Tensor, 
+                                k_range, 
+                                device=torch.device('cuda:0')):
+
+    """
+    Finds the best number of clusters based on modularity.
+
+    Parameters
+    ----------
+    adj_sparse : torch.Tensor
+        Adjacency matrix of the graph, shape [N, N].
+        
+    embeddings : torch.Tensor
+        Node embeddings matrix, shape [N, D].
+
+    k_range : iterable
+        Range of cluster numbers (k) to try.
+
+    device : torch.device, optional
+        Device for computing: 'cuda', 'cpu'
+        Default: torch.device('cuda:0').
+
+    Returns
+    -------
+    tuple
+        best_k : int
+            Number of clusters with highest modularity.
+        best_labels : torch.Tensor
+            Predicted cluster assignments for all nodes, shape [N].
+    """
     best_k = None
     best_modularity = -float('inf')
     best_labels = None
 
     for k in k_range:
-        print(f"Пробуем k={k}")
-        
         pred_labels, cluster_centers = clustering(
             feature = embeddings,
             n_clusters=k,
@@ -163,27 +234,72 @@ def find_best_k_with_modularity(adj_sparse, embeddings, k_range, device=torch.de
             spectral_clustering=False
         )
 
+        """
         if cluster_centers is not None:
             dists = torch.cdist(embeddings, cluster_centers.to(device))
             assignments = torch.softmax(-dists, dim=1)
         else:
             assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
+        """
+        assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
+        mod = Metrics.modularity(adj_sparse, assignments)
 
-        mod = Metrics.modularity_magi_prob(adj_sparse, assignments)
-
-        print(f"Модулярность для k={k}: {mod:.4f}")
+        print(f"Modularity for k={k}: {mod:.4f}")
 
         if mod > best_modularity:
             best_modularity = mod
             best_k = k
             best_labels = pred_labels
 
-    print(f"Лучшее k={best_k} с модулярностью {best_modularity:.4f}")
+    print(f"Best k={best_k} with modularity {best_modularity:.4f}")
     return best_k, best_labels
 
 
 
-def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000, tol=1e-4, device=torch.device('cuda:0'), spectral_clustering=False):
+def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
+               tol=1e-4, device=torch.device('cuda:0'), spectral_clustering=False):
+    
+    """
+    Clustering method from MAGI
+
+    Parameters
+    ----------
+    feature : torch.Tensor
+        Node feature matrix, shape [N, K].
+
+    n_clusters : int
+        Number of clusters.
+
+    kmeans_device : str, optional
+        Device to run k-means on ('cpu' or 'cuda'). Ignored if spectral_clustering=True.
+        Default: 'cpu'.
+
+    batch_size : int, optional
+        Batch size for k-means. 
+        Default: 100000.
+
+    tol : float, optional
+        Tolerance for convergence in k-means. 
+        Default: 1e-4.
+
+    device : torch.device, optional
+        Device for computing: 'cuda', 'cpu'
+        Default: torch.device('cuda:0').
+
+    spectral_clustering : bool, optional
+        Using spectral clustering instead of k-means. 
+        Default: False.
+
+    Returns
+    -------
+    tuple
+        predict_labels : np.ndarray
+            Cluster assignments, shape [N].
+
+        cluster_centers : torch.Tensor or None
+            Cluster centroids (for k-means), or None for spectral clustering.
+    """
+
     if spectral_clustering:
         if isinstance(feature, torch.Tensor):
             feature = feature.numpy()

@@ -2,7 +2,7 @@
 
 NAME=""
 DOCKER=docker
-IMAGE="pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel"
+IMAGE="tensorflow/tensorflow:latest-gpu"
 REUSE=0
 SHM_SIZE="2g"
 

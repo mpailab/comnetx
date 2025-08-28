@@ -17,8 +17,7 @@ def test_train_custom_eat_runs_successfully():
 
     dataset_path = Path(__file__).parent / "graphs" / "small" / "eat"
 
-     #  Script run
-    result = subprocess.run(
+    proc = subprocess.Popen(
         [
             "python", str(script_path),
             "--runs", "1",
@@ -35,19 +34,26 @@ def test_train_custom_eat_runs_successfully():
             "--tau", "0.5",
             "--ns", "0.5",
             "--lr", "0.01",
-            "--epochs", "400",
+            "--epochs", "100",
             "--wd", "0",
-            "--dropout", "0"
+            "--dropout", "0",
         ],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
-        timeout=600
+        bufsize=1
     )
 
-    print(result.stdout)
-    print(result.stderr)
+    logs = []
+    for line in proc.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        logs.append(line)
 
-    assert result.returncode == 0, f"Script failed: {result.stderr}"
+    proc.wait(timeout=120)
+    log_text = "".join(logs)
+
+    assert proc.returncode == 0, f"Script failed. Logs:\n{log_text}"
 
 
 @pytest.mark.long
@@ -56,7 +62,6 @@ def test_train_custom_cora_runs_successfully():
 
     dataset_path = Path(__file__).parent / "graphs" / "small" / "cora"
 
-    #  Script run
     result = subprocess.run(
         [
             "python", str(script_path),
@@ -74,13 +79,13 @@ def test_train_custom_cora_runs_successfully():
             "--tau", "0.5",
             "--ns", "0.5",
             "--lr", "0.01",
-            "--epochs", "400",
+            "--epochs", "100",
             "--wd", "0",
             "--dropout", "0"
         ],
         capture_output=True,
         text=True,
-        timeout=600
+        timeout=60
     )
 
     print(result.stdout)
