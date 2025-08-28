@@ -2,6 +2,55 @@ import sys
 sys.path.append("src") 
 from optimizer import Optimizer
 import torch
+import numpy as np
+import sparse
+from typing import Union
+
+@staticmethod
+def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], 
+                         nodes: torch.Tensor, 
+                         step: int = 1) -> torch.Tensor:
+    visited = nodes.clone()
+    
+    if isinstance(A, torch.Tensor) and A.is_sparse:
+        A_c = A.coalesce()
+        rows, cols = A_c.indices()
+        
+        for k in range(step):
+            if not visited.any():
+                break
+
+            frontier = torch.where(visited)[0]
+            if len(frontier) == 0:
+                break
+
+            mask = torch.isin(rows, frontier)
+            neighbors = cols[mask]
+            
+            if len(neighbors) > 0:
+                visited[neighbors] = True
+                
+    elif hasattr(A, 'coords'):
+        rows, cols = A.coords
+        visited_np = visited.cpu().numpy()
+        
+        for k in range(step):
+            if not visited_np.any():
+                break
+            
+            frontier_indices = np.where(visited_np)[0]
+            mask = np.isin(rows, frontier_indices)
+            
+            if mask.any():
+                neighbors = cols[mask]
+                visited_np[neighbors] = True
+        
+        visited = torch.tensor(visited_np, device=visited.device)
+        
+    else:
+        raise TypeError(f"Unsupported matrix type: {type(A)}")
+    
+    return visited
 
 A = torch.tensor([
     [0, 1, 0, 0],
@@ -13,7 +62,7 @@ A = torch.tensor([
 indices = torch.nonzero(A).t()
 values = A[indices[0], indices[1]]
 
-A_sparse = torch.sparse_coo_tensor(
+A_torch_sparse = torch.sparse_coo_tensor(
     indices=indices,
     values=values,
     size=A.shape,
@@ -22,6 +71,19 @@ A_sparse = torch.sparse_coo_tensor(
 
 initial_nodes = torch.tensor([True, False, False, False])
 
-k = 2
-nodes_new = Optimizer.neighborhood(A_sparse, initial_nodes, k)
+nodes_new = neighborhood(A_torch_sparse, initial_nodes, step=2)
+print(nodes_new)
+
+torch_sparse = A_torch_sparse.coalesce()
+indices = torch_sparse.indices().cpu().numpy()
+values = torch_sparse.values().cpu().numpy()
+shape = torch_sparse.shape
+
+A_sparse_coo = sparse.COO(
+    coords=indices,  
+    data=values,     
+    shape=shape      
+)
+
+result = neighborhood(A_sparse_coo, initial_nodes, step=2)
 print(nodes_new)
