@@ -118,27 +118,24 @@ class Optimizer:
         return affected_nodes
 
     @staticmethod
-    def neighborhood(A, nodes, step=1):
+    def neighborhood(adj, nodes, step=1):
         """
         Args:
-            A (torch.sparse_coo): adjacency (n x n).
+            adj (torch.sparse_coo): adjacency (n x n).
             nodes (torch.Tensor): binary vector (n,)
             step (int)
 
         Return:
             torch.Tensor: new binary mask with new nodes.
         """
-        # FIXME don't work for sparse A
         visited = nodes.clone()
-        A_c = A.coalesce() 
+        adj = adj.coalesce() 
 
         for k in range(step):
-            if not visited.any():
+            if visited.all():
                 break
-
-            new_frontier_mask = visited[A_c.indices()[0]]
-            neighbors = A_c.indices()[1][new_frontier_mask]
-            
+            new_frontier_mask = visited[adj.indices()[0]]
+            neighbors = adj.indices()[1][new_frontier_mask]
             visited[neighbors] = True
             
         return visited

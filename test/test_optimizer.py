@@ -57,3 +57,40 @@ def test_update_adj():
     true_res = adj_matrix * 2
     res = opt.adj
     assert torch.equal(true_res, opt.adj.to_dense())
+
+@pytest.mark.short
+def test_neighborhood_1():
+    A = torch.tensor([
+        [0, 1, 0, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [0, 0, 0, 0]
+    ], dtype=torch.float32)
+    A_sparse = A.to_sparse_coo()
+    initial_nodes = torch.tensor([True, False, False, False])
+    nodes_0 = Optimizer.neighborhood(A_sparse, initial_nodes, 0)
+    nodes_1 = Optimizer.neighborhood(A_sparse, initial_nodes, 1)
+    nodes_2 = Optimizer.neighborhood(A_sparse, initial_nodes, 2)
+    true_nodes_1 = torch.tensor([True, True, False, False])
+    true_nodes_2 = torch.tensor([True, True, True, True])
+    assert torch.equal(nodes_0, initial_nodes)
+    assert torch.equal(nodes_1, true_nodes_1)
+    assert torch.equal(nodes_2, true_nodes_2)
+
+def test_neighborhood_2():
+    A = torch.tensor([
+        [0, 1, 0, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [0, 0, 0, 0]
+    ], dtype=torch.float32)
+    A_sparse = A.t().to_sparse_coo()
+    initial_nodes = torch.tensor([True, False, False, False])
+    nodes_0 = Optimizer.neighborhood(A_sparse, initial_nodes, 0)
+    nodes_1 = Optimizer.neighborhood(A_sparse, initial_nodes, 1)
+    nodes_2 = Optimizer.neighborhood(A_sparse, initial_nodes, 2)
+    true_nodes_1 = torch.tensor([True, True, False, False])
+    true_nodes_2 = torch.tensor([True, True, True, True])
+    assert torch.equal(nodes_0, initial_nodes)
+    assert torch.equal(nodes_1, true_nodes_1)
+    assert torch.equal(nodes_2, true_nodes_2)
