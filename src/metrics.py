@@ -116,8 +116,8 @@ class Metrics:
     def modularity(adjacency, assignments) -> float:
         """
         Args:
-            adjacency: tf.sparse.SparseTensor or SparseTensor [n_nodes, n_nodes]
-            assignments: tf.Tensor or torch.Tensor [n_nodes, n_clusters]
+            adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]
+            assignments: torch.Tensor or torch.Tensor or tf.Tensor [n_nodes, n_clusters]
             
         Returns:
             modularity: float 
@@ -131,8 +131,18 @@ class Metrics:
             graph_pooled = torch.matmul(a_s.t(), assignments)
             s_d = torch.matmul(assignments.t(), degrees)
             normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
-            # modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
-            modularity = torch.trace(graph_pooled - normalizer) * inv_2m
+            modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
+            # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
+            return modularity.item()
+        elif isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor):
+            degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
+            m = degrees.sum()
+            inv_2m = 1.0 / (2 * m)
+            a_s = torch.sparse.mm(adjacency, assignments)
+            graph_pooled = torch.matmul(a_s.t(), assignments)
+            s_d = torch.matmul(assignments.t(), degrees)
+            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
+            modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
             return modularity.item()
         elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
             degrees = tf.sparse.reduce_sum(adjacency, axis=0)
@@ -144,6 +154,6 @@ class Metrics:
             s_d = tf.matmul(assignments, degrees, transpose_a=True)
             normalizer = tf.matmul(s_d, s_d, transpose_b=True) * inv_2m
             modularity = tf.linalg.trace(graph_pooled - normalizer) * inv_2m
-            return modularity
+            return modularity.numpy()
         else:
             raise TypeError("Unsupported type")

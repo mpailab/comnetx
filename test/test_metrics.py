@@ -8,7 +8,7 @@ sys.path.append("src")
 from metrics import Metrics
 
 
-N, K = 10000, 3
+N, K = 100000, 10
 
 # SIZE = 1
 # time_arr = torch.zeros(5,SIZE)
@@ -59,7 +59,7 @@ N, K = 10000, 3
 # print(torch.mean(time_arr, dim=1))
 
 SIZE = 10
-time_arr = torch.zeros(2,SIZE)
+time_arr = torch.zeros(3,SIZE)
 
 for i in range(SIZE):
     features_tf = tf.random.normal((N, 10))
@@ -71,13 +71,26 @@ for i in range(SIZE):
     # print(assignments_tf)
     indices_np = indices_tf.numpy()
     values_np = values_tf.numpy()
-    adjacency_torch = SparseTensor(
+    adjacency_torch_geom = SparseTensor(
         row=torch.from_numpy(indices_np[:, 0]).long(),
         col=torch.from_numpy(indices_np[:, 1]).long(),
         value=torch.from_numpy(values_np).float(),
         sparse_sizes=(N, N)
     )
     assignments_torch = torch.from_numpy(assignments_tf.numpy()).float()
+
+    indices_np = indices_tf.numpy().T
+    adjacency_torch = torch.sparse_coo_tensor(
+        indices=torch.from_numpy(indices_np).long(),
+        values=torch.from_numpy(values_np).float(),
+        size=(N, N)
+    ).coalesce()
+
+    # torch geom-version
+    start_time = time.time()
+    mod_value = Metrics.modularity(adjacency_torch_geom, assignments_torch)
+    print("mod. = ", mod_value)
+    time_arr[0,i] = time.time() - start_time
 
     # torch version
     start_time = time.time()
@@ -89,6 +102,6 @@ for i in range(SIZE):
     start_time = time.time()
     mod_value = Metrics.modularity(adjacency_tf, assignments_tf)
     print("mod. = ", mod_value)
-    time_arr[0,i] = time.time() - start_time
+    time_arr[2,i] = time.time() - start_time
 
 print(torch.mean(time_arr, dim=1))
