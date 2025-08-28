@@ -1,6 +1,8 @@
 # External imports
 import torch
 import os
+import numpy as np
+from typing import Union
 
 # Internal imports
 from baselines.magi import magi
@@ -118,7 +120,7 @@ class Optimizer:
         return affected_nodes
 
     @staticmethod
-    def neighborhood(A, nodes, step=1):
+    def neighborhood_torch(A, nodes, step=1):
         """
         Args:
             A (torch.sparse_coo): adjacency (n x n).
@@ -141,6 +143,82 @@ class Optimizer:
             
             visited[neighbors] = True
             
+        return visited
+    @staticmethod
+    def neighborhood_sparse(A, nodes, step=1):
+        """
+        Args:
+            A (sparse.COO): adjacency matrix (n x n)
+            nodes (torch.Tensor): binary vector (n,)
+            step (int)
+        
+        Return:
+            torch.Tensor: new binary mask with new nodes
+        """
+        visited = nodes.clone().numpy() if isinstance(nodes, torch.Tensor) else nodes.copy()
+        
+        for k in range(step):
+            if not visited.any():
+                break
+            
+            # Получаем индексы ненулевых элементов
+            rows, cols = A.coords
+            data = A.data
+            
+            # Ищем соседей через индексы
+            frontier_indices = np.where(visited)[0]
+            mask = np.isin(rows, frontier_indices)
+            
+            if mask.any():
+                neighbors = cols[mask]
+                visited[neighbors] = True
+                
+        return torch.tensor(visited) if isinstance(nodes, torch.Tensor) else visited
+
+    @staticmethod
+    def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], 
+                         nodes: torch.Tensor, 
+                         step: int = 1) -> torch.Tensor:
+        visited = nodes.clone()
+        
+        if isinstance(A, torch.Tensor) and A.is_sparse:
+            A_c = A.coalesce()
+            rows, cols = A_c.indices()
+            
+            for k in range(step):
+                if not visited.any():
+                    break
+
+                frontier = torch.where(visited)[0]
+                if len(frontier) == 0:
+                    break
+
+                mask = torch.isin(rows, frontier)
+                neighbors = cols[mask]
+                
+                if len(neighbors) > 0:
+                    visited[neighbors] = True
+                    
+        elif hasattr(A, 'coords'):
+            rows, cols = A.coords
+            visited_np = visited.cpu().numpy()
+            
+            for k in range(step):
+                if not visited_np.any():
+                    break
+                
+                frontier_indices = np.where(visited_np)[0]
+                mask = np.isin(rows, frontier_indices)
+                
+                if mask.any():
+                    neighbors = cols[mask]
+                    visited_np[neighbors] = True
+            
+            visited = torch.tensor(visited_np, device=visited.device)
+            
+        else:
+            raise TypeError(f"Unsupported matrix type: {type(A)}")
+        
         return visited
 
     def local_algorithm(self,

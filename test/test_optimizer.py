@@ -2,6 +2,7 @@ import sys
 import os
 import torch
 import pytest
+from typing import Union
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
@@ -58,3 +59,41 @@ def test_upgrade():
     true_res = adj_matrix * 2
     res = opt.adj
     assert torch.equal(true_res, opt.adj.to_dense())
+
+@pytest.mark.short
+def test_neighborhood():
+        A = torch.tensor([
+        [0, 1, 0, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [0, 0, 0, 0]
+    ], dtype=torch.float32)
+
+    indices = torch.nonzero(A).t()
+    values = A[indices[0], indices[1]]
+
+    A_torch_sparse = torch.sparse_coo_tensor(
+        indices=indices,
+        values=values,
+        size=A.shape,
+        dtype=torch.float32
+    )
+
+    initial_nodes = torch.tensor([True, False, False, False])
+
+    nodes_new = neighborhood(A_torch_sparse, initial_nodes, step=2)
+    print(nodes_new)
+
+    torch_sparse = A_torch_sparse.coalesce()
+    indices = torch_sparse.indices().cpu().numpy()
+    values = torch_sparse.values().cpu().numpy()
+    shape = torch_sparse.shape
+
+    A_sparse_coo = sparse.COO(
+        coords=indices,  
+        data=values,     
+        shape=shape      
+    )
+
+    result = neighborhood(A_sparse_coo, initial_nodes, step=2)
+    print(nodes_new)
