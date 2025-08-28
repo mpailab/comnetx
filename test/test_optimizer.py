@@ -2,6 +2,7 @@ import sys
 import os
 import torch
 import pytest
+from typing import Union
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
