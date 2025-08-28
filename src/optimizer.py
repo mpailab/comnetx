@@ -130,7 +130,6 @@ class Optimizer:
         Return:
             torch.Tensor: new binary mask with new nodes.
         """
-        # FIXME don't work for sparse A
         visited = nodes.clone()
         A_c = A.coalesce() 
 
@@ -144,6 +143,7 @@ class Optimizer:
             visited[neighbors] = True
             
         return visited
+    
     @staticmethod
     def neighborhood_sparse(A, nodes, step=1):
         """
