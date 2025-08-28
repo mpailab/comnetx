@@ -56,22 +56,22 @@ class Optimizer:
     def modularity(gamma = 1):
         pass
 
-    def upgrade_graph(self,
-                      batch_update: torch.Tensor):
+    def update_adj(self,
+                      batch: torch.Tensor):
         """
         Change the graph based on the current batch of updates.
 
         Parameters
         ----------
-        batch_update : torch.Tensor of the shape (n, n)
+        batch : torch.Tensor of the shape (n, n)
         """
 
-        batch_size = batch_update.size()
+        batch_size = batch.size()
         if self.size != batch_size:
             raise(f"Unsuitable batch size: {batch_size}. {self.size} is required.")
         
-        self.adj += batch_update.type(self.adj.dtype)
-        affected_nodes = batch_update.indices().unique()
+        self.adj += batch.type(self.adj.dtype)
+        affected_nodes = batch.indices().unique()
 
         return affected_nodes
 

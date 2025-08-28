@@ -50,11 +50,10 @@ def test_run_magi():
     print(opt.coms.to_dense())
 
 @pytest.mark.short
-def test_upgrade():
+def test_update_adj():
     adj_matrix = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]])
     opt = Optimizer(adj_matrix.to_sparse_coo())
-    #batch = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    opt.upgrade_graph(adj_matrix.to_sparse_coo())
+    opt.update_adj(adj_matrix.to_sparse_coo())
     true_res = adj_matrix * 2
     res = opt.adj
     assert torch.equal(true_res, opt.adj.to_dense())
