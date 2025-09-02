@@ -6,7 +6,6 @@ import numpy as np
 import sparse
 from typing import Union
 
-@staticmethod
 def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], 
                          nodes: torch.Tensor, 
                          step: int = 1) -> torch.Tensor:
@@ -14,21 +13,22 @@ def neighborhood(A: Union[torch.Tensor, 'sparse.COO'],
     
     if isinstance(A, torch.Tensor) and A.is_sparse:
         A_c = A.coalesce()
-        rows, cols = A_c.indices()
-        
         for k in range(step):
             if not visited.any():
                 break
 
-            frontier = torch.where(visited)[0]
-            if len(frontier) == 0:
-                break
+            frontier_mask = visited[A_c.indices()[0]]
+            neighbors = A_c.indices()[1][frontier_mask]
 
-            mask = torch.isin(rows, frontier)
-            neighbors = cols[mask]
+            alt_frontier_mask = visited[A_c.indices()[1]]
+            alt_neighbors = A_c.indices()[0][alt_frontier_mask]
             
-            if len(neighbors) > 0:
-                visited[neighbors] = True
+            neighbors = torch.cat([neighbors, alt_neighbors])
+            neighbors = torch.unique(neighbors)
+
+            visited[neighbors] = True
+            
+        return visited
                 
     elif hasattr(A, 'coords'):
         rows, cols = A.coords
@@ -39,12 +39,17 @@ def neighborhood(A: Union[torch.Tensor, 'sparse.COO'],
                 break
             
             frontier_indices = np.where(visited_np)[0]
-            mask = np.isin(rows, frontier_indices)
             
-            if mask.any():
-                neighbors = cols[mask]
-                visited_np[neighbors] = True
-        
+            mask_out = np.isin(rows, frontier_indices)
+            if mask_out.any():
+                neighbors_out = cols[mask_out]
+                visited_np[neighbors_out] = True
+            
+            mask_in = np.isin(cols, frontier_indices)
+            if mask_in.any():
+                neighbors_in = rows[mask_in]
+                visited_np[neighbors_in] = True
+
         visited = torch.tensor(visited_np, device=visited.device)
         
     else:
@@ -54,7 +59,7 @@ def neighborhood(A: Union[torch.Tensor, 'sparse.COO'],
 
 A = torch.tensor([
     [0, 1, 0, 0],
-    [0, 0, 1, 1],
+    [0, 0, 1, 0],
     [0, 0, 0, 1],
     [0, 0, 0, 0]
 ], dtype=torch.float32)
@@ -69,9 +74,9 @@ A_torch_sparse = torch.sparse_coo_tensor(
     dtype=torch.float32
 )
 
-initial_nodes = torch.tensor([True, False, False, False])
+initial_nodes = torch.tensor([False, True, False, False])
 
-nodes_new = neighborhood(A_torch_sparse, initial_nodes, step=2)
+nodes_new = neighborhood(A_torch_sparse, initial_nodes, step=1)
 print(nodes_new)
 
 torch_sparse = A_torch_sparse.coalesce()
@@ -85,5 +90,5 @@ A_sparse_coo = sparse.COO(
     shape=shape      
 )
 
-result = neighborhood(A_sparse_coo, initial_nodes, step=2)
-print(nodes_new)
+result = neighborhood(A_sparse_coo, initial_nodes, step=1)
+print(result)
