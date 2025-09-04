@@ -113,7 +113,7 @@ class Metrics:
         
         return modularity.item()
 
-    def modularity(adjacency, assignments) -> float:
+    def modularity(adjacency, assignments, gamma = 1) -> float:
         """
         Args:
             adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]
@@ -130,7 +130,7 @@ class Metrics:
             a_s = adjacency.matmul(assignments)
             graph_pooled = torch.matmul(a_s.t(), assignments)
             s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
+            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
             modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
             # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
             return modularity.item()
@@ -141,7 +141,7 @@ class Metrics:
             a_s = torch.sparse.mm(adjacency, assignments)
             graph_pooled = torch.matmul(a_s.t(), assignments)
             s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
+            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
             modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
             return modularity.item()
         elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
@@ -152,8 +152,28 @@ class Metrics:
             a_s = tf.sparse.sparse_dense_matmul(adjacency, assignments)
             graph_pooled = tf.matmul(a_s, assignments, transpose_a=True)
             s_d = tf.matmul(assignments, degrees, transpose_a=True)
-            normalizer = tf.matmul(s_d, s_d, transpose_b=True) * inv_2m
+            normalizer = tf.matmul(s_d, s_d, transpose_b=True) * inv_2m * gamma
             modularity = tf.linalg.trace(graph_pooled - normalizer) * inv_2m
             return modularity.numpy()
         else:
             raise TypeError("Unsupported type")
+
+    def create_dense_community(communities, n, L=0):
+        """
+        Args:
+            communities: torch.Tensor [3, N]
+            n: int
+            L: int, optional (default=0)
+                
+        Returns:
+            community_matrix: torch.Tensor [n, n]
+        """
+        communities = communities[0:2,L*n:(L+1)*n]
+
+        comms = (communities[0]).long()
+        nodes = communities[1].long()
+        
+        community_matrix = torch.zeros(n, n, dtype=torch.int32)
+        community_matrix[comms, nodes] = 1
+        
+        return community_matrix
