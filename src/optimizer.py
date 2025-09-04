@@ -9,6 +9,7 @@ from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import sparse
 import datasets
+import metrics
 
 class Optimizer:
     
@@ -54,51 +55,28 @@ class Optimizer:
         
         self.method = method
 
-
-    def modularity(adjacency, assignments, gamma = 1) -> float:
+    def dense_modularity(self, gamma = 1) -> float:
         """
         Args:
-            adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]
-            assignments: torch.Tensor or torch.Tensor or tf.Tensor [n_nodes, n_clusters]
+            gamma: float
             
         Returns:
             modularity: float 
         """
-        if isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor):
-            degrees = adjacency.sum(dim=1)
-            m = degrees.sum()
-            inv_2m = 1.0 / (2 * m)
-            degrees.view(-1, 1)
-            a_s = adjacency.matmul(assignments)
-            graph_pooled = torch.matmul(a_s.t(), assignments)
-            s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
-            modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
-            # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
-            return modularity.item()
-        elif isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor):
-            degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
-            m = degrees.sum()
-            inv_2m = 1.0 / (2 * m)
-            a_s = torch.sparse.mm(adjacency, assignments)
-            graph_pooled = torch.matmul(a_s.t(), assignments)
-            s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
-            modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
-            return modularity.item()
-        elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
-            degrees = tf.sparse.reduce_sum(adjacency, axis=0)
-            m = tf.reduce_sum(degrees)
-            inv_2m = 1.0 / (2 * m) 
-            degrees = tf.reshape(degrees, (-1, 1))
-            a_s = tf.sparse.sparse_dense_matmul(adjacency, assignments)
-            graph_pooled = tf.matmul(a_s, assignments, transpose_a=True)
-            s_d = tf.matmul(assignments, degrees, transpose_a=True)
-            normalizer = tf.matmul(s_d, s_d, transpose_b=True) * inv_2m
-            modularity = tf.linalg.trace(graph_pooled - normalizer) * inv_2m
-            return modularity.numpy()
-        else:
-            raise TypeError("Unsupported type")
+        return Metrics.modularity(self.adj, self.coms.T, gamma)
+
+    def sparse_modularity(self, gamma = 1) -> float:
+        """
+        Args:
+            gamma: float
+            
+        Returns:
+            modularity: float 
+        """
+        n = self.size
+        dense_coms = metrics.create_dense_community(self.coms, n, L=0).T 
+        return Metrics.modularity(self.adj, dense_coms, gamma)
+        
 
     def upgrade_graph(self,
                       batch_update: torch.Tensor):
