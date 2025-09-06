@@ -7,6 +7,7 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from optimizer import Optimizer
+from datasets import Dataset
 import sparse
 
 # @pytest.mark.short
@@ -48,6 +49,32 @@ def test_run_magi():
     opt.run(nodes_mask)
     print()
     print(opt.coms.to_dense())
+
+
+@pytest.mark.long
+def test_run_magi_on_custom_dataset():
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset("cora", path=data_dir + "/cora")
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features = features, method  = "magi")
+    num_nodes = adj.shape[0]
+    nodes_mask = torch.zeros(num_nodes, dtype=torch.bool).scatter_(0, torch.randint(num_nodes, (1,)), True)
+    print(adj.shape, nodes_mask.shape)
+    opt.run(nodes_mask)
+
+
+@pytest.mark.long
+def test_run_magi_on_custom_dataset_2():
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset("citeseer", path=data_dir + "/citeseer")
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features = features, method  = "magi")
+    num_nodes = adj.shape[0]
+    nodes_mask = torch.zeros(num_nodes, dtype=torch.bool).scatter_(0, torch.randint(num_nodes, (1,)), True)
+    print(adj.shape, nodes_mask.shape)
+    opt.run(nodes_mask)
 
 @pytest.mark.short
 def test_upgrade():
