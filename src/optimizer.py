@@ -182,12 +182,22 @@ class Optimizer:
         nodes = torch.nonzero(nodes_mask).squeeze(1)
 
         # Find pairs of all indices (i,l), where i is an affected community at the level l
+        
         communities = self.coms[0:3:2, torch.isin(self.coms[1], nodes)].unique(dim=1)
-
+        """
         # Find mask of all triples (i,j,l) called affected community triples,  
         # where i is an affected community at the level l and j is its node
         mask = (self.coms[0:3:2].unsqueeze(2) == communities.unsqueeze(1))
-        affected_mask = torch.sum(mask[0] * mask[1], dim=1, dtype=torch.bool)
+        """
+        coms_pairs = self.coms[0:3:2]
+        comm_pairs = communities
+        max_l = int(self.coms[2].max()) + 1
+        coms_keys = coms_pairs[0] * max_l + coms_pairs[1]
+        comm_keys = comm_pairs[0] * max_l + comm_pairs[1]
+        pairs_mask = torch.isin(coms_keys, comm_keys)
+        nodes_mask = torch.isin(self.coms[1], nodes)
+        affected_mask = pairs_mask & nodes_mask
+        #affected_mask = torch.sum(mask[0] * mask[1], dim=1, dtype=torch.bool)
 
         # Find nodes in all affected communities
         ext_nodes = self.coms[1,affected_mask].unique()
@@ -197,7 +207,8 @@ class Optimizer:
 
         # Find mask of all triples (i,j,L) called remaining community triples,
         # where i is an affected community at the highest level L and j is its node
-        remaining_mask = torch.logical_and(self.coms[2] == self.subcoms_depth-1, ~nodes_mask)
+        #remaining_mask = torch.logical_and(self.coms[2] == self.subcoms_depth-1, ~nodes_mask)
+        remaining_mask = torch.logical_and(self.coms[2] == self.subcoms_depth - 1, ~torch.isin(self.coms[1], nodes))
 
         # Remove all affected community triples except for the remaining ones
         coms = self.coms[:, torch.logical_or(~affected_mask, remaining_mask)]
@@ -242,19 +253,21 @@ class Optimizer:
             del aggr_ptn
 
             # Apply local algorithm for aggregated graph
+            #if aggr_adj._nnz() == 0 or aggr_features.size(0) == 0:
+                #continue
             new_coms = self.local_algorithm(aggr_adj, aggr_features, l > 0)
 
             # Restoring the community of the original graph
             new_coms = torch.tensor([[ reindexing[i.item()] for i in new_coms[0] ],
                                      [ reindexing[i.item()] for i in new_coms[1] ]])
-            res_coms = sparse.mm(new_coms, old_coms, self.size)
+            new_coms = sparse.mm(new_coms, old_coms, self.size)
 
             # Store new communities at the level l
-            new_coms = torch.cat((new_coms, torch.full((1,new_coms.size()[1]), l)), dim=0)
-            self.coms = torch.cat((self.coms, new_coms), dim=1)
+            res_coms = torch.cat((new_coms, torch.full((1,new_coms.size()[1]), l)), dim=0)
+            self.coms = torch.cat((self.coms, res_coms), dim=1)
 
             # Cut off adjacency matrix
-            cut_ptn = sparse.tensor(res_coms, self.size, adj.dtype)
+            cut_ptn = sparse.tensor(new_coms, self.size, adj.dtype)
             adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
 
 
