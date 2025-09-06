@@ -7,7 +7,7 @@ import json
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
-from baselines.rough_PRGPT import rough_prgpt, reorder_to_tensor
+from baselines.rough_PRGPT import rough_prgpt, to_ind_tensor
 from datasets import Dataset, KONECT_PATH
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "konect-datasets-info"))
 
@@ -72,8 +72,8 @@ def test_rough_prgpt_locale_on_convote(convote_dataset):
     rough_prgpt(convote_dataset.adj, refine="infomap")
 
 @pytest.mark.short
-def test_reorder():
+def test_to_ind_tensor():
     clus_res = [1, 1, 0]
-    res = reorder_to_tensor(clus_res, 2, zero_base = True)
-    true = torch.tensor([[False, False, True], [True, True, False]])
-    assert torch.equal(true, res.to_dense())
+    res = to_ind_tensor(clus_res, shift = 0)
+    true = torch.tensor([[1, 1, 0], [0, 1, 2]])
+    assert torch.equal(true, res)

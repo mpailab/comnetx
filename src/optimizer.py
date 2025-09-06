@@ -1,12 +1,15 @@
 # External imports
 import torch
 import os
+import numpy as np
+from typing import Union
 
 # Internal imports
 from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import sparse
 import datasets
+import metrics
 
 class Optimizer:
     
@@ -52,95 +55,152 @@ class Optimizer:
         
         self.method = method
 
-
-    def modularity(adjacency, assignments, gamma = 1) -> float:
+    def dense_modularity(self, gamma = 1) -> float:
         """
         Args:
-            adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]
-            assignments: torch.Tensor or torch.Tensor or tf.Tensor [n_nodes, n_clusters]
+            gamma: float
             
         Returns:
             modularity: float 
         """
-        if isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor):
-            degrees = adjacency.sum(dim=1)
-            m = degrees.sum()
-            inv_2m = 1.0 / (2 * m)
-            degrees.view(-1, 1)
-            a_s = adjacency.matmul(assignments)
-            graph_pooled = torch.matmul(a_s.t(), assignments)
-            s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
-            modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
-            # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
-            return modularity.item()
-        elif isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor):
-            degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
-            m = degrees.sum()
-            inv_2m = 1.0 / (2 * m)
-            a_s = torch.sparse.mm(adjacency, assignments)
-            graph_pooled = torch.matmul(a_s.t(), assignments)
-            s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m
-            modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
-            return modularity.item()
-        elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
-            degrees = tf.sparse.reduce_sum(adjacency, axis=0)
-            m = tf.reduce_sum(degrees)
-            inv_2m = 1.0 / (2 * m) 
-            degrees = tf.reshape(degrees, (-1, 1))
-            a_s = tf.sparse.sparse_dense_matmul(adjacency, assignments)
-            graph_pooled = tf.matmul(a_s, assignments, transpose_a=True)
-            s_d = tf.matmul(assignments, degrees, transpose_a=True)
-            normalizer = tf.matmul(s_d, s_d, transpose_b=True) * inv_2m
-            modularity = tf.linalg.trace(graph_pooled - normalizer) * inv_2m
-            return modularity.numpy()
-        else:
-            raise TypeError("Unsupported type")
+        return Metrics.modularity(self.adj, self.coms.T, gamma)
 
-    def upgrade_graph(self,
-                      batch_update: torch.Tensor):
+    def sparse_modularity(self, gamma = 1) -> float:
+        """
+        Args:
+            gamma: float
+            
+        Returns:
+            modularity: float 
+        """
+        n = self.size
+        dense_coms = metrics.create_dense_community(self.coms, n, L=0).T 
+        return Metrics.modularity(self.adj, dense_coms, gamma)
+        
+
+    def update_adj(self,
+                      batch: torch.Tensor):
         """
         Change the graph based on the current batch of updates.
 
         Parameters
         ----------
-        batch_update : torch.Tensor of the shape (n, n)
+        batch : torch.Tensor of the shape (n, n)
         """
 
-        batch_size = batch_update.size()
+        batch_size = batch.size()
         if self.size != batch_size:
             raise(f"Unsuitable batch size: {batch_size}. {self.size} is required.")
         
-        self.adj += batch_update.type(self.adj.dtype)
-        affected_nodes = batch_update.indices().unique()
+        self.adj += batch.type(self.adj.dtype)
+        affected_nodes = batch.indices().unique()
 
         return affected_nodes
 
-    @staticmethod
-    def neighborhood(A, nodes, step=1):
-        """
-        Args:
-            A (torch.sparse_coo): adjacency (n x n).
-            nodes (torch.Tensor): binary vector (n,)
-            step (int)
+    # @staticmethod
+    # def neighborhood_torch(A, nodes, step=1):
+    #     """
+    #     Args:
+    #         A (torch.sparse_coo): adjacency (n x n).
+    #         nodes (torch.Tensor): binary vector (n,)
+    #         step (int)
 
-        Return:
-            torch.Tensor: new binary mask with new nodes.
-        """
-        # FIXME don't work for sparse A
+    #     Return:
+    #         torch.Tensor: new binary mask with new nodes.
+    #     """
+    #     visited = nodes.clone()
+    #     A_c = A.coalesce() 
+
+    #     for k in range(step):
+    #         if not visited.any():
+    #             break
+
+    #         frontier_mask = visited[A_c.indices()[0]]
+    #         neighbors = A_c.indices()[1][frontier_mask]
+
+    #         visited[neighbors] = True
+            
+    #     return visited
+    
+    # @staticmethod
+    # def neighborhood_sparse(A, nodes, step=1):
+    #     """
+    #     Args:
+    #         A (sparse.COO): adjacency matrix (n x n)
+    #         nodes (torch.Tensor): binary vector (n,)
+    #         step (int)
+        
+    #     Return:
+    #         torch.Tensor: new binary mask with new nodes
+    #     """
+    #     visited = nodes.clone().numpy() if isinstance(nodes, torch.Tensor) else nodes.copy()
+        
+    #     for k in range(step):
+    #         if not visited.any():
+    #             break
+            
+    #         # Получаем индексы ненулевых элементов
+    #         rows, cols = A.coords
+    #         data = A.data
+            
+    #         # Ищем соседей через индексы
+    #         frontier_indices = np.where(visited)[0]
+    #         mask = np.isin(rows, frontier_indices)
+            
+    #         if mask.any():
+    #             neighbors = cols[mask]
+    #             visited[neighbors] = True
+                
+    #     return torch.tensor(visited) if isinstance(nodes, torch.Tensor) else visited
+
+    def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], nodes: torch.Tensor, 
+                    step: int = 1) -> torch.Tensor:
         visited = nodes.clone()
-        A_c = A.coalesce() 
+        
+        if isinstance(A, torch.Tensor) and A.is_sparse:
+            A_c = A.coalesce()
+            for k in range(step):
+                if not visited.any():
+                    break
 
-        for k in range(step):
-            if not visited.any():
-                break
+                frontier_mask = visited[A_c.indices()[0]]
+                neighbors = A_c.indices()[1][frontier_mask]
 
-            new_frontier_mask = visited[A_c.indices()[0]]
-            neighbors = A_c.indices()[1][new_frontier_mask]
+                alt_frontier_mask = visited[A_c.indices()[1]]
+                alt_neighbors = A_c.indices()[0][alt_frontier_mask]
+                
+                neighbors = torch.cat([neighbors, alt_neighbors])
+                neighbors = torch.unique(neighbors)
+
+                visited[neighbors] = True
+                
+            return visited
+                    
+        elif hasattr(A, 'coords'):
+            rows, cols = A.coords
+            visited_np = visited.cpu().numpy()
             
-            visited[neighbors] = True
+            for k in range(step):
+                if not visited_np.any():
+                    break
+                
+                frontier_indices = np.where(visited_np)[0]
+                
+                mask_out = np.isin(rows, frontier_indices)
+                if mask_out.any():
+                    neighbors_out = cols[mask_out]
+                    visited_np[neighbors_out] = True
+                
+                mask_in = np.isin(cols, frontier_indices)
+                if mask_in.any():
+                    neighbors_in = rows[mask_in]
+                    visited_np[neighbors_in] = True
+
+            visited = torch.tensor(visited_np, device=visited.device)
             
+        else:
+            raise TypeError(f"Unsupported matrix type: {type(A)}")
+        
         return visited
 
     def local_algorithm(self,
