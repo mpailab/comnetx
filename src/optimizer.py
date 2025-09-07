@@ -278,7 +278,7 @@ class Optimizer:
             new_coms = sparse.mm(new_coms, old_coms, self.size)
 
             # Store new communities at the level l
-            self.coms[l, ext_mask[l]] = new_coms[0]
+            self.coms[l, ext_mask[l]] = new_coms[0, new_coms[1].sort().indices]
 
             # Cut off adjacency matrix
             cut_ptn = sparse.tensor(new_coms, self.size, adj.dtype)
