@@ -9,7 +9,7 @@ from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import sparse
 import datasets
-import metrics
+from metrics import Metrics
 
 class Optimizer:
     
@@ -74,7 +74,7 @@ class Optimizer:
             modularity: float 
         """
         n = self.size
-        dense_coms = metrics.create_dense_community(self.coms, n, L=0).T 
+        dense_coms = Metrics.create_dense_community(self.coms, n, L=0).T 
         return Metrics.modularity(self.adj, dense_coms, gamma)
         
 
