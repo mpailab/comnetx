@@ -55,9 +55,6 @@ def convert_scipy_sparse_to_sparse_tensor(matrix):
   return tf.sparse.SparseTensor(
       np.vstack([matrix.row, matrix.col]).T, matrix.data.astype(np.float32),
       matrix.shape)
-def convert_res_to_optimizer_format(clusters):
-   
-   return opt_clusters
    
 def torch_to_tf_sparse_tensor(tensor):
     """
@@ -205,12 +202,13 @@ def adapted_dmon(adj: torch.Tensor,
   # Prints some metrics used in the paper.
   print('Conductance:', metrics.conductance(adjacency, clusters))
   print('Modularity:', metrics.modularity(adjacency, clusters))
-  print(
+  if lbls != None:
+     print(
       'NMI:',
       sklearn.metrics.normalized_mutual_info_score(
           know_labels, clusters[label_indices], average_method='arithmetic'))
-  precision = metrics.pairwise_precision(know_labels, clusters[label_indices])
-  recall = metrics.pairwise_recall(know_labels, clusters[label_indices])
-  print('F1:', 2 * precision * recall / (precision + recall))
+     precision = metrics.pairwise_precision(know_labels, clusters[label_indices])
+     recall = metrics.pairwise_recall(know_labels, clusters[label_indices])
+     print('F1:', 2 * precision * recall / (precision + recall))
   return clusters_tensor
   

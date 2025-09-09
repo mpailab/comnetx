@@ -7,6 +7,7 @@ from typing import Union
 # Internal imports
 from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
+from baselines.dmon import adapted_dmon
 import sparse
 import datasets
 import metrics
@@ -215,6 +216,9 @@ class Optimizer:
             
         elif self.method == "prgpt:locale":
             return rough_prgpt(adj.to_sparse(), refine="locale")
+        
+        elif self.method == "dmon":
+            return adapted_dmon(adj, features, labels)
 
         else:
             raise ValueError("Unsupported baseline method name")
