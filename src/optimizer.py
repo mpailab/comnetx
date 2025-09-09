@@ -55,7 +55,8 @@ class Optimizer:
         
         self.method = method
 
-    def dense_modularity(self, gamma = 1) -> float:
+    def dense_modularity(self, 
+                            gamma = 1) -> float:
         """
         Args:
             gamma: float
@@ -65,16 +66,17 @@ class Optimizer:
         """
         return Metrics.modularity(self.adj, self.coms.T, gamma)
 
-    def sparse_modularity(self, gamma = 1) -> float:
+    def sparse_modularity(self, 
+                            gamma=1, L=0) -> float:
         """
         Args:
-            gamma: float
-            
+            gamma: float, optional (default=1)
+            L: int, optional (default=0)
         Returns:
             modularity: float 
         """
-        n = self.size
-        dense_coms = Metrics.create_dense_community(self.coms, n, L=0).T 
+        n = self.coms.shape[0]
+        dense_coms = Metrics.create_dense_community(self.coms, n, L).T 
         return Metrics.modularity(self.adj, dense_coms, gamma)
         
 
