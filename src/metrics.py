@@ -171,6 +171,8 @@ class Metrics:
         communities = communities[L,:].long()
         nodes = torch.tensor(range(n)).long()
 
+        # print(len(communities), len(nodes))
+
         community_matrix = torch.zeros(n, n, dtype=torch.int32)
         community_matrix[communities, nodes] = 1
         

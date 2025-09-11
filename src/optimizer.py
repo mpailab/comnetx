@@ -53,8 +53,7 @@ class Optimizer:
         
         self.method = method
 
-    def dense_modularity(self, 
-                            gamma = 1) -> float:
+    def dense_modularity(self, adj, coms, gamma = 1) -> float:
         """
         Args:
             gamma: float
@@ -62,10 +61,10 @@ class Optimizer:
         Returns:
             modularity: float 
         """
-        return Metrics.modularity(self.adj, self.coms.T, gamma)
+        return Metrics.modularity(adj, coms.T, gamma)
 
-    def sparse_modularity(self, 
-                            gamma=1, L=0) -> float:
+    def modularity(self, 
+                    gamma=1, L=0) -> float:
         """
         Args:
             gamma: float, optional (default=1)
@@ -73,9 +72,9 @@ class Optimizer:
         Returns:
             modularity: float 
         """
-        n = self.coms.shape[0]
-        dense_coms = Metrics.create_dense_community(self.coms, n, L).T 
-        return Metrics.modularity(self.adj, dense_coms, gamma)
+        n = self.coms.shape[1]
+        dense_coms = Metrics.create_dense_community(self.coms, n, L).T
+        return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
         
 
     def update_adj(self,
