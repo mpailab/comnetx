@@ -53,9 +53,12 @@ class Optimizer:
         
         self.method = method
 
-    def dense_modularity(self, adj, coms, gamma = 1) -> float:
+    def dense_modularity(self, 
+            adj, coms, gamma = 1) -> float:
         """
         Args:
+            adj: torch.tensor [n_nodes, n_nodes]
+            coms: torch.tensor [n_nodes, n_nodes]
             gamma: float
             
         Returns:
@@ -64,7 +67,7 @@ class Optimizer:
         return Metrics.modularity(adj, coms.T, gamma)
 
     def modularity(self, 
-                    gamma=1, L=0) -> float:
+            gamma=1, L=0) -> float:
         """
         Args:
             gamma: float, optional (default=1)
@@ -154,6 +157,14 @@ class Optimizer:
 
     def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], nodes: torch.Tensor, 
                     step: int = 1) -> torch.Tensor:
+        """
+        Args:
+            A : Union[torch.Tensor, sparse.COO]
+            nodes : torch.Tensor
+            step : int, optional (default=1)
+        Returns:
+            visited: torch.Tensor 
+        """
         visited = nodes.clone()
         
         if isinstance(A, torch.Tensor) and A.is_sparse:
