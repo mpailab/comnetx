@@ -9,7 +9,7 @@ from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import sparse
 import datasets
-import metrics
+from metrics import Metrics
 
 class Optimizer:
     
@@ -53,27 +53,31 @@ class Optimizer:
         
         self.method = method
 
-    def dense_modularity(self, gamma = 1) -> float:
+    def dense_modularity(self, 
+            adj, coms, gamma = 1) -> float:
         """
         Args:
+            adj: torch.tensor [n_nodes, n_nodes]
+            coms: torch.tensor [n_nodes, n_nodes]
             gamma: float
             
         Returns:
             modularity: float 
         """
-        return Metrics.modularity(self.adj, self.coms.T, gamma)
+        return Metrics.modularity(adj, coms.T, gamma)
 
-    def sparse_modularity(self, gamma = 1) -> float:
+    def modularity(self, 
+            gamma=1, L=0) -> float:
         """
         Args:
-            gamma: float
-            
+            gamma: float, optional (default=1)
+            L: int, optional (default=0)
         Returns:
             modularity: float 
         """
-        n = self.size
-        dense_coms = metrics.create_dense_community(self.coms, n, L=0).T 
-        return Metrics.modularity(self.adj, dense_coms, gamma)
+        n = self.coms.shape[1]
+        dense_coms = Metrics.create_dense_community(self.coms, n, L).T
+        return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
         
 
     def update_adj(self,
@@ -153,6 +157,14 @@ class Optimizer:
 
     def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], nodes: torch.Tensor, 
                     step: int = 1) -> torch.Tensor:
+        """
+        Args:
+            A : Union[torch.Tensor, sparse.COO]
+            nodes : torch.Tensor
+            step : int, optional (default=1)
+        Returns:
+            visited: torch.Tensor 
+        """
         visited = nodes.clone()
         
         if isinstance(A, torch.Tensor) and A.is_sparse:
