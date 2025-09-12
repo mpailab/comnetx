@@ -76,5 +76,7 @@
     "kmer_A2a": 0.971094,
     "kmer_V1r": 0.948756,
     "dimacs10-uk-2007-05": 0.99596,
-    "friendster": 0.649341
+    "friendster": 0.649341,
+    "twitter": 0.499362,
+    "wikipedia_link_en": 0.810946
 }
