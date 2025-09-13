@@ -27,9 +27,10 @@ def test_aggregate_2():
     true_res = torch.tensor([[9, 0], [1, 1]])
     assert torch.equal(true_res.to_dense(), res.to_dense())
 
+@pytest.mark.short
 def test_run_prgpt():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
+    communities = torch.tensor([[1, 1, 1, 3]])
     opt = Optimizer(A, communities = communities, method  = "prgpt:infomap")
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)
@@ -38,10 +39,10 @@ def test_run_prgpt():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.long
+@pytest.mark.short
 def test_run_magi():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
+    communities = torch.tensor([[1, 1, 1, 3]])
     opt = Optimizer(A, communities = communities, method  = "magi")
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)
