@@ -72,14 +72,13 @@ class GCN(tf.keras.layers.Layer):
       An (n*n_channels) node representation matrix.
     """
     features, norm_adjacency = inputs
-
-    assert isinstance(features, tf.Tensor)
+    features_dense = tf.sparse.to_dense(features) if isinstance(features, tf.SparseTensor) else features
     assert isinstance(norm_adjacency, tf.SparseTensor)
     assert len(features.shape) == 2
     assert len(norm_adjacency.shape) == 2
     assert features.shape[0] == norm_adjacency.shape[0]
 
-    output = tf.matmul(features, self.kernel)
+    output = tf.matmul(features_dense, self.kernel)
     if self.skip_connection:
       output = output * self.skip_weight + tf.sparse.sparse_dense_matmul(
           norm_adjacency, output)
