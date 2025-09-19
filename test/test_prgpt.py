@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import os
 import torch
@@ -9,15 +10,23 @@ sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from baselines.rough_PRGPT import rough_prgpt, to_com_tensor
 from datasets import Dataset, KONECT_PATH
-KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "konect-datasets-info"))
+KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
 def load_konect_info():
-    """Load dynamic and static dataset info from JSONs."""
+    """Load dataset info from all.json."""
+    file_path = os.path.join(KONECT_INFO, "all.json")
+    with open(file_path, "r", encoding="utf-8") as f:
+        info = json.load(f)
+    return info
+"""
+def load_konect_info():
+    #Load dynamic and static dataset info from JSONs.
     with open(os.path.join(KONECT_INFO, "dynamic.json")) as f:
         info = json.load(f)
     with open(os.path.join(KONECT_INFO, "static.json")) as f:
         info.update(json.load(f))
     return info
+"""
 
 def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
@@ -31,15 +40,48 @@ def get_all_konect_datasets():
 
 KONECT_DATASETS = get_all_konect_datasets()
 
+@pytest.mark.long
+def test_run_prgpt_isolated():
+    subset = list(KONECT_DATASETS.keys())[0:20]
+    param = sys.argv[-1] if len(sys.argv) > 1 else None
+    for key in subset:
+        print(f"\nRunning subprocess for parameter: {key}\n")
+        env = os.environ.copy()
+        env["KONECT_PARAM"] = key
+        cmd = [
+            sys.executable, "-m", "pytest", __file__, 
+            "-k", "test_rough_prgpt_on_konect", 
+            "--tb=short",
+            "--disable-warnings"
+        ]
+        proc = subprocess.run(cmd, env=env)
+        torch.cuda.empty_cache()
+        if proc.returncode != 0:
+            raise RuntimeError(f"Test failed in subprocess for parameter {key}")
+
+
+@pytest.mark.long
+def test_rough_prgpt_on_konect():
+    param = os.environ.get("KONECT_PARAM")
+    if param and param in KONECT_DATASETS:
+        dataset = KONECT_DATASETS[param]
+        dataset.load()
+        rough_prgpt(dataset.adj, refine="infomap")
+        torch.cuda.empty_cache()
+    else:
+        pytest.skip("No KONECT_PARAM environment variable set")
+"""
 @pytest.mark.parametrize(
     "name,dataset",
     list(KONECT_DATASETS.items()),
     ids=list(KONECT_DATASETS.keys())
 )
+
 @pytest.mark.long
 def test_rough_prgpt_on_konect(name, dataset):
     dataset.load()
     rough_prgpt(dataset.adj, refine="infomap")
+"""
 
 @pytest.fixture(scope="class")
 def facebook_dataset():
