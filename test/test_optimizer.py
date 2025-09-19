@@ -178,6 +178,41 @@ def test_run_magi_on_custom_dataset(name, data_dir):
     opt.run(nodes_mask)
 
 
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name,data_dir",
+    list(datasets.items()),
+    ids=list(datasets.keys())
+)
+def test_run_dmon_on_custom_dataset(name, data_dir):
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="dmon")
+
+    top_level_coms = opt.coms[0]  # size (num_nodes,)
+
+    coo = adj if not adj.is_sparse else adj.to_dense()
+    if adj.is_sparse:
+        edges = adj._indices().t()
+    else:
+        edges = torch.nonzero(adj) 
+
+    found = False
+    for i, j in edges:
+        ci, cj = top_level_coms[i].item(), top_level_coms[j].item()
+        if ci != cj:
+            com1_nodes = (top_level_coms == ci)
+            com2_nodes = (top_level_coms == cj)
+            nodes_mask = com1_nodes | com2_nodes
+            found = True
+            break
+
+    if not found:
+        raise RuntimeError("No communities with edge between them")
+
+    print(adj.shape, nodes_mask.sum())
+    opt.run(nodes_mask)
 
 @pytest.mark.long
 @pytest.mark.parametrize(
@@ -283,6 +318,22 @@ def test_run_magi_on_true_mask(name, data_dir):
     adj, features, labels = dataset.load(tensor_type="coo")
 
     opt = Optimizer(adj, features=features, method="magi")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name,data_dir",
+    list(datasets.items()),
+    ids=list(datasets.keys())
+)
+def test_run_dmon_on_true_mask(name, data_dir):
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="dmon")
 
     nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
     opt.run(nodes_mask)

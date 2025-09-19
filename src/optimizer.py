@@ -63,8 +63,6 @@ class Optimizer:
 
     def dense_modularity(self, 
             adj, coms, gamma = 1) -> float:
-    def dense_modularity(self, 
-            adj, coms, gamma = 1) -> float:
         """
         Args:
             adj: torch.tensor [n_nodes, n_nodes]
@@ -246,7 +244,6 @@ class Optimizer:
                         labels: torch.Tensor | None = None) -> torch.Tensor:
         
         if self.method == "magi":
-            return magi(adj, features, labels)
             return magi(adj, features, labels)
 
         elif self.method == "prgpt:infomap":
