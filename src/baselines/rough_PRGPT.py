@@ -22,11 +22,17 @@ from PRGPT.PRGPT_static import get_sp_GCN_sup, get_sp_adj, get_rand_proj_mat, ra
 from PRGPT.PRGPT_static import get_init_res, InfoMap_rfn, locale_rfn, clus_reorder
 from PRoCD.utils import get_mod_mtc
 
-def to_ind_tensor(clus_res, shift = 0):
-    num_nodes = len(clus_res)
-    res = torch.tensor([clus_res, list(range(num_nodes))], dtype = torch.int32)
-    res[1] = res[1] + shift
-    return res
+def to_com_tensor(clus_res, origin_num_nodes, shift = 0):
+    com = {}
+    for node_new_id, com_id in enumerate(clus_res):
+        node_old_id = node_new_id + shift
+        com[node_old_id] = com_id
+    additional_com_id = max(com.values()) + 1
+    for node_id in range(origin_num_nodes):
+        if node_id not in com:
+            com[node_id] = additional_com_id
+            additional_com_id += 1
+    return torch.tensor(list(com.values()), dtype=torch.long)
 
 def rough_prgpt(adj : torch.Tensor, 
 #                device=None,
@@ -51,14 +57,12 @@ def rough_prgpt(adj : torch.Tensor,
 
     # ====================
     inx = adj.coalesce().indices()
+    origin_num_nodes = adj.size()[0]
     tst_edges = list(zip(inx[0].tolist(), inx[1].tolist()))
     tst_edges = list(filter(lambda x: x[0] >= x[1], tst_edges))
 
     # ====================
-    if np.min(tst_edges) == 1:
-        shift = 1
-    else:
-        shift = 0
+    shift = np.min(tst_edges)
     tst_edges = [(el[0] - shift, el[1] - shift) for el in tst_edges]
     tst_num_nodes = np.max(np.max(tst_edges)) + 1
     tst_num_edges = len(tst_edges)
@@ -139,7 +143,7 @@ def rough_prgpt(adj : torch.Tensor,
     print('INIT EST-K %d MOD %.4f' % (num_clus_est, mod_init))
     clus_res = clus_res_init_
     if refine is None:
-        return to_ind_tensor(clus_res_init_, shift)
+        return to_com_tensor(clus_res_init_, origin_num_nodes, shift)
     elif refine == "infomap":
         # Online refinement via InfoMap
         time_s = time.time()
@@ -152,7 +156,7 @@ def rough_prgpt(adj : torch.Tensor,
         mod_IM = get_mod_mtc(tst_edges, clus_res_IM, num_clus_IM)
         print('InfoMap EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
             % (num_clus_est, mod_IM, time_IM, feat_time, FFP_time, init_time, rfn_time_IM))
-        return to_ind_tensor(clus_res_IM, shift)
+        return to_com_tensor(clus_res_IM, origin_num_nodes, shift)
     elif refine == "locale":
         # Online refinement via Locale
         time_s = time.time()
@@ -165,6 +169,6 @@ def rough_prgpt(adj : torch.Tensor,
         mod_Lcl = get_mod_mtc(tst_edges, clus_res_Lcl, num_clus_Lcl)
         print('Locale EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
             % (num_clus_est, mod_Lcl, time_Lcl, feat_time, FFP_time, init_time, rfn_time_Lcl))
-        return to_ind_tensor(clus_res_Lcl, shift)
+        return to_com_tensor(clus_res_Lcl, origin_num_nodes, shift)
     else:
         raise ValueError(f"Unsupported refine method: {refine}")

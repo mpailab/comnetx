@@ -161,19 +161,19 @@ class Metrics:
     def create_dense_community(communities, n, L=0):
         """
         Args:
-            communities: torch.Tensor [3, N]
+            communities: torch.Tensor [l, n]
             n: int
             L: int, optional (default=0)
                 
         Returns:
             community_matrix: torch.Tensor [n, n]
         """
-        communities = communities[0:2,L*n:(L+1)*n]
+        communities = communities[L,:].long()
+        nodes = torch.tensor(range(n)).long()
 
-        comms = (communities[0]).long()
-        nodes = communities[1].long()
-        
+        # print(len(communities), len(nodes))
+
         community_matrix = torch.zeros(n, n, dtype=torch.int32)
-        community_matrix[comms, nodes] = 1
+        community_matrix[communities, nodes] = 1
         
         return community_matrix

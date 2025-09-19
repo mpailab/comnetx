@@ -13,7 +13,7 @@ import time
 import json
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
-KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "konect-datasets-info"))
+INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
 # TODO (to drobyshev) make dataset dict
 
@@ -49,14 +49,11 @@ class Dataset:
             "adj": f"{self.name.lower()}_adj.npy"
         }
 
-        with open(os.path.join(KONECT_INFO, "dynamic.json")) as _:
-            konect_info = json.load(_)
-        with open(os.path.join(KONECT_INFO, "static.json")) as _:
-            konect_info.update(json.load(_))
+        with open(os.path.join(INFO, "all.json")) as _:
+            info = json.load(_)
         
-
-        if self.name in konect_info:
-            is_directed = konect_info[self.name]['d'] == 'directed'
+        if self.name in info:
+            is_directed = info[self.name]['d'] == 'directed'
             if batches == None:
                 self._load_konect(batches_num = 1, is_directed = is_directed)
                 self.adj = self.adj[0]
@@ -188,10 +185,8 @@ class Dataset:
         self.adj = torch.stack(adjs) # 3-dimensional tensor
 
 def list_konect_datasets():
-    with open(os.path.join(KONECT_INFO, "dynamic.json")) as _:
+    with open(os.path.join(INFO, "all.json")) as _:
         info = json.load(_)
-    with open(os.path.join(KONECT_INFO, "static.json")) as _:
-        info.update(json.load(_))
     datasets = list(info.keys())
     max_name_len = max(map(len, datasets))
     max_n_strlen = max(map(lambda x: len(str(info[x]["n"])), datasets))

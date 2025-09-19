@@ -10,6 +10,7 @@ from baselines.rough_PRGPT import rough_prgpt
 import sparse
 import datasets
 from metrics import Metrics
+from metrics import Metrics
 
 class Optimizer:
     
@@ -24,6 +25,10 @@ class Optimizer:
 
         Parameters
         ----------
+        communities : torch.Tensor of the shape (l,n)
+            Each elements communities[d,i] defines a community at the level d 
+            that the node i belongs to, l is the number of community levels and
+            n is the number of nodes.
         communities : torch.Tensor of the shape (l,n)
             Each elements communities[d,i] defines a community at the level d 
             that the node i belongs to, l is the number of community levels and
@@ -46,6 +51,8 @@ class Optimizer:
             n = self.nodes_num
             l = self.subcoms_depth
             self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
+            l = self.subcoms_depth
+            self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
         else:
             #TODO reindexing of the communities numbers such that the following condition holds:
             # if c is a community number, the node c belongs to the community community c;
@@ -55,8 +62,12 @@ class Optimizer:
 
     def dense_modularity(self, 
             adj, coms, gamma = 1) -> float:
+    def dense_modularity(self, 
+            adj, coms, gamma = 1) -> float:
         """
         Args:
+            adj: torch.tensor [n_nodes, n_nodes]
+            coms: torch.tensor [n_nodes, n_nodes]
             adj: torch.tensor [n_nodes, n_nodes]
             coms: torch.tensor [n_nodes, n_nodes]
             gamma: float
@@ -65,6 +76,7 @@ class Optimizer:
             modularity: float 
         """
         return Metrics.modularity(adj, coms.T, gamma)
+        return Metrics.modularity(adj, coms.T, gamma)
 
     def modularity(self, 
             gamma=1, L=0) -> float:
@@ -72,9 +84,14 @@ class Optimizer:
         Args:
             gamma: float, optional (default=1)
             L: int, optional (default=0)
+            gamma: float, optional (default=1)
+            L: int, optional (default=0)
         Returns:
             modularity: float 
         """
+        n = self.coms.shape[1]
+        dense_coms = Metrics.create_dense_community(self.coms, n, L).T
+        return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
         n = self.coms.shape[1]
         dense_coms = Metrics.create_dense_community(self.coms, n, L).T
         return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
@@ -165,6 +182,14 @@ class Optimizer:
         Returns:
             visited: torch.Tensor 
         """
+        """
+        Args:
+            A : Union[torch.Tensor, sparse.COO]
+            nodes : torch.Tensor
+            step : int, optional (default=1)
+        Returns:
+            visited: torch.Tensor 
+        """
         visited = nodes.clone()
         
         if isinstance(A, torch.Tensor) and A.is_sparse:
@@ -221,6 +246,7 @@ class Optimizer:
         
         if self.method == "magi":
             return magi(adj, features, labels)
+            return magi(adj, features, labels)
 
         elif self.method == "prgpt:infomap":
             return rough_prgpt(adj.to_sparse(), refine="infomap")
@@ -250,7 +276,21 @@ class Optimizer:
 
         # Find mask of all nodes in the affected communities
         ext_mask = torch.isin(self.coms, self.coms[:, nodes_mask])
+        nodes = torch.nonzero(nodes_mask, as_tuple=True)[0]
 
+        # Find mask of all nodes in the affected communities
+        ext_mask = torch.isin(self.coms, self.coms[:, nodes_mask])
+
+        # Set singleton communities for affected nodes at the last level
+        self.coms[-1, nodes_mask] = nodes
+
+        # Propagate remaining communities from the larger level to the smaller one
+        for l in range(self.subcoms_depth - 2, -1, -1):
+            level_ext_mask = ext_mask[l]
+            self.coms[l, level_ext_mask] = self.coms[l + 1, level_ext_mask]
+
+        # Reset adjacency matrix to the nodes of affected communities
+        adj = sparse.reset_matrix(self.adj, torch.nonzero(ext_mask[0], as_tuple=True)[0])
         # Set singleton communities for affected nodes at the last level
         self.coms[-1, nodes_mask] = nodes
 
@@ -267,6 +307,9 @@ class Optimizer:
             # Get affected communites and all their nodes at the level l
             coms = self.coms[l, ext_mask[l]]
             ext_nodes = torch.nonzero(ext_mask[l], as_tuple=True)[0]
+            # Get affected communites and all their nodes at the level l
+            coms = self.coms[l, ext_mask[l]]
+            ext_nodes = torch.nonzero(ext_mask[l], as_tuple=True)[0]
 
             # Reindexing communities
             old_idx, old_agg_idx = torch.unique(coms, return_inverse=True)
@@ -276,6 +319,7 @@ class Optimizer:
             n = old_idx.size()[0]
 
             # Aggregate adjacency and features matrices
+            aggr_ptn = sparse.tensor(old_coms, (n, self.nodes_num), adj.dtype)
             aggr_ptn = sparse.tensor(old_coms, (n, self.nodes_num), adj.dtype)
             aggr_adj = self.aggregate(adj, aggr_ptn)
             aggr_features = torch.sparse.mm(aggr_ptn, self.features)
