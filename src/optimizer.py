@@ -9,7 +9,7 @@ from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 import sparse
 import datasets
-import metrics
+from metrics import Metrics
 
 class Optimizer:
     
@@ -24,11 +24,10 @@ class Optimizer:
 
         Parameters
         ----------
-        communities : torch.Tensor of the shape (3,m)
-            Each column in this tensor has the form (i,j,k), where 
-                i is a community number, 
-                j is a node number that belongs to the community i,
-                k is a level of the community i. 
+        communities : torch.Tensor of the shape (l,n)
+            Each elements communities[d,i] defines a community at the level d 
+            that the node i belongs to, l is the number of community levels and
+            n is the number of nodes.
         """
         
         self.size = adj_matrix.size()
@@ -45,9 +44,8 @@ class Optimizer:
 
         if communities is None:
             n = self.nodes_num
-            self.coms = torch.stack((torch.arange(0,n,dtype=torch.long).repeat(n), 
-                                     torch.arange(0,n,dtype=torch.long).repeat(n),
-                                     torch.arange(0,n,dtype=torch.long).repeat_interleave(n)))
+            l = self.subcoms_depth
+            self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
         else:
             #TODO reindexing of the communities numbers such that the following condition holds:
             # if c is a community number, the node c belongs to the community community c;
@@ -55,27 +53,31 @@ class Optimizer:
         
         self.method = method
 
-    def dense_modularity(self, gamma = 1) -> float:
+    def dense_modularity(self, 
+            adj, coms, gamma = 1) -> float:
         """
         Args:
+            adj: torch.tensor [n_nodes, n_nodes]
+            coms: torch.tensor [n_nodes, n_nodes]
             gamma: float
             
         Returns:
             modularity: float 
         """
-        return Metrics.modularity(self.adj, self.coms.T, gamma)
+        return Metrics.modularity(adj, coms.T, gamma)
 
-    def sparse_modularity(self, gamma = 1) -> float:
+    def modularity(self, 
+            gamma=1, L=0) -> float:
         """
         Args:
-            gamma: float
-            
+            gamma: float, optional (default=1)
+            L: int, optional (default=0)
         Returns:
             modularity: float 
         """
-        n = self.size
-        dense_coms = metrics.create_dense_community(self.coms, n, L=0).T 
-        return Metrics.modularity(self.adj, dense_coms, gamma)
+        n = self.coms.shape[1]
+        dense_coms = Metrics.create_dense_community(self.coms, n, L).T
+        return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
         
 
     def update_adj(self,
@@ -155,6 +157,14 @@ class Optimizer:
 
     def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], nodes: torch.Tensor, 
                     step: int = 1) -> torch.Tensor:
+        """
+        Args:
+            A : Union[torch.Tensor, sparse.COO]
+            nodes : torch.Tensor
+            step : int, optional (default=1)
+        Returns:
+            visited: torch.Tensor 
+        """
         visited = nodes.clone()
         
         if isinstance(A, torch.Tensor) and A.is_sparse:
@@ -210,10 +220,7 @@ class Optimizer:
                         labels: torch.Tensor | None = None) -> torch.Tensor:
         
         if self.method == "magi":
-            labels = magi(adj, features, labels)
-            num_nodes = labels.size(0)
-            reorder_tensor = torch.stack([labels, torch.arange(num_nodes, device=labels.device)])
-            return reorder_tensor
+            return magi(adj, features, labels)
 
         elif self.method == "prgpt:infomap":
             return rough_prgpt(adj.to_sparse(), refine="infomap")
@@ -239,95 +246,60 @@ class Optimizer:
         """
 
         # Find indices of affected nodes
-        nodes = torch.nonzero(nodes_mask).squeeze(1)
+        nodes = torch.nonzero(nodes_mask, as_tuple=True)[0]
 
-        # Find pairs of all indices (i,l), where i is an affected community at the level l
-        
-        communities = self.coms[0:3:2, torch.isin(self.coms[1], nodes)].unique(dim=1)
-        """
-        # Find mask of all triples (i,j,l) called affected community triples,  
-        # where i is an affected community at the level l and j is its node
-        mask = (self.coms[0:3:2].unsqueeze(2) == communities.unsqueeze(1))
-        """
-        coms_pairs = self.coms[0:3:2]
-        comm_pairs = communities
-        max_l = int(self.coms[2].max()) + 1
-        coms_keys = coms_pairs[0] * max_l + coms_pairs[1]
-        comm_keys = comm_pairs[0] * max_l + comm_pairs[1]
-        pairs_mask = torch.isin(coms_keys, comm_keys)
-        nodes_mask = torch.isin(self.coms[1], nodes)
-        affected_mask = pairs_mask & nodes_mask
-        #affected_mask = torch.sum(mask[0] * mask[1], dim=1, dtype=torch.bool)
+        # Find mask of all nodes in the affected communities
+        ext_mask = torch.isin(self.coms, self.coms[:, nodes_mask])
 
-        # Find nodes in all affected communities
-        ext_nodes = self.coms[1,affected_mask].unique()
+        # Set singleton communities for affected nodes at the last level
+        self.coms[-1, nodes_mask] = nodes
 
-        # TODO: Perhaps, to save memory, it is worth pruning the matrices self.adj, 
-        # self.coms and self.features for nodes from ext_nodes using reindexing
+        # Propagate remaining communities from the larger level to the smaller one
+        for l in range(self.subcoms_depth - 2, -1, -1):
+            level_ext_mask = ext_mask[l]
+            self.coms[l, level_ext_mask] = self.coms[l + 1, level_ext_mask]
 
-        # Find mask of all triples (i,j,L) called remaining community triples,
-        # where i is an affected community at the highest level L and j is its node
-        #remaining_mask = torch.logical_and(self.coms[2] == self.subcoms_depth-1, ~nodes_mask)
-        remaining_mask = torch.logical_and(self.coms[2] == self.subcoms_depth - 1, ~torch.isin(self.coms[1], nodes))
-
-        # Remove all affected community triples except for the remaining ones
-        coms = self.coms[:, torch.logical_or(~affected_mask, remaining_mask)]
-
-        # Complete the missing community triples from higher levels
-        prev_mask = torch.logical_and(affected_mask, self.coms[2] == 0)
-        for l in range(1, self.subcoms_depth):
-            level_mask = torch.logical_and(affected_mask, self.coms[2] == l)
-            level_coms = self.coms[:2, torch.logical_and(~level_mask, prev_mask)]
-            coms = torch.cat((coms, sparse.ext_range(level_coms, l)), dim=1)
-            prev_mask = level_mask
-
-        # Propagate remaining community triples to lower levels and
-        # add singleton communities for affected nodes at all levels
-        remain_coms = sparse.ext_range(self.coms[:2, remaining_mask], 
-                                       self.subcoms_depth-1)
-        singleton_coms = sparse.ext_range(torch.stack((nodes, nodes)), self.subcoms_depth)
-        coms = torch.cat((coms, remain_coms, singleton_coms), dim=1)
-
-        # Reset adjacency matrix
-        adj = sparse.reset_matrix(self.adj, ext_nodes)
-
-        # Store communities of unaffected nodes
-        ext_nodes_mask = torch.isin(coms[1], ext_nodes)
-        self.coms = coms[:, ~ext_nodes_mask]
-        coms = coms[:, ext_nodes_mask]
+        # Reset adjacency matrix to the nodes of affected communities
+        adj = sparse.reset_matrix(self.adj, torch.nonzero(ext_mask[0], as_tuple=True)[0])
 
         for l in range(self.subcoms_depth):
 
-            # Get affected communites at the level l
-            old_coms = coms[:2, coms[2] == l]
+            # Get affected communites and all their nodes at the level l
+            coms = self.coms[l, ext_mask[l]]
+            ext_nodes = torch.nonzero(ext_mask[l], as_tuple=True)[0]
 
             # Reindexing communities
-            reindexing = torch.unique(old_coms[0])
-            reindexing_map = { j.item(): i for i, j in enumerate(reindexing) }
-            old_coms[0] = torch.tensor([ reindexing_map[i.item()] for i in old_coms[0] ])
+            old_idx, old_agg_idx = torch.unique(coms, return_inverse=True)
+            new_idx = { j.item(): i for i, j in enumerate(old_idx) }
+            old_coms = torch.stack((torch.tensor([ new_idx[i.item()] for i in coms ]), 
+                                    ext_nodes))
+            n = old_idx.size()[0]
 
             # Aggregate adjacency and features matrices
-            aggr_ptn = sparse.tensor(old_coms, (reindexing.size()[0], self.nodes_num), adj.dtype)
+            aggr_ptn = sparse.tensor(old_coms, (n, self.nodes_num), adj.dtype)
             aggr_adj = self.aggregate(adj, aggr_ptn)
             aggr_features = torch.sparse.mm(aggr_ptn, self.features)
             del aggr_ptn
 
             # Apply local algorithm for aggregated graph
-            #if aggr_adj._nnz() == 0 or aggr_features.size(0) == 0:
-                #continue
-            new_coms = self.local_algorithm(aggr_adj, aggr_features, l > 0)
+            agg_coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(self.coms.device)
 
             # Restoring the community of the original graph
-            new_coms = torch.tensor([[ reindexing[i.item()] for i in new_coms[0] ],
-                                     [ reindexing[i.item()] for i in new_coms[1] ]])
-            new_coms = sparse.mm(new_coms, old_coms, self.size)
+            """
+            old_agg_idx = torch.tensor([new_idx[i.item()] for i in coms], device=ext_nodes.device)
+            new_coms = torch.tensor([agg_coms[i] for i in old_agg_idx], device=ext_nodes.device)
+            """
+            #new_coms = torch.stack((torch.tensor([ old_idx[i.item()] for i in coms ]), old_idx))
 
-            # Store new communities at the level l
-            res_coms = torch.cat((new_coms, torch.full((1,new_coms.size()[1]), l)), dim=0)
-            self.coms = torch.cat((self.coms, res_coms), dim=1)
+            #new_coms = sparse.mm(new_coms, old_coms, self.size)
+            new_coms = agg_coms[old_agg_idx]
+
+
+            self.coms[l, ext_mask[l]] = new_coms
 
             # Cut off adjacency matrix
-            cut_ptn = sparse.tensor(new_coms, self.size, adj.dtype)
+            indices = torch.stack((new_coms, ext_nodes))  # [2, num_nodes]
+            cut_ptn = sparse.tensor(indices, self.size, adj.dtype)
             adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
 
 
