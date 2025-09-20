@@ -40,8 +40,11 @@ class Dataset:
 
         Returns
         -------
-        adj - (l, n, n)-tensor or (n, n)-tensor
+        adj - (l, n, n)-tensor, where l is number of batches
+              (n, n)-tensor if batches is None
         
+        features - #TODO (to Drobyshev) add info for shape
+        label - #TODO (to Drobyshev) add info for shape
         """
 
         filenames = {
