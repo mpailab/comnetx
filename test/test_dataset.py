@@ -13,7 +13,6 @@ from datasets import Dataset, KONECT_PATH
 TEST_DIR = os.path.dirname(__file__)
 GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "small")
 
-
 @pytest.fixture
 def temp_dataset_dir():
     path = tempfile.mkdtemp()
@@ -115,8 +114,7 @@ def test_tensor_csc_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_exist_cora_dataset():
-    path = os.path.join(GRAPHS_DIR, "cora")
-    loader = Dataset(dataset_name="Cora", path=path)
+    loader = Dataset(dataset_name="Cora", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -127,8 +125,7 @@ def test_exist_cora_dataset():
 
 @pytest.mark.short
 def test_exist_citeseer_dataset():
-    path = os.path.join(GRAPHS_DIR, "citeseer")
-    loader = Dataset(dataset_name="Citeseer", path=path)
+    loader = Dataset(dataset_name="Citeseer", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -139,8 +136,7 @@ def test_exist_citeseer_dataset():
 
 @pytest.mark.short
 def test_exist_acm_dataset():
-    path = os.path.join(GRAPHS_DIR, "acm")
-    loader = Dataset(dataset_name="Acm", path=path)
+    loader = Dataset(dataset_name="Acm", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -151,8 +147,7 @@ def test_exist_acm_dataset():
 
 @pytest.mark.short
 def test_exist_bat_dataset():
-    path = os.path.join(GRAPHS_DIR, "bat")
-    loader = Dataset(dataset_name="Bat", path=path)
+    loader = Dataset(dataset_name="Bat", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -163,8 +158,7 @@ def test_exist_bat_dataset():
 
 @pytest.mark.short
 def test_exist_dblp_dataset():
-    path = os.path.join(GRAPHS_DIR, "dblp")
-    loader = Dataset(dataset_name="Dblp", path=path)
+    loader = Dataset(dataset_name="Dblp", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -175,8 +169,7 @@ def test_exist_dblp_dataset():
 
 @pytest.mark.short
 def test_exist_eat_dataset():
-    path = os.path.join(GRAPHS_DIR, "eat")
-    loader = Dataset(dataset_name="Eat", path=path)
+    loader = Dataset(dataset_name="Eat", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -187,8 +180,7 @@ def test_exist_eat_dataset():
 
 @pytest.mark.short
 def test_exist_uat_dataset():
-    path = os.path.join(GRAPHS_DIR, "uat")
-    loader = Dataset(dataset_name="Uat", path=path)
+    loader = Dataset(dataset_name="Uat", path=GRAPHS_DIR)
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
