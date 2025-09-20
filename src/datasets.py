@@ -13,18 +13,18 @@ import time
 import json
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
-INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+INFO = os.path.join(PROJECT_DIR, "datasets-info")
 
 # TODO (to drobyshev) make dataset dict
 
 class Dataset:
     """Dataset treatment"""
 
-
     def __init__(self, dataset_name : str, path: str = "./datasets"):
         self.name = dataset_name
-        self.path = path
-        self.adj = None
+        self.path = path # dir with datasets dirs
+        self.adj = None # (l, n, n)-tensor or (n, n)-tensor
         self.features = None
         self.label = None
 
@@ -40,7 +40,11 @@ class Dataset:
 
         Returns
         -------
-        TODO (to drobyshev) add comment for shape of output tensor
+        adj - (l, n, n)-tensor, where l is number of batches
+              (n, n)-tensor if batches is None
+        
+        features - #TODO (to Drobyshev) add info for shape
+        label - #TODO (to Drobyshev) add info for shape
         """
 
         filenames = {
@@ -61,7 +65,7 @@ class Dataset:
                 self._load_konect(batches_num = batches, is_directed = is_directed)
         elif self.name.lower() in {"cora", "citeseer", "pubmed", "reddit"} or self.name.startswith("ogbn-"):
             for key, filename in filenames.items():
-                full_path = os.path.join(self.path, filename)
+                full_path = os.path.join(self.path, self.name.lower(), filename)
                 if not os.path.isfile(full_path):
                     print(f"file not found: {filename}")
                     print("Downloading files...")
@@ -83,8 +87,6 @@ class Dataset:
             return self.adj.to_sparse_csc(), self.features, self.label
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
-        
-        return self.adj, self.features, self.label
 
     def _load_magi(self):
         name = self.name.lower()
@@ -115,11 +117,11 @@ class Dataset:
 
     def _save_magi(self):
         self._load_magi()
-        save_dir = self.path + '/' + self.name.lower()
-        os.makedirs(self.path, exist_ok=True)
+        save_dir = os.path.join(self.path, self.name.lower())
+        os.makedirs(save_dir, exist_ok=True)
 
-        np.save(os.path.join(save_dir + '_feat.npy'), self.features.numpy())
-        np.save(os.path.join(save_dir + '_label.npy'), self.label.numpy())
+        np.save(os.path.join(save_dir, f'{self.name.lower()}_feat.npy'), self.features.numpy())
+        np.save(os.path.join(save_dir, f'{self.name.lower()}_label.npy'), self.label.numpy())
 
         adj = self.adj.coalesce()
         """
@@ -131,18 +133,21 @@ class Dataset:
         }
         """
         adj_dense = adj.to_dense().numpy()
-        np.save(os.path.join(save_dir + '_adj.npy'), adj_dense)
-        #np.save(os.path.join(save_dir + '_adj.npy'), adj_dict, allow_pickle=True)
+        np.save(os.path.join(save_dir, f'{self.name.lower()}_adj.npy'), adj_dense)
+        #np.save(os.path.join(save_dir, f'{self.name.lower()}_adj.npy'), adj_dict, allow_pickle=True)
 
     def _load_npy_format(self):  #Drobyshev
-        self.path = os.path.abspath(self.path)
+        load_dir = os.path.join(self.path, self.name.lower())
 
-        features = np.load(self.path + '/' + self.name.lower() + '_feat.npy')
-        labels = np.load(self.path + '/' + self.name.lower() + '_label.npy')
+        features_path = os.path.join(load_dir, f"{self.name.lower()}_feat.npy")
+        features = np.load(features_path)
+        labels_path = os.path.join(load_dir, f"{self.name.lower()}_label.npy")
+        labels = np.load(labels_path)
         self.features = torch.tensor(features, dtype=torch.float)
         self.label = torch.tensor(labels, dtype=torch.long)
 
-        adj_data = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True)
+        adj_path = os.path.join(load_dir, f"{self.name.lower()}_adj.npy")
+        adj_data = np.load(adj_path, allow_pickle=True)
         rows, cols = adj_data.nonzero()
         values_np = adj_data[rows, cols]
         indices_np = np.vstack((rows, cols))
@@ -150,12 +155,7 @@ class Dataset:
         indices = torch.from_numpy(indices_np).long()
         values = torch.from_numpy(values_np).float()
         shape = adj_data.shape
-        
 
-        #adj_data = np.load(self.path + '/' + self.name.lower() + '_adj.npy', allow_pickle=True).item()
-        #indices = torch.tensor([adj_data['row'], adj_data['col']], dtype=torch.long)
-        #values = torch.tensor(adj_data['data'], dtype=torch.float)
-        #shape = tuple(adj_data['shape'])
         self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
     
     def _load_konect(self, batches_num = 1, is_directed = True):
@@ -183,6 +183,44 @@ class Dataset:
                 adj = adj + torch.t(adj)
             adjs.append(adj)
         self.adj = torch.stack(adjs) # 3-dimensional tensor
+    
+    def _save_konect(self, path = None, int_weights = True):
+        main_adj = self.adj.to_sparse_coo().coalesce()
+        edges_num = main_adj._nnz()
+        nodes_num = main_adj.size(0)
+        if main_adj.ndim == 2:
+            batches_num = 1
+            adjs = [main_adj]
+        elif main_adj.ndim == 3:
+            batches_num = main_adj.shape[0]
+            adjs = [main_adj[i] for i in range(batches_num)]
+        else:
+            raise ValueError(f"Неподдерживаемая размерность: {adj.ndim}")
+        lines = []
+        lines_num = edges_num + 1
+        lines.append(f"{nodes_num} {lines_num}")
+        for num, adj in enumerate(adjs):
+            batch = num + 1
+            indices = adj.indices()
+            values = adj.values()
+            for i in range(edges_num):
+                source = indices[0, i].item()
+                target = indices[1, i].item()
+                weight = values[i].item()
+                if int_weights:
+                    weight = int(weight)
+                lines.append(f"{source} {target} {weight} {batch}")
+        if path:
+            output_dir = os.path.join(path, self.name)
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            filepath = os.path.join(output_dir, f"out.{self.name}.{batches_num}_batches")
+            with open(filepath, "w") as f:
+                for line in lines:
+                    f.write(line + '\n')
+        else:
+            for line in lines:
+                print(line)
 
 def list_konect_datasets():
     with open(os.path.join(INFO, "all.json")) as _:
@@ -202,8 +240,20 @@ def list_konect_datasets():
         pstring += f" {info[dataset]['w']:<{max_w_strlen}}"
         print(pstring, sep="\t")
 
+def save_small_datasets_in_konect_format():
+    dir_small_datasets = os.path.join(PROJECT_DIR, "test/graphs/small")
+    dir_output = os.path.join(PROJECT_DIR, "test/graphs/small_konect")
+    os.makedirs(dir_output, exist_ok = True)
+    for dname in os.listdir(dir_small_datasets):
+        print(dname)
+        ds = Dataset(dname, path = dir_small_datasets)
+        ds.load()
+        ds._save_konect(dir_output)
+        print("ok")
+
+
 if __name__ == "__main__":
-    dataset = "dblp_coauthor"
+    #dataset = "dblp_coauthor"
     #ds = Dataset(dataset, KONECT_PATH)
     #ds._load_konect(batches_num = 10)
-    list_konect_datasets()
+    save_small_datasets_in_konect_format()
