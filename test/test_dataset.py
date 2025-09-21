@@ -31,29 +31,29 @@ def test_load_small_datasets(temp_dataset_dir):
         assert ds.features is not None
         assert ds.label is not None
 
-"""
 @pytest.mark.short
-def test_load_Reddit_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="Reddit", path="graphs/small/reddit")
-    tensor, features, label = loader.load(tensor_type="csr")
+def test_coo_joblib_save(temp_dataset_dir):
+    ds = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+    ds._load_magi()
+    ds._save_magi(coo_adj = True)
+    ds._save_magi(coo_adj = False)
+    ds1 = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+    ds2 = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+    ds1._load_npy_format(coo_adj = True)
+    ds2._load_npy_format(coo_adj = False)
+    assert torch.equal(ds1.adj.to_dense(), ds2.adj.to_dense())
 
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_load_OGDB_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="ogbn-arxiv", path=temp_dataset_dir)
-    tensor, features, label = loader.load(tensor_type="coo")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.is_sparse
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-"""
+@pytest.mark.long
+def test_load_magi_big_datasets(temp_dataset_dir):
+    datasets = ["Reddit", "ogbn-arxiv"]
+    for dataset_name in datasets:
+        ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
+        ds.load(tensor_type="coo")
+        assert isinstance(ds.adj, torch.Tensor)
+        assert ds.adj.is_sparse
+        assert ds.adj.shape[0] == ds.adj.shape[1]
+        assert ds.features is not None
+        assert ds.label is not None
 
 @pytest.mark.short
 def test_load_youtube_dataset(temp_dataset_dir):
