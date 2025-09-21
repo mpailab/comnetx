@@ -78,15 +78,16 @@ class Dataset:
             raise ValueError(f"Unsupported dataset: {self.name}")
 
         if tensor_type == "dense":
-            return self.adj.to_dense(), self.features, self.label
+            self.adj = self.adj.to_dense()
         elif tensor_type == "coo":
-            return self.adj.coalesce(), self.features, self.label
+            self.adj = self.adj.coalesce()
         elif tensor_type == "csr":
-            return self.adj.to_sparse_csr(), self.features, self.label
+            self.adj = self.adj.to_sparse_csr()
         elif tensor_type == "csc":
-            return self.adj.to_sparse_csc(), self.features, self.label
+            self.adj = self.adj.to_sparse_csc()
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
+        return self.adj, self.features, self.label
 
     def _load_magi(self):
         name = self.name.lower()

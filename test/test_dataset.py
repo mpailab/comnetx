@@ -20,37 +20,16 @@ def temp_dataset_dir():
     shutil.rmtree(path)
 
 @pytest.mark.short
-def test_load_Cora_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    tensor, features, label = loader.load(tensor_type="coo")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.is_sparse
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_load_Citeseer_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
-    tensor, features, label = loader.load(tensor_type="coo")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.is_sparse
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_load_pubmed_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="pubmed", path=temp_dataset_dir)
-    tensor, features, label = loader.load(tensor_type="coo")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.is_sparse
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
+def test_load_small_datasets(temp_dataset_dir):
+    datasets = ["Cora", "Citeseer", "Pubmed"]
+    for dataset_name in datasets:
+        ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
+        ds.load(tensor_type="coo")
+        assert isinstance(ds.adj, torch.Tensor)
+        assert ds.adj.is_sparse
+        assert ds.adj.shape[0] == ds.adj.shape[1]
+        assert ds.features is not None
+        assert ds.label is not None
 
 """
 @pytest.mark.short
@@ -113,81 +92,16 @@ def test_tensor_csc_output(temp_dataset_dir):
     assert tensor.shape[0] == tensor.shape[1]
 
 @pytest.mark.short
-def test_exist_cora_dataset():
-    loader = Dataset(dataset_name="Cora", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_exist_citeseer_dataset():
-    loader = Dataset(dataset_name="Citeseer", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_exist_acm_dataset():
-    loader = Dataset(dataset_name="Acm", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_exist_bat_dataset():
-    loader = Dataset(dataset_name="Bat", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_exist_dblp_dataset():
-    loader = Dataset(dataset_name="Dblp", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_exist_eat_dataset():
-    loader = Dataset(dataset_name="Eat", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
-
-@pytest.mark.short
-def test_exist_uat_dataset():
-    loader = Dataset(dataset_name="Uat", path=GRAPHS_DIR)
-    tensor, features, label = loader.load(tensor_type="csr")
-
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.layout == torch.sparse_csr
-    assert tensor.shape[0] == tensor.shape[1]
-    assert loader.features is not None
-    assert loader.label is not None
+def test_exist_small_datasets():
+    datasets = ["Cora", "Citeseer", "Acm", "Bat", "Dblp", "Eat"]
+    for dataset_name in datasets:
+        ds = Dataset(dataset_name=dataset_name, path=GRAPHS_DIR)
+        ds.load(tensor_type="csr")
+        assert isinstance(ds.adj, torch.Tensor)
+        assert ds.adj.layout == torch.sparse_csr
+        assert ds.adj.shape[0] == ds.adj.shape[1]
+        assert ds.features is not None
+        assert ds.label is not None
 
 @pytest.mark.short
 def test_invalid_tensor_type(temp_dataset_dir):
