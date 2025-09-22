@@ -6,7 +6,8 @@ from typing import Union
 
 # Internal imports
 from baselines.magi import magi
-from baselines.rough_PRGPT import rough_prgpt 
+from baselines.rough_PRGPT import rough_prgpt
+from baselines.leidenalg import leidenalg_partition
 import sparse
 import datasets
 from metrics import Metrics
@@ -227,6 +228,9 @@ class Optimizer:
             
         elif self.method == "prgpt:locale":
             return rough_prgpt(adj.to_sparse(), refine="locale")
+        
+        elif self.method =="leidenalg":
+            return leidenalg_partition(adj.to_sparse())
 
         else:
             raise ValueError("Unsupported baseline method name")

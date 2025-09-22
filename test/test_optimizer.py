@@ -40,6 +40,18 @@ def test_run_prgpt():
     print(opt.coms.to_dense())
 
 @pytest.mark.short
+def test_run_leidenalg():
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
+    communities = torch.tensor([[1, 1, 1, 3]])
+    opt = Optimizer(A, communities = communities, method  = "leidenalg")
+    nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
+    print("communities:", communities)
+    print("nodes_mask:", nodes_mask)
+    opt.run(nodes_mask)
+    print()
+    print(opt.coms.to_dense())
+
+@pytest.mark.short
 def test_run_magi():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3]])
