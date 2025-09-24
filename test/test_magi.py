@@ -4,6 +4,9 @@ import numpy as np
 import sys
 import torch, gc
 import pytest
+import json
+import subprocess
+import tempfile
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
@@ -63,6 +66,19 @@ def load_konect_info():
     return info
 """
 
+@pytest.fixture(scope="class")
+def facebook_dataset():
+    ds = Dataset("facebook-wosn-links", KONECT_PATH)
+    ds.load()
+    return ds
+
+def test_magi_on_facebook(facebook_dataset):
+    num_nodes = facebook_dataset.adj.shape[-1]
+    adj = facebook_dataset.adj.coalesce()
+    features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    magi(adj, features, epochs=10)
+
+
 def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
     info = load_konect_info()
@@ -73,14 +89,42 @@ def get_all_konect_datasets():
             datasets[name] = Dataset(name, KONECT_PATH)
     return datasets
 
-@pytest.fixture(scope="class")
-def facebook_dataset():
-    ds = Dataset("facebook-wosn-links", KONECT_PATH)
-    ds.load()
-    return ds
+KONECT_DATASETS = get_all_konect_datasets()
 
-def test_magi_on_facebook(facebook_dataset):
-    num_nodes = facebook_dataset.adj.shape[-1]
-    adj = facebook_dataset.adj.coalesce()
-    features = torch.zeros(num_nodes, 1, dtype=torch.float32)
-    magi(adj, features)
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    list(KONECT_DATASETS.keys()),
+    ids=list(KONECT_DATASETS.keys())
+)
+def test_magi_konect_dataset(name):
+    dataset = Dataset(name, path=KONECT_PATH)
+    adj, features, labels = dataset.load()
+    adj = adj.coalesce()
+    num_nodes = adj.size(0)
+    features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
+        temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
+        torch.save(adj, temp_adj_path)
+        torch.save(features, temp_features_path)
+
+        cmd = [
+            sys.executable,
+            "run_magi_subprocess.py",
+            "--adj", temp_adj_path,
+            "--features", temp_features_path,
+            "--epochs", "1"
+        ]
+
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        #print(proc.stdout)
+        if proc.returncode != 0:
+            # Если ошибка только из-за tensorflow предупреждения, можно игнорировать или логировать
+            if "Unable to register cuDNN factory" in proc.stderr:
+                print("Warning: TensorFlow cuDNN factory warning detected, ignoring")
+            else:
+                pytest.fail(f"Subprocess failed for dataset {name} with error: {proc.stderr}")
+    del adj, features, labels 
+    gc.collect()
+    torch.cuda.empty_cache()
