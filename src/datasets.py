@@ -137,16 +137,14 @@ class Dataset:
         #np.save(os.path.join(save_dir, f'{self.name.lower()}_adj.npy'), adj_dict, allow_pickle=True)
 
     def _load_npy_format(self):  #Drobyshev
-        load_dir = os.path.join(self.path, self.name.lower())
-
-        features_path = os.path.join(load_dir, f"{self.name.lower()}_feat.npy")
+        features_path = os.path.join(self.path, f"{self.name.lower()}_feat.npy")
         features = np.load(features_path)
-        labels_path = os.path.join(load_dir, f"{self.name.lower()}_label.npy")
+        labels_path = os.path.join(self.path, f"{self.name.lower()}_label.npy")
         labels = np.load(labels_path)
         self.features = torch.tensor(features, dtype=torch.float)
         self.label = torch.tensor(labels, dtype=torch.long)
 
-        adj_path = os.path.join(load_dir, f"{self.name.lower()}_adj.npy")
+        adj_path = os.path.join(self.path, f"{self.name.lower()}_adj.npy")
         adj_data = np.load(adj_path, allow_pickle=True)
         rows, cols = adj_data.nonzero()
         values_np = adj_data[rows, cols]

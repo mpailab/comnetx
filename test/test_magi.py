@@ -7,9 +7,10 @@ import pytest
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
 from baselines.magi import magi
-from datasets import Dataset
+from datasets import Dataset, KONECT_PATH
 
 
 def get_all_datasets():
@@ -46,21 +47,40 @@ def test_magi_single_dataset(name, data_dir):
 
     del adj, features, labels, new_labels
 
-def test_features():
-    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
-    dataset = Dataset("cora", path=data_dir+"/cora")
-    adj, features, labels = dataset.load(tensor_type="coo")
+def load_konect_info():
+    """Load dataset info from all.json."""
+    file_path = os.path.join(KONECT_INFO, "all.json")
+    with open(file_path, "r", encoding="utf-8") as f:
+        info = json.load(f)
+    return info
+"""
+def load_konect_info():
+    #Load dynamic and static dataset info from JSONs.
+    with open(os.path.join(KONECT_INFO, "dynamic.json")) as f:
+        info = json.load(f)
+    with open(os.path.join(KONECT_INFO, "static.json")) as f:
+        info.update(json.load(f))
+    return info
+"""
 
-    print(features.size())
-    print(features)
-    print(torch.unique(features))
+def get_all_konect_datasets():
+    """Return a dict {dataset_name: Dataset object}."""
+    info = load_konect_info()
+    datasets = {}
+    for name in info.keys():
+        path = os.path.join(KONECT_PATH, name)
+        if os.path.exists(path):
+            datasets[name] = Dataset(name, KONECT_PATH)
+    return datasets
 
-    dataset = Dataset("eat", path=data_dir+"/eat")
-    adj, features, labels = dataset.load(tensor_type="coo")
+@pytest.fixture(scope="class")
+def facebook_dataset():
+    ds = Dataset("facebook-wosn-links", KONECT_PATH)
+    ds.load()
+    return ds
 
-    print(features.size())
-    print(features)
-    print(torch.unique(features))
-
-    assert torch.cuda.is_available()
-    
+def test_magi_on_facebook(facebook_dataset):
+    num_nodes = facebook_dataset.adj.shape[-1]
+    adj = facebook_dataset.adj.coalesce()
+    features = torch.zeros(num_nodes, 1, dtype=torch.float32)
+    magi(adj, features)
