@@ -6,7 +6,8 @@ from typing import Union
 
 # Internal imports
 from baselines.magi import magi
-from baselines.rough_PRGPT import rough_prgpt 
+from baselines.rough_PRGPT import rough_prgpt
+from baselines.leidenalg import leidenalg_partition
 from baselines.dmon import adapted_dmon
 import sparse
 import datasets
@@ -95,9 +96,7 @@ class Optimizer:
         dense_coms = Metrics.create_dense_community(self.coms, n, L).T
         return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
         
-
-    def update_adj(self,
-                      batch: torch.Tensor):
+    def update_adj(self, batch: torch.Tensor):
         """
         Change the graph based on the current batch of updates.
 
@@ -106,102 +105,39 @@ class Optimizer:
         batch : torch.Tensor of the shape (n, n)
         """
 
-        batch_size = batch.size()
-        if self.size != batch_size:
-            raise(f"Unsuitable batch size: {batch_size}. {self.size} is required.")
+        if self.size != batch.size():
+            raise(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
         
         self.adj += batch.type(self.adj.dtype)
         affected_nodes = batch.indices().unique()
 
         return affected_nodes
-
-    # @staticmethod
-    # def neighborhood_torch(A, nodes, step=1):
-    #     """
-    #     Args:
-    #         A (torch.sparse_coo): adjacency (n x n).
-    #         nodes (torch.Tensor): binary vector (n,)
-    #         step (int)
-
-    #     Return:
-    #         torch.Tensor: new binary mask with new nodes.
-    #     """
-    #     visited = nodes.clone()
-    #     A_c = A.coalesce() 
-
-    #     for k in range(step):
-    #         if not visited.any():
-    #             break
-
-    #         frontier_mask = visited[A_c.indices()[0]]
-    #         neighbors = A_c.indices()[1][frontier_mask]
-
-    #         visited[neighbors] = True
-            
-    #     return visited
     
-    # @staticmethod
-    # def neighborhood_sparse(A, nodes, step=1):
-    #     """
-    #     Args:
-    #         A (sparse.COO): adjacency matrix (n x n)
-    #         nodes (torch.Tensor): binary vector (n,)
-    #         step (int)
-        
-    #     Return:
-    #         torch.Tensor: new binary mask with new nodes
-    #     """
-    #     visited = nodes.clone().numpy() if isinstance(nodes, torch.Tensor) else nodes.copy()
-        
-    #     for k in range(step):
-    #         if not visited.any():
-    #             break
-            
-    #         # Получаем индексы ненулевых элементов
-    #         rows, cols = A.coords
-    #         data = A.data
-            
-    #         # Ищем соседей через индексы
-    #         frontier_indices = np.where(visited)[0]
-    #         mask = np.isin(rows, frontier_indices)
-            
-    #         if mask.any():
-    #             neighbors = cols[mask]
-    #             visited[neighbors] = True
-                
-    #     return torch.tensor(visited) if isinstance(nodes, torch.Tensor) else visited
-
-    def neighborhood(A: Union[torch.Tensor, 'sparse.COO'], nodes: torch.Tensor, 
+    @staticmethod
+    def neighborhood(adj: Union[torch.Tensor, 'sparse.COO'],
+                    nodes_mask: torch.Tensor, 
                     step: int = 1) -> torch.Tensor:
         """
         Args:
-            A : Union[torch.Tensor, sparse.COO]
-            nodes : torch.Tensor
+            adj : Union[torch.Tensor, sparse.COO]
+            nodes_mask : torch.BoolTensor
             step : int, optional (default=1)
         Returns:
-            visited: torch.Tensor 
+            visited: torch.BoolTensor 
         """
-        """
-        Args:
-            A : Union[torch.Tensor, sparse.COO]
-            nodes : torch.Tensor
-            step : int, optional (default=1)
-        Returns:
-            visited: torch.Tensor 
-        """
-        visited = nodes.clone()
+        visited = nodes_mask.clone()
         
-        if isinstance(A, torch.Tensor) and A.is_sparse:
-            A_c = A.coalesce()
+        if isinstance(adj, torch.Tensor) and adj.is_sparse:
+            adj_c = adj.coalesce()
             for k in range(step):
                 if not visited.any():
                     break
 
-                frontier_mask = visited[A_c.indices()[0]]
-                neighbors = A_c.indices()[1][frontier_mask]
+                frontier_mask = visited[adj_c.indices()[0]]
+                neighbors = adj_c.indices()[1][frontier_mask]
 
-                alt_frontier_mask = visited[A_c.indices()[1]]
-                alt_neighbors = A_c.indices()[0][alt_frontier_mask]
+                alt_frontier_mask = visited[adj_c.indices()[1]]
+                alt_neighbors = adj_c.indices()[0][alt_frontier_mask]
                 
                 neighbors = torch.cat([neighbors, alt_neighbors])
                 neighbors = torch.unique(neighbors)
@@ -210,8 +146,8 @@ class Optimizer:
                 
             return visited
                     
-        elif hasattr(A, 'coords'):
-            rows, cols = A.coords
+        elif hasattr(adj, 'coords'):
+            rows, cols = adj.coords
             visited_np = visited.cpu().numpy()
             
             for k in range(step):
@@ -233,7 +169,7 @@ class Optimizer:
             visited = torch.tensor(visited_np, device=visited.device)
             
         else:
-            raise TypeError(f"Unsupported matrix type: {type(A)}")
+            raise TypeError(f"Unsupported matrix type: {type(adj)}")
         
         return visited
 
@@ -252,8 +188,8 @@ class Optimizer:
         elif self.method == "prgpt:locale":
             return rough_prgpt(adj.to_sparse(), refine="locale")
         
-        elif self.method == "dmon":
-            return adapted_dmon(adj, features, labels)
+        elif self.method =="leidenalg":
+            return leidenalg_partition(adj.to_sparse())
 
         else:
             raise ValueError("Unsupported baseline method name")
@@ -261,8 +197,7 @@ class Optimizer:
     @staticmethod
     def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
         return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
-    
-    
+        
     def run(self, nodes_mask : torch.Tensor):
         """
         Run Optimizer on nodes

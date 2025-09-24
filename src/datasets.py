@@ -11,12 +11,11 @@ from ogb.nodeproppred import PygNodePropPredDataset
 
 import time
 import json
+import joblib
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INFO = os.path.join(PROJECT_DIR, "datasets-info")
-
-# TODO (to drobyshev) make dataset dict
 
 class Dataset:
     """Dataset treatment"""
@@ -46,47 +45,51 @@ class Dataset:
         features - #TODO (to Drobyshev) add info for shape
         label - #TODO (to Drobyshev) add info for shape
         """
-
-        filenames = {
-            "features": f"{self.name.lower()}_feat.npy",
-            "labels": f"{self.name.lower()}_label.npy",
-            "adj": f"{self.name.lower()}_adj.npy"
-        }
+        
+        
 
         with open(os.path.join(INFO, "all.json")) as _:
             info = json.load(_)
+        #TODO (to Drobyshev) Add to set all magi datasets
+        magi_datasets = {"cora", "citeseer", "pubmed", "reddit", "ogbn-arxiv"}
         
-        if self.name in info:
+        dname = self.name.lower()
+        if dname in info:
             is_directed = info[self.name]['d'] == 'directed'
             if batches == None:
                 self._load_konect(batches_num = 1, is_directed = is_directed)
                 self.adj = self.adj[0]
             else:
                 self._load_konect(batches_num = batches, is_directed = is_directed)
-        elif self.name.lower() in {"cora", "citeseer", "pubmed", "reddit"} or self.name.startswith("ogbn-"):
-            for key, filename in filenames.items():
-                full_path = os.path.join(self.path, self.name.lower(), filename)
-                if not os.path.isfile(full_path):
+        elif dname in magi_datasets:
+            download_flag = False
+            for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"}:
+                if not os.path.isfile(os.path.join(self.path, dname, filename)):
                     print(f"file not found: {filename}")
                     print("Downloading files...")
-                    self._save_magi()
+                    download_flag = True
                     break
-            self._load_npy_format()
-        elif self.name.lower() in {"acm", "bat", "dblp", "eat", "uat"}:
+            if download_flag:
+                self._load_magi()
+                self._save_magi(coo_adj = True)
+            else:
+                self._load_npy_format(coo_adj = True)
+        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
         else:
             raise ValueError(f"Unsupported dataset: {self.name}")
 
         if tensor_type == "dense":
-            return self.adj.to_dense(), self.features, self.label
+            self.adj = self.adj.to_dense()
         elif tensor_type == "coo":
-            return self.adj.coalesce(), self.features, self.label
+            self.adj = self.adj.coalesce()
         elif tensor_type == "csr":
-            return self.adj.to_sparse_csr(), self.features, self.label
+            self.adj = self.adj.to_sparse_csr()
         elif tensor_type == "csc":
-            return self.adj.to_sparse_csc(), self.features, self.label
+            self.adj = self.adj.to_sparse_csc()
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
+        return self.adj, self.features, self.label
 
     def _load_magi(self):
         name = self.name.lower()
@@ -115,46 +118,47 @@ class Dataset:
         self.features = data.x
         self.label = data.y
 
-    def _save_magi(self):
-        self._load_magi()
-        save_dir = os.path.join(self.path, self.name.lower())
+    def _save_magi(self, coo_adj = False):
+        dname = self.name.lower()
+        save_dir = os.path.join(self.path, dname)
         os.makedirs(save_dir, exist_ok=True)
 
-        np.save(os.path.join(save_dir, f'{self.name.lower()}_feat.npy'), self.features.numpy())
-        np.save(os.path.join(save_dir, f'{self.name.lower()}_label.npy'), self.label.numpy())
+        np.save(os.path.join(save_dir, f'{dname}_feat.npy'), self.features.numpy())
+        np.save(os.path.join(save_dir, f'{dname}_label.npy'), self.label.numpy())
 
         adj = self.adj.coalesce()
-        """
-        adj_dict = {
-            'row': adj.indices()[0].numpy(),
-            'col': adj.indices()[1].numpy(),
-            'data': adj.values().numpy(),
-            'shape': adj.shape
-        }
-        """
-        adj_dense = adj.to_dense().numpy()
-        np.save(os.path.join(save_dir, f'{self.name.lower()}_adj.npy'), adj_dense)
-        #np.save(os.path.join(save_dir, f'{self.name.lower()}_adj.npy'), adj_dict, allow_pickle=True)
 
-    def _load_npy_format(self):  #Drobyshev
-        features_path = os.path.join(self.path, f"{self.name.lower()}_feat.npy")
-        features = np.load(features_path)
-        labels_path = os.path.join(self.path, f"{self.name.lower()}_label.npy")
-        labels = np.load(labels_path)
+        if coo_adj:
+            adj_data = {
+                'indices': adj.indices().numpy(),
+                'values': adj.values().numpy(),
+                'shape': adj.shape
+            }
+            joblib.dump(adj_data, os.path.join(save_dir, f'{dname}_coo_adj.joblib'))
+        else:
+            adj_dense = adj.to_dense().numpy()
+            np.save(os.path.join(save_dir, f'{dname}_adj.npy'), adj_dense)
+
+    def _load_npy_format(self, coo_adj = False):
+        dname = self.name.lower()
+        load_dir = os.path.join(self.path, dname)
+
+        features = np.load(os.path.join(load_dir, f"{dname}_feat.npy"))
+        labels = np.load(os.path.join(load_dir, f"{dname}_label.npy"))
         self.features = torch.tensor(features, dtype=torch.float)
         self.label = torch.tensor(labels, dtype=torch.long)
 
-        adj_path = os.path.join(self.path, f"{self.name.lower()}_adj.npy")
-        adj_data = np.load(adj_path, allow_pickle=True)
-        rows, cols = adj_data.nonzero()
-        values_np = adj_data[rows, cols]
-        indices_np = np.vstack((rows, cols))
-
-        indices = torch.from_numpy(indices_np).long()
-        values = torch.from_numpy(values_np).float()
-        shape = adj_data.shape
-
-        self.adj = torch.sparse_coo_tensor(indices, values, size=shape)
+        if coo_adj:
+            adj_data = joblib.load(os.path.join(load_dir, f"{dname}_coo_adj.joblib"))
+            self.adj = torch.sparse_coo_tensor(adj_data['indices'], adj_data['values'], size=adj_data['shape'])
+        else:
+            adj_data = np.load(os.path.join(load_dir, f"{dname}_adj.npy"), allow_pickle=True)
+            rows, cols = adj_data.nonzero()
+            values_np = adj_data[rows, cols]
+            indices_np = np.vstack((rows, cols))
+            indices = torch.from_numpy(indices_np).long()
+            values = torch.from_numpy(values_np).float()
+            self.adj = torch.sparse_coo_tensor(indices, values, size=adj_data.shape)
     
     def _load_konect(self, batches_num = 1, is_directed = True):
         """
@@ -251,7 +255,4 @@ def save_small_datasets_in_konect_format():
 
 
 if __name__ == "__main__":
-    #dataset = "dblp_coauthor"
-    #ds = Dataset(dataset, KONECT_PATH)
-    #ds._load_konect(batches_num = 10)
-    save_small_datasets_in_konect_format()
+    list_konect_datasets()
