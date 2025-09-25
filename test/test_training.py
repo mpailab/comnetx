@@ -15,7 +15,7 @@ from datasets import Dataset
 def test_train_custom_eat_runs_successfully():
     script_path = Path(__file__).parent.parent / "baselines" / "MAGI" / "train_custom.py"
 
-    dataset_path = Path(__file__).parent / "graphs" / "small" / "eat"
+    dataset_path = Path(__file__).parent / "graphs" / "small"
 
     proc = subprocess.Popen(
         [
