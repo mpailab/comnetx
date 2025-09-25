@@ -35,7 +35,7 @@ parser.add_argument('--kmeans_batch', type=int, default=-1,
 parser.add_argument('--batchsize', type=int, default=2048, help='')
 
 # dataset para
-parser.add_argument('--dataset_path', type=str, default='../../../test/graphs/small/reddit')
+parser.add_argument('--dataset_path', type=str, default='../../../test/graphs/small')
 parser.add_argument('--dataset_name', type=str, default='Reddit')
 
 # model para
