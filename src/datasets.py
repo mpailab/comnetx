@@ -54,7 +54,7 @@ class Dataset:
         magi_datasets = {"cora", "citeseer", "pubmed", "reddit", "ogbn-arxiv"}
         
         dname = self.name.lower()
-        if dname in info:
+        if self.name in info:
             is_directed = info[self.name]['d'] == 'directed'
             if batches == None:
                 self._load_konect(batches_num = 1, is_directed = is_directed)
@@ -176,6 +176,9 @@ class Dataset:
             max_index = num_nodes - 1
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        #FiXME -- don't add nodes with no edges
+        # nodes_set = set(i.tolist() + j.tolist())
+        # print(len(nodes_set), min(nodes_set), max(nodes_set))
         adjs = []
         for num in range(batches_num):
             mask = (t == num)
