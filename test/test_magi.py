@@ -26,7 +26,7 @@ def get_all_datasets():
         for name in os.listdir(base_dir):
             path = os.path.join(base_dir, name)
             if os.path.isdir(path):
-                datasets[name] = path
+                datasets[name] = base_dir
     return datasets
 
 
