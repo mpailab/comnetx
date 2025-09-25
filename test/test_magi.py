@@ -120,7 +120,6 @@ def test_magi_konect_dataset(name):
         proc = subprocess.run(cmd, capture_output=True, text=True)
         #print(proc.stdout)
         if proc.returncode != 0:
-            # Если ошибка только из-за tensorflow предупреждения, можно игнорировать или логировать
             if "Unable to register cuDNN factory" in proc.stderr:
                 print("Warning: TensorFlow cuDNN factory warning detected, ignoring")
             else:

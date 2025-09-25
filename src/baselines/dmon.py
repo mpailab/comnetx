@@ -7,9 +7,26 @@ import numpy as np
 import scipy.sparse
 from scipy.sparse import base
 import sklearn.metrics
+import torch
+import warnings
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+warnings.simplefilter("ignore")
+
+stdout = sys.stdout
+stderr = sys.stderr
+sys.stdout = open(os.devnull, 'w')
+sys.stderr = open(os.devnull, 'w')
+
 import tensorflow.compat.v2 as tf
 tf.compat.v1.enable_v2_behavior()
-import torch
+
+sys.stdout.close()
+sys.stderr.close()
+sys.stdout = stdout
+sys.stderr = stderr
+
+tf.get_logger().setLevel('ERROR')
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 dmon_root = os.path.join(PROJECT_PATH, "baselines", "DMON")
@@ -120,7 +137,8 @@ def build_dmon(input_features,
 def adapted_dmon(adj: torch.Tensor,
         ftrs : torch.Tensor,
         lbls : torch.Tensor | None = None,
-        args = None):
+        args=None,
+        **kwargs):
   """
   DMON method
 
@@ -139,14 +157,19 @@ def adapted_dmon(adj: torch.Tensor,
         Hyperparameters for DMON training. If None, default parameters are used.
   """
   if args is None:
-        class Args:
-            _architecture = [64]
-            _collapse_regularization = 1
-            _dropout_rate = 0 #min - 0, max - 1
-            _n_clusters = 16 #min - 0
-            _n_epochs = 1000 #min - 0
-            _learning_rate = 0.001 #min - 0
-        args = Args()
+    class Args:
+        _architecture = [64]
+        _collapse_regularization = 1
+        _dropout_rate = 0 #min - 0, max - 1
+        _n_clusters = 16 #min - 0
+        _n_epochs = 1000 #min - 0
+        _learning_rate = 0.001 #min - 0
+    args = Args()
+  for key, value in kwargs.items():
+    if hasattr(args, key):
+        setattr(args, key, value)
+    else:
+        raise ValueError(f"Unknown argument {key}")
 
   graph, features = torch_to_tf_sparse_tensor(adj), torch_to_tf_sparse_tensor(ftrs)
   adjacency = torch_to_scipy_csr(adj)
@@ -181,8 +204,8 @@ def adapted_dmon(adj: torch.Tensor,
   for epoch in range(args._n_epochs):
     loss_values, grads = grad(model, [features, graph_normalized, graph])
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    #print(f'epoch {epoch}, losses: ' +
-    #     ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
+    print(f'epoch {epoch}, losses: ' +
+         ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
 
   # Obtain the cluster assignments.
   _, assignments = model([features, graph_normalized, graph], training=False)
@@ -210,5 +233,6 @@ def adapted_dmon(adj: torch.Tensor,
      precision = metrics.pairwise_precision(know_labels, clusters[label_indices])
      recall = metrics.pairwise_recall(know_labels, clusters[label_indices])
      print('F1:', 2 * precision * recall / (precision + recall))
+  print("Returning clusters_tensor:", type(clusters_tensor), clusters_tensor.shape)
   return clusters_tensor
   

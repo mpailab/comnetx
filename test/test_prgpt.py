@@ -1,9 +1,10 @@
 import subprocess
 import sys
 import os
-import torch
+import torch, gc
 import pytest
 import json
+import tempfile
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
@@ -41,8 +42,40 @@ def get_all_konect_datasets():
 KONECT_DATASETS = get_all_konect_datasets()
 
 @pytest.mark.long
-def test_run_prgpt_isolated():
-    subset = list(KONECT_DATASETS.keys())[0:20]
+@pytest.mark.parametrize(
+    "name",
+    list(KONECT_DATASETS.keys()),
+    ids=list(KONECT_DATASETS.keys())
+)
+def test_run_prgpt_isolated(name):
+    dataset = Dataset(name, path=KONECT_PATH)
+    adj, features, labels = dataset.load()
+    adj = adj.coalesce()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
+        temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
+        torch.save(adj, temp_adj_path)
+        torch.save(features, temp_features_path)
+
+        cmd = [
+            sys.executable, "-m", "pytest", __file__, 
+            "-k", "test_rough_prgpt_on_konect", 
+            "--tb=short",
+            "--disable-warnings"
+        ]
+
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        #print(proc.stdout)
+        if proc.returncode != 0:
+            raise RuntimeError(f"Test failed in subprocess for parameter {key}")
+    del adj, features, labels 
+    gc.collect()
+    torch.cuda.empty_cache()
+
+@pytest.mark.long
+def test_run_prgpt_isolated2():
+    print("number of datasets = ", len(list(KONECT_DATASETS.keys())))
+    subset = list(KONECT_DATASETS.keys())[77:]
     param = sys.argv[-1] if len(sys.argv) > 1 else None
     for key in subset:
         print(f"\nRunning subprocess for parameter: {key}\n")
@@ -54,7 +87,7 @@ def test_run_prgpt_isolated():
             "--tb=short",
             "--disable-warnings"
         ]
-        proc = subprocess.run(cmd, env=env)
+        proc = subprocess.run(cmd, env=env, text=True, stdout=sys.stdout, stderr=sys.stderr)
         torch.cuda.empty_cache()
         if proc.returncode != 0:
             raise RuntimeError(f"Test failed in subprocess for parameter {key}")
@@ -82,6 +115,15 @@ def test_rough_prgpt_on_konect(name, dataset):
     dataset.load()
     rough_prgpt(dataset.adj, refine="infomap")
 """
+
+@pytest.fixture(scope="class")
+def custom_dataset():
+    ds = Dataset("europe_osm", KONECT_PATH)
+    ds.load()
+    return ds
+
+def test_rough_prgpt_infomap_on_custom(custom_dataset):
+    rough_prgpt(custom_dataset.adj, refine="infomap")
 
 @pytest.fixture(scope="class")
 def facebook_dataset():
