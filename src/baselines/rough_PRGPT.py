@@ -141,7 +141,6 @@ def rough_prgpt(adj : torch.Tensor,
     clus_res_init_, num_clus_est = clus_reorder(tst_num_nodes, clus_res_init)
     mod_init = get_mod_mtc(tst_edges, clus_res_init_, num_clus_est)
     print('INIT EST-K %d MOD %.4f' % (num_clus_est, mod_init))
-    clus_res = clus_res_init_
     if refine is None:
         return to_com_tensor(clus_res_init_, origin_num_nodes, shift)
     elif refine == "infomap":
@@ -155,7 +154,7 @@ def rough_prgpt(adj : torch.Tensor,
         clus_res_IM, num_clus_IM = clus_reorder(tst_num_nodes, clus_res_IM)
         mod_IM = get_mod_mtc(tst_edges, clus_res_IM, num_clus_IM)
         print('InfoMap EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
-            % (num_clus_est, mod_IM, time_IM, feat_time, FFP_time, init_time, rfn_time_IM))
+            % (num_clus_IM, mod_IM, time_IM, feat_time, FFP_time, init_time, rfn_time_IM))
         return to_com_tensor(clus_res_IM, origin_num_nodes, shift)
     elif refine == "locale":
         # Online refinement via Locale
@@ -168,7 +167,7 @@ def rough_prgpt(adj : torch.Tensor,
         clus_res_Lcl, num_clus_Lcl = clus_reorder(tst_num_nodes, clus_res_Lcl)
         mod_Lcl = get_mod_mtc(tst_edges, clus_res_Lcl, num_clus_Lcl)
         print('Locale EST-K %d MOD %.4f TIME %.4f (%.4f %.4f %.4f %.4f)'
-            % (num_clus_est, mod_Lcl, time_Lcl, feat_time, FFP_time, init_time, rfn_time_Lcl))
+            % (num_clus_Lcl, mod_Lcl, time_Lcl, feat_time, FFP_time, init_time, rfn_time_Lcl))
         return to_com_tensor(clus_res_Lcl, origin_num_nodes, shift)
     else:
         raise ValueError(f"Unsupported refine method: {refine}")
