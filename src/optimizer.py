@@ -9,6 +9,7 @@ from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt 
 from baselines.dmon import adapted_dmon
 from baselines.leidenalg import leidenalg_partition
+from baselines.networkit import networkit_partition
 import sparse
 from metrics import Metrics
 
@@ -178,8 +179,11 @@ class Optimizer:
         elif self.method == "dmon":
             return adapted_dmon(adj, features, labels)
         
-        elif self.method =="leidenalg":
+        elif self.method == "leidenalg":
             return leidenalg_partition(adj.to_sparse())
+        
+        elif self.method == "networkit":
+            return networkit_partition(adj.to_sparse())
 
         else:
             raise ValueError("Unsupported baseline method name")
