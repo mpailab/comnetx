@@ -48,4 +48,6 @@ pip install --no-cache-dir \
 
 pip install leidenalg
 
+pip install networkit
+
 echo "[INFO] Done!"
