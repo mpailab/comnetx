@@ -9,7 +9,6 @@ from baselines.magi import magi
 from baselines.rough_PRGPT import rough_prgpt
 from baselines.leidenalg import leidenalg_partition
 import sparse
-import datasets
 from metrics import Metrics
 
 class Optimizer:
@@ -84,18 +83,21 @@ class Optimizer:
         """
         Change the graph based on the current batch of updates.
 
-        Parameters
-        ----------
-        batch : torch.Tensor of the shape (n, n)
+        Args:
+            batch : torch.Tensor of the shape (n, n)
+        Returns:
+
         """
 
         if self.size != batch.size():
             raise(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
         
         self.adj += batch.type(self.adj.dtype)
-        affected_nodes = batch.indices().unique()
+        affected_nodes = batch.coalesce().indices().unique()
+        mask = torch.zeros(self.nodes_num, dtype=torch.bool)
+        mask[affected_nodes] = True
 
-        return affected_nodes
+        return mask
     
     @staticmethod
     def neighborhood(adj: Union[torch.Tensor, 'sparse.COO'],
@@ -241,19 +243,3 @@ class Optimizer:
             # Cut off adjacency matrix
             cut_ptn = sparse.tensor(new_coms, self.size, adj.dtype)
             adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
-
-
-    def apply(self, batch):
-        """
-        Apply Optimizer to the current graph update
-
-        Parameters
-        ----------
-        batch : torch.Tensor of the shape (n,3)
-            List of edges with weights given in the form (i,j,w), 
-            where i and j are node numbers and w is the changing edge weight. 
-        """
-
-        nodes = self.upgrade_graph(batch)
-        nodes = self.neighborhood(self.A, nodes.to_dense()) # BoolTensor n x 1
-        self.run(nodes)
