@@ -1,5 +1,5 @@
 import torch
-from torch_geometric.datasets import Planetoid, Reddit
+from torch_geometric.datasets import Planetoid, Reddit, Amazon
 
 from ogb.nodeproppred import PygNodePropPredDataset
 import tempfile
@@ -51,7 +51,7 @@ class Dataset:
         with open(os.path.join(INFO, "all.json")) as _:
             info = json.load(_)
         #TODO (to Drobyshev) Add to set all magi datasets
-        magi_datasets = {"cora", "citeseer", "pubmed", "reddit", "ogbn-arxiv"}
+        magi_datasets = {"cora", "citeseer", "pubmed", "reddit", "ogbn-arxiv", "ogbn-products", "ogbn-papers100M", "amazon-photo", "amazon-computers"}
         
         dname = self.name.lower()
         if self.name in info:
@@ -107,6 +107,10 @@ class Dataset:
                 split_idx = dataset.get_idx_split()
                 data = dataset[0]
                 data.y = data.y.view(-1)
+            elif name.startswith("amazon-"):
+                amazon_name = name.replace("amazon-", "").capitalize()
+                dataset = Amazon(root=tmpdir, name=amazon_name)
+                data = dataset[0]
             else:
                 raise ValueError(f"Unknown MAGI-compatible dataset: {self.name}")
 

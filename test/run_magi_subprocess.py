@@ -11,12 +11,15 @@ def main():
     parser.add_argument("--adj", required=True)
     parser.add_argument("--features", required=True)
     parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
     features = torch.load(args.features)
 
     new_labels = magi(adj, features, epochs=args.epochs)
+
+    torch.save(new_labels, args.out)
     print("MAGI finished successfully")
 
 if __name__ == "__main__":

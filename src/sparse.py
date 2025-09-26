@@ -22,9 +22,9 @@ def ext_range(tensor : torch.Tensor, size : int):
 
 def reset_matrix(tensor : torch.Tensor, 
                  indices : torch.Tensor) -> torch.Tensor:
-    mask = torch.isin(tensor.indices(), indices).min(0).values
-    return torch.sparse_coo_tensor(tensor.indices()[:, mask], 
-                                   tensor.values()[mask],
+    mask = torch.isin(tensor.coalesce().indices(), indices).min(0).values
+    return torch.sparse_coo_tensor(tensor.coalesce().indices()[:, mask], 
+                                   tensor.coalesce().values()[mask],
                                    tensor.size()).coalesce()
 
 
@@ -52,9 +52,9 @@ def reset(tensor : torch.Tensor,
         torch.Tensor
     """
     selected_indices = torch.range(0, tensor.size()[dim])[key]
-    mask = torch.isin(tensor.indices()[dim], selected_indices) ^ invert
-    return torch.sparse_coo_tensor(tensor.indices()[:, mask], 
-                                   tensor.values()[mask],
+    mask = torch.isin(tensor.coalesce().indices()[dim], selected_indices) ^ invert
+    return torch.sparse_coo_tensor(tensor.coalesce().indices()[:, mask], 
+                                   tensor.coalesce().values()[mask],
                                    tensor.size()).coalesce()
 
 
@@ -75,7 +75,7 @@ def clear(tensor : torch.Tensor,
     -------
         torch.Tensor
     """
-    indices = tensor.indices()
+    indices = tensor.coalesce().indices()
     size = list(tensor.size())
 
     old_dim_indices = indices[dim]
@@ -89,7 +89,7 @@ def clear(tensor : torch.Tensor,
     ])
     size[dim] = unique_old_dim_indices.size()[0]
 
-    return torch.sparse_coo_tensor(indices, tensor.values(), size, 
+    return torch.sparse_coo_tensor(indices, tensor.coalesce().values(), size, 
                                    is_coalesced=tensor.is_coalesced())
 
 

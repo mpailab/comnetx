@@ -55,6 +55,31 @@ def test_load_magi_big_datasets(temp_dataset_dir):
         assert ds.features is not None
         assert ds.label is not None
 
+
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "dataset_name",
+    [
+        "cora",
+        "citeseer",
+        "pubmed",
+        "reddit",
+        "ogbn-arxiv",
+        "ogbn-products",
+        "ogbn-papers100M",
+        "amazon-photo",
+        "amazon-computers",
+    ],
+)
+def test_load_magi_datasets(dataset_name, temp_dataset_dir):
+    ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
+    ds.load(tensor_type="coo")
+    assert isinstance(ds.adj, torch.Tensor)
+    assert ds.adj.is_sparse
+    assert ds.adj.shape[0] == ds.adj.shape[1]
+    assert ds.features is not None
+    assert ds.label is not None
+
 @pytest.mark.short
 def test_load_youtube_dataset(temp_dataset_dir):
     loader = Dataset(dataset_name="youtube-u-growth", path=KONECT_PATH)

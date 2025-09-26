@@ -68,7 +68,7 @@ def load_konect_info():
 
 @pytest.fixture(scope="class")
 def facebook_dataset():
-    ds = Dataset("facebook-wosn-links", KONECT_PATH)
+    ds = Dataset("epinions", KONECT_PATH)
     ds.load()
     return ds
 
@@ -76,7 +76,11 @@ def test_magi_on_facebook(facebook_dataset):
     num_nodes = facebook_dataset.adj.shape[-1]
     adj = facebook_dataset.adj.coalesce()
     features = torch.randn(num_nodes, 128, dtype=torch.float32)
-    magi(adj, features, epochs=10)
+    new_labels = magi(adj, features, epochs=10)
+    assert isinstance(new_labels, torch.Tensor)
+    assert new_labels.shape[0] == adj.size(0)
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
 
 
 def get_all_konect_datasets():
@@ -106,6 +110,7 @@ def test_magi_konect_dataset(name):
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
         temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
+        temp_labels_path = os.path.join(tmpdir, f"labels_{name}.pt")
         torch.save(adj, temp_adj_path)
         torch.save(features, temp_features_path)
 
@@ -114,16 +119,23 @@ def test_magi_konect_dataset(name):
             "run_magi_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
-            "--epochs", "1"
+            "--epochs", "1",
+            "--out", temp_labels_path
         ]
 
         proc = subprocess.run(cmd, capture_output=True, text=True)
-        #print(proc.stdout)
         if proc.returncode != 0:
-            if "Unable to register cuDNN factory" in proc.stderr:
-                print("Warning: TensorFlow cuDNN factory warning detected, ignoring")
-            else:
-                pytest.fail(f"Subprocess failed for dataset {name} with error: {proc.stderr}")
-    del adj, features, labels 
+            print(f"Subprocess failed with code {proc.returncode}")
+            print("stdout:", proc.stdout)
+            print("stderr:", proc.stderr)
+            pytest.fail(f"Subprocess failed for dataset {name}")
+
+        new_labels = torch.load(temp_labels_path)
+
+        assert isinstance(new_labels, torch.Tensor)
+        assert new_labels.shape[0] == adj.size(0)
+        assert new_labels.dtype in (torch.int64, torch.long)
+        assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
