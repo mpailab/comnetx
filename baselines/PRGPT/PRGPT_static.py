@@ -169,6 +169,11 @@ def get_init_res(ind_est, edges):
             init_edge_map[(src_node_idx, dst_node_idx)] = 1.0
         else:
             init_edge_map[(src_node_idx, dst_node_idx)] += 1.0
+    for lbl in clus_res:
+        if lbl not in init_node_map:
+            init_node_map[lbl] = init_node_idx
+            init_node_idx += 1
+
     # ==========
     init_edges = [(src, dst, init_edge_map[(src, dst)]) for (src, dst) in init_edge_map]
     #init_edges = sorted(init_edges)

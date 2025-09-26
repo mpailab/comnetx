@@ -27,9 +27,10 @@ def test_aggregate_2():
     true_res = torch.tensor([[9, 0], [1, 1]])
     assert torch.equal(true_res.to_dense(), res.to_dense())
 
+@pytest.mark.short
 def test_run_prgpt():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
+    communities = torch.tensor([[1, 1, 1, 3]])
     opt = Optimizer(A, communities = communities, method  = "prgpt:infomap")
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)
@@ -38,10 +39,22 @@ def test_run_prgpt():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.long
+@pytest.mark.short
+def test_run_leidenalg():
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
+    communities = torch.tensor([[1, 1, 1, 3]])
+    opt = Optimizer(A, communities = communities, method  = "leidenalg")
+    nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
+    print("communities:", communities)
+    print("nodes_mask:", nodes_mask)
+    opt.run(nodes_mask)
+    print()
+    print(opt.coms.to_dense())
+
+@pytest.mark.short
 def test_run_magi():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
+    communities = torch.tensor([[1, 1, 1, 3]])
     opt = Optimizer(A, communities = communities, method  = "magi")
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)
@@ -107,3 +120,33 @@ def test_neighborhood_2():
     assert torch.equal(nodes_0, initial_nodes)
     assert torch.equal(nodes_1, true_nodes_1)
     assert torch.equal(nodes_2, true_nodes_2)
+
+def test_modularity():
+    communities = torch.tensor([
+        [0, 0, 0, 3, 3, 3],
+        [0, 0, 2, 3, 4, 3],
+        [0, 1, 2, 3, 4, 5]
+    ])
+
+    dense_communities = torch.tensor([
+        [1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0]], dtype=torch.float32)
+
+    adj_matrix = torch.tensor([
+                        [1, 1, 1, 0, 0, 0], 
+                        [1, 1, 1, 0, 0, 0], 
+                        [1, 1, 1, 0, 0, 0], 
+                        [0, 1, 0, 1, 1, 1], 
+                        [0, 0, 0, 1, 1, 1],
+                        [0, 0, 0, 1, 1, 1]], dtype = torch.float).to_sparse()
+
+    optimizer = Optimizer(adj_matrix=adj_matrix, communities=communities)
+    modularity = optimizer.modularity()
+    dense_modularity = optimizer.dense_modularity(adj_matrix, dense_communities)
+    print(type(modularity))
+    assert modularity < 1.0
+    assert dense_modularity == modularity
