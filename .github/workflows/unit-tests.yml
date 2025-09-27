@@ -26,9 +26,10 @@ jobs:
           # Ensure TF-compatible numpy
           pip install 'numpy<2'
           # Common scientific stack used by metrics module imports
-          pip install scipy scikit-learn networkx
-          # CPU-only PyTorch wheel
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install scipy scikit-learn networkx joblib
+          # CPU-only PyTorch (pinned) and matching torch-sparse wheel
+          pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-sparse -f https://data.pyg.org/whl/torch-2.3.0+cpu.html
           # TensorFlow CPU from wheel
           pip install --only-binary=:all: 'tensorflow==2.15.0'
 
