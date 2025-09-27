@@ -23,13 +23,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest
-          pip install numpy
+          # Ensure TF-compatible numpy
+          pip install 'numpy<2'
+          # Common scientific stack used by metrics module imports
+          pip install scipy scikit-learn networkx
           # CPU-only PyTorch wheel
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # TensorFlow CPU from wheel
+          pip install --only-binary=:all: 'tensorflow==2.15.0'
 
       - name: Run unit tests
         env:
           PYTHONPATH: src
         run: |
           pytest -q test/unit
-
