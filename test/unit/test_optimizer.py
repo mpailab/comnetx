@@ -36,6 +36,16 @@ def test_init_with_inputs():
 
 
 @pytest.mark.unit
+def test_update_adj():
+    adj_matrix = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]])
+    opt = Optimizer(adj_matrix.to_sparse_coo())
+    opt.update_adj(adj_matrix.to_sparse_coo())
+    true_res = adj_matrix * 2
+    res = opt.adj
+    assert torch.equal(true_res, opt.adj.to_dense())
+
+
+@pytest.mark.unit
 def test_update_adj_adds_and_returns_mask():
     A = torch.tensor([[0,1,0],[1,0,0],[0,0,0]], dtype=torch.float32).to_sparse_coo()
     opt = Optimizer(A)
@@ -86,6 +96,25 @@ def test_local_algorithm_unsupported():
         pass
 
 
+# @pytest.mark.unit
+# FIXME now aggregate don't work for 2 sparse matrix with int-like elements type
+# def test_aggregate_1():
+#     adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.int64).to_sparse()
+#     coms = torch.tensor([[1, 1, 1, 0], [0, 0, 0, 1]]).type(adj.dtype).to_sparse()
+#     res = Optimizer.aggregate(adj, coms)
+#     true_res = torch.tensor([[9, 0], [1, 1]])
+#     assert torch.equal(true_res, res)
+
+
+@pytest.mark.unit
+def test_aggregate_2():
+    adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.float).to_sparse()
+    coms = torch.tensor([[1, 1, 1, 0], [0, 0, 0, 1]]).type(adj.dtype).to_sparse()
+    res = Optimizer.aggregate(adj, coms)
+    true_res = torch.tensor([[9, 0], [1, 1]])
+    assert torch.equal(true_res.to_dense(), res.to_dense())
+
+
 @pytest.mark.unit
 def test_aggregate_simple():
     adj = torch.tensor([[1,1,1,0],[1,1,1,0],[1,1,1,0],[0,1,0,1]], dtype=torch.float32).to_sparse_coo()
@@ -108,6 +137,38 @@ def test_aggregate_via_sparse_helper():
 
 
 @pytest.mark.unit
+def test_modularity():
+    communities = torch.tensor([
+        [0, 0, 0, 3, 3, 3],
+        [0, 0, 2, 3, 4, 3],
+        [0, 1, 2, 3, 4, 5]
+    ])
+
+    dense_communities = torch.tensor([
+        [1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0]], dtype=torch.float32)
+
+    adj_matrix = torch.tensor([
+                        [1, 1, 1, 0, 0, 0], 
+                        [1, 1, 1, 0, 0, 0], 
+                        [1, 1, 1, 0, 0, 0], 
+                        [0, 1, 0, 1, 1, 1], 
+                        [0, 0, 0, 1, 1, 1],
+                        [0, 0, 0, 1, 1, 1]], dtype = torch.float).to_sparse()
+
+    optimizer = Optimizer(adj_matrix=adj_matrix, communities=communities)
+    modularity = optimizer.modularity()
+    dense_modularity = optimizer.dense_modularity(adj_matrix, dense_communities)
+    print(type(modularity))
+    assert modularity < 1.0
+    assert dense_modularity == modularity
+
+
+@pytest.mark.unit
 def test_dense_vs_sparse_modularity():
     # Two cliques of size 3
     edges = []
@@ -127,6 +188,46 @@ def test_dense_vs_sparse_modularity():
     m1 = opt.modularity()
     m2 = opt.dense_modularity(A, dense_coms)
     assert abs(m1 - m2) < 1e-6
+
+
+@pytest.mark.unit
+def test_neighborhood_1():
+    A = torch.tensor([
+        [0, 1, 0, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [0, 0, 0, 0]
+    ], dtype=torch.float32)
+    A_sparse = A.to_sparse_coo()
+    initial_nodes = torch.tensor([True, False, False, False])
+    nodes_0 = Optimizer.neighborhood(A_sparse, initial_nodes, 0)
+    nodes_1 = Optimizer.neighborhood(A_sparse, initial_nodes, 1)
+    nodes_2 = Optimizer.neighborhood(A_sparse, initial_nodes, 2)
+    true_nodes_1 = torch.tensor([True, True, False, False])
+    true_nodes_2 = torch.tensor([True, True, True, True])
+    assert torch.equal(nodes_0, initial_nodes)
+    assert torch.equal(nodes_1, true_nodes_1)
+    assert torch.equal(nodes_2, true_nodes_2)
+
+
+@pytest.mark.unit
+def test_neighborhood_2():
+    A = torch.tensor([
+        [0, 1, 0, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [0, 0, 0, 0]
+    ], dtype=torch.float32)
+    A_sparse = A.t().to_sparse_coo()
+    initial_nodes = torch.tensor([True, False, False, False])
+    nodes_0 = Optimizer.neighborhood(A_sparse, initial_nodes, 0)
+    nodes_1 = Optimizer.neighborhood(A_sparse, initial_nodes, 1)
+    nodes_2 = Optimizer.neighborhood(A_sparse, initial_nodes, 2)
+    true_nodes_1 = torch.tensor([True, True, False, False])
+    true_nodes_2 = torch.tensor([True, True, True, True])
+    assert torch.equal(nodes_0, initial_nodes)
+    assert torch.equal(nodes_1, true_nodes_1)
+    assert torch.equal(nodes_2, true_nodes_2)
 
 
 @pytest.mark.unit
