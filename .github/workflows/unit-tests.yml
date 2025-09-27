@@ -29,6 +29,7 @@ jobs:
           pip install scipy scikit-learn networkx joblib
           # CPU-only PyTorch (pinned) and matching torch-sparse wheel
           pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-scatter -f https://data.pyg.org/whl/torch-2.3.0+cpu.html
           pip install torch-sparse -f https://data.pyg.org/whl/torch-2.3.0+cpu.html
           # TensorFlow CPU from wheel
           pip install --only-binary=:all: 'tensorflow==2.15.0'
