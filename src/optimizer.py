@@ -178,13 +178,13 @@ class Optimizer:
             return magi(adj, features, labels)
         elif self.method == "prgpt:infomap":
             from baselines.rough_PRGPT import rough_prgpt
-            return rough_prgpt(adj.to_sparse(), refine="infomap")
+            return rough_prgpt(adj, refine="infomap")
         elif self.method == "prgpt:locale":
             from baselines.rough_PRGPT import rough_prgpt
-            return rough_prgpt(adj.to_sparse(), refine="locale")
+            return rough_prgpt(adj, refine="locale")
         elif self.method == "leidenalg":
             from baselines.leidenalg import leidenalg_partition
-            return leidenalg_partition(adj.to_sparse())
+            return leidenalg_partition(adj)
         else:
             raise ValueError("Unsupported baseline method name")
 
@@ -253,6 +253,6 @@ class Optimizer:
             self.coms[l, ext_mask[l]] = new_coms
 
             # Cut off adjacency matrix
-            cut_idx = torch.stack((new_coms, new_coms))
+            cut_idx = torch.stack((new_coms, ext_nodes))
             cut_ptn = sparse.tensor(cut_idx, self.size, adj.dtype)
             adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
