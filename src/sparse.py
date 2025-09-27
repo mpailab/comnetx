@@ -22,7 +22,7 @@ def ext_range(tensor : torch.Tensor, size : int):
 
 def reset_matrix(tensor : torch.Tensor, 
                  indices : torch.Tensor) -> torch.Tensor:
-    mask = torch.isin(tensor.coalesce().indices(), indices).min(0).values
+    mask = torch.isin(tensor.coalesce().indices(), indices).all(0)
     return torch.sparse_coo_tensor(tensor.coalesce().indices()[:, mask], 
                                    tensor.coalesce().values()[mask],
                                    tensor.size()).coalesce()
@@ -51,7 +51,7 @@ def reset(tensor : torch.Tensor,
     -------
         torch.Tensor
     """
-    selected_indices = torch.range(0, tensor.size()[dim])[key]
+    selected_indices = torch.arange(tensor.size()[dim])[key]
     mask = torch.isin(tensor.coalesce().indices()[dim], selected_indices) ^ invert
     return torch.sparse_coo_tensor(tensor.coalesce().indices()[:, mask], 
                                    tensor.coalesce().values()[mask],
