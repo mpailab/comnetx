@@ -1,27 +1,26 @@
 # External imports
 import torch
-import os
 import numpy as np
-from typing import Union
+from typing import Union, Optional, Callable
 
 # Internal imports
-from baselines.magi import magi
-from baselines.rough_PRGPT import rough_prgpt 
-from baselines.dmon import adapted_dmon
-from baselines.leidenalg import leidenalg_partition
-from baselines.networkit import networkit_partition
 import sparse
 from metrics import Metrics
+
+# Type aliases
+LocalAlgorithmFn = Callable[[torch.Tensor, torch.Tensor, bool, Optional[torch.Tensor]], \
+                            torch.Tensor]
 
 class Optimizer:
     
     def __init__(self, 
-                 adj_matrix : torch.Tensor, 
-                 features : torch.Tensor | None = None, 
-                 communities : torch.Tensor | None = None,
-                 subcoms_num : int = 1,
-                 subcoms_depth : int = 1,
-                 method : str = "prgpt:infomap"):
+                 adj_matrix: torch.Tensor, 
+                 features: Optional[torch.Tensor] = None, 
+                 communities: Optional[torch.Tensor] = None,
+                 subcoms_num: int = 1,
+                 subcoms_depth: int = 1,
+                 method: str = "prgpt:infomap",
+                 local_algorithm_fn: Optional[LocalAlgorithmFn] = None):
         """
 
         Parameters
@@ -54,9 +53,10 @@ class Optimizer:
             self.coms = communities
         
         self.method = method
+        self.local_algorithm_fn = local_algorithm_fn
 
     def dense_modularity(self, 
-            adj, coms, gamma = 1) -> float:
+            adj: torch.Tensor, coms: torch.Tensor, gamma: float = 1) -> float:
         """
         Args:
             adj: torch.tensor [n_nodes, n_nodes]
@@ -69,7 +69,7 @@ class Optimizer:
         return Metrics.modularity(adj, coms.T, gamma)
 
     def modularity(self, 
-            gamma=1, L=0) -> float:
+            gamma: float = 1, L: int = 0) -> float:
         """
         Args:
             gamma: float, optional (default=1)
@@ -81,7 +81,7 @@ class Optimizer:
         dense_coms = Metrics.create_dense_community(self.coms, n, L).T
         return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
         
-    def update_adj(self, batch: torch.Tensor):
+    def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
         Change the graph based on the current batch of updates.
 
@@ -92,7 +92,7 @@ class Optimizer:
         """
 
         if self.size != batch.size():
-            raise(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
+            raise ValueError(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
         
         self.adj += batch.type(self.adj.dtype)
         affected_nodes = batch.coalesce().indices().unique()
@@ -114,24 +114,27 @@ class Optimizer:
             visited: torch.BoolTensor 
         """
         visited = nodes_mask.clone()
-        
+
+        if step <= 0:
+            return visited
+
         if isinstance(adj, torch.Tensor) and adj.is_sparse:
-            adj_c = adj.coalesce()
-            for k in range(step):
-                if not visited.any():
+            # Use sparse matmul for frontier expansion (faster than per-edge masking)
+            A = adj.coalesce()
+            AT = torch.sparse_coo_tensor(A.indices().flip(0), A.values(), size=A.size()).coalesce()
+            A_sym = (A + AT).coalesce()
+
+            # Work with float vector for spmm, keep boolean for masks
+            frontier = visited.clone()
+            for _ in range(step):
+                if not frontier.any():
                     break
+                y = torch.sparse.mm(A_sym, frontier.to(dtype=A_sym.dtype).unsqueeze(1)).squeeze(1)
+                new_nodes = y > 0
+                new_frontier = new_nodes & (~visited)
+                visited = visited | new_nodes
+                frontier = new_frontier
 
-                frontier_mask = visited[adj_c.indices()[0]]
-                neighbors = adj_c.indices()[1][frontier_mask]
-
-                alt_frontier_mask = visited[adj_c.indices()[1]]
-                alt_neighbors = adj_c.indices()[0][alt_frontier_mask]
-                
-                neighbors = torch.cat([neighbors, alt_neighbors])
-                neighbors = torch.unique(neighbors)
-
-                visited[neighbors] = True
-                
             return visited
                     
         elif hasattr(adj, 'coords'):
@@ -162,37 +165,40 @@ class Optimizer:
         return visited
 
     def local_algorithm(self,
-                        adj, 
-                        features,
-                        limited : bool,
-                        labels: torch.Tensor | None = None) -> torch.Tensor:
-        
+                        adj: torch.Tensor, 
+                        features: torch.Tensor,
+                        limited: bool,
+                        labels: Optional[torch.Tensor] = None) -> torch.Tensor:
+        if self.local_algorithm_fn is not None:
+            return self.local_algorithm_fn(adj, features, limited, labels)
+
+        # Lazy import heavy baselines
         if self.method == "magi":
+            from baselines.magi import magi
             return magi(adj, features, labels)
-
         elif self.method == "prgpt:infomap":
-            return rough_prgpt(adj.to_sparse(), refine="infomap")
-            
+            from baselines.rough_PRGPT import rough_prgpt
+            return rough_prgpt(adj, refine="infomap")
         elif self.method == "prgpt:locale":
-            return rough_prgpt(adj.to_sparse(), refine="locale")
-        
-        elif self.method == "dmon":
-            return adapted_dmon(adj, features, labels)
-        
+            from baselines.rough_PRGPT import rough_prgpt
+            return rough_prgpt(adj, refine="locale")
         elif self.method == "leidenalg":
-            return leidenalg_partition(adj.to_sparse())
-        
+            from baselines.leidenalg import leidenalg_partition
+            return leidenalg_partition(adj)
+        elif self.method == "dmon":
+            from baselines.dmon import adapted_dmon
+            return adapted_dmon(adj, features, labels)
         elif self.method == "networkit":
-            return networkit_partition(adj.to_sparse())
-
+            from baselines.networkit import networkit_partition
+            return networkit_partition(adj)
         else:
             raise ValueError("Unsupported baseline method name")
 
     @staticmethod
-    def aggregate(adj : torch.Tensor, pattern : torch.Tensor):
+    def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:
         return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
         
-    def run(self, nodes_mask : torch.Tensor):
+    def run(self, nodes_mask: torch.Tensor) -> None:
         """
         Run Optimizer on nodes
 
@@ -204,8 +210,16 @@ class Optimizer:
         # Find indices of affected nodes
         nodes = torch.nonzero(nodes_mask, as_tuple=True)[0]
 
+        if nodes.numel() == 0:
+            return
+
         # Find mask of all nodes in the affected communities
-        ext_mask = torch.isin(self.coms, self.coms[:, nodes_mask])
+        # Per-level mask: only nodes in communities touched at each level
+        ext_mask = torch.zeros_like(self.coms, dtype=torch.bool)
+        for l in range(self.subcoms_depth):
+            # Use index_select (faster than boolean indexing)
+            touched = self.coms[l].index_select(0, nodes)
+            ext_mask[l] = torch.isin(self.coms[l], torch.unique(touched))
 
         # Set singleton communities for affected nodes at the last level
         self.coms[-1, nodes_mask] = nodes
@@ -224,15 +238,13 @@ class Optimizer:
             coms = self.coms[l, ext_mask[l]]
             ext_nodes = torch.nonzero(ext_mask[l], as_tuple=True)[0]
 
-            # Reindexing communities
-            old_idx = torch.unique(coms)
-            new_idx = { j.item(): i for i, j in enumerate(old_idx) }
-            old_coms = torch.stack((torch.tensor([ new_idx[i.item()] for i in coms ]), 
-                                    ext_nodes))
-            n = old_idx.size()[0]
+            # Reindex communities
+            old_idx, inverse = torch.unique(coms, sorted=True, return_inverse=True)
+            n = old_idx.size(0)
 
             # Aggregate adjacency and features matrices
-            aggr_ptn = sparse.tensor(old_coms, (n, self.nodes_num), adj.dtype)
+            aggr_idx = torch.stack((inverse, ext_nodes))
+            aggr_ptn = sparse.tensor(aggr_idx, (n, self.nodes_num), adj.dtype)
             aggr_adj = self.aggregate(adj, aggr_ptn)
             aggr_features = torch.sparse.mm(aggr_ptn, self.features)
             del aggr_ptn
@@ -241,13 +253,12 @@ class Optimizer:
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0)
 
             # Restoring the community of the original graph
-            new_coms = torch.stack((torch.tensor([ old_idx[i.item()] for i in coms ]), 
-                                    old_idx))
-            new_coms = sparse.mm(new_coms, old_coms, self.size)
+            new_coms = old_idx[coms[inverse]]
 
             # Store new communities at the level l
-            self.coms[l, ext_mask[l]] = new_coms[0, new_coms[1].sort().indices]
+            self.coms[l, ext_mask[l]] = new_coms
 
             # Cut off adjacency matrix
-            cut_ptn = sparse.tensor(new_coms, self.size, adj.dtype)
+            cut_idx = torch.stack((new_coms, ext_nodes))
+            cut_ptn = sparse.tensor(cut_idx, self.size, adj.dtype)
             adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)

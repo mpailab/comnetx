@@ -200,7 +200,7 @@ class Dataset:
             batches_num = main_adj.shape[0]
             adjs = [main_adj[i] for i in range(batches_num)]
         else:
-            raise ValueError(f"Неподдерживаемая размерность: {adj.ndim}")
+            raise ValueError(f"Unsupported adjacency ndim: {main_adj.ndim}")
         lines = []
         lines_num = edges_num + 1
         lines.append(f"{nodes_num} {lines_num}")
