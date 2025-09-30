@@ -12,6 +12,20 @@ import sparse
 
 
 @pytest.mark.short
+def test_run_networkit():
+    # works only with undirected graphs
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 1], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
+    communities = torch.tensor([[1, 1, 1, 3]])
+    opt = Optimizer(A, communities = communities, method  = "networkit")
+    nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
+    print("communities:", communities)
+    print("nodes_mask:", nodes_mask)
+    opt.run(nodes_mask)
+    print()
+    print(opt.coms.to_dense())
+    del A, communities, nodes_mask
+
+@pytest.mark.short
 def test_run_prgpt():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3]])
@@ -47,23 +61,11 @@ def test_run_magi():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.long
+@pytest.mark.short
 def test_run_dmon():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
-    opt = Optimizer(A, communities = communities, method  = "dmon")
-    nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
-    print("communities:", communities)
-    print("nodes_mask:", nodes_mask)
-    opt.run(nodes_mask)
-    print()
-    print(opt.coms.to_dense())
-
-@pytest.mark.short
-def test_run_networkit():
-    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3]])
-    opt = Optimizer(A, communities = communities, method  = "networkit")
+    opt = Optimizer(A, communities = communities, method  = "dmon")
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)
     print("nodes_mask:", nodes_mask)

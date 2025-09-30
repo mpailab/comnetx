@@ -8,6 +8,7 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from baselines.networkit import sparse_tensor_to_networkit, networkit_partition
+from datasets import Dataset
 
 @pytest.mark.short
 def test_edge_list_correctness():
@@ -47,3 +48,31 @@ def test_partition_2():
     coms = networkit_partition(adj_matrix.to_sparse())
     assert len(coms) == 4
     assert len(set(coms.tolist())) == 2
+
+@pytest.mark.long
+def test_networkit_on_cora():
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset("cora", path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    new_labels = networkit_partition(adj)
+
+    assert isinstance(new_labels, torch.Tensor)
+    assert new_labels.shape[0] == labels.shape[0]
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
+
+@pytest.mark.long    
+def test_magi_on_citeseer():
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset("citeseer", path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    new_labels = networkit_partition(adj)
+
+    assert isinstance(new_labels, torch.Tensor)
+    assert new_labels.shape[0] == labels.shape[0]
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
