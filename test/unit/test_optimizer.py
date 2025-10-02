@@ -163,7 +163,6 @@ def test_modularity():
     optimizer = Optimizer(adj_matrix=adj_matrix, communities=communities)
     modularity = optimizer.modularity()
     dense_modularity = optimizer.dense_modularity(adj_matrix, dense_communities)
-    print(type(modularity))
     assert modularity < 1.0
     assert dense_modularity == modularity
 
@@ -181,10 +180,11 @@ def test_dense_vs_sparse_modularity():
     A = torch.sparse_coo_tensor(idx, vals, size=(6, 6)).coalesce()
 
     # Communities: {0,1,2} and {3,4,5}
-    C = torch.tensor([[0,0,0,1,1,1]])
+    C = torch.tensor([[0,0,0,3,3,3]])
     opt = Optimizer(A, communities=C)
 
-    dense_coms = torch.nn.functional.one_hot(C[0], num_classes=2).to(torch.float32)
+    dense_coms = torch.nn.functional.one_hot(C[0], num_classes=6).to(torch.float32).T
+    print(dense_coms)
     m1 = opt.modularity()
     m2 = opt.dense_modularity(A, dense_coms)
     assert abs(m1 - m2) < 1e-6
