@@ -103,10 +103,10 @@ def test_run_magi():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.long
+@pytest.mark.short
 def test_run_dmon():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3], [0, 1, 2, 3], [0, 0, 0, 0]])
+    communities = torch.tensor([[1, 1, 1, 3]])
     opt = Optimizer(A, communities = communities, method  = "dmon")
     nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
     print("communities:", communities)

@@ -113,7 +113,7 @@ class Metrics:
         
         return modularity.item()
 
-    def modularity(adjacency, assignments, gamma = 1) -> float:
+    def modularity(adjacency, assignments, gamma : float = 1.0) -> float:
         """
         Args:
             adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]

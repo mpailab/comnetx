@@ -173,6 +173,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+test/exper_dmon.py
 
 # cached graphs
 /test/graphs/small/
