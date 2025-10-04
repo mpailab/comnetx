@@ -25,7 +25,8 @@ def magi(adj : torch.Tensor,
          labels : torch.Tensor | None = None, 
          n_clusters : int = -1, 
          device=None, 
-         args=None):
+         args=None,
+         **kwargs):
 
     """
     MAGI method
@@ -77,6 +78,12 @@ def magi(adj : torch.Tensor,
             wd = 0
             dropout = 0
         args = Args()
+
+    for key, value in kwargs.items():
+        if hasattr(args, key):
+            setattr(args, key, value)
+        else:
+            raise ValueError(f"Unknown argument {key}")
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
