@@ -67,7 +67,7 @@ def test_run_leidenalg():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.long
+@pytest.mark.debug
 def test_run_prgpt():
     A = torch.tensor([
         [1, 1, 1, 0, 0, 0],
