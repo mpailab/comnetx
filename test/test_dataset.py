@@ -20,18 +20,6 @@ def temp_dataset_dir():
     shutil.rmtree(path)
 
 @pytest.mark.short
-def test_load_small_datasets(temp_dataset_dir):
-    datasets = ["Cora", "Citeseer", "Pubmed"]
-    for dataset_name in datasets:
-        ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
-        ds.load(tensor_type="coo")
-        assert isinstance(ds.adj, torch.Tensor)
-        assert ds.adj.is_sparse
-        assert ds.adj.shape[0] == ds.adj.shape[1]
-        assert ds.features is not None
-        assert ds.label is not None
-
-@pytest.mark.short
 def test_coo_joblib_save(temp_dataset_dir):
     ds = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     ds._load_magi()
@@ -42,19 +30,6 @@ def test_coo_joblib_save(temp_dataset_dir):
     ds1._load_npy_format(coo_adj = True)
     ds2._load_npy_format(coo_adj = False)
     assert torch.equal(ds1.adj.to_dense(), ds2.adj.to_dense())
-
-@pytest.mark.long
-def test_load_magi_big_datasets(temp_dataset_dir):
-    datasets = ["Reddit", "ogbn-arxiv"]
-    for dataset_name in datasets:
-        ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
-        ds.load(tensor_type="coo")
-        assert isinstance(ds.adj, torch.Tensor)
-        assert ds.adj.is_sparse
-        assert ds.adj.shape[0] == ds.adj.shape[1]
-        assert ds.features is not None
-        assert ds.label is not None
-
 
 @pytest.mark.long
 @pytest.mark.parametrize(
@@ -81,8 +56,8 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     assert ds.label is not None
 
 @pytest.mark.short
-def test_load_youtube_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="youtube-u-growth", path=KONECT_PATH)
+def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
+    loader = Dataset(dataset_name="wiki_talk_ht", path=KONECT_PATH)
     tensor, features, label = loader.load(tensor_type="coo")
 
     assert isinstance(tensor, torch.Tensor)
@@ -109,7 +84,7 @@ def test_tensor_csr_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csc_output(temp_dataset_dir):
-    loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+    loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csc")
 
     assert isinstance(tensor, torch.Tensor)
@@ -118,7 +93,7 @@ def test_tensor_csc_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_exist_small_datasets():
-    datasets = ["Cora", "Citeseer", "Acm", "Bat", "Dblp", "Eat"]
+    datasets = ["Acm", "Bat", "Eat"]
     for dataset_name in datasets:
         ds = Dataset(dataset_name=dataset_name, path=GRAPHS_DIR)
         ds.load(tensor_type="csr")

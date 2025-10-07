@@ -103,7 +103,7 @@ def test_run_magi():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.short
+@pytest.mark.long
 def test_run_dmon():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3]])
@@ -114,7 +114,6 @@ def test_run_dmon():
     opt.run(nodes_mask)
     print()
     print(opt.coms.to_dense())
-
 
 def test_aggregate_larger():
     A = torch.tensor([
