@@ -25,9 +25,11 @@ def networkit_partition(adj: torch.Tensor, algorithm="leiden"):
 
     detector.run()
     partition = detector.getPartition()
-    membership = [partition[i] for i in range(partition.numberOfElements())]
-    
-    return torch.tensor(membership, dtype=torch.long)
+    res = torch.arange(adj.shape[0], dtype=torch.long)
+    for c in partition.getSubsetIds():
+        members = partition.getMembers(c)
+        res[list(members)] = min(members)
+    return res
 
 
     
