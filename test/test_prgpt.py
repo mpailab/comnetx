@@ -159,8 +159,9 @@ def test_rough_prgpt_locale_on_convote(convote_dataset):
 def test_to_com_tensor():
     clus_res = [1, 1, 0]
     origin_num_nodes = 4
-    res = to_com_tensor(clus_res, origin_num_nodes, shift = 0)
-    true = torch.tensor([1, 1, 0, 2])
+    reverse_mapping = {0: 1, 1: 2, 2: 3}
+    res = to_com_tensor(clus_res, origin_num_nodes, reverse_mapping)
+    true = torch.tensor([2, 1, 1, 0])
     assert torch.equal(true, res)
 
 def get_all_datasets():
