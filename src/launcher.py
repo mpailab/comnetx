@@ -1,7 +1,14 @@
 import torch
+import json
+import os
 
-from datasets import KONECT_PATH, Dataset
+from datasets import KONECT_PATH, INFO, Dataset
 from optimizer import Optimizer
+
+def get_true_modularities():
+    with open(os.path.join(INFO, "modularity.json")) as _:
+        true_mod = json.load(_)
+    return true_mod
 
 def launch_dynamic_scenario(dataset_name : str,
                             batches_num : int,
@@ -27,3 +34,5 @@ def launch_dynamic_scenario(dataset_name : str,
         mod = opt.modularity()
         print("Modularity:", mod)
         print("-------------------------")
+    true_mod = get_true_modularities()
+    print("True final modularity: ", true_mod[dataset_name])

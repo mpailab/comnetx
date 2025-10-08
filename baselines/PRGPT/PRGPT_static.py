@@ -136,8 +136,8 @@ def get_init_res(ind_est, edges):
         if comp_mem_cnt[clus_res_[i]] > 1:
             clus_res[i] = clus_res_[i]
     print('#NODE %d #SUP-NODE %d' % (num_nodes, num_clus_est))
-    if num_clus_est == 1:
-        return clus_res, None, None, None, 1
+    # if num_clus_est == 1:
+    #     return clus_res, None, None, None, 1
     # ==========
     init_node_idx = 0
     init_node_map = {}
@@ -176,7 +176,6 @@ def get_init_res(ind_est, edges):
 
     # ==========
     init_edges = [(src, dst, init_edge_map[(src, dst)]) for (src, dst) in init_edge_map]
-    #init_edges = sorted(init_edges)
     init_src_idxs = []
     init_dst_idxs = []
     init_vals = []
@@ -189,7 +188,6 @@ def get_init_res(ind_est, edges):
             init_dst_idxs.append(src)
             init_vals.append(val)
     graph = sp.coo_matrix((init_vals, (init_src_idxs, init_dst_idxs)))
-
     return clus_res, graph, init_edges, init_node_map, init_node_idx
 
 
@@ -229,7 +227,11 @@ def locale_rfn(graph, init_node_map, clus_res, num_nodes, rand_seed):
     :return:
     '''
     init_random_seed(rand_seed)
-    rfn_res_ = leiden_locale(graph, k=8, eps=1e-6, max_outer=10, max_lv=10, max_inner=2, verbose=0)
+    try:
+        rfn_res_ = leiden_locale(graph, k=8, eps=1e-6, max_outer=10, max_lv=10, max_inner=2, verbose=0)
+    except IndexError as e:
+        print("Warning:", f"'{e}' error", "in leiden_locale function")
+        rfn_res_ = {x : x for x in init_node_map.values()}
     rfn_res = [rfn_res_[init_node_map[clus_res[i]]] for i in range(num_nodes)]
 
     return rfn_res

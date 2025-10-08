@@ -67,7 +67,7 @@ def test_run_leidenalg():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.long
+@pytest.mark.debug
 def test_run_prgpt():
     A = torch.tensor([
         [1, 1, 1, 0, 0, 0],
@@ -103,7 +103,7 @@ def test_run_magi():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.short
+@pytest.mark.long
 def test_run_dmon():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3]])
@@ -114,7 +114,6 @@ def test_run_dmon():
     opt.run(nodes_mask)
     print()
     print(opt.coms.to_dense())
-
 
 def test_aggregate_larger():
     A = torch.tensor([
@@ -426,3 +425,156 @@ def test_modularity():
     print(type(modularity))
     assert modularity < 1.0
     assert dense_modularity == modularity
+
+@pytest.mark.short
+def test_communities_none():
+    """Тест когда communities=None"""
+    adj = torch.randn(5, 5)
+    optimizer = Optimizer(adj_matrix=adj, subcoms_depth=3)
+    
+    assert optimizer.coms.shape == (3, 5)  # (subcoms_depth, nodes_num)
+    # Должны быть созданы дефолтные communities
+    expected = torch.arange(5).repeat(3).reshape(3, 5)
+    assert torch.equal(optimizer.coms, expected)
+
+@pytest.mark.short
+def test_perfect_match():
+    """Тест когда communities идеально совпадает с subcoms_depth"""
+    adj = torch.randn(5, 5)
+    communities = torch.tensor([
+        [0, 0, 1, 1, 2],  # уровень 0
+        [0, 0, 0, 1, 1],  # уровень 1
+        [0, 0, 0, 0, 0]   # уровень 2
+    ])
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=3)
+    
+    assert optimizer.coms.shape == (3, 5)
+    assert torch.equal(optimizer.coms, communities)
+
+@pytest.mark.short
+def test_communities_greater_depth(capfd):
+    """Тест когда communities имеет большую глубину чем subcoms_depth"""
+    adj = torch.randn(5, 5)
+    communities = torch.tensor([
+        [0, 0, 1, 1, 2],
+        [0, 0, 0, 1, 1],  
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0]
+    ])
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=3)
+    
+    captured = capfd.readouterr()
+    assert "communities depth 4 > subcoms_depth 3" in captured.out
+    assert "Truncating to 3 levels" in captured.out
+    
+    assert optimizer.coms.shape == (3, 5)
+    expected = communities[:3, :]
+    assert torch.equal(optimizer.coms, expected)
+
+@pytest.mark.short
+def test_communities_less_depth(capfd):
+    """Тест когда communities имеет меньшую глубину чем subcoms_depth"""
+    adj = torch.randn(5, 5)
+    communities = torch.tensor([
+        [0, 0, 1, 1, 2],
+        [0, 0, 0, 1, 1]
+    ])
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=4)
+    
+    captured = capfd.readouterr()
+    assert "communities depth 2 < subcoms_depth 4" in captured.out
+    assert "Extending with zeros to 4 levels" in captured.out
+    
+    assert optimizer.coms.shape == (4, 5)
+    assert torch.equal(optimizer.coms[:2, :], communities)
+    assert torch.equal(optimizer.coms[2:, :], torch.zeros((2, 5), dtype=communities.dtype))
+
+@pytest.mark.short
+def test_bad_nodes_number(capfd):
+    """Тест когда communities имеет неправильное количество узлов"""
+    adj = torch.randn(5, 5)
+    communities = torch.tensor([
+        [0, 0, 1, 1],
+        [0, 0, 0, 1]
+    ])
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=2)
+    
+    captured = capfd.readouterr()
+    assert "bad communities shape" in captured.out
+    assert "Use default communities" in captured.out
+    
+    assert optimizer.coms.shape == (2, 5)
+    expected = torch.arange(5).repeat(2).reshape(2, 5)
+    assert torch.equal(optimizer.coms, expected)
+
+@pytest.mark.short
+def test_1d_communities():
+    """Тест когда communities передан как 1D тензор"""
+    adj = torch.randn(5, 5)
+    communities = torch.tensor([0, 0, 1, 1, 2])  # 1D тензор
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=3)
+    
+    assert optimizer.coms.shape == (3, 5)
+    # Должен быть преобразован в 2D и дополнен нулями
+    expected_first_row = communities
+    assert torch.equal(optimizer.coms[0, :], expected_first_row)
+    assert torch.equal(optimizer.coms[1:, :], torch.zeros((2, 5), dtype=communities.dtype))
+
+@pytest.mark.short
+def test_edge_case_single_node():
+    """Тест с одним узлом"""
+    adj = torch.randn(1, 1)
+    communities = torch.tensor([[0]])
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=2)
+    
+    assert optimizer.coms.shape == (2, 1)
+    assert optimizer.coms[0, 0] == 0
+    assert optimizer.coms[1, 0] == 0  # дополнено нулем
+
+@pytest.mark.short
+def test_large_scale():
+    """Тест с большим количеством узлов"""
+    n_nodes = 100
+    adj = torch.randn(n_nodes, n_nodes)
+    communities = torch.randint(0, 10, (2, n_nodes))
+    
+    optimizer = Optimizer(adj_matrix=adj, communities=communities, subcoms_depth=5)
+    
+    assert optimizer.coms.shape == (5, n_nodes)
+    assert torch.equal(optimizer.coms[:2, :], communities)
+    assert torch.equal(optimizer.coms[2:, :], torch.zeros((3, n_nodes), dtype=communities.dtype))
+
+@pytest.mark.short
+def test_warning_messages(capfd):
+    """Тест что правильные предупреждения выводятся в stdout"""
+    adj = torch.randn(4, 4)
+    
+    # Test depth > subcoms_depth
+    communities_more = torch.tensor([[0,0,1,1], [0,0,0,1], [0,0,0,0], [0,0,0,0]])
+    Optimizer(adj_matrix=adj, communities=communities_more, subcoms_depth=2)
+    
+    captured = capfd.readouterr()
+    assert "communities depth 4 > subcoms_depth 2" in captured.out
+    assert "Truncating to 2 levels" in captured.out
+    
+    # Test depth < subcoms_depth  
+    communities_less = torch.tensor([[0,0,1,1]])
+    Optimizer(adj_matrix=adj, communities=communities_less, subcoms_depth=3)
+    
+    captured = capfd.readouterr()
+    assert "communities depth 1 < subcoms_depth 3" in captured.out
+    assert "Extending with zeros to 3 levels" in captured.out
+    
+    # Test bad shape
+    communities_bad = torch.tensor([[0,0,1]])  # 3 nodes vs 4 in adj
+    Optimizer(adj_matrix=adj, communities=communities_bad, subcoms_depth=2)
+    
+    captured = capfd.readouterr()
+    assert "bad communities shape" in captured.out
+    assert "Use default communities" in captured.out
