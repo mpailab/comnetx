@@ -136,8 +136,8 @@ def get_init_res(ind_est, edges):
         if comp_mem_cnt[clus_res_[i]] > 1:
             clus_res[i] = clus_res_[i]
     print('#NODE %d #SUP-NODE %d' % (num_nodes, num_clus_est))
-    if num_clus_est == 1:
-        return clus_res, None, None, None, 1
+    # if num_clus_est == 1:
+    #     return clus_res, None, None, None, 1
     # ==========
     init_node_idx = 0
     init_node_map = {}
@@ -188,7 +188,6 @@ def get_init_res(ind_est, edges):
             init_dst_idxs.append(src)
             init_vals.append(val)
     graph = sp.coo_matrix((init_vals, (init_src_idxs, init_dst_idxs)))
-
     return clus_res, graph, init_edges, init_node_map, init_node_idx
 
 
