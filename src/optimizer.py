@@ -33,24 +33,41 @@ class Optimizer:
         
         self.size = adj_matrix.size()
         self.nodes_num = adj_matrix.size()[0]
+        n = self.nodes_num
         self.subcoms_num = subcoms_num
         self.subcoms_depth = subcoms_depth
+        l = self.subcoms_depth
         
         self.adj = adj_matrix.float() # FIXME add any type support
 
         if features is None:
-            self.features = torch.zeros((self.nodes_num,1), dtype=self.adj.dtype)
+            self.features = torch.zeros((n, 1), dtype=self.adj.dtype)
         else:
             self.features = features.float() # FIXME add any type support
-
+     
         if communities is None:
-            n = self.nodes_num
-            l = self.subcoms_depth
             self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
         else:
-            #TODO reindexing of the communities numbers such that the following condition holds:
-            # if c is a community number, the node c belongs to the community community c;
-            self.coms = communities
+            if communities.dim() == 1:
+                print(f"Warning: 1D communities converted to 2D with depth 1")
+                communities = communities.unsqueeze(0)
+            if communities.size(1) != n:
+                print(f"Warning: bad communities shape {communities.shape}, required ({l}, {n})")
+                print(f"Use default communities with shape ({l}, {n})")
+                self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
+            else:
+                current_depth = communities.size(0)
+                if current_depth == l:
+                    self.coms = communities
+                elif current_depth > l:
+                    print(f"Warning: communities depth {current_depth} > subcoms_depth {l}.")
+                    print(f"Truncating to {l} levels.")
+                    self.coms = communities[:l, :]
+                else:
+                    print(f"Warning: communities depth {current_depth} < subcoms_depth {l}.")
+                    print(f"Extending with zeros to {l} levels.")
+                    zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype)
+                    self.coms = torch.cat([communities, zeros_to_add], dim=0)
         
         self.method = method
         self.local_algorithm_fn = local_algorithm_fn

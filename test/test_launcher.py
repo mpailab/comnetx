@@ -28,6 +28,6 @@ def test_dynamic_networkit():
 def test_dynamic_magi():
     launch_dynamic_scenario("wiki_talk_ht", 10, "magi")
 
-@pytest.mark.short  
+@pytest.mark.long
 def test_dynamic_dmon():
     launch_dynamic_scenario("wiki_talk_ht", 1, "dmon")
