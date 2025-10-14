@@ -185,6 +185,12 @@ class Optimizer:
         elif self.method == "leidenalg":
             from baselines.leidenalg import leidenalg_partition
             return leidenalg_partition(adj)
+        elif self.method == "dmon":
+            from baselines.dmon import adapted_dmon
+            return adapted_dmon(adj, features, labels)
+        elif self.method == "networkit":
+            from baselines.networkit import networkit_partition
+            return networkit_partition(adj)
         else:
             raise ValueError("Unsupported baseline method name")
 

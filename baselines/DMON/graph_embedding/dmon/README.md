@@ -10,7 +10,7 @@ First, make sure you have the requirements `numpy`, `scipy`, `tensorflow 2`. You
 Then, to reproduce the paper results on the [Cora graph](https://relational.fel.cvut.cz/dataset/CORA), run
 
 ```python
-# From google-research/
+# From baselines/DMON/
 python3 -m graph_embedding.dmon.train --graph_path=graph_embedding/dmon/data/cora.npz --dropout_rate=0.5
 ```
 

@@ -32,6 +32,7 @@ python3 -m graph_embedding.dmon.train \
 from typing import Tuple
 from absl import app
 from absl import flags
+import os
 import numpy as np
 import scipy.sparse
 from scipy.sparse import base
@@ -113,6 +114,57 @@ def load_npz(
       0], 'Labels and label_indices size must be equal!'
   return adjacency, features, labels, label_indices
 
+def load_npy(filename):
+    """Loads an attributed graph from three npy files.
+    
+    Args:
+        filename: Full path to the dataset without suffixes.
+        
+    Returns:
+        A tuple (graph, features, labels, label_indices) with the sparse adjacency
+        matrix of a graph, sparse feature matrix, dense label array, and dense label
+        index array (indices of nodes that have the labels in the label array).
+    """
+    # Extract just the dataset name from the full path for printing
+    dataset_name = os.path.basename(filename)
+    print(dataset_name)
+    
+    # Get the directory path from the filename
+    dir_path = os.path.dirname(filename)
+    
+    # Load the three files using the correct directory path
+    adj_path = os.path.join(filename, f"{dataset_name}_adj.npy")
+    feat_path = os.path.join(filename, f"{dataset_name}_feat.npy")
+    label_path = os.path.join(filename, f"{dataset_name}_label.npy")
+    
+    # Check if files exist
+    if not os.path.exists(adj_path):
+        raise FileNotFoundError(f"File not found: {adj_path}")
+    if not os.path.exists(feat_path):
+        raise FileNotFoundError(f"File not found: {feat_path}")
+    if not os.path.exists(label_path):
+        raise FileNotFoundError(f"File not found: {label_path}")
+    
+    # Load the files
+    adj_matrix = np.load(adj_path)
+    features = np.load(feat_path)
+    labels = np.load(label_path)
+    
+    # Convert to sparse matrices
+    adjacency = scipy.sparse.csr_matrix(adj_matrix)
+    features = scipy.sparse.csr_matrix(features)
+    
+    # Find labeled nodes (assuming unlabeled nodes have label -1)
+    label_indices = np.where(labels != -1)[0]
+    known_labels = labels[label_indices]
+    
+    # Validate shapes
+    assert adjacency.shape[0] == features.shape[0], \
+        'Adjacency and feature size must be equal!'
+    assert known_labels.shape[0] == label_indices.shape[0], \
+        'Labels and label_indices size must be equal!'
+    
+    return adjacency, features, known_labels, label_indices
 
 def convert_scipy_sparse_to_sparse_tensor(
     matrix):
@@ -160,7 +212,7 @@ def main(argv):
     raise app.UsageError('Too many command-line arguments.')
   # Load and process the data (convert node features to dense, normalize the
   # graph, convert it to Tensorflow sparse tensor.
-  adjacency, features, labels, label_indices = load_npz(FLAGS.graph_path)
+  adjacency, features, labels, label_indices = load_npy(FLAGS.graph_path)
   features = features.todense()
   n_nodes = adjacency.shape[0]
   feature_size = features.shape[1]
@@ -188,8 +240,8 @@ def main(argv):
   for epoch in range(FLAGS.n_epochs):
     loss_values, grads = grad(model, [features, graph_normalized, graph])
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    print(f'epoch {epoch}, losses: ' +
-          ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
+    #print(f'epoch {epoch}, losses: ' +
+    #     ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
 
   # Obtain the cluster assignments.
   _, assignments = model([features, graph_normalized, graph], training=False)
