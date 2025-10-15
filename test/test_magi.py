@@ -12,7 +12,7 @@ import tempfile
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
-from baselines.magi import magi
+from baselines.magi_model import magi
 from datasets import Dataset, KONECT_PATH
 
 
@@ -79,7 +79,7 @@ def test_magi_single_dataset(name, data_dir):
 
 def load_konect_info():
     """Load dataset info from all.json."""
-    file_path = os.path.join(KONECT_INFO, "all.json")
+    file_path = os.path.join(os.path.dirname(__file__), "dataset_paths.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
     return info

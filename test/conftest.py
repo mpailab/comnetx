@@ -21,7 +21,7 @@ def collect_datasets():
         raise ValueError(f"dataset_paths.json must be an object mapping names to paths, got {type(data)}")
     return data
 
-ALL_METHODS = ["dmon", "magi", "prgpt"]
+ALL_METHODS = ["dmon", "magi", "prgpt", "leidenalg", "networkit"]
 ALL_DATASETS = list(collect_datasets().keys())
 
 tf_spec = importlib.util.find_spec("tensorflow")
@@ -106,9 +106,11 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture
 def runner_dmon():
     def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "dmon.py"
         cmd = [
             sys.executable,
-            "run_dmon_subprocess.py",
+            str(script),
             "--adj", ds["adj"],
             "--features", ds["features"],
             "--epochs", "10",
@@ -120,9 +122,11 @@ def runner_dmon():
 @pytest.fixture
 def runner_magi():
     def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "magi_model.py"
         cmd = [
             sys.executable,
-            "run_magi_subprocess.py",
+            str(script),
             "--adj", ds["adj"],
             "--features", ds["features"],
             "--epochs", "1",
@@ -135,9 +139,11 @@ def runner_magi():
 @pytest.fixture
 def runner_prgpt():
     def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "rough_PRGPT.py"
         cmd = [
             sys.executable,
-            "run_prgpt_subprocess.py",
+            str(script),
             "--adj", ds["adj"],
             "--out", ds["out"],
         ]
@@ -147,4 +153,41 @@ def runner_prgpt():
             cmd += ["--refine", ds["refine"]]
 
         return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    return run
+
+@pytest.fixture
+def runner_leidenalg():
+    def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "leiden.py"
+        cmd = [
+            sys.executable, 
+            str(script),
+            "--adj", ds["adj"],
+            "--out", ds["out"],
+        ]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    return run
+
+@pytest.fixture
+def runner_networkit():
+    def run(ds, algorithm="leiden", directed=False):
+        from pathlib import Path
+        import sys, subprocess
+
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "network.py"
+
+        cmd = [
+            sys.executable, 
+            str(script),
+            "--adj", ds["adj"],
+            "--out", ds["out"],
+        ]
+        if algorithm in ("leiden", "plm"):
+            cmd += ["--algorithm", algorithm]
+        if directed:
+            cmd += ["--directed"]
+
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=str(root))
     return run

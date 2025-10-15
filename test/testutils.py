@@ -31,6 +31,13 @@ def load_konect_names(all_json_path: Path) -> set[str]:
         return {d["name"] for d in data if isinstance(d, dict) and "name" in d}
     return set()
 
+def filter_datasets_by_node_count(json_path: Path, max_nodes: int):
+    with json_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    filtered = {name: info for name, info in data.items() if info.get("n", 0) < max_nodes}
+    return filtered
+
 def main() -> None:
     test_dir = Path(__file__).resolve().parent
     repo_root = test_dir.parent
@@ -39,9 +46,12 @@ def main() -> None:
     small_root = test_dir / "graphs" / "small"
     out_path = test_dir / "dataset_paths.json"
 
-    mapping: dict[str, str] = {}
+    MAX_NODES = 10000
 
-    for name in sorted(load_konect_names(all_json)):
+    filtered_datasets = filter_datasets_by_node_count(all_json, MAX_NODES)
+
+    mapping: dict[str, str] = {}
+    for name in filtered_datasets:
         mapping[name] = KONECT_PATH
 
     if small_root.exists():

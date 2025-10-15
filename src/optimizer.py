@@ -191,7 +191,7 @@ class Optimizer:
 
         # Lazy import heavy baselines
         if self.method == "magi":
-            from baselines.magi import magi
+            from baselines.magi_model import magi
             return magi(adj, features, labels)
         elif self.method == "prgpt:infomap":
             from baselines.rough_PRGPT import rough_prgpt
@@ -200,13 +200,13 @@ class Optimizer:
             from baselines.rough_PRGPT import rough_prgpt
             return rough_prgpt(adj, refine="locale")
         elif self.method == "leidenalg":
-            from baselines.leidenalg import leidenalg_partition
+            from baselines.leiden import leidenalg_partition
             return leidenalg_partition(adj)
         elif self.method == "dmon":
             from baselines.dmon import adapted_dmon
             return adapted_dmon(adj, features, labels)
         elif self.method == "networkit":
-            from baselines.networkit import networkit_partition
+            from baselines.network import networkit_partition
             return networkit_partition(adj)
         else:
             raise ValueError("Unsupported baseline method name")

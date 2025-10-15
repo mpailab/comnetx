@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import torch
@@ -6,11 +7,17 @@ import torch.nn.functional as F
 from torch_geometric.utils import to_undirected, add_remaining_self_loops
 from torch_sparse import SparseTensor
 from sklearnex import patch_sklearn
+from sklearn.cluster import KMeans, SpectralClustering
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-magi_root = os.path.join(PROJECT_PATH, "baselines", "MAGI")
-if magi_root not in sys.path:
-    sys.path.insert(0, magi_root)
+
+SRC_PATH = os.path.join(PROJECT_PATH, "src")
+
+MAGI_PATH = os.path.join(PROJECT_PATH, "baselines", "MAGI")
+
+if SRC_PATH not in sys.path: sys.path.insert(0, SRC_PATH)
+
+if MAGI_PATH not in sys.path: sys.path.insert(0, MAGI_PATH)
 
 from magi.model import Model, Encoder
 from magi.utils import get_mask
@@ -249,7 +256,9 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
         else:
             assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
         """
-        assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
+        assignments = torch.nn.functional.one_hot(
+                        torch.as_tensor(pred_labels, device=device, dtype=torch.int64),
+                        num_classes=k).float()
         mod = Metrics.modularity(adj_sparse, assignments)
 
         print(f"Modularity for k={k}: {mod:.4f}")
@@ -336,3 +345,23 @@ def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
             cluster_centers = torch.tensor(Cluster.cluster_centers_, dtype=torch.float32)
 
     return predict_labels, cluster_centers
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--adj", required=True)
+    parser.add_argument("--features", required=True)
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--batchsize", type=int, default=2048)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
+
+    adj = torch.load(args.adj)
+    features = torch.load(args.features)
+
+    new_labels = magi(adj, features, epochs=args.epochs, batchsize=args.batchsize)
+
+    torch.save(new_labels, args.out)
+    print("MAGI finished successfully")
+
+if __name__ == "__main__":
+    main()
