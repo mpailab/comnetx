@@ -25,8 +25,8 @@ def dynamic_our_vs_naive():
         for batches_num in BATCHES:
             for baseline in STATIC_BASELINES:
                 try:
-                    local_our_db = dynamic_scenario(dataset, batches_num, baseline, mode = "our")
-                    local_naive_db = dynamic_scenario(dataset, batches_num, baseline, mode = "naive")
+                    local_our_db = dynamic_launch(dataset, batches_num, baseline, mode = "smart")
+                    local_naive_db = dynamic_launch(dataset, batches_num, baseline, mode = "naive")
                 except Exception as e:
                     print(f"Error {e} on:", dataset, batches_num, baseline)
                     continue
@@ -39,7 +39,7 @@ def dynamic_our_vs_naive():
 
             for baseline in GPU_DYNAMIC_BASELINES:
                 try:
-                    local_gpu_db = dynamic_scenario(dataset, batches_num, baseline, mode = "original")
+                    local_gpu_db = dynamic_launch(dataset, batches_num, baseline, mode = "original")
                 except Exception as e:
                     print(f"Error {e} on:", dataset, batches_num, baseline)
                     continue
@@ -55,7 +55,7 @@ def dynamic_our_vs_naive():
         json.dump(gpu_db, f, indent=4)
 
 # Note
-# static_scenario(dataset, baseline) is equal to naive_dynamic_scenario(dataset, 1, baseline)
+# static_scenario(dataset, baseline) is equal to naive_dynamic_launch(dataset, 1, baseline)
 
 def graphics_and_tables():
     our_db = json.load(PATH_OUR)

@@ -6,28 +6,28 @@ import torch
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
-from launcher import launch_dynamic_scenario
+from launcher import dynamic_launch
 
 @pytest.mark.short
 def test_dynamic_locale():
-    launch_dynamic_scenario("wiki_talk_ht", 10, "prgpt:locale")
+    dynamic_launch("wiki_talk_ht", 10, "prgpt:locale")
 
 @pytest.mark.short  
 def test_dynamic_infomap():
-    launch_dynamic_scenario("wiki_talk_ht", 10, "prgpt:infomap")
+    dynamic_launch("wiki_talk_ht", 10, "prgpt:infomap")
 
 @pytest.mark.short  
 def test_dynamic_leidenalg():
-    launch_dynamic_scenario("wiki_talk_ht", 10, "leidenalg")
+    dynamic_launch("wiki_talk_ht", 10, "leidenalg")
 
 @pytest.mark.short  
 def test_dynamic_networkit():
-    launch_dynamic_scenario("wiki_talk_ht", 1, "networkit")
+    dynamic_launch("wiki_talk_ht", 1, "networkit")
 
 @pytest.mark.short  
 def test_dynamic_magi():
-    launch_dynamic_scenario("wiki_talk_ht", 10, "magi")
+    dynamic_launch("wiki_talk_ht", 10, "magi")
 
 @pytest.mark.long
 def test_dynamic_dmon():
-    launch_dynamic_scenario("wiki_talk_ht", 1, "dmon")
+    dynamic_launch("wiki_talk_ht", 1, "dmon")
