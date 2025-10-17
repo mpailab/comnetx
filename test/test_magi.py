@@ -166,3 +166,22 @@ def test_magi_konect_dataset(name):
     del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
+
+@pytest.fixture(scope="class")
+def facebook_dataset():
+    ds = Dataset("elec", KONECT_PATH)
+    ds.load()
+    return ds
+
+def test_communities(facebook_dataset):
+    num_nodes = facebook_dataset.adj.shape[-1]
+    adj = facebook_dataset.adj.coalesce()
+    features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    new_labels = magi(adj, features, epochs=1, n_clusters=num_nodes)
+
+    uniq_vals = np.unique(new_labels)
+    print("UNIQUE COMMUNITIES:", uniq_vals.size, "EXPECTED:", num_nodes)
+
+    # Проверка, что все назначения уникальны и это именно 0..num_nodes-1
+    all_unique_and_full_range = set(uniq_vals.tolist()) == set(range(num_nodes))
+    print("ALL ASSIGNMENTS UNIQUE:", all_unique_and_full_range)
