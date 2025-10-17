@@ -6,6 +6,7 @@ from typing import Union, Optional, Callable
 # Internal imports
 import sparse
 from metrics import Metrics
+from our_utils import quiet_zone
 
 # Type aliases
 LocalAlgorithmFn = Callable[[torch.Tensor, torch.Tensor, bool, Optional[torch.Tensor]], \
@@ -19,7 +20,8 @@ class Optimizer:
                  communities: Optional[torch.Tensor] = None,
                  subcoms_depth: int = 1,
                  method: str = "prgpt:infomap",
-                 local_algorithm_fn: Optional[LocalAlgorithmFn] = None):
+                 local_algorithm_fn: Optional[LocalAlgorithmFn] = None,
+                 verbose : int = 0):
         """
 
         Parameters
@@ -45,6 +47,8 @@ class Optimizer:
         self._set_communities(communities)
         self.method = method
         self.local_algorithm_fn = local_algorithm_fn
+
+        self.verbose = verbose
     
     def _set_communities(self, communities, replace_subcoms_depth = False):
         n = self.nodes_num
@@ -190,30 +194,32 @@ class Optimizer:
                         features: torch.Tensor,
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
-        if self.local_algorithm_fn is not None:
-            return self.local_algorithm_fn(adj, features, limited, labels)
-
-        # Lazy import heavy baselines
-        if self.method == "magi":
-            from baselines.magi import magi
-            return magi(adj, features, labels)
-        elif self.method == "prgpt:infomap":
-            from baselines.rough_PRGPT import rough_prgpt
-            return rough_prgpt(adj, refine="infomap")
-        elif self.method == "prgpt:locale":
-            from baselines.rough_PRGPT import rough_prgpt
-            return rough_prgpt(adj, refine="locale")
-        elif self.method == "leidenalg":
-            from baselines.leidenalg import leidenalg_partition
-            return leidenalg_partition(adj)
-        elif self.method == "dmon":
-            from baselines.dmon import adapted_dmon
-            return adapted_dmon(adj, features, labels)
-        elif self.method == "networkit":
-            from baselines.networkit import networkit_partition
-            return networkit_partition(adj)
-        else:
-            raise ValueError("Unsupported baseline method name")
+        
+        with quiet_zone(self.verbose):
+            if self.local_algorithm_fn is not None:
+                return self.local_algorithm_fn(adj, features, limited, labels)
+            
+            # Lazy import for heavy baselines
+            if self.method == "magi":
+                from baselines.magi import magi
+                return magi(adj, features, labels)
+            elif self.method == "prgpt:infomap":
+                from baselines.rough_PRGPT import rough_prgpt
+                return rough_prgpt(adj, refine="infomap")
+            elif self.method == "prgpt:locale":
+                from baselines.rough_PRGPT import rough_prgpt
+                return rough_prgpt(adj, refine="locale")
+            elif self.method == "leidenalg":
+                from baselines.leidenalg import leidenalg_partition
+                return leidenalg_partition(adj)
+            elif self.method == "dmon":
+                from baselines.dmon import adapted_dmon
+                return adapted_dmon(adj, features, labels)
+            elif self.method == "networkit":
+                from baselines.networkit import networkit_partition
+                return networkit_partition(adj)
+            else:
+                raise ValueError("Unsupported baseline method name")
 
     @staticmethod
     def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:

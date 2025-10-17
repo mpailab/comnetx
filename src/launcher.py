@@ -6,11 +6,6 @@ import time
 from datasets import KONECT_PATH, INFO, Dataset
 from optimizer import Optimizer
 
-def get_true_modularities():
-    with open(os.path.join(INFO, "modularity.json")) as _:
-        true_mod = json.load(_)
-    return true_mod
-
 def dynamic_launch(dataset_name : str, batches_num : int,
                     underlying_static_method : str,
                     mode : str = "smart",
@@ -47,8 +42,6 @@ def dynamic_launch(dataset_name : str, batches_num : int,
         mod = opt.modularity()
         results.append({'modularity' : mod, 'time': time_e - time_s})
 
-    true_mod = get_true_modularities()
     print("Final modularity: ", mod)
-    print("True final modularity: ", true_mod[dataset_name])
     print("-----------------------------------------------")
     return results
