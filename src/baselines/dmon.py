@@ -51,8 +51,8 @@ def copy_sparse_tensor(sparse_tensor):
 
 def torch_to_scipy_csr(tensor):
     if tensor.is_sparse:
-        indices = tensor.indices().cpu()
-        values = tensor.values().detach().cpu()
+        indices = tensor.coalesce().indices().cpu()
+        values = tensor.coalesce().values().detach().cpu()
         shape = tensor.shape
         
         coo_matrix = scipy.sparse.coo_matrix((values.numpy(), (indices[0].numpy(), indices[1].numpy())), shape=shape)
@@ -87,8 +87,8 @@ def torch_to_tf_sparse_tensor(tensor):
       A ternsorflow sparse matrix (rank-2 tensor).
     """
     if tensor.is_sparse:
-        indices = tensor.indices().cpu().numpy().T  # [i, j] format
-        values = tensor.values().detach().cpu().numpy().astype(np.float32)
+        indices = tensor.coalesce().indices().cpu().numpy().T  # [i, j] format
+        values = tensor.coalesce().values().detach().cpu().numpy().astype(np.float32)
         shape = tensor.shape
         
         return tf.sparse.SparseTensor(

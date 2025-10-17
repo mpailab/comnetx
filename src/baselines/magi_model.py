@@ -107,7 +107,7 @@ def magi(adj : torch.Tensor,
 
     N, num_features = features.shape[0], features.shape[-1]
 
-    edge_index = adj.indices() if hasattr(adj, 'indices') else adj
+    edge_index = adj.coalesce().indices() if hasattr(adj, 'indices') else adj
     edge_index = to_undirected(add_remaining_self_loops(edge_index)[0])
     new_values = torch.ones(edge_index.size(1), device=device)
     adj_sparse = SparseTensor(row=edge_index[0].to(device), col=edge_index[1].to(device), value=new_values, sparse_sizes=(N, N))

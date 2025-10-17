@@ -1,38 +1,56 @@
 import torch
 import json
 import os
+import time
 
 from datasets import KONECT_PATH, INFO, Dataset
 from optimizer import Optimizer
+from our_utils import print_zone
 
-def get_true_modularities():
-    with open(os.path.join(INFO, "modularity.json")) as _:
-        true_mod = json.load(_)
-    return true_mod
-
-def launch_dynamic_scenario(dataset_name : str,
-                            batches_num : int,
-                            static_method : str):
+def dynamic_launch(dataset_name : str, batches_num : int,
+                    underlying_static_method : str,
+                    mode : str = "smart",
+                    smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
+                    verbose : int = 1):
 
     ds = Dataset(dataset_name, path = KONECT_PATH)
     ds.load(batches = batches_num)
 
-    print("-------------------------")
+    with print_zone(verbose >= 1):
+        print("-----------------------------------------------")
+        print(f"Dataset: {dataset_name} ({batches_num} batches)")
+        print(f"Baseline: {underlying_static_method}-{mode}")
+    results = []
     for i, batch in enumerate(torch.unbind(ds.adj)):
-        print("Batch:", i)
+        with print_zone(verbose >= 2):
+            print("Batch", i)
         if i == 0:
             opt = Optimizer(batch, ds.features, ds.label,
-                            subcoms_depth = 2,
-                            method = static_method)
-            nodes = batch.coalesce().indices().unique()
-            nodes_mask = torch.zeros(batch.size()[0], dtype=torch.bool)
-            nodes_mask[nodes] = True
+                            subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
+                            method = underlying_static_method,
+                            verbose = verbose)
+            active_nodes = batch.coalesce().indices().unique()
+            affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool)
+            affected_nodes_mask[active_nodes] = True
         else:
-            nodes_mask = opt.update_adj(batch)
-        nodes_mask = opt.neighborhood(opt.adj, nodes_mask)
-        opt.run(nodes_mask)
+            affected_nodes_mask = opt.update_adj(batch)
+        
+        time_s = time.time()
+        if mode == "smart":
+            affected_nodes_mask = opt.neighborhood(opt.adj, affected_nodes_mask, step = smart_neighborhood_step)
+            opt.run(affected_nodes_mask)
+        elif mode == "naive" or mode == "raw":
+            labels = opt.coms if mode == "naive" else None
+            coms = opt.local_algorithm(opt.adj, opt.features, labels = labels)
+            opt._set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
+        time_e = time.time()
+
         mod = opt.modularity()
-        print("Modularity:", mod)
-        print("-------------------------")
-    true_mod = get_true_modularities()
-    print("True final modularity: ", true_mod[dataset_name])
+        results.append({'modularity' : mod, 'time': time_e - time_s})
+
+    with print_zone(verbose >= 1):
+        total_time = sum(map(lambda x: x["time"], results))
+        print(f"Final modularity: {mod:.2}")
+        print(f"Total time: {total_time:.2}")
+        print("-----------------------------------------------")
+    return results

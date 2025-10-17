@@ -6,6 +6,7 @@ from typing import Union, Optional, Callable
 # Internal imports
 import sparse
 from metrics import Metrics
+from our_utils import print_zone
 
 # Type aliases
 LocalAlgorithmFn = Callable[[torch.Tensor, torch.Tensor, bool, Optional[torch.Tensor]], \
@@ -17,10 +18,10 @@ class Optimizer:
                  adj_matrix: torch.Tensor, 
                  features: Optional[torch.Tensor] = None, 
                  communities: Optional[torch.Tensor] = None,
-                 subcoms_num: int = 1,
                  subcoms_depth: int = 1,
                  method: str = "prgpt:infomap",
-                 local_algorithm_fn: Optional[LocalAlgorithmFn] = None):
+                 local_algorithm_fn: Optional[LocalAlgorithmFn] = None,
+                 verbose : int = 0):
         """
 
         Parameters
@@ -33,18 +34,25 @@ class Optimizer:
         
         self.size = adj_matrix.size()
         self.nodes_num = adj_matrix.size()[0]
-        n = self.nodes_num
-        self.subcoms_num = subcoms_num
         self.subcoms_depth = subcoms_depth
-        l = self.subcoms_depth
+        
         
         self.adj = adj_matrix.float() # FIXME add any type support
 
         if features is None:
-            self.features = torch.zeros((n, 1), dtype=self.adj.dtype)
+            self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype)
         else:
             self.features = features.float() # FIXME add any type support
-     
+        
+        self._set_communities(communities)
+        self.method = method
+        self.local_algorithm_fn = local_algorithm_fn
+
+        self.verbose = verbose
+    
+    def _set_communities(self, communities, replace_subcoms_depth = False):
+        n = self.nodes_num
+        l = self.subcoms_depth
         if communities is None:
             self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
         else:
@@ -57,6 +65,9 @@ class Optimizer:
                 self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
             else:
                 current_depth = communities.size(0)
+                if replace_subcoms_depth:
+                    self.coms = communities
+                    self.subcoms_depth = current_depth
                 if current_depth == l:
                     self.coms = communities
                 elif current_depth > l:
@@ -68,9 +79,6 @@ class Optimizer:
                     print(f"Extending with zeros to {l} levels.")
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
-        
-        self.method = method
-        self.local_algorithm_fn = local_algorithm_fn
 
     def dense_modularity(self, 
             adj: torch.Tensor, coms: torch.Tensor, gamma: float = 1) -> float:
@@ -113,10 +121,10 @@ class Optimizer:
         
         self.adj += batch.type(self.adj.dtype)
         affected_nodes = batch.coalesce().indices().unique()
-        mask = torch.zeros(self.nodes_num, dtype=torch.bool)
-        mask[affected_nodes] = True
+        affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool)
+        affected_nodes_mask[affected_nodes] = True
 
-        return mask
+        return affected_nodes_mask
     
     @staticmethod
     def neighborhood(adj: Union[torch.Tensor, 'sparse.COO'],
@@ -184,32 +192,34 @@ class Optimizer:
     def local_algorithm(self,
                         adj: torch.Tensor, 
                         features: torch.Tensor,
-                        limited: bool,
+                        limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
-        if self.local_algorithm_fn is not None:
-            return self.local_algorithm_fn(adj, features, limited, labels)
-
-        # Lazy import heavy baselines
-        if self.method == "magi":
-            from baselines.magi_model import magi
-            return magi(adj, features, labels)
-        elif self.method == "prgpt:infomap":
-            from baselines.rough_PRGPT import rough_prgpt
-            return rough_prgpt(adj, refine="infomap")
-        elif self.method == "prgpt:locale":
-            from baselines.rough_PRGPT import rough_prgpt
-            return rough_prgpt(adj, refine="locale")
-        elif self.method == "leidenalg":
-            from baselines.leiden import leidenalg_partition
-            return leidenalg_partition(adj)
-        elif self.method == "dmon":
-            from baselines.dmon import adapted_dmon
-            return adapted_dmon(adj, features, labels)
-        elif self.method == "networkit":
-            from baselines.network import networkit_partition
-            return networkit_partition(adj)
-        else:
-            raise ValueError("Unsupported baseline method name")
+        
+        with print_zone(self.verbose >= 3):
+            if self.local_algorithm_fn is not None:
+                return self.local_algorithm_fn(adj, features, limited, labels)
+            
+            # Lazy import for heavy baselines
+            if self.method == "magi":
+                from baselines.magi import magi
+                return magi(adj, features, labels)
+            elif self.method == "prgpt:infomap":
+                from baselines.rough_PRGPT import rough_prgpt
+                return rough_prgpt(adj, refine="infomap")
+            elif self.method == "prgpt:locale":
+                from baselines.rough_PRGPT import rough_prgpt
+                return rough_prgpt(adj, refine="locale")
+            elif self.method == "leidenalg":
+                from baselines.leidenalg import leidenalg_partition
+                return leidenalg_partition(adj)
+            elif self.method == "dmon":
+                from baselines.dmon import adapted_dmon
+                return adapted_dmon(adj, features, labels)
+            elif self.method == "networkit":
+                from baselines.networkit import networkit_partition
+                return networkit_partition(adj)
+            else:
+                raise ValueError("Unsupported baseline method name")
 
     @staticmethod
     def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:
