@@ -6,7 +6,7 @@ from typing import Union, Optional, Callable
 # Internal imports
 import sparse
 from metrics import Metrics
-from our_utils import quiet_zone
+from our_utils import print_zone
 
 # Type aliases
 LocalAlgorithmFn = Callable[[torch.Tensor, torch.Tensor, bool, Optional[torch.Tensor]], \
@@ -195,7 +195,7 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         
-        with quiet_zone(self.verbose):
+        with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:
                 return self.local_algorithm_fn(adj, features, limited, labels)
             

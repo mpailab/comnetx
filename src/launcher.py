@@ -5,24 +5,30 @@ import time
 
 from datasets import KONECT_PATH, INFO, Dataset
 from optimizer import Optimizer
+from our_utils import print_zone
 
 def dynamic_launch(dataset_name : str, batches_num : int,
                     underlying_static_method : str,
                     mode : str = "smart",
-                    smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1):
+                    smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
+                    verbose : int = 1):
 
     ds = Dataset(dataset_name, path = KONECT_PATH)
     ds.load(batches = batches_num)
 
-    print("-----------------------------------------------")
-    print(f"Dataset: {dataset_name} ({batches_num} batches)")
-    print(f"Baseline: {underlying_static_method}-{mode}")
+    with print_zone(verbose >= 1):
+        print("-----------------------------------------------")
+        print(f"Dataset: {dataset_name} ({batches_num} batches)")
+        print(f"Baseline: {underlying_static_method}-{mode}")
     results = []
     for i, batch in enumerate(torch.unbind(ds.adj)):
+        with print_zone(verbose >= 2):
+            print("Batch", i)
         if i == 0:
             opt = Optimizer(batch, ds.features, ds.label,
                             subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
-                            method = underlying_static_method)
+                            method = underlying_static_method,
+                            verbose = verbose)
             active_nodes = batch.coalesce().indices().unique()
             affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool)
             affected_nodes_mask[active_nodes] = True
@@ -42,6 +48,9 @@ def dynamic_launch(dataset_name : str, batches_num : int,
         mod = opt.modularity()
         results.append({'modularity' : mod, 'time': time_e - time_s})
 
-    print("Final modularity: ", mod)
-    print("-----------------------------------------------")
+    with print_zone(verbose >= 1):
+        total_time = sum(map(lambda x: x["time"], results))
+        print(f"Final modularity: {mod:.2}")
+        print(f"Total time: {total_time:.2}")
+        print("-----------------------------------------------")
     return results

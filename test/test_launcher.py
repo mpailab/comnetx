@@ -28,3 +28,9 @@ def test_dynamic_magi():
 def test_dynamic_dmon():
     for mode in ["smart", "naive", "raw"]:
         dynamic_launch("wiki_talk_ht", 1, "dmon", mode = mode)
+
+@pytest.mark.debug
+def test_dynamic_networkit_bad_datasets():
+    # Работает нестабильно, периодически 'зависает'
+    for dataset in ["sociopatterns-hypertext", "radoslaw_email"]:
+        dynamic_launch(dataset, 100, "networkit", mode = "smart", verbose = 2)
