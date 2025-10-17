@@ -29,9 +29,8 @@ def get_all_datasets():
     datasets = {}
     if os.path.isdir(base_dir):
         for name in os.listdir(base_dir):
-            path = os.path.join(base_dir, name)
-            if os.path.isdir(path):
-                datasets[name] = path
+            if os.path.isdir(base_dir):
+                datasets[name] = base_dir
     return datasets
 
 @pytest.mark.short
