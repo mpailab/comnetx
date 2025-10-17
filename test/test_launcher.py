@@ -9,25 +9,23 @@ sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
 
 @pytest.mark.short
-def test_dynamic_locale():
-    dynamic_launch("wiki_talk_ht", 10, "prgpt:locale")
+def test_dynamic_prgpt():
+    for method in ["prgpt:locale", "prgpt:infomap"]:
+        for mode in ["smart", "naive", "raw"]:
+            dynamic_launch("wiki_talk_ht", 10, method, mode = mode)
 
 @pytest.mark.short  
-def test_dynamic_infomap():
-    dynamic_launch("wiki_talk_ht", 10, "prgpt:infomap")
-
-@pytest.mark.short  
-def test_dynamic_leidenalg():
-    dynamic_launch("wiki_talk_ht", 10, "leidenalg")
-
-@pytest.mark.short  
-def test_dynamic_networkit():
-    dynamic_launch("wiki_talk_ht", 1, "networkit")
+def test_dynamic_leidenalg_networkit():
+    for method in ["leidenalg", "networkit"]:
+        for mode in ["smart", "naive", "raw"]:
+            dynamic_launch("wiki_talk_ht", 10, method, mode = mode)
 
 @pytest.mark.short  
 def test_dynamic_magi():
-    dynamic_launch("wiki_talk_ht", 10, "magi")
+    for mode in ["smart", "naive", "raw"]:
+        dynamic_launch("wiki_talk_ht", 1, "magi", mode = mode)
 
 @pytest.mark.long
 def test_dynamic_dmon():
-    dynamic_launch("wiki_talk_ht", 1, "dmon")
+    for mode in ["smart", "naive", "raw"]:
+        dynamic_launch("wiki_talk_ht", 1, "dmon", mode = mode)

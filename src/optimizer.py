@@ -188,7 +188,7 @@ class Optimizer:
     def local_algorithm(self,
                         adj: torch.Tensor, 
                         features: torch.Tensor,
-                        limited: bool,
+                        limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         if self.local_algorithm_fn is not None:
             return self.local_algorithm_fn(adj, features, limited, labels)
