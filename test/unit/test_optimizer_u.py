@@ -11,6 +11,7 @@ import sparse
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_init_defaults():
     A = torch.sparse_coo_tensor(torch.tensor([[0,1],[1,0]]), torch.ones(2), size=(2,2)).coalesce()
     opt = Optimizer(A, subcoms_depth=3)
@@ -26,6 +27,7 @@ def test_init_defaults():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_init_with_inputs():
     A = torch.sparse_coo_tensor(torch.tensor([[0,1],[1,0]]), torch.ones(2), size=(2,2)).coalesce()
     X = torch.randn(2, 4)
@@ -36,6 +38,7 @@ def test_init_with_inputs():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_update_adj():
     adj_matrix = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]])
     opt = Optimizer(adj_matrix.to_sparse_coo())
@@ -46,6 +49,7 @@ def test_update_adj():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_update_adj_adds_and_returns_mask():
     A = torch.tensor([[0,1,0],[1,0,0],[0,0,0]], dtype=torch.float32).to_sparse_coo()
     opt = Optimizer(A)
@@ -60,6 +64,7 @@ def test_update_adj_adds_and_returns_mask():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_update_adj_size_mismatch():
     A = torch.zeros((3,3)).to_sparse_coo()
     B = torch.zeros((2,2)).to_sparse_coo()
@@ -77,6 +82,7 @@ def identity_la(adj, features, limited, labels):
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_local_algorithm_injection():
     A = torch.zeros((3,3)).to_sparse_coo()
     X = torch.randn(3,2)
@@ -86,6 +92,7 @@ def test_local_algorithm_injection():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_local_algorithm_unsupported():
     A = torch.zeros((2,2)).to_sparse_coo()
     opt = Optimizer(A, method="unknown_method")
@@ -97,6 +104,7 @@ def test_local_algorithm_unsupported():
 
 
 # @pytest.mark.unit
+@pytest.mark.short
 # FIXME now aggregate don't work for 2 sparse matrix with int-like elements type
 # def test_aggregate_1():
 #     adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.int64).to_sparse()
@@ -107,6 +115,7 @@ def test_local_algorithm_unsupported():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_aggregate_2():
     adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.float).to_sparse()
     coms = torch.tensor([[1, 1, 1, 0], [0, 0, 0, 1]]).type(adj.dtype).to_sparse()
@@ -116,6 +125,7 @@ def test_aggregate_2():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_aggregate_simple():
     adj = torch.tensor([[1,1,1,0],[1,1,1,0],[1,1,1,0],[0,1,0,1]], dtype=torch.float32).to_sparse_coo()
     # Group nodes 0,1,2 together and 3 alone
@@ -126,6 +136,7 @@ def test_aggregate_simple():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_aggregate_via_sparse_helper():
     # Same as above but build pattern via sparse helper like in run()
     adj = torch.tensor([[1,1,1,0],[1,1,1,0],[1,1,1,0],[0,1,0,1]], dtype=torch.float32).to_sparse_coo()
@@ -137,6 +148,7 @@ def test_aggregate_via_sparse_helper():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_modularity():
     communities = torch.tensor([
         [0, 0, 0, 3, 3, 3],
@@ -168,6 +180,7 @@ def test_modularity():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_dense_vs_sparse_modularity():
     # Two cliques of size 3
     edges = []
@@ -191,6 +204,7 @@ def test_dense_vs_sparse_modularity():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_neighborhood_1():
     A = torch.tensor([
         [0, 1, 0, 0],
@@ -211,6 +225,7 @@ def test_neighborhood_1():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_neighborhood_2():
     A = torch.tensor([
         [0, 1, 0, 0],
@@ -231,6 +246,7 @@ def test_neighborhood_2():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_neighborhood_steps_directed():
     A = torch.tensor([
         [0, 1, 0, 0],
@@ -245,6 +261,7 @@ def test_neighborhood_steps_directed():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_run_updates_last_level_singletons_and_propagates():
     # Simple chain 0-1-2-3
     idx = torch.tensor([[0,1,2],[1,2,3]])

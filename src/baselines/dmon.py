@@ -7,9 +7,26 @@ import numpy as np
 import scipy.sparse
 from scipy.sparse import base
 import sklearn.metrics
+import torch
+import warnings
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+warnings.simplefilter("ignore")
+
+stdout = sys.stdout
+stderr = sys.stderr
+sys.stdout = open(os.devnull, 'w')
+sys.stderr = open(os.devnull, 'w')
+
 import tensorflow.compat.v2 as tf
 tf.compat.v1.enable_v2_behavior()
-import torch
+
+sys.stdout.close()
+sys.stderr.close()
+sys.stdout = stdout
+sys.stderr = stderr
+
+tf.get_logger().setLevel('ERROR')
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 dmon_root = os.path.join(PROJECT_PATH, "baselines", "DMON")
@@ -33,8 +50,8 @@ def copy_sparse_tensor(sparse_tensor):
 
 def torch_to_scipy_csr(tensor):
     if tensor.is_sparse:
-        indices = tensor.indices().cpu()
-        values = tensor.values().detach().cpu()
+        indices = tensor.coalesce().indices().cpu()
+        values = tensor.coalesce().values().detach().cpu()
         shape = tensor.shape
         
         coo_matrix = scipy.sparse.coo_matrix((values.numpy(), (indices[0].numpy(), indices[1].numpy())), shape=shape)
@@ -69,8 +86,8 @@ def torch_to_tf_sparse_tensor(tensor):
       A ternsorflow sparse matrix (rank-2 tensor).
     """
     if tensor.is_sparse:
-        indices = tensor.indices().cpu().numpy().T  # [i, j] format
-        values = tensor.values().detach().cpu().numpy().astype(np.float32)
+        indices = tensor.coalesce().indices().cpu().numpy().T  # [i, j] format
+        values = tensor.coalesce().values().detach().cpu().numpy().astype(np.float32)
         shape = tensor.shape
         
         return tf.sparse.SparseTensor(
@@ -122,7 +139,8 @@ def build_dmon(input_features,
 def adapted_dmon(adj: torch.Tensor,
         ftrs : torch.Tensor,
         lbls : torch.Tensor | None = None,
-        args = None):
+        args=None,
+        **kwargs):
   """
   DMON method
 
@@ -181,8 +199,8 @@ def adapted_dmon(adj: torch.Tensor,
   for epoch in range(args._n_epochs):
     loss_values, grads = grad(model, [features, graph_normalized, graph])
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    #print(f'epoch {epoch}, losses: ' +
-    #     ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
+    print(f'epoch {epoch}, losses: ' +
+         ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
 
   # Obtain the cluster assignments.
   _, assignments = model([features, graph_normalized, graph], training=False)
@@ -209,6 +227,7 @@ def adapted_dmon(adj: torch.Tensor,
      precision = metrics.pairwise_precision(know_labels, clusters[label_indices])
      recall = metrics.pairwise_recall(know_labels, clusters[label_indices])
      print('F1:', 2 * precision * recall / (precision + recall))
+  print("Returning clusters_tensor:", type(clusters_tensor), clusters_tensor.shape)
   return clusters_tensor
 
 def find_best_n_clusters(adj, features, min_k=2, max_k=None, step=2):

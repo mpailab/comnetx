@@ -64,7 +64,7 @@ def test_networkit_on_cora():
     del adj, features, labels, new_labels
 
 @pytest.mark.long    
-def test_magi_on_citeseer():
+def test_networkit_on_citeseer():
     data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset("citeseer", path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")

@@ -25,7 +25,8 @@ def magi(adj : torch.Tensor,
          labels : torch.Tensor | None = None, 
          n_clusters : int = -1, 
          device=None, 
-         args=None):
+         args=None,
+         **kwargs):
 
     """
     MAGI method
@@ -78,6 +79,12 @@ def magi(adj : torch.Tensor,
             dropout = 0
         args = Args()
 
+    for key, value in kwargs.items():
+        if hasattr(args, key):
+            setattr(args, key, value)
+        else:
+            raise ValueError(f"Unknown argument {key}")
+
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -92,7 +99,7 @@ def magi(adj : torch.Tensor,
 
     N, num_features = features.shape[0], features.shape[-1]
 
-    edge_index = adj.indices() if hasattr(adj, 'indices') else adj
+    edge_index = adj.coalesce().indices() if hasattr(adj, 'indices') else adj
     edge_index = to_undirected(add_remaining_self_loops(edge_index)[0])
     new_values = torch.ones(edge_index.size(1), device=device)
     adj_sparse = SparseTensor(row=edge_index[0].to(device), col=edge_index[1].to(device), value=new_values, sparse_sizes=(N, N))

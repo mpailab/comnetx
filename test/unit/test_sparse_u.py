@@ -16,6 +16,7 @@ def coo(i, j, v, size):
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_reset_matrix_filters_nodes():
     # Graph: 0-1 edge, 1-2 edge, 2-3 edge
     A = coo([0, 1, 2], [1, 2, 3], [1, 1, 1], (4, 4))
@@ -28,6 +29,7 @@ def test_reset_matrix_filters_nodes():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_reset_slice_rows():
     # 3x3 with 0->1, 1->2, 2->0
     A = coo([0, 1, 2], [1, 2, 0], [1, 1, 1], (3, 3))
@@ -41,6 +43,7 @@ def test_reset_slice_rows():
 
 
 @pytest.mark.unit
+@pytest.mark.short
 def test_cat_and_equal():
     A = coo([0], [0], [1], (1, 1))
     B = coo([0], [0], [2], (1, 1))
