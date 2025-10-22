@@ -104,7 +104,7 @@ class Optimizer:
         """
         n = self.coms.shape[1]
         dense_coms = Metrics.create_dense_community(self.coms, n, L).T
-        return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
+        return Metrics.modularity(self.adj, dense_coms.float(), gamma)
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
