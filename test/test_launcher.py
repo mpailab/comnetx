@@ -34,3 +34,11 @@ def test_dynamic_networkit_bad_datasets():
     # Работает нестабильно, периодически 'зависает'
     for dataset in ["sociopatterns-hypertext", "radoslaw_email"]:
         dynamic_launch(dataset, 100, "networkit", mode = "smart", verbose = 2)
+
+@pytest.mark.debug
+def test_dynamic_leidenalg_bad_datasets():
+    # 'Killed'
+    for dataset in ['wiki_talk_ca', 'wiki_talk_el', 'slashdot-threads', 'wiki_talk_sk', 'wiki_talk_bn', 'wiki_talk_lv', 'wiki_talk_eu', 'facebook-wosn-links']:
+        print(dataset)
+        dynamic_launch(dataset, 1, "leidenalg", mode = "raw", verbose = 2)
+
