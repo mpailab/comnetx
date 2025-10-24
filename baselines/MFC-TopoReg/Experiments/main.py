@@ -136,7 +136,7 @@ def main(file_name, network_type):
 if __name__ == "__main__":
     torch.manual_seed(42)
     network = "MFC" # GEC/DAEGC/MFC/SDCN
-    graph_pkl = ["enron",]
+    graph_pkl = ["Cora",]
     for g in graph_pkl:
         print(g)
         main(g, network_type=network)

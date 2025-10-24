@@ -146,12 +146,35 @@ import os
 import pickle
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-dmon_root = os.path.join(PROJECT_PATH, "baselines", "MFC-")
+Data_root = os.path.join(PROJECT_PATH, "baselines", "MFC", "Data")
 
 # путь к файлу
-with open("graph.pkl", "rb") as f:
+with open(Data_root + "/enron.pkl", "rb") as f:
     data = pickle.load(f)
 
+print(len(data))
 print(type(data))
+print(type(data[0]))
+
+import networkx as nx
+
+G = data[0]
+print(nx.info(G))
+
+print("Узлы:", list(G.nodes())[:10])
+print("Рёбра:", list(G.edges())[:10])
+
+
+# labels
+with open(Data_root + "/enron_label.pkl", "rb") as f:
+    data = pickle.load(f)
+
+print(len(data))
+print(data.keys())
+
+from itertools import islice
+print(dict(islice(data.items(), 50)))
+
+
 
     
