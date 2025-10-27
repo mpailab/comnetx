@@ -20,20 +20,6 @@ import sparse
 #     true_res = torch.tensor([[9, 0], [1, 1]])
 #     assert torch.equal(true_res, res)
 
-
-def get_all_datasets():
-    """
-    Сreate dict with all datasets in test directory.
-    """
-    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
-    datasets = {}
-    if os.path.isdir(base_dir):
-        for name in os.listdir(base_dir):
-            path = os.path.join(base_dir, name)
-            if os.path.isdir(path):
-                datasets[name] = path
-    return datasets
-
 @pytest.mark.short
 def test_aggregate_2():
     adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.float).to_sparse()
@@ -41,19 +27,6 @@ def test_aggregate_2():
     res = Optimizer.aggregate(adj, coms)
     true_res = torch.tensor([[9, 0], [1, 1]])
     assert torch.equal(true_res.to_dense(), res.to_dense())
-
-"""
-def test_run_prgpt():
-    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
-    communities = torch.tensor([[1, 1, 1, 3]])
-    opt = Optimizer(A, communities = communities, method  = "prgpt:infomap")
-    nodes_mask = torch.tensor([0, 0, 1, 0]).bool()
-    print("communities:", communities)
-    print("nodes_mask:", nodes_mask)
-    opt.run(nodes_mask)
-    print()
-    print(opt.coms.to_dense())
-"""
 
 @pytest.mark.short
 def test_run_leidenalg():
@@ -67,7 +40,7 @@ def test_run_leidenalg():
     print()
     print(opt.coms.to_dense())
 
-@pytest.mark.debug
+@pytest.mark.short
 def test_run_prgpt():
     A = torch.tensor([
         [1, 1, 1, 0, 0, 0],
@@ -151,14 +124,25 @@ def test_aggregate_larger():
     assert torch.allclose(aggr_adj.to_dense(), expected)
 
 
-datasets = get_all_datasets()
+def get_all_small_datasets():
+    """
+    Сreate dict with all datasets in test directory.
+    """
+    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    datasets = []
+    if os.path.isdir(base_dir):
+        for name in os.listdir(base_dir):
+            datasets.append(name)
+    return datasets
+
+datasets = get_all_small_datasets()
 @pytest.mark.long
 @pytest.mark.parametrize(
-    "name,data_dir",
-    list(datasets.items()),
-    ids=list(datasets.keys())
+    "name",
+    datasets,
 )
-def test_run_magi_on_custom_dataset(name, data_dir):
+def test_run_magi_on_custom_dataset(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")
 
@@ -191,11 +175,11 @@ def test_run_magi_on_custom_dataset(name, data_dir):
 
 @pytest.mark.long
 @pytest.mark.parametrize(
-    "name,data_dir",
-    list(datasets.items()),
-    ids=list(datasets.keys())
+    "name",
+    datasets
 )
-def test_run_dmon_on_custom_dataset(name, data_dir):
+def test_run_dmon_on_custom_dataset(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")
 
@@ -227,11 +211,11 @@ def test_run_dmon_on_custom_dataset(name, data_dir):
 
 @pytest.mark.long
 @pytest.mark.parametrize(
-    "name,data_dir",
-    list(datasets.items()),
-    ids=list(datasets.keys())
+    "name",
+    datasets
 )
-def test_run_magi_on_isolated_communities(name, data_dir):
+def test_run_magi_on_isolated_communities(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")
 
@@ -271,11 +255,11 @@ def test_run_magi_on_isolated_communities(name, data_dir):
 
 @pytest.mark.long
 @pytest.mark.parametrize(
-    "name,data_dir",
-    list(datasets.items()),
-    ids=list(datasets.keys())
+    "name",
+    datasets
 )
-def test_run_magi_partial_mask(name, data_dir):
+def test_run_magi_partial_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")
 
@@ -320,11 +304,11 @@ def test_run_magi_partial_mask(name, data_dir):
 
 @pytest.mark.long
 @pytest.mark.parametrize(
-    "name,data_dir",
-    list(datasets.items()),
-    ids=list(datasets.keys())
+    "name",
+    datasets
 )
-def test_run_magi_on_true_mask(name, data_dir):
+def test_run_magi_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")
 
@@ -336,11 +320,11 @@ def test_run_magi_on_true_mask(name, data_dir):
 
 @pytest.mark.long
 @pytest.mark.parametrize(
-    "name,data_dir",
-    list(datasets.items()),
-    ids=list(datasets.keys())
+    "name",
+    datasets
 )
-def test_run_dmon_on_true_mask(name, data_dir):
+def test_run_dmon_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load(tensor_type="coo")
 
