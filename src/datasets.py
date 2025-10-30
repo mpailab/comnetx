@@ -24,6 +24,7 @@ class Dataset:
         self.name = dataset_name
         self.path = path # dir with datasets dirs
         self.adj = None # (l, n, n)-tensor or (n, n)-tensor
+        self.is_directed = False
         self.features = None
         self.label = None
 
@@ -41,7 +42,6 @@ class Dataset:
         -------
         adj - (l, n, n)-tensor, where l is number of batches
               (n, n)-tensor if batches is None
-        
         features - #TODO (to Drobyshev) add info for shape
         label - #TODO (to Drobyshev) add info for shape
         """
@@ -50,17 +50,16 @@ class Dataset:
 
         with open(os.path.join(INFO, "all.json")) as _:
             info = json.load(_)
-        #TODO (to Drobyshev) Add to set all magi datasets
         magi_datasets = {"cora", "citeseer", "pubmed", "reddit", "ogbn-arxiv", "ogbn-products", "ogbn-papers100M", "amazon-photo", "amazon-computers"}
         
         dname = self.name.lower()
         if self.name in info:
-            is_directed = info[self.name]['d'] == 'directed'
+            self.is_directed = info[self.name]['d'] == 'directed'
             if batches == None:
-                self._load_konect(batches_num = 1, is_directed = is_directed)
+                self._load_konect(batches_num = 1)
                 self.adj = self.adj[0]
             else:
-                self._load_konect(batches_num = batches, is_directed = is_directed)
+                self._load_konect(batches_num = batches)
         elif dname in magi_datasets:
             download_flag = False
             for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"}:
@@ -164,7 +163,7 @@ class Dataset:
             values = torch.from_numpy(values_np).float()
             self.adj = torch.sparse_coo_tensor(indices, values, size=adj_data.shape)
     
-    def _load_konect(self, batches_num = 1, is_directed = True):
+    def _load_konect(self, batches_num = 1):
         """
         Load dynamic dataset from KONECT collection
 
@@ -188,7 +187,7 @@ class Dataset:
             mask = (t == num)
             adj_index = np.vstack((i[mask], j[mask]))
             adj = torch.sparse_coo_tensor(adj_index, w[mask], size=(num_nodes, num_nodes)).coalesce()
-            if not is_directed:
+            if not self.is_directed:
                 adj = adj + torch.t(adj)
             adjs.append(adj)
         self.adj = torch.stack(adjs) # 3-dimensional tensor

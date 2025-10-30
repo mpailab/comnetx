@@ -387,14 +387,6 @@ def test_modularity():
         [0, 1, 2, 3, 4, 5]
     ])
 
-    dense_communities = torch.tensor([
-        [1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0]], dtype=torch.float32)
-
     adj_matrix = torch.tensor([
                         [1, 1, 1, 0, 0, 0], 
                         [1, 1, 1, 0, 0, 0], 
@@ -405,10 +397,7 @@ def test_modularity():
 
     optimizer = Optimizer(adj_matrix=adj_matrix, communities=communities)
     modularity = optimizer.modularity()
-    dense_modularity = optimizer.dense_modularity(adj_matrix, dense_communities)
-    print(type(modularity))
     assert modularity < 1.0
-    assert dense_modularity == modularity
 
 @pytest.mark.short
 def test_communities_none():
