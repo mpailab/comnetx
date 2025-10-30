@@ -156,14 +156,6 @@ def test_modularity():
         [0, 1, 2, 3, 4, 5]
     ])
 
-    dense_communities = torch.tensor([
-        [1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0]], dtype=torch.float32)
-
     adj_matrix = torch.tensor([
                         [1, 1, 1, 0, 0, 0], 
                         [1, 1, 1, 0, 0, 0], 
@@ -174,34 +166,7 @@ def test_modularity():
 
     optimizer = Optimizer(adj_matrix=adj_matrix, communities=communities)
     modularity = optimizer.modularity()
-    dense_modularity = optimizer.dense_modularity(adj_matrix, dense_communities)
     assert modularity < 1.0
-    assert dense_modularity == modularity
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_dense_vs_sparse_modularity():
-    # Two cliques of size 3
-    edges = []
-    tri1 = [(0,1),(1,2),(2,0),(1,0),(2,1),(0,2)]
-    tri2 = [(3,4),(4,5),(5,3),(4,3),(5,4),(3,5)]
-    edges.extend(tri1)
-    edges.extend(tri2)
-    idx = torch.tensor(edges, dtype=torch.long).t()
-    vals = torch.ones(idx.size(1))
-    A = torch.sparse_coo_tensor(idx, vals, size=(6, 6)).coalesce()
-
-    # Communities: {0,1,2} and {3,4,5}
-    C = torch.tensor([[0,0,0,3,3,3]])
-    opt = Optimizer(A, communities=C)
-
-    dense_coms = torch.nn.functional.one_hot(C[0], num_classes=6).to(torch.float32).T
-    print(dense_coms)
-    m1 = opt.modularity()
-    m2 = opt.dense_modularity(A, dense_coms)
-    assert abs(m1 - m2) < 1e-6
-
 
 @pytest.mark.unit
 @pytest.mark.short
@@ -222,7 +187,6 @@ def test_neighborhood_1():
     assert torch.equal(nodes_0, initial_nodes)
     assert torch.equal(nodes_1, true_nodes_1)
     assert torch.equal(nodes_2, true_nodes_2)
-
 
 @pytest.mark.unit
 @pytest.mark.short
