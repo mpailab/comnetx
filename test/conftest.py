@@ -8,6 +8,13 @@ import os, json
 os.environ["OGB_FORCE_DOWNLOAD"] = "1"
 from pathlib import Path
 
+PROJECT_PATH = Path(__file__).resolve().parent.parent
+TEST_PATH = Path(__file__).resolve().parent
+for p in (str(TEST_PATH), str(PROJECT_PATH), str(PROJECT_PATH / "src")):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+from testutils import ResourceMonitor, with_timeout, TimeoutException
+
 _DATASETS_JSON = Path(__file__).parent / "dataset_paths.json"
 
 def collect_datasets():
@@ -191,3 +198,11 @@ def runner_networkit():
 
         return subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=str(root))
     return run
+
+@pytest.fixture
+def resource_monitor():
+    monitor = ResourceMonitor(interval=0.3)
+    monitor.start()
+    yield monitor
+    monitor.stop()
+    monitor.print_summary()
