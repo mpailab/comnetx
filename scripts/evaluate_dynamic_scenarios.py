@@ -21,7 +21,7 @@ EDGE_RESTRICTION = 100000
 #NODE_RESTRICTION = None
 if EDGE_RESTRICTION:
     DATASETS = list(filter(lambda dataset: int(info[dataset]["m"]) < EDGE_RESTRICTION, DATASETS))
-DATASETS.sort(key = lambda x: info[x]["n"])
+DATASETS.sort(key = lambda x: info[x]["m"])
 BATCHES = [1, 10, 100]
 #BATCHES = [1, 10, 100, 1000]
 print("Number of datasets: ", len(DATASETS))

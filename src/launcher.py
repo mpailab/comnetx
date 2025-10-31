@@ -45,7 +45,7 @@ def dynamic_launch(dataset_name : str, batches_num : int,
             opt._set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
         time_e = time.time()
 
-        mod = opt.modularity()
+        mod = opt.modularity(directed = ds.is_directed)
         results.append({'modularity' : mod, 'time': time_e - time_s})
 
     with print_zone(verbose >= 1):

@@ -27,12 +27,13 @@ def test_modularity():
     datasets = datasets_1 + datasets_2 + datasets_3
     print("Number of datasets:", len(datasets))
 
-    print("Dataset Modularity (True modularity)")
+    print("Dataset (is_directed) : Modularity (True modularity)")
     for dataset in datasets:
         results = dynamic_launch(dataset, 1, "leidenalg", mode = "raw", verbose = 0)
         mod = results[-1]['modularity']
         true_mod = true_mod_db[dataset]
-        print(f"{dataset}: {mod:.4} (true - {true_mod:.4})")
+        is_directed = info[dataset]["d"]
+        print(f"{dataset} ({is_directed}): {mod:.4} (true - {true_mod:.4})")
         #assert mod < true_mod * 1.1
         #assert mod > true_mod * 0.8
 
