@@ -80,21 +80,8 @@ class Optimizer:
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
 
-    def dense_modularity(self, 
-            adj: torch.Tensor, coms: torch.Tensor, gamma: float = 1) -> float:
-        """
-        Args:
-            adj: torch.tensor [n_nodes, n_nodes]
-            coms: torch.tensor [n_nodes, n_nodes]
-            gamma: float
-            
-        Returns:
-            modularity: float 
-        """
-        return Metrics.modularity(adj, coms.T, gamma)
-
     def modularity(self, 
-            gamma: float = 1, L: int = 0) -> float:
+            gamma: float = 1, L: int = 0, directed: bool = False) -> float:
         """
         Args:
             gamma: float, optional (default=1)
@@ -104,7 +91,7 @@ class Optimizer:
         """
         n = self.coms.shape[1]
         dense_coms = Metrics.create_dense_community(self.coms, n, L).T
-        return Metrics.modularity(self.adj, dense_coms.to(torch.float32), gamma)
+        return Metrics.modularity(self.adj, dense_coms.float(), gamma, directed = directed)
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """

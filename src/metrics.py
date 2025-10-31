@@ -113,18 +113,21 @@ class Metrics:
         
         return modularity.item()
 
-    def modularity(adjacency, assignments, gamma : float = 1.0) -> float:
+    def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
         """
         Args:
             adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]
-            assignments: torch.Tensor or torch.Tensor or tf.Tensor [n_nodes, n_clusters]
-            
+            assignments: torch.Tensor or torch.Tensor or tf.Tensor [n_nodes, n_clusters] 
+            gamma: float, optional (default = 1.0)
+            directed: bool, optional (default = Fasle)
         Returns:
             modularity: float 
         """
         if isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor):
             degrees = adjacency.sum(dim=1)
             m = degrees.sum()
+            if not directed:
+                m = m / 2
             inv_2m = 1.0 / (2 * m)
             degrees.view(-1, 1)
             a_s = adjacency.matmul(assignments)
@@ -137,6 +140,8 @@ class Metrics:
         elif isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor):
             degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
             m = degrees.sum()
+            if not directed:
+                m = m / 2
             inv_2m = 1.0 / (2 * m)
             a_s = torch.sparse.mm(adjacency, assignments)
             graph_pooled = torch.matmul(a_s.t(), assignments)
@@ -147,6 +152,8 @@ class Metrics:
         elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
             degrees = tf.sparse.reduce_sum(adjacency, axis=0)
             m = tf.reduce_sum(degrees)
+            if not directed:
+                m = m / 2
             inv_2m = 1.0 / (2 * m) 
             degrees = tf.reshape(degrees, (-1, 1))
             a_s = tf.sparse.sparse_dense_matmul(adjacency, assignments)
