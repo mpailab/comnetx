@@ -213,39 +213,49 @@ class Metrics:
             return modularity.item()
         
         elif assignments.dim()==1:
-            A = adjacency.float()
-            c = assignments
-            delta = (c.unsqueeze(0) == c.unsqueeze(1)).float()
 
             def sum_along_dim(A, dim):
                 if isinstance(A, SparseTensor):
                     return A.sum(dim=dim)
                 elif A.is_sparse:
-                    return torch.sparse.sum(A, dim=dim).to_dense()
+                    return torch.sparse.sum(A, dim=dim)
                 else:
                     return A.sum(dim=dim)
 
-            def to_dense(A):
-                if isinstance(A, SparseTensor):
-                    return A.to_dense()
-                elif A.is_sparse:
-                    return A.to_dense()
-                else:
-                    return A
-
-            if directed:
-                k_out = sum_along_dim(A, dim=1) 
-                k_in = sum_along_dim(A, dim=0)
-                m = k_out.sum()
-                A = to_dense(A)
-                B = A - gamma * torch.outer(k_out, k_in) / m
-                modularity = (B * delta).sum() / m
+            if isinstance(adjacency, SparseTensor):
+                row, col, weight = adjacency.coo()
+            elif adjacency.is_sparse:
+                adjacency = adjacency.coalesce()
+                row, col = adjacency.indices()
+                weight = adjacency.values()
             else:
-                k = sum_along_dim(A, dim=1)
-                m = A.sum() / 2
-                A = to_dense(A)
-                B = A - gamma * torch.outer(k, k) / (2 * m)
-                modularity = (B * delta).sum() / (2 * m)    
+                adjacency = adjacency.to_sparse()
+                row, col = adjacency.indices()
+                weight = adjacency.values()
+
+            # --- Степени вершин ---
+            if directed:
+                k_out = sum_along_dim(adjacency, dim=1).to_dense()
+                k_in = sum_along_dim(adjacency, dim=0).to_dense()
+                m = weight.sum()  # без деления на 2
+            else:
+                k = sum_along_dim(adjacency, dim=1).to_dense()
+                m = weight.sum() / 2
+
+            # --- Определяем, какие рёбра внутри сообществ ---
+            same_comm = (assignments[row] == assignments[col])
+
+            # --- Вычисляем ожидаемое значение ---
+            if directed:
+                B = gamma * (k_out[row] * k_in[col]) / m
+                inv_m = 1.0 / m
+            else:
+                B = gamma * (k[row] * k[col]) / (2 * m)
+                inv_m = 1.0 / (2 * m)
+
+            # --- Считаем модульность только по рёбрам ---
+            
+            modularity = ((weight - B) * same_comm.float()).sum() * inv_m   
             
             return modularity
 

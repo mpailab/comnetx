@@ -151,8 +151,8 @@ def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = Fa
         k = sum_along_dim(A, dim=1)
         m = A.sum() / 2
         A = to_dense(A)
-        B = A - gamma * torch.outer(k, k) / (2 * m)
-        modularity = (B * delta).sum() / (2 * m)    
+        B = A - gamma * torch.outer(k, k) / (2*m)
+        modularity = (B * delta).sum() / (2*m)    
     
     return modularity
 
