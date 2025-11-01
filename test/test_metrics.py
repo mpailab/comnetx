@@ -106,57 +106,80 @@ N, K = 100000, 10
 
 # print(torch.mean(time_arr, dim=1))
 
-def modularity(adj_matrix: torch.Tensor, communities: torch.Tensor) -> torch.Tensor:
+def sum_along_dim(A, dim):
+        """Суммирует вдоль измерения независимо от формата."""
+        if isinstance(A, SparseTensor):
+            return A.sum(dim=dim)
+        elif A.is_sparse:
+            return torch.sparse.sum(A, dim=dim).to_dense()
+        else:
+            return A.sum(dim=dim)
+
+def to_dense(A):
+        """Преобразует в плотную матрицу для финальных операций."""
+        if isinstance(A, SparseTensor):
+            return A.to_dense()
+        elif A.is_sparse:
+            return A.to_dense()
+        else:
+            return A
+
+def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> torch.Tensor:
     """
-    Вычисляет модулярность графа по матрице смежности и вектору сообществ.
-
-    Параметры:
-        adj_matrix : torch.Tensor, shape [N, N]
-            Матрица смежности (0/1 или весовая)
-        communities : torch.Tensor, shape [N]
-            Вектор меток сообществ (целые числа)
-
-    Возвращает:
-        torch.Tensor (скаляр) — значение модулярности
+        Args:
+            adjacency: SparseTensor or torch.sparse.Tensor or torch.Tensor[n_nodes, n_nodes]
+            assignments: torch.Tensor [n_nodes] 
+            gamma: float, optional (default = 1.0)
+            directed: bool, optional (default = Fasle)
+        Returns:
+            modularity: float 
     """
-    # Убедимся, что типы совпадают
-    A = adj_matrix.float()
-    c = communities
-    n = A.size(0)
-
-    # Сумма всех рёбер (делим на 2, так как граф неориентированный)
-    m = A.sum() / 2
-
-    # Степени вершин
-    k = A.sum(dim=1)
-
-    # Матрица δ(c_i, c_j)
+    A = adjacency.float()
+    c = assignments
     delta = (c.unsqueeze(0) == c.unsqueeze(1)).float()
 
-    # Основное выражение
-    B = A - torch.outer(k, k) / (2 * m)
 
-    Q = (B * delta).sum() / (2 * m)
-    return Q
+    if directed:
+        k_out = sum_along_dim(A, dim=1) 
+        k_in = sum_along_dim(A, dim=0)
+        m = k_out.sum()
+        A = to_dense(A)
+        B = A - gamma * torch.outer(k_out, k_in) / m
+        modularity = (B * delta).sum() / m
+    else:
+        # --- Неориентированный случай ---
+        k = sum_along_dim(A, dim=1)
+        m = A.sum() / 2
+        A = to_dense(A)
+        B = A - gamma * torch.outer(k, k) / (2 * m)
+        modularity = (B * delta).sum() / (2 * m)    
+    
+    return modularity
 
-A = torch.tensor([
-    [1, 1, 0, 0],
-    [1, 1, 1, 0],
-    [0, 1, 1, 1],
-    [0, 0, 1, 1]
+A_dense = torch.tensor([
+    [0, 1, 0, 0],
+    [1, 0, 1, 0],
+    [0, 1, 0, 1],
+    [0, 0, 1, 0]
 ], dtype=torch.float32)
 
-# Метки сообществ (0 и 1)
 communities = torch.tensor([[0, 0, 2, 2]])
 print(communities[0])
 
-Q = modularity(A, communities[0])
-print(f"Модулярность: {Q.item():.4f}")
+A = SparseTensor.from_dense(A_dense) 
+Q_my = Metrics.modularity(A, communities[0].float(), directed=False)
+print(f"Модулярность: {Q_my}")
 
-communities = torch.tensor([[0, 0, 2, 2]])
-dense_com = Metrics.create_dense_community(communities, 4).T
-A = SparseTensor.from_dense(A) 
 
-Q2 = Metrics.modularity(A, dense_com.float())
-print(dense_com)
-print(f"Модулярность: {Q2:.4f}")
+Q1 = modularity(A_dense, communities[0], gamma=1.0, directed=False)
+print("Dense:", Q1.item())
+
+# Torch sparse
+A_sparse = A_dense.to_sparse()
+Q2 = modularity(A_sparse, communities[0], gamma=1.0, directed=False)
+print("torch.sparse:", Q2.item())
+
+# SparseTensor (PyTorch Geometric)
+A_st = SparseTensor.from_dense(A_dense)
+Q3 = modularity(A_st, communities[0], gamma=1.0, directed=False)
+print("SparseTensor:", Q3.item())
