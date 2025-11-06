@@ -1,9 +1,16 @@
 import sys,os
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
+# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+MFC_root = os.path.join(PROJECT_PATH, "baselines", "MFC-TopoReg")
+if MFC_root not in sys.path:
+    sys.path.insert(0, MFC_root)
+
 from Code.train import base_train, retrain_with_topo
-from Code.dataloader import load_graphs
+from Code.dataloader import get_complete_graphs, NetworkSnapshots
 from Models.GraphFiltrationLayer import WrcfLayer,build_community_graph
+from Experiments.main import Args, InitModel
 import torch
 import os
 from Models import *
@@ -12,48 +19,37 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 import scipy.sparse as sp
 import pickle
 
-class Args(dict):
-    def __init__(self,n_cluster,file_name,network_type) -> None:
-        self.encoded_space_dim = 50
-        self.n_cluster = n_cluster  # clusters
-        self.num_epoch = 201 #1000
-        self.learning_rate = 0.001 # for topo
-        self.LAMBDA = 1
-        self.card = 20 # num of ph considered
-        self.file_name = file_name
-        self.network_type = network_type
-        self.start_mf = 500
+graph_pkl = ["acm", "bat", "dblp", "eat", "uat"]
+label_num_dic = {"acm": 3, "bat": 4, "dblp": 4, "eat": 4, "uat": 4}
+COMPLETE_GRAPH = False
+def load_graphs(file_name,network_type):
+    if file_name in graph_pkl:
+        return load_graphs_pkl(PROJECT_PATH + '/test/graphs/small/dblp/'+file_name,network_type)
+    else:
+        raise NameError  
+    
 
-class InitModel():
-    def __init__(self, device):
-        self.device = device
-    def __call__(self, network_type, adj, feature_dim, args):
-        if network_type == "DAEGC":
-            return DAEGC(num_features=feature_dim, 
-                        hidden_size=256,
-                        embedding_size=args.encoded_space_dim, 
-                        alpha=0.2, 
-                        num_clusters=args.n_cluster).to(self.device)
-        elif network_type == "GEC":
-            adj_norm = graph_normalization(adj) # norm
-            adj_norm = torch.sparse.FloatTensor(torch.LongTensor(adj_norm[0].T),
-                                                torch.FloatTensor(adj_norm[1]),
-                                                torch.Size(adj_norm[2])).to(self.device)
-            return GAE(adj_norm, feature_dim, args).to(self.device)
-        elif network_type == "MFC":
-            adj_norm = graph_normalization(adj) # norm
-            adj_norm = torch.sparse.FloatTensor(torch.LongTensor(adj_norm[0].T),
-                                                torch.FloatTensor(adj_norm[1]),
-                                                torch.Size(adj_norm[2])).to(self.device)
-            return GAEMF(adj_norm, feature_dim, args).to(self.device)
-        elif network_type == "SDCN":
-            return SDCN(500, 500, 2000, 2000, 500, 500,
-                        n_input=feature_dim,
-                        n_z=args.encoded_space_dim,
-                        n_clusters=args.n_cluster,
-                        v=1.0).to(self.device)
-        else:
-            raise ValueError(f'Unknown network type: {network_type}')
+def load_graphs_pkl(file_name,network_type, complete_graph=COMPLETE_GRAPH):
+    with open(file_name + '.pkl', 'rb') as handle:
+        try:
+            graph_snapshots = pickle.load(handle, encoding='bytes', fix_imports=True)
+        except ValueError:
+            handle.seek(0)
+            graph_snapshots = pickle.load(handle, encoding='bytes', fix_imports=True, protocol=2)
+    with open(file_name + '_label.pkl', 'rb') as handle:
+        try:
+            labels = pickle.load(handle, encoding='bytes', fix_imports=True)
+        except ValueError:
+            handle.seek(0)
+            labels = pickle.load(handle, encoding='bytes', fix_imports=True, protocol=2)
+    
+    print("Lengths of snapshots:", len(graph_snapshots))
+    print("Types of labels:", label_num_dic[file_name.split('/')[-1]])
+    if file_name == "DBLP":
+        graph_snapshots = graph_snapshots[:8] # take first 8 snapshots in DBLP for GPU memory limit
+    if complete_graph:
+        graph_snapshots = get_complete_graphs(graph_snapshots)
+    return NetworkSnapshots(graph_snapshots,labels,network_type,file_name), label_num_dic[file_name.split('/')[-1]]
 
 def main(file_name, network_type):
     model_init = InitModel(device = "cuda")
@@ -97,12 +93,15 @@ def main(file_name, network_type):
     for t in range(len(snapshot_list)):
         m = model_list[t]
         adj,features,labels = snapshot_list[t]
-        if t == 0:
-            gt_dgm = [None, dgm_list[t+1]]
-        elif t == len(snapshot_list)-1: 
-            gt_dgm = [dgm_list[t-1], None]
-        else:
-            gt_dgm = [dgm_list[t-1],dgm_list[t+1]]
+        # if t == 0:
+        #     gt_dgm = [None, dgm_list[t+1]]
+        # elif t == len(snapshot_list)-1: 
+        #     gt_dgm = [dgm_list[t-1], None]
+        # else:
+        #     gt_dgm = [dgm_list[t-1],dgm_list[t+1]]
+
+        gt_dgm = [None, dgm_list[t]] #FIXME
+
         retrain_with_topo(
             network_type,
             m,
@@ -128,21 +127,21 @@ def main(file_name, network_type):
             dgm1_new = wrcf_layer_dim1(community_graph)
             dgm_list[t] = [dgm0_new,dgm1_new]
 
-    with open("/home/egorov/comnetx/baselines/MFC-TopoReg/Data/"+file_name+'/results_raw.pkl', 'wb') as handle:
+    with open("/home/egorov/comnetx/results/"+file_name+'/results_raw.pkl', 'wb') as handle:
         pickle.dump(results_raw, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open("/home/egorov/comnetx/baselines/MFC-TopoReg/Data/"+file_name+'/results_topo.pkl', 'wb') as handle:
+    with open("/home/egorov/comnetx/results/"+file_name+'/results_topo.pkl', 'wb') as handle:
         pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     torch.manual_seed(42)
     network = "MFC" # GEC/DAEGC/MFC/SDCN
-    graph_pkl = ["DBLP",]
+    graph_pkl = ["dblp",]
     for g in graph_pkl:
         print(g)
         main(g, network_type=network)
 
-        
-
-
-
-    
+# def mfc():
+#     torch.manual_seed(42)
+#     network = "MFC" # GEC/DAEGC/MFC/SDCN
+#     g = "dblp"    
+#     main(g, network_type=network)
