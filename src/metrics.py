@@ -63,156 +63,63 @@ class Metrics:
         
     #     return modularity.item()
 
-    def modularity_sparse(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> torch.Tensor:
-        """
-            Args:
-                adjacency: SparseTensor or torch.sparse.Tensor or torch.Tensor[n_nodes, n_nodes]
-                assignments: torch.Tensor [n_nodes] 
-                gamma: float, optional (default = 1.0)
-                directed: bool, optional (default = Fasle)
-            Returns:
-                modularity: float 
-        """
-        A = adjacency.float()
-        c = assignments
-        delta = (c.unsqueeze(0) == c.unsqueeze(1)).float()
-
-        def sum_along_dim(A, dim):
-            if isinstance(A, SparseTensor):
-                return A.sum(dim=dim)
-            elif A.is_sparse:
-                return torch.sparse.sum(A, dim=dim).to_dense()
-            else:
-                return A.sum(dim=dim)
-
-        def to_dense(A):
-            if isinstance(A, SparseTensor):
-                return A.to_dense()
-            elif A.is_sparse:
-                return A.to_dense()
-            else:
-                return A
-
-        if directed:
-            k_out = sum_along_dim(A, dim=1) 
-            k_in = sum_along_dim(A, dim=0)
-            m = k_out.sum()
-            A = to_dense(A)
-            B = A - gamma * torch.outer(k_out, k_in) / m
-            modularity = (B * delta).sum() / m
-        else:
-            k = sum_along_dim(A, dim=1)
-            m = A.sum() / 2
-            A = to_dense(A)
-            B = A - gamma * torch.outer(k, k) / (2 * m)
-            modularity = (B * delta).sum() / (2 * m)    
-        
-        return modularity
-
     def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
         """
         Args:
             adjacency: SparseTensor or torch.sparse.Tensor or tf.sparse.SparseTensor [n_nodes, n_nodes]
-            assignments: torch.Tensor or torch.Tensor or tf.Tensor [n_nodes, n_clusters] or torch.Tensor [n_nodes] 
+            assignments: torch.Tensor or tf.Tensor [n_nodes, n_clusters] or torch.Tensor [n_nodes] 
             gamma: float, optional (default = 1.0)
             directed: bool, optional (default = Fasle)
         Returns:
             modularity: float 
         """
-        if (isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor)
-            and assignments.dim()==2):
-            # degrees = adjacency.sum(dim=1)
-            # m = degrees.sum()
-            # if not directed:
-            #     m = m / 2
-            # inv_2m = 1.0 / (2 * m)
-            # degrees.view(-1, 1)
-            # a_s = adjacency.matmul(assignments)
-            # graph_pooled = torch.matmul(a_s.t(), assignments)
-            # s_d = torch.matmul(assignments.t(), degrees)
-            # normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
-            # modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
-            # # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
+
+        def create_sparse_community(community):
+            """
+            Args:
+                community_matrix: torch.Tensor [n, n]
+                                  example = [[1, 1, 0],
+                                             [0, 0, 0],
+                                             [0, 0, 1]]
+            Returns:
+                communities: torch.Tensor [n]
+            """
+            comm_idx, node_idx = torch.nonzero(community, as_tuple=True)
+
+            communities = torch.zeros(community.shape[1], dtype=torch.long)
             
-            if directed:
-                k_out = adjacency.sum(dim=1)
-                k_in = adjacency.sum(dim=0)
-                m = k_out.sum()
-                inv_m = 1.0 / m
+            communities[node_idx] = comm_idx
 
-                a_s = adjacency.matmul(assignments)
-                graph_pooled = torch.matmul(a_s.t(), assignments)
+            return communities
 
-                s_d_out = torch.matmul(assignments.t(), k_out)
-                s_d_in = torch.matmul(assignments.t(), k_in)
-                normalizer = gamma * torch.matmul(s_d_out, s_d_in.t()) * inv_m
-
-                modularity = (graph_pooled.diag().sum() - normalizer.sum()) * inv_m
-
-            else:
-                # directed
-                degrees = adjacency.sum(dim=1)
-                m = degrees.sum() / 2
-                inv_2m = 1.0 / (2 * m)
-
-                a_s = adjacency.matmul(assignments)
-                graph_pooled = torch.matmul(a_s.t(), assignments)
-
-                s_d = torch.matmul(assignments.t(), degrees)
-                normalizer = gamma * torch.matmul(s_d, s_d.t()) * inv_2m
-
-                modularity = (graph_pooled.diag().sum() - normalizer.sum()) * inv_2m
-
+        if isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor) and assignments.dim()==2:
+            degrees = adjacency.sum(dim=1)
+            m = degrees.sum()
+            if not directed:
+                m = m / 2
+            inv_2m = 1.0 / (2 * m)
+            degrees.view(-1, 1)
+            a_s = adjacency.matmul(assignments)
+            graph_pooled = torch.matmul(a_s.t(), assignments)
+            s_d = torch.matmul(assignments.t(), degrees)
+            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
+            modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
+            # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
+            return modularity.item()
+        elif isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor) and assignments.dim()==2:
+            degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
+            m = degrees.sum()
+            if not directed:
+                m = m / 2
+            inv_2m = 1.0 / (2 * m)
+            a_s = torch.sparse.mm(adjacency, assignments)
+            graph_pooled = torch.matmul(a_s.t(), assignments)
+            s_d = torch.matmul(assignments.t(), degrees)
+            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
+            modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
             return modularity.item()
         
-
-        elif (isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor)
-              and assignments.dim()==2):
-            # degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
-            # m = degrees.sum()
-            # if not directed:
-            #     m = m / 2
-            # inv_2m = 1.0 / (2 * m)
-            # a_s = torch.sparse.mm(adjacency, assignments)
-            # graph_pooled = torch.matmul(a_s.t(), assignments)
-            # s_d = torch.matmul(assignments.t(), degrees)
-            # normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
-            # modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
-
-            
-            if directed:
-                k_out = adjacency.sum(dim=1)
-                k_in = adjacency.sum(dim=0)
-                m = k_out.sum()
-                inv_m = 1.0 / m
-
-                a_s = torch.sparse.mm(adjacency, assignments)
-                graph_pooled = torch.matmul(a_s.t(), assignments)
-
-                s_d_out = torch.matmul(assignments.t(), k_out)
-                s_d_in = torch.matmul(assignments.t(), k_in)
-                normalizer = gamma * torch.matmul(s_d_out, s_d_in.t()) * inv_m
-
-                modularity = (graph_pooled.diag().sum() - normalizer.sum()) * inv_m
-
-            else:
-                # directed
-                degrees = adjacency.sum(dim=1)
-                m = degrees.sum() / 2
-                inv_2m = 1.0 / (2 * m)
-
-                a_s = torch.sparse.mm(adjacency, assignments)
-                graph_pooled = torch.matmul(a_s.t(), assignments)
-
-                s_d = torch.matmul(assignments.t(), degrees)
-                normalizer = gamma * torch.matmul(s_d, s_d.t()) * inv_2m
-
-                modularity = (graph_pooled.diag().sum() - normalizer.sum()) * inv_2m
-
-
-            return modularity.item()
-        
-        elif assignments.dim()==1:
+        elif isinstance(assignments, torch.Tensor) and assignments.dim()==1:
 
             def sum_along_dim(A, dim):
                 if isinstance(A, SparseTensor):
@@ -247,8 +154,8 @@ class Metrics:
 
             # --- Вычисляем ожидаемое значение ---
             if directed:
-                B = gamma * (k_out[row] * k_in[col]) / m
-                inv_m = 1.0 / m
+                B = gamma * (k_out[row] * k_in[col]) / (2 * m)
+                inv_m = 1.0 / (2 * m)
             else:
                 B = gamma * (k[row] * k[col]) / (2 * m)
                 inv_m = 1.0 / (2 * m)
@@ -274,23 +181,3 @@ class Metrics:
             return modularity.numpy()
         else:
             raise TypeError("Unsupported type")
-
-    def create_dense_community(communities, n, L=0):
-        """
-        Args:
-            communities: torch.Tensor [l, n]
-            n: int
-            L: int, optional (default=0)
-                
-        Returns:
-            community_matrix: torch.Tensor [n, n]
-        """
-        communities = communities[L,:].long()
-        nodes = torch.tensor(range(n)).long()
-
-        # print(len(communities), len(nodes))
-
-        community_matrix = torch.zeros(n, n, dtype=torch.int32)
-        community_matrix[communities, nodes] = 1
-        
-        return community_matrix
