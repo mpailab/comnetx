@@ -1,6 +1,7 @@
+import networkx as nx
+import torch
 import sys,os
-# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# sys.path.append(os.path.dirname(SCRIPT_DIR))
+import pickle
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MFC_root = os.path.join(PROJECT_PATH, "baselines", "MFC-TopoReg")
@@ -11,51 +12,76 @@ from Code.train import base_train, retrain_with_topo
 from Code.dataloader import get_complete_graphs, NetworkSnapshots
 from Models.GraphFiltrationLayer import WrcfLayer,build_community_graph
 from Experiments.main import Args, InitModel
+
 import torch
-import os
-from Models import *
-from Code.train import *
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-import scipy.sparse as sp
-import pickle
+import networkx as nx
 
-graph_pkl = ["acm", "bat", "dblp", "eat", "uat"]
-label_num_dic = {"acm": 3, "bat": 4, "dblp": 4, "eat": 4, "uat": 4}
-COMPLETE_GRAPH = False
-def load_graphs(file_name,network_type):
-    if file_name in graph_pkl:
-        return load_graphs_pkl(PROJECT_PATH + '/test/graphs/small/dblp/'+file_name,network_type)
+def load_graphs_from_dynamic_tensors(adj_matrices, 
+                                     labels_list, 
+                                     network_type, 
+                                     file_name, 
+                                     complete_graph=False):
+    
+    if isinstance(adj_matrices, torch.Tensor) and adj_matrices.dim() == 3:
+        adj_list = [adj_matrices[t] for t in range(adj_matrices.size(0))]
+    elif isinstance(adj_matrices, list):
+        adj_list = adj_matrices
     else:
-        raise NameError  
-    
+        raise ValueError("adj_matrices should be list of 2-dim tensor")
 
-def load_graphs_pkl(file_name,network_type, complete_graph=COMPLETE_GRAPH):
-    with open(file_name + '.pkl', 'rb') as handle:
-        try:
-            graph_snapshots = pickle.load(handle, encoding='bytes', fix_imports=True)
-        except ValueError:
-            handle.seek(0)
-            graph_snapshots = pickle.load(handle, encoding='bytes', fix_imports=True, protocol=2)
-    with open(file_name + '_label.pkl', 'rb') as handle:
-        try:
-            labels = pickle.load(handle, encoding='bytes', fix_imports=True)
-        except ValueError:
-            handle.seek(0)
-            labels = pickle.load(handle, encoding='bytes', fix_imports=True, protocol=2)
-    
-    print("Lengths of snapshots:", len(graph_snapshots))
-    print("Types of labels:", label_num_dic[file_name.split('/')[-1]])
-    if file_name == "DBLP":
-        graph_snapshots = graph_snapshots[:8] # take first 8 snapshots in DBLP for GPU memory limit
+    if isinstance(labels_list, torch.Tensor) and labels_list.dim() == 2:
+        label_snapshots = [labels_list[t] for t in range(labels_list.size(0))]
+    elif isinstance(labels_list, list):
+        label_snapshots = labels_list
+    else:
+        raise ValueError("labels_list should be list of tensor")
+
+    if len(label_snapshots) == 1 and len(adj_list) > 1:
+        label_snapshots = label_snapshots * len(adj_list)
+
+    graph_snapshots = []
+    labels_dicts = []
+    for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
+        if adj_t.dim() != 2 or adj_t.size(0) != adj_t.size(1):
+            raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN")
+        if labels_t.dim() != 1 or labels_t.size(0) != adj_t.size(0):
+            raise ValueError(f"Метки снапшота {t} должны быть длины N")
+
+        g = nx.from_numpy_array(adj_t.cpu().numpy())
+        labels_dict = {i: int(labels_t[i].item()) for i in range(len(labels_t))}
+        graph_snapshots.append(g)
+        labels_dicts.append(labels_dict)
+
     if complete_graph:
         graph_snapshots = get_complete_graphs(graph_snapshots)
-    return NetworkSnapshots(graph_snapshots,labels,network_type,file_name), label_num_dic[file_name.split('/')[-1]]
 
-def main(file_name, network_type):
+    all_labels = torch.cat(label_snapshots)
+    num_classes = len(torch.unique(all_labels))
+
+    snapshots = NetworkSnapshots(graph_snapshots, labels_dicts[0], network_type, file_name)
+
+    return snapshots, num_classes
+
+
+def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
+    if file_name == "from_tensor":
+        if adj_matrix is None or labels is None:
+            raise ValueError("Для 'from_tensor' нужно передать adj_matrix и labels.")
+        return load_graphs_from_dynamic_tensors(adj_matrices=adj_matrix, 
+                                                labels_list=labels, 
+                                                network_type=network_type,
+                                                file_name=file_name)
+    else:
+        raise NameError
+
+def main(network_type, adj_matrix, labels):
     model_init = InitModel(device = "cuda")
-    snapshot_list, n_cluster = load_graphs(file_name=file_name, network_type=network_type)
+    snapshot_list, n_cluster = load_graphs("from_tensor", 
+                                           network_type=network_type, 
+                                           adj_matrix=adj_matrix, 
+                                           labels=labels)
     print(len(snapshot_list))
-    args = Args(n_cluster, file_name, network_type) # fix 20 cluster or assume known n_cluster
+    args = Args(n_cluster, "from_tensor", network_type) # fix 20 cluster or assume known n_cluster
     model_list = []
     dgm_list = []
     wrcf_layer_dim0 = WrcfLayer(dim=0, card=args.card)
@@ -93,14 +119,18 @@ def main(file_name, network_type):
     for t in range(len(snapshot_list)):
         m = model_list[t]
         adj,features,labels = snapshot_list[t]
-        # if t == 0:
-        #     gt_dgm = [None, dgm_list[t+1]]
-        # elif t == len(snapshot_list)-1: 
-        #     gt_dgm = [dgm_list[t-1], None]
-        # else:
-        #     gt_dgm = [dgm_list[t-1],dgm_list[t+1]]
-
-        gt_dgm = [None, dgm_list[t]] #FIXME
+        
+        if len(snapshot_list)!=1:
+            # print('several snapshot')
+            if t == 0:
+                gt_dgm = [None, dgm_list[t+1]]
+            elif t == len(snapshot_list)-1: 
+                gt_dgm = [dgm_list[t-1], None]
+            else:
+                gt_dgm = [dgm_list[t-1],dgm_list[t+1]]
+        else:
+            # print('one snapshot')
+            gt_dgm = [None, dgm_list[t]]
 
         retrain_with_topo(
             network_type,
@@ -127,21 +157,40 @@ def main(file_name, network_type):
             dgm1_new = wrcf_layer_dim1(community_graph)
             dgm_list[t] = [dgm0_new,dgm1_new]
 
-    with open("/home/egorov/comnetx/results/"+file_name+'/results_raw.pkl', 'wb') as handle:
+    with open("/home/egorov/comnetx/results/mfc/results_raw.pkl", 'wb') as handle:
         pickle.dump(results_raw, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open("/home/egorov/comnetx/results/"+file_name+'/results_topo.pkl', 'wb') as handle:
+    with open("/home/egorov/comnetx/results/mfc/results_topo.pkl", 'wb') as handle:
         pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-if __name__ == "__main__":
-    torch.manual_seed(42)
-    network = "MFC" # GEC/DAEGC/MFC/SDCN
-    graph_pkl = ["dblp",]
-    for g in graph_pkl:
-        print(g)
-        main(g, network_type=network)
+def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor], network_type="MFC"):
+    """
+    Args:
+        adj_matrices: list[torch.Tensor], each one [N, N].
+        labels_list: list[torch.Tensor], each one [N].
+        network_type: str, optional (default="MFC"), MFC/GEC/DAEGC/MFC/SDCN.
+    """
+    main(network_type=network_type,
+         adj_matrix=adj_matrices,
+         labels=labels_list)
 
-# def mfc():
-#     torch.manual_seed(42)
-#     network = "MFC" # GEC/DAEGC/MFC/SDCN
-#     g = "dblp"    
-#     main(g, network_type=network)
+# network_type = "MFC" # GEC/DAEGC/MFC/SDCN
+# adj0 = torch.tensor([
+#     [0,1,0,0],
+#     [1,0,1,0],
+#     [0,1,0,0],
+#     [0,0,0,0],
+# ], dtype=torch.float32)
+
+# adj1 = torch.tensor([
+#     [0,1,0,0],
+#     [1,0,1,1],
+#     [0,1,0,1],
+#     [0,1,1,0]
+# ], dtype=torch.float32)
+
+
+# labels0 = torch.tensor([0,1,0,0])
+# labels1 = torch.tensor([0,1,0,0])
+# main(network_type=network_type,
+#      adj_matrix=[adj0, ], 
+#      labels=[labels0, ])
