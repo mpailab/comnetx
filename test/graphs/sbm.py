@@ -3,10 +3,115 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt 
 import time
+import os
+
+
+def _ensure_sbm_dir():
+    d = os.path.join(os.getcwd(), "sbm")
+    os.makedirs(d, exist_ok=True)
+    return d
+def save_sbm_graph(rows, cols, n, labels, fname, meta=None, temporal=False, directed=False, connected=True):
+    """
+    Save graph (edge list) and labels in .pt file
+    - rows, cols: int (index of nodes in edges)
+    - labels: numpy array or torch tensor 
+    - meta: (block_sizes, k, p_in/p_out)
+    """
+    os.makedirs("sbm", exist_ok=True)
+    path = os.path.join("sbm", fname)
+
+    meta_full = meta.copy() if meta else {}
+    meta_full.update({
+        "directed": directed,
+        "connected": connected,
+        "temporal": temporal,
+        "n": n,
+    })
+
+    data = {"meta": meta_full}
+
+    if temporal:
+        assert isinstance(rows, list) and isinstance(cols, list), \
+            "rows/cols must be list of lists in temporal-graph"
+        data['rows'] = [np.asarray(r, dtype=np.int64) for r in rows]
+        data['cols'] = [np.asarray(c, dtype=np.int64) for c in cols]
+        data['labels'] = [torch.tensor(l, dtype=torch.long) for l in labels]
+    else:
+        data['rows'] = np.asarray(rows, dtype=np.int64)
+        data['cols'] = np.asarray(cols, dtype=np.int64)
+        data['labels'] = torch.tensor(labels, dtype=torch.long)
+
+    torch.save(data, path)
+    return path
+
+
+def load_sbm_graph(fname, device='cpu'):
+    """
+    Load .pt file, returns:
+      - adj_sparse: torch.sparse_coo_tensor (shape n x n), coalesced, dtype=torch.float32
+      - labels_t: torch.tensor(labels, dtype=torch.long)
+    """
+    if not os.path.isabs(fname) and not os.path.exists(fname):
+        candidate = os.path.join(os.getcwd(), "sbm", fname)
+        if os.path.exists(candidate):
+            fname = candidate
+
+    data = torch.load(fname, map_location='cpu')  # load on cpu
+    rows = np.asarray(data["rows"], dtype=np.int64)
+    cols = np.asarray(data["cols"], dtype=np.int64)
+    n = int(data["n"])
+    if rows.size == 0:
+        indices = torch.empty((2, 0), dtype=torch.long)
+        values = torch.empty((0,), dtype=torch.float32)
+    else:
+        indices = torch.tensor(np.vstack([rows, cols]), dtype=torch.long)
+        values = torch.ones(indices.shape[1], dtype=torch.float32)
+    adj = torch.sparse_coo_tensor(indices, values, (n, n)).coalesce().to(device)
+    labels_t = torch.tensor(data["labels"], dtype=torch.long, device=device)
+    return adj, labels_t
+
+def load_temporal_sbm_graph(path, device='cpu'):
+    """
+    Load dynamic SBM (.pt), returns:
+      - adj_sparse: torch.sparse_coo_tensor [n_steps, n, n]
+      - labels_t: torch.tensor [n_steps, n]
+    """
+    data = torch.load(path, map_location=device)
+    meta = data.get('meta', {})
+    temporal = meta.get('temporal', False)
+
+    if not temporal:
+        raise ValueError("File not temporal SBM-graph(temporal=False)")
+
+    n = meta.get('n')
+    rows_list = data['rows']
+    cols_list = data['cols']
+    labels_list = data['labels']
+    n_steps = len(rows_list)
+
+    adjs = []
+    for rows, cols in zip(rows_list, cols_list):
+        if len(rows) == 0:
+            adj_t = torch.sparse_coo_tensor(
+                torch.zeros((2, 0), dtype=torch.long),
+                torch.zeros(0, dtype=torch.float32),
+                (n, n),
+                device=device
+            )
+        else:
+            indices = torch.tensor([rows, cols], dtype=torch.long, device=device)
+            values = torch.ones(len(rows), dtype=torch.float32, device=device)
+            adj_t = torch.sparse_coo_tensor(indices, values, (n, n), device=device).coalesce()
+        adjs.append(adj_t)
+    temporal_adjs = torch.stack(adjs, dim=0)
+    temporal_labels = torch.stack(labels_list, dim=0).to(device)
+
+    return temporal_adjs, temporal_labels
 
 def generate_sbm_graph_universal(n, k, p_in, p_out, 
                        batch_size=None, directed=False, device='cpu', seed=None, 
-                       ensure_connected=True, mode='auto', sparse_threshold=50000
+                       ensure_connected=True, mode='auto', sparse_threshold=50000,
+                       graph_type='sbm'
 ):
     """
     Params:
@@ -22,8 +127,8 @@ def generate_sbm_graph_universal(n, k, p_in, p_out,
         sparse_threshold : int
             if n > sparse_threshold → create sparse matrix
     Returns:
-        if mode='static' → (adj, labels)
-        if mode='batch' → (adj_batches, label_batches)
+        if mode='static'  (adj, labels)
+        if mode='batch'  (adj_batches, label_batches)
     """
     rng = np.random.default_rng(seed)
 
@@ -37,129 +142,177 @@ def generate_sbm_graph_universal(n, k, p_in, p_out,
         np.full(size, i, dtype=np.int64)
         for i, size in enumerate(block_sizes)
     ])
-    labels_t = torch.tensor(labels, dtype=torch.long, device=device)
+    # labels_t = torch.tensor(labels, dtype=torch.long, device=device) 
 
     if mode == 'auto':
-        if n > 100000 or (batch_size and batch_size < n):
+        if n >= 10000 or (batch_size and batch_size < n):
             mode = 'batch'
         else:
             mode = 'static'
 
-    use_sparse = n > sparse_threshold
-
+    batches_field = batch_size if (mode == 'batch' and batch_size is not None) else 0
+    connected_field = 'conn' if ensure_connected else 'unconn'
+    fname = (
+        f"{graph_type}_{batches_field}b_{n}v_{k}c_"
+        f"{'dir' if directed else 'undir'}_"
+        f"{connected_field}.pt"
+    )
     if mode == 'static':
-        if use_sparse:
-            rows, cols = [], []
-            for i in range(k):
-                for j in range(k):
-                    p = p_in if i == j else p_out
-                    u = np.arange(block_start[i], block_start[i] + block_sizes[i])
-                    v = np.arange(block_start[j], block_start[j] + block_sizes[j])
-                    mask = rng.random((len(u), len(v))) < p
+        rows = []
+        cols = []
+        for i in range(k):
+            si = block_start[i]
+            ni = block_sizes[i]
+            u = np.arange(si, si + ni, dtype=np.int64)
+            j_range = range(i, k) if not directed else range(0, k)
+            for j in j_range:
+                sj = block_start[j]
+                nj = block_sizes[j]
+                v = np.arange(sj, sj + nj, dtype=np.int64)
+
+                p = p_in if i == j else p_out
+
+                if ni == 0 or nj == 0:
+                    continue
+
+                if not directed and i == j:
+                    mask = rng.random((ni, ni)) < p
+                    ui, vj = np.nonzero(np.triu(mask, k=1))
+                    if ui.size > 0:
+                        rows.extend(u[ui].tolist())
+                        cols.extend(v[vj].tolist())
+                        rows.extend(v[vj].tolist())
+                        cols.extend(u[ui].tolist())
+                else:
+                    mask = rng.random((ni, nj)) < p
                     ui, vj = np.nonzero(mask)
-                    rows.extend(u[ui])
-                    cols.extend(v[vj])
-            if not directed:
-                rows = np.concatenate([rows, cols])
-                cols = np.concatenate([cols, rows[:len(cols)]])
-            values = np.ones(len(rows), dtype=np.float32)
-            adj_torch = torch.sparse_coo_tensor(
-                torch.tensor([rows, cols]),
-                torch.tensor(values),
-                (n, n),
-                device=device
-            ).coalesce()
-        else:
-            A = np.zeros((n, n), dtype=np.float32)
-            for i in range(k):
-                for j in range(k):
-                    p = p_in if i == j else p_out
-                    ni = block_sizes[i]
-                    nj = block_sizes[j]
-                    u = np.arange(block_start[i], block_start[i] + ni)
-                    v = np.arange(block_start[j], block_start[j] + nj)
-                    sub = rng.random((ni, nj)) < p
-                    A[np.ix_(u, v)] = sub.astype(np.float32)
-            if not directed:
-                A = np.triu(A, 1)
-                A = A + A.T
-            if ensure_connected:
-                deg = A.sum(axis=1)
-                isolated = np.where(deg == 0)[0]
-                for v in isolated:
-                    block_v = labels[v]
-                    same_block = np.where(labels == block_v)[0]
-                    same_block = same_block[same_block != v]
-                    if len(same_block) > 0:
-                        u = rng.choice(same_block)
-                        A[v, u] = 1
+                    if ui.size > 0:
+                        rows.extend((u[ui]).tolist())
+                        cols.extend((v[vj]).tolist())
+                        if (not directed) and (j != i):
+                            rows.extend((v[vj]).tolist())
+                            cols.extend((u[ui]).tolist())
+
+        if ensure_connected:
+            if len(rows) == 0:
+                for b in range(k):
+                    if block_sizes[b] >= 2:
+                        a = block_start[b]
+                        bidx = block_start[b] + 1
+                        rows.append(a); cols.append(bidx)
                         if not directed:
-                            A[u, v] = 1
-            adj_torch = torch.tensor(A, dtype=torch.float32, device=device)
+                            rows.append(bidx); cols.append(a)
+            deg = np.zeros(n, dtype=np.int64)
+            if len(rows) > 0:
+                np.add.at(deg, np.asarray(rows, dtype=np.int64), 1)
+                np.add.at(deg, np.asarray(cols, dtype=np.int64), 1)
+            isolated = np.where(deg == 0)[0]
+            for vtx in isolated:
+                block_v = labels[vtx]
+                same_block_start = block_start[block_v]
+                same_block_size = block_sizes[block_v]
+                if same_block_size <= 1:
+                    continue
+                candidates = np.arange(same_block_start, same_block_start + same_block_size, dtype=np.int64)
+                candidates = candidates[candidates != vtx]
+                u_choice = int(rng.choice(candidates))
+                rows.append(int(vtx)); cols.append(u_choice)
+                if not directed:
+                    rows.append(int(u_choice)); cols.append(int(vtx))
 
-        return adj_torch, labels_t
+        saved_path = save_sbm_graph(fname, rows, cols, labels, n, directed=directed, connected=ensure_connected,
+                                   meta={"mode": "static", "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes})
+        return saved_path
 
+    # --- BATCH mode
     elif mode == 'batch':
         if batch_size is None:
-            batch_size = 100
+            batch_size = 10
 
-        def generate_batch(start, end):
-            batch_n = end - start
-            if use_sparse:
-                rows, cols = [], []
-                for i in range(k):
-                    for j in range(k):
-                        p = p_in if i == j else p_out
-                        u_local = np.where(labels[start:end] == i)[0]
-                        v_global = np.arange(block_start[j], block_start[j] + block_sizes[j])
-                        if len(u_local) == 0 or len(v_global) == 0:
-                            continue
-                        mask = rng.random((len(u_local), len(v_global))) < p
-                        ui, vj = np.nonzero(mask)
-                        rows.extend(start + u_local[ui])
-                        cols.extend(v_global[vj])
-                if not directed:
-                    rows = np.concatenate([rows, cols])
-                    cols = np.concatenate([cols, rows[:len(cols)]])
-                values = np.ones(len(rows), dtype=np.float32)
-                adj = torch.sparse_coo_tensor(
-                    torch.tensor([rows, cols]),
-                    torch.tensor(values),
-                    (n, n),
-                    device=device
-                ).coalesce()
-            else:
-                A = np.zeros((batch_n, n), dtype=np.float32)
-                for i in range(k):
-                    for j in range(k):
-                        p = p_in if i == j else p_out
-                        u_idx = np.where(labels[start:end] == i)[0]
-                        v_idx = np.arange(block_start[j], block_start[j] + block_sizes[j])
-                        if len(u_idx) == 0 or len(v_idx) == 0:
-                            continue
-                        sub = rng.random((len(u_idx), len(v_idx))) < p
-                        A[np.ix_(u_idx, v_idx)] = sub.astype(np.float32)
-                if not directed:
-                    A[:, start:end] = np.triu(A[:, start:end], 1)
-                    A[:, start:end] = A[:, start:end] + A[:, start:end].T
-                adj = torch.tensor(A, dtype=torch.float32, device=device)
-            return adj
+        rows = []
+        cols = []
 
-        adj_batches, label_batches = [], []
         for start in range(0, n, batch_size):
             end = min(start + batch_size, n)
-            adj_batches.append(generate_batch(start, end))
-            label_batches.append(labels_t[start:end])
+            batch_labels = labels[start:end]
+            batch_n = end - start
+            for i in range(k):
+                local_idx = np.where(batch_labels == i)[0]
+                if local_idx.size == 0:
+                    continue
+                u_local_global = (start + local_idx).astype(np.int64) 
 
-        return adj_batches, label_batches
+                for j in range(k):
+                    sj = block_start[j]
+                    nj = block_sizes[j]
+                    if nj == 0:
+                        continue
+                    v_global = np.arange(sj, sj + nj, dtype=np.int64)
+
+                    p = p_in if i == j else p_out
+
+                    if not directed and i == j:
+                        mask = rng.random((u_local_global.size, v_global.size)) < p
+                        ui, vj = np.nonzero(mask)
+                        if ui.size > 0:
+                            gu = u_local_global[ui]
+                            gv = v_global[vj]
+                            sel = np.where(gu < gv)[0]
+                            if sel.size > 0:
+                                rows.extend(gu[sel].tolist())
+                                cols.extend(gv[sel].tolist())
+                                rows.extend(gv[sel].tolist())
+                                cols.extend(gu[sel].tolist())
+                    else:
+                        mask = rng.random((u_local_global.size, v_global.size)) < p
+                        ui, vj = np.nonzero(mask)
+                        if ui.size > 0:
+                            rows.extend(u_local_global[ui].tolist())
+                            cols.extend(v_global[vj].tolist())
+                            if not directed and i != j:
+                                rows.extend(v_global[vj].tolist())
+                                cols.extend(u_local_global[ui].tolist())
+
+        if ensure_connected:
+            if len(rows) == 0:
+                for b in range(k):
+                    if block_sizes[b] >= 2:
+                        a = block_start[b]
+                        bidx = block_start[b] + 1
+                        rows.append(a); cols.append(bidx)
+                        if not directed:
+                            rows.append(bidx); cols.append(a)
+
+            deg = np.zeros(n, dtype=np.int64)
+            if len(rows) > 0:
+                np.add.at(deg, np.asarray(rows, dtype=np.int64), 1)
+                np.add.at(deg, np.asarray(cols, dtype=np.int64), 1)
+            isolated = np.where(deg == 0)[0]
+            for vtx in isolated:
+                block_v = labels[vtx]
+                same_block_start = block_start[block_v]
+                same_block_size = block_sizes[block_v]
+                if same_block_size <= 1:
+                    continue
+                candidates = np.arange(same_block_start, same_block_start + same_block_size, dtype=np.int64)
+                candidates = candidates[candidates != vtx]
+                u_choice = int(rng.choice(candidates))
+                rows.append(int(vtx)); cols.append(u_choice)
+                if not directed:
+                    rows.append(int(u_choice)); cols.append(int(vtx))
+
+        saved_path = save_sbm_graph(fname, rows, cols, labels, n, directed=directed, connected=ensure_connected,
+                                   meta={"mode": "batch", "batch_size": batch_size, "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes})
+        return saved_path
 
     else:
         raise ValueError(f"Error mode: {mode}")
+    
 
-
-def generate_temporal_sbm_graph(n, k, p_in, p_out, n_steps=10, drift_prob=0.01, 
-                                edge_persistence=0.9, directed=False, device='cpu',
-                                seed=None, ensure_connected=True
+def generate_temporal_sbm_graph_optimized(
+    n, k, p_in, p_out, n_steps=10, drift_prob=0.01, edge_persistence=0.9,
+    directed=False, device='cpu', seed=None, ensure_connected=True,
+    graph_type='tsbm'
 ):
     """
     Params:
@@ -178,8 +331,8 @@ def generate_temporal_sbm_graph(n, k, p_in, p_out, n_steps=10, drift_prob=0.01,
         sparse_threshold : int
             if n > sparse_threshold → create sparse matrix
     Returns:
-        temporal_adjs: list of tensors [T]
-        temporal_labels: list of tensors [T]
+        temporal_adjs: 3d tensor [n_steps, n, n]
+        temporal_labels: 2d tensor [n_steps, n]
     """
     rng = np.random.default_rng(seed)
 
@@ -187,43 +340,35 @@ def generate_temporal_sbm_graph(n, k, p_in, p_out, n_steps=10, drift_prob=0.01,
     block_sizes = [base_size] * k
     for i in range(n - base_size * k):
         block_sizes[i % k] += 1
+
     labels = np.concatenate([
         np.full(size, i, dtype=np.int64)
         for i, size in enumerate(block_sizes)
     ])
-
-    def gen_adj(labels):
-        A = np.zeros((n, n), dtype=np.float32)
+    def gen_edges_from_labels(labels):
+        rows, cols = [], []
         for i in range(k):
+            u = np.where(labels == i)[0]
             for j in range(k):
-                p = p_in if i == j else p_out
-                u = np.where(labels == i)[0]
                 v = np.where(labels == j)[0]
                 if len(u) == 0 or len(v) == 0:
                     continue
-                sub = rng.random((len(u), len(v))) < p
-                A[np.ix_(u, v)] = sub.astype(np.float32)
-        if not directed:
-            A = np.triu(A, 1)
-            A = A + A.T
-        if ensure_connected:
-            deg = A.sum(axis=1)
-            isolated = np.where(deg == 0)[0]
-            for v in isolated:
-                block_v = labels[v]
-                same_block = np.where(labels == block_v)[0]
-                same_block = same_block[same_block != v]
-                if len(same_block) > 0:
-                    u = rng.choice(same_block)
-                    A[v, u] = 1
-                    if not directed:
-                        A[u, v] = 1
-        return A
+                p = p_in if i == j else p_out
+                mask = rng.random((len(u), len(v))) < p
+                ui, vj = np.nonzero(mask)
+                rows.extend(u[ui])
+                cols.extend(v[vj])
+                if not directed and i != j:
+                    rows.extend(v[vj])
+                    cols.extend(u[ui])
+        mask = np.asarray(rows) != np.asarray(cols)
+        return np.asarray(rows)[mask], np.asarray(cols)[mask]
 
-    A_prev = gen_adj(labels)
-    temporal_adjs = [torch.tensor(A_prev, dtype=torch.float32, device=device)]
-    temporal_labels = [torch.tensor(labels, dtype=torch.long, device=device)]
+    rows, cols = gen_edges_from_labels(labels)
+    edges_per_step = [(rows, cols)]
+    labels_per_step = [labels.copy()]
 
+    prev_edges = set(zip(rows.tolist(), cols.tolist()))
     for t in range(1, n_steps):
         drift_mask = rng.random(n) < drift_prob
         for i in np.where(drift_mask)[0]:
@@ -231,92 +376,155 @@ def generate_temporal_sbm_graph(n, k, p_in, p_out, n_steps=10, drift_prob=0.01,
             new = rng.choice([x for x in range(k) if x != old])
             labels[i] = new
 
-        A_new = A_prev.copy()
+        new_edges = set()
+        for e in prev_edges:
+            if rng.random() < edge_persistence:
+                new_edges.add(e)
 
-        keep_mask = rng.random(A_prev.shape) < edge_persistence
-        A_new = A_new * keep_mask
+        rows_new, cols_new = gen_edges_from_labels(labels)
+        for u, v in zip(rows_new.tolist(), cols_new.tolist()):
+            if rng.random() < (1 - edge_persistence):
+                new_edges.add((u, v))
 
-        for i in range(k):
-            for j in range(k):
-                p = p_in if i == j else p_out
-                u = np.where(labels == i)[0]
-                v = np.where(labels == j)[0]
-                if len(u) == 0 or len(v) == 0:
-                    continue
-                sub_new = rng.random((len(u), len(v))) < p * (1 - edge_persistence)
-                A_new[np.ix_(u, v)] = np.maximum(A_new[np.ix_(u, v)], sub_new.astype(np.float32))
-        
-        if not directed:
-            A_new = np.triu(A_new, 1)
-            A_new = A_new + A_new.T
-        
         if ensure_connected:
-            deg = A_new.sum(axis=1)
+            deg = np.zeros(n, dtype=np.int64)
+            for u, v in new_edges:
+                deg[u] += 1
+                deg[v] += 1
             isolated = np.where(deg == 0)[0]
-            for v in isolated:
-                block_v = labels[v]
+            for vtx in isolated:
+                block_v = labels[vtx]
                 same_block = np.where(labels == block_v)[0]
-                same_block = same_block[same_block != v]
+                same_block = same_block[same_block != vtx]
                 if len(same_block) > 0:
-                    u = rng.choice(same_block)
-                    A_new[v, u] = 1
+                    u_choice = int(rng.choice(same_block))
+                    new_edges.add((vtx, u_choice))
                     if not directed:
-                        A_new[u, v] = 1
+                        new_edges.add((u_choice, vtx))
 
-        A_prev = A_new
-        temporal_adjs.append(torch.tensor(A_new, dtype=torch.float32, device=device))
-        temporal_labels.append(torch.tensor(labels.copy(), dtype=torch.long, device=device))
+        prev_edges = new_edges
+        r, c = zip(*new_edges) if new_edges else ([], [])
+        edges_per_step.append((np.array(r, dtype=np.int64), np.array(c, dtype=np.int64)))
+        labels_per_step.append(labels.copy())
 
-    return temporal_adjs, temporal_labels
+    connected_field = 'conn' if ensure_connected else 'unconn'
+    fname = (
+        f"{graph_type}_{n_steps}s_{n}v_{k}c_"
+        f"{'dir' if directed else 'undir'}_{connected_field}.pt"
+    )
+    meta = dict(
+        graph_type=graph_type,
+        n_steps=n_steps,
+        k=k,
+        p_in=p_in,
+        p_out=p_out,
+        drift_prob=drift_prob,
+        edge_persistence=edge_persistence,
+    )
+
+    path = save_sbm_graph(
+        rows=[r for (r, _) in edges_per_step],
+        cols=[c for (_, c) in edges_per_step],
+        n=n,
+        labels=labels_per_step,
+        fname=fname,
+        meta=meta,
+        temporal=True,
+        directed=directed,
+        connected=ensure_connected
+    )
+    return path
+
+
+def test_sbm_generation_and_visualization():
+    n = 100000          
+    k = 4            
+    p_in = 0.015      
+    p_out = 0.0002     
+
+    start = time.time()
+    path = generate_sbm_graph_universal(
+        n=n, k=k, p_in=p_in, p_out=p_out,
+        directed=False,
+        ensure_connected=True,
+        mode='static',  
+        seed=42
+    )
+    print("Generation time:", round(time.time()-start, 3), "sec")
+    print(f"Saved in: {path}")
+
+    adj, labels = load_sbm_graph(path)
+    print(f"Dim adj: {adj.shape}")
+    print(f"Count of edges: {adj._nnz()}")
+    print(f"Labels: {torch.unique(labels)}")
+
+    assert adj.shape[0] == n and adj.shape[1] == n, "Dim!"
+    assert len(labels) == n, "Len labels!"
+    assert adj.is_coalesced(), "Coalesced!"
+
+    # A_np = adj.to_dense().cpu().numpy()
+    # G = nx.from_numpy_array(A_np)
+    # colors = [plt.cm.tab10(int(c)) for c in labels.cpu().numpy()]
+
+    # plt.figure(figsize=(7, 7))
+    # pos = nx.spring_layout(G, seed=42, k=0.15)
+    # nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=40, alpha=0.8)
+    # nx.draw_networkx_edges(G, pos, alpha=0.3, width=0.5)
+    # plt.title("Stochastic Block Model", fontsize=14)
+    # plt.axis('off')
+    # plt.savefig("graph.png", dpi=150)
+    # plt.close()
+
+def test_temporal_sbm_generation():
+    start = time.time()
+    path = generate_temporal_sbm_graph_optimized(
+        n=100,        
+        k=4,
+        p_in=0.15,
+        p_out=0.01,
+        n_steps=10,
+        drift_prob=0.05,
+        edge_persistence=0.9,
+        directed=False,
+        seed=42,
+        ensure_connected=True,
+        graph_type='tsbmtest'
+    )
+    print("Generation time for temporal:", round(time.time()-start, 3), "sec")
+    print(f"Saved in: {path}")
+
+    temporal_adjs, temporal_labels = load_temporal_sbm_graph(path)
+    print("Dim:")
+    print("  temporal_adjs:", temporal_adjs.shape, "(sparse)")
+    print("  temporal_labels:", temporal_labels.shape)
+
+    n_steps = temporal_labels.shape[0]
+    n = temporal_labels.shape[1]
+    assert n_steps == 10, "Count of steps!"
+    assert n == 100, "Count of nodes!"
+    print("✓ Checks passed")
+
+    for t in [0, 3, 6, 9]:
+        print(f"Visualizing step {t}...")
+        A_t = temporal_adjs[t].to_dense().cpu().numpy()
+        labels_t = temporal_labels[t].cpu().numpy()
+
+        G = nx.from_numpy_array(A_t)
+        colors = [plt.cm.tab10(l % 10 / 10) for l in labels_t]
+
+        plt.figure(figsize=(6, 6))
+        pos = nx.spring_layout(G, seed=42)
+        nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=50)
+        nx.draw_networkx_edges(G, pos, alpha=0.3)
+        plt.title(f"Step {t}")
+        plt.axis("off")
+        plt.savefig(f"graph_temp_{t}.png", dpi=150)
+        plt.close()
+        print(f"Saved graph_temp_{t}.png")
 
 
 
 
-start = time.time()
-adj, labels = generate_sbm_graph_universal(
-    n=200,
-    k=4,
-    p_in=0.08,
-    p_out=0.005,
-    directed=True,
-    seed=42
-)
-print("Generation time:", round(time.time()-start, 3), "sec")
-A_np = adj.cpu().numpy()
-G = nx.from_numpy_array(A_np)
-colors = [plt.cm.tab10(int(c)) for c in labels.cpu().numpy()]
 
-plt.figure(figsize=(7, 7))
-pos = nx.spring_layout(G, seed=42, k=0.15)
-nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=40, alpha=0.8)
-nx.draw_networkx_edges(G, pos, alpha=0.3, width=0.5)
-plt.title("Stochastic Block Model")
-plt.axis('off')
-plt.savefig("graph.png", dpi=150)
-
-start = time.time()
-temporal_adjs, temporal_labels = generate_temporal_sbm_graph(
-    n=500,
-    k=4,
-    p_in=0.08,
-    p_out=0.005,
-    n_steps=10,
-    drift_prob=0.02,         
-    edge_persistence=0.9,    
-    seed=42
-)
-print("Generation time for temporal:", round(time.time()-start, 3), "sec")
-for t in [0, 3, 6, 9]:
-    G = nx.from_numpy_array(temporal_adjs[t].cpu().numpy())
-    labels_t = temporal_labels[t].cpu().numpy()
-    colors = [plt.cm.tab10(l % 10 / 10) for l in labels_t]
-
-    plt.figure(figsize=(6, 6))
-    pos = nx.spring_layout(G, seed=42)
-    nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=50)
-    nx.draw_networkx_edges(G, pos, alpha=0.3)
-    plt.title(f"Step {t}")
-    plt.axis("off")
-    plt.savefig(f"graph_temp_{t}.png", dpi=150)
-    plt.close()
-
+#test_sbm_generation_and_visualization()
+test_temporal_sbm_generation()

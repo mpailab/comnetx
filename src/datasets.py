@@ -8,6 +8,7 @@ import numpy as np
 import scipy.sparse as sp
 import os.path
 from ogb.nodeproppred import PygNodePropPredDataset
+import pickle
 
 import time
 import json
@@ -75,6 +76,19 @@ class Dataset:
                 self._load_npy_format(coo_adj = True)
         elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
+        elif dname.startswith("static") or dname.startswith("stream"):
+            parts = self.name.split("_")
+
+            if dname.startswith("static"):
+                dataset_type = "static"
+            elif dname.startswith("stream"):
+                dataset_type = "stream"
+            num_snapshots = 5 
+            num_nodes = int(parts[2])
+            mu = float(parts[3])
+            beta = float(parts[4])
+            self._load_prgpt_dataset(dataset_type=dataset_type, num_nodes=num_nodes, 
+                                     mu=mu, beta=beta, num_snapshots=num_snapshots)
         else:
             raise ValueError(f"Unsupported dataset: {self.name}")
 
@@ -162,7 +176,84 @@ class Dataset:
             indices = torch.from_numpy(indices_np).long()
             values = torch.from_numpy(values_np).float()
             self.adj = torch.sparse_coo_tensor(indices, values, size=adj_data.shape)
-    
+    def _load_prgpt_dataset(self, dataset_type='static',
+                       num_nodes=10000,
+                       mu=2.5,
+                       beta=3.0,
+                       num_snapshots=5):
+        base_path = self.path
+        # ---------- STATIC ----------
+        if dataset_type == 'static':
+            edges_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
+            gnd_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd_list.pickle')
+
+            with open(edges_path, 'rb') as f:
+                edges_list = pickle.load(f)
+            with open(gnd_path, 'rb') as f:
+                labels_list = pickle.load(f)
+
+            adjs = []
+            all_labels = []
+
+
+            for snap in range(num_snapshots):
+                snap_edges = edges_list[snap]
+                snap_labels = torch.tensor(labels_list[snap], dtype=torch.long)
+                all_labels.append(snap_labels) 
+                edge_index = torch.tensor(snap_edges, dtype=torch.long).t() 
+                values = torch.ones(edge_index.shape[1], dtype=torch.float32)
+                adj_sparse = torch.sparse_coo_tensor(indices=edge_index, values=values,
+                                                     size=(num_nodes, num_nodes), dtype=torch.float32)
+
+                adj_sparse = adj_sparse.coalesce()
+                adj_t = torch.sparse_coo_tensor(indices=adj_sparse.indices().flip(0), 
+                                                values=adj_sparse.values(),
+                                                size=adj_sparse.shape)
+                adj_sparse = (adj_sparse + adj_t).coalesce()
+                adjs.append(adj_sparse)
+
+
+            self.adj = torch.stack(adjs)
+            self.label = torch.stack(all_labels)
+            self.is_directed = False
+
+        # ---------- STREAM (DYNAMIC) ----------
+        elif dataset_type == 'stream':
+            adjs = []
+            all_labels = []
+
+            for snap in range(0, num_snapshots):
+                if snap + 1 == 5:
+                    beta = 1.0
+                edges_path = os.path.join(base_path, f'stream_{snap + 1}_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
+                gnd_path = os.path.join(base_path, f'stream_{snap + 1}_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd.pickle')
+
+                with open(edges_path, 'rb') as f:
+                    snap_edges = pickle.load(f)
+                with open(gnd_path, 'rb') as f:
+                    snap_labels = torch.tensor(pickle.load(f), dtype=torch.long)
+                    all_labels.append(snap_labels)
+                
+                all_edges = np.vstack([np.array(batch) for batch in snap_edges])
+
+                edge_index = torch.tensor(all_edges, dtype=torch.long).t()
+                values = torch.ones(all_edges.shape[0], dtype=torch.float32)
+
+                adj_sparse = torch.sparse_coo_tensor(indices=edge_index, values=values, size=(num_nodes, num_nodes))
+                adj_sparse = adj_sparse.coalesce()
+                adj_t = torch.sparse_coo_tensor(indices=adj_sparse.indices().flip(0),
+                                            values=adj_sparse.values(), size=adj_sparse.shape)
+                adj_sparse = (adj_sparse + adj_t).coalesce()
+
+                adjs.append(adj_sparse)
+
+            self.adj =  torch.stack(adjs)
+            self.label = torch.stack(all_labels)
+            self.is_directed = False
+
+        else:
+            raise ValueError("dataset_type must be'static' or 'stream'.")
+
     def _load_konect(self, batches_num = 1):
         """
         Load dynamic dataset from KONECT collection
