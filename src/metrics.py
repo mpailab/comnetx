@@ -164,7 +164,7 @@ class Metrics:
             
             modularity = ((weight - B) * same_comm.float()).sum() * inv_m   
             
-            return modularity
+            return modularity.item()
 
         elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
             degrees = tf.sparse.reduce_sum(adjacency, axis=0)

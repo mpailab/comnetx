@@ -119,7 +119,7 @@ print(communities[0])
 
 A = SparseTensor.from_dense(A_dense) 
 Q_my = Metrics.modularity(A, communities[0].float(), directed=True)
-print(f"Модулярность: {Q_my}")
+print(f"Модулярность: {type(Q_my)}")
 
 C_dense = torch.tensor(
         [[1, 0, 1, 0],
