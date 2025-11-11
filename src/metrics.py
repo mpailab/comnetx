@@ -140,24 +140,15 @@ class Metrics:
                 row, col = adjacency.indices()
                 weight = adjacency.values()
 
-            if directed:
-                k_out = sum_along_dim(adjacency, dim=1).to_dense()
-                k_in = sum_along_dim(adjacency, dim=0).to_dense()
-                m = weight.sum()
-            else:
-                k = sum_along_dim(adjacency, dim=1).to_dense()
-                m = weight.sum() / 2
+            k_out = sum_along_dim(adjacency, dim=1).to_dense()
+            k_in = sum_along_dim(adjacency, dim=0).to_dense()
+            m = weight.sum()
+            B = gamma * (k_out[row] * k_in[col]) / m
+            # print(type(k_out), type(k_in), type(weight), type(row), type(col), type(B))
 
             same_comm = (assignments[row] == assignments[col])
 
-            if directed:
-                B = gamma * (k_out[row] * k_in[col]) / (2 * m)
-                inv_m = 1.0 / (2 * m)
-            else:
-                B = gamma * (k[row] * k[col]) / (2 * m)
-                inv_m = 1.0 / (2 * m)
-            
-            modularity = ((weight - B) * same_comm.float()).sum() * inv_m   
+            modularity = ((weight - B) * same_comm.float()).sum() / m  
             
             return modularity.item()
 
