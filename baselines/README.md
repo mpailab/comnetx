@@ -20,3 +20,9 @@ https://github.com/vtraag/leidenalg
 
 MAGI
 https://github.com/EdisonLeeeee/MAGI.git
+
+MFC-TopoReg
+https://github.com/kundtx/MFC-TopoReg
+
+FLMIF_algorithm
+https://github.com/salahinfo/FLMIG_algorithm
