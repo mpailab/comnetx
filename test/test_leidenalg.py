@@ -8,7 +8,7 @@ import igraph as ig
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
-from baselines.leidenalg import sparse_tensor_to_igraph, leidenalg_partition
+from baselines.leiden import sparse_tensor_to_igraph, leidenalg_partition
 from datasets import Dataset, KONECT_PATH
 
 @pytest.fixture(scope="class")

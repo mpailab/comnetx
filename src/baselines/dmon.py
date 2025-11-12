@@ -1,3 +1,4 @@
+import argparse
 from typing import Tuple
 import sys
 from absl import app
@@ -38,7 +39,7 @@ from graph_embedding.dmon import gcn
 from graph_embedding.dmon import metrics
 from graph_embedding.dmon import utils
 
-from metrics import Metrics
+#from metrics import Metrics
 
 
 def copy_sparse_tensor(sparse_tensor):
@@ -309,3 +310,21 @@ def adapted_dmon_internal(adj: torch.Tensor, ftrs: torch.Tensor, lbls: torch.Ten
     clusters = assignments.argmax(axis=1)
     return clusters
   
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--adj", required=True)
+    parser.add_argument("--features", required=True)
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
+
+    adj = torch.load(args.adj)
+    features = torch.load(args.features)
+
+    new_labels = adapted_dmon(adj, features, _n_epochs=args.epochs)
+
+    torch.save(new_labels, args.out)
+    print("DMON finished successfully")
+
+if __name__ == "__main__":
+    main()

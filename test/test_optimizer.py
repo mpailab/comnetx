@@ -20,6 +20,19 @@ import sparse
 #     true_res = torch.tensor([[9, 0], [1, 1]])
 #     assert torch.equal(true_res, res)
 
+
+def get_all_datasets():
+    """
+    Сreate dict with all datasets in test directory.
+    """
+    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    datasets = {}
+    if os.path.isdir(base_dir):
+        for name in os.listdir(base_dir):
+            if os.path.isdir(base_dir):
+                datasets[name] = base_dir
+    return datasets
+
 @pytest.mark.short
 def test_aggregate_2():
     adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.float).to_sparse()

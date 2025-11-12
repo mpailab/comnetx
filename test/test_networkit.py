@@ -7,7 +7,7 @@ import networkit
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
-from baselines.networkit import sparse_tensor_to_networkit, networkit_partition
+from baselines.network import sparse_tensor_to_networkit, networkit_partition
 from datasets import Dataset
 
 @pytest.mark.short
