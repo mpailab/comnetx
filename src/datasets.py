@@ -50,7 +50,8 @@ class Dataset:
 
         with open(os.path.join(INFO, "all.json")) as _:
             info = json.load(_)
-        magi_datasets = {"cora", "citeseer", "pubmed", "reddit", "ogbn-arxiv", "ogbn-products", "ogbn-papers100M", "amazon-photo", "amazon-computers"}
+        with open(os.path.join(INFO, "magi.json")) as _:
+                magi_info = json.load(_)
         
         dname = self.name.lower()
         if self.name in info:
@@ -60,7 +61,8 @@ class Dataset:
                 self.adj = self.adj[0]
             else:
                 self._load_konect(batches_num = batches)
-        elif dname in magi_datasets:
+        elif dname in magi_info:
+            self.is_directed = magi_info[dname]['d'] == 'directed'
             download_flag = False
             for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"}:
                 if not os.path.isfile(os.path.join(self.path, dname, filename)):
