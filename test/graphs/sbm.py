@@ -6,10 +6,6 @@ import time
 import os
 
 
-def _ensure_sbm_dir():
-    d = os.path.join(os.getcwd(), "sbm")
-    os.makedirs(d, exist_ok=True)
-    return d
 def save_sbm_graph(rows, cols, n, labels, fname, meta=None, temporal=False, directed=False, connected=True):
     """
     Save graph (edge list) and labels in .pt file
@@ -59,7 +55,7 @@ def load_sbm_graph(fname, device='cpu'):
     data = torch.load(fname, map_location='cpu')  # load on cpu
     rows = np.asarray(data["rows"], dtype=np.int64)
     cols = np.asarray(data["cols"], dtype=np.int64)
-    n = int(data["n"])
+    n = int(data["meta"]["n"])
     if rows.size == 0:
         indices = torch.empty((2, 0), dtype=torch.long)
         values = torch.empty((0,), dtype=torch.float32)
@@ -91,17 +87,18 @@ def load_temporal_sbm_graph(path, device='cpu'):
 
     adjs = []
     for rows, cols in zip(rows_list, cols_list):
+
+        rows = np.asarray(rows, dtype=np.int64)
+        cols = np.asarray(cols, dtype=np.int64)
+
         if len(rows) == 0:
-            adj_t = torch.sparse_coo_tensor(
-                torch.zeros((2, 0), dtype=torch.long),
-                torch.zeros(0, dtype=torch.float32),
-                (n, n),
-                device=device
-            )
+            indices = torch.empty((2, 0), dtype=torch.long, device=device)
+            values = torch.empty((0,), dtype=torch.float32, device=device)
         else:
-            indices = torch.tensor([rows, cols], dtype=torch.long, device=device)
+            idx_np = np.vstack([rows, cols])          # shape (2, E)
+            indices = torch.from_numpy(idx_np).long().to(device)
             values = torch.ones(len(rows), dtype=torch.float32, device=device)
-            adj_t = torch.sparse_coo_tensor(indices, values, (n, n), device=device).coalesce()
+        adj_t = torch.sparse_coo_tensor(indices, values, (n, n), device=device).coalesce()
         adjs.append(adj_t)
     temporal_adjs = torch.stack(adjs, dim=0)
     temporal_labels = torch.stack(labels_list, dim=0).to(device)
@@ -110,8 +107,7 @@ def load_temporal_sbm_graph(path, device='cpu'):
 
 def generate_sbm_graph_universal(n, k, p_in, p_out, 
                        batch_size=None, directed=False, device='cpu', seed=None, 
-                       ensure_connected=True, mode='auto', sparse_threshold=50000,
-                       graph_type='sbm'
+                       ensure_connected=True, mode='auto', graph_type='sbm'
 ):
     """
     Params:
@@ -124,8 +120,6 @@ def generate_sbm_graph_universal(n, k, p_in, p_out,
         seed : int | None
         ensure_connected (bool): delete isolated nodes
         mode (str): 'static', 'batch' or 'auto' 
-        sparse_threshold : int
-            if n > sparse_threshold → create sparse matrix
     Returns:
         if mode='static'  (adj, labels)
         if mode='batch'  (adj_batches, label_batches)
@@ -183,6 +177,7 @@ def generate_sbm_graph_universal(n, k, p_in, p_out,
                         cols.extend(v[vj].tolist())
                         rows.extend(v[vj].tolist())
                         cols.extend(u[ui].tolist())
+
                 else:
                     mask = rng.random((ni, nj)) < p
                     ui, vj = np.nonzero(mask)
@@ -219,9 +214,9 @@ def generate_sbm_graph_universal(n, k, p_in, p_out,
                 rows.append(int(vtx)); cols.append(u_choice)
                 if not directed:
                     rows.append(int(u_choice)); cols.append(int(vtx))
-
-        saved_path = save_sbm_graph(fname, rows, cols, labels, n, directed=directed, connected=ensure_connected,
-                                   meta={"mode": "static", "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes})
+        saved_path = save_sbm_graph(rows=rows, cols=cols, n=n, labels=labels, fname=fname,
+                                    meta={"mode": "static", "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes},
+                                    directed=directed, connected=ensure_connected)
         return saved_path
 
     # --- BATCH mode
@@ -301,8 +296,9 @@ def generate_sbm_graph_universal(n, k, p_in, p_out,
                 if not directed:
                     rows.append(int(u_choice)); cols.append(int(vtx))
 
-        saved_path = save_sbm_graph(fname, rows, cols, labels, n, directed=directed, connected=ensure_connected,
-                                   meta={"mode": "batch", "batch_size": batch_size, "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes})
+        saved_path = save_sbm_graph(rows=rows, cols=cols, n=n, labels=labels, fname=fname,
+                                    meta={"mode": "batch", "batch_size": batch_size, "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes},
+                                    directed=directed, connected=ensure_connected)
         return saved_path
 
     else:
@@ -316,7 +312,7 @@ def generate_temporal_sbm_graph_optimized(
 ):
     """
     Params:
-         n : int nodes
+        n : int nodes
         k : int communities
         p_in : float probability of edge within community
         p_out : float probability of edge between communities
@@ -328,8 +324,6 @@ def generate_temporal_sbm_graph_optimized(
         seed : int | None
         ensure_connected (bool): delete isolated nodes
         mode (str): 'static', 'batch' or 'auto' 
-        sparse_threshold : int
-            if n > sparse_threshold → create sparse matrix
     Returns:
         temporal_adjs: 3d tensor [n_steps, n, n]
         temporal_labels: 2d tensor [n_steps, n]
@@ -345,7 +339,7 @@ def generate_temporal_sbm_graph_optimized(
         np.full(size, i, dtype=np.int64)
         for i, size in enumerate(block_sizes)
     ])
-    def gen_edges_from_labels(labels):
+    def gen_edges(labels):
         rows, cols = [], []
         for i in range(k):
             u = np.where(labels == i)[0]
@@ -358,34 +352,48 @@ def generate_temporal_sbm_graph_optimized(
                 ui, vj = np.nonzero(mask)
                 rows.extend(u[ui])
                 cols.extend(v[vj])
-                if not directed and i != j:
-                    rows.extend(v[vj])
-                    cols.extend(u[ui])
-        mask = np.asarray(rows) != np.asarray(cols)
-        return np.asarray(rows)[mask], np.asarray(cols)[mask]
+        rows = np.array(rows, dtype=np.int64)
+        cols = np.array(cols, dtype=np.int64)
 
-    rows, cols = gen_edges_from_labels(labels)
+        # Remove self-loops
+        mask = rows != cols
+        rows, cols = rows[mask], cols[mask]
+
+        if not directed:
+            # Mirror edges and remove duplicates
+            mirrored = np.vstack([cols, rows])
+            combined = np.hstack([np.vstack([rows, cols]), mirrored])
+            combined = np.unique(combined, axis=1)
+            rows, cols = combined[0], combined[1]
+
+        return rows, cols
+
+    # --- initial snapshot
+    rows, cols = gen_edges(labels)
     edges_per_step = [(rows, cols)]
     labels_per_step = [labels.copy()]
-
     prev_edges = set(zip(rows.tolist(), cols.tolist()))
+
     for t in range(1, n_steps):
+        # --- node drift
         drift_mask = rng.random(n) < drift_prob
         for i in np.where(drift_mask)[0]:
             old = labels[i]
-            new = rng.choice([x for x in range(k) if x != old])
-            labels[i] = new
+            labels[i] = rng.choice([x for x in range(k) if x != old])
 
+        # --- edge persistence
         new_edges = set()
-        for e in prev_edges:
+        for u, v in prev_edges:
             if rng.random() < edge_persistence:
-                new_edges.add(e)
+                new_edges.add((u, v))
 
-        rows_new, cols_new = gen_edges_from_labels(labels)
-        for u, v in zip(rows_new.tolist(), cols_new.tolist()):
+        # --- new edges according to SBM
+        rows_new, cols_new = gen_edges(labels)
+        for u, v in zip(rows_new, cols_new):
             if rng.random() < (1 - edge_persistence):
                 new_edges.add((u, v))
 
+        # --- ensure connectedness
         if ensure_connected:
             deg = np.zeros(n, dtype=np.int64)
             for u, v in new_edges:
@@ -393,8 +401,7 @@ def generate_temporal_sbm_graph_optimized(
                 deg[v] += 1
             isolated = np.where(deg == 0)[0]
             for vtx in isolated:
-                block_v = labels[vtx]
-                same_block = np.where(labels == block_v)[0]
+                same_block = np.where(labels == labels[vtx])[0]
                 same_block = same_block[same_block != vtx]
                 if len(same_block) > 0:
                     u_choice = int(rng.choice(same_block))
@@ -402,29 +409,36 @@ def generate_temporal_sbm_graph_optimized(
                     if not directed:
                         new_edges.add((u_choice, vtx))
 
+        # --- mirror undirected edges
+        if not directed:
+            mirrored = {(v, u) for u, v in new_edges}
+            new_edges.update(mirrored)
+
+        # --- finalize snapshot
         prev_edges = new_edges
-        r, c = zip(*new_edges) if new_edges else ([], [])
-        edges_per_step.append((np.array(r, dtype=np.int64), np.array(c, dtype=np.int64)))
+        if new_edges:
+            r, c = zip(*new_edges)
+            r = np.array(r, dtype=np.int64)
+            c = np.array(c, dtype=np.int64)
+        else:
+            r = np.array([], dtype=np.int64)
+            c = np.array([], dtype=np.int64)
+
+        edges_per_step.append((r, c))
         labels_per_step.append(labels.copy())
 
+
     connected_field = 'conn' if ensure_connected else 'unconn'
-    fname = (
-        f"{graph_type}_{n_steps}s_{n}v_{k}c_"
-        f"{'dir' if directed else 'undir'}_{connected_field}.pt"
-    )
+    fname = f"{graph_type}_{n_steps}s_{n}v_{k}c_{'dir' if directed else 'undir'}_{connected_field}.pt"
     meta = dict(
-        graph_type=graph_type,
-        n_steps=n_steps,
-        k=k,
-        p_in=p_in,
-        p_out=p_out,
-        drift_prob=drift_prob,
-        edge_persistence=edge_persistence,
+        graph_type=graph_type, n_steps=n_steps, k=k,
+        p_in=p_in, p_out=p_out, drift_prob=drift_prob,
+        edge_persistence=edge_persistence
     )
 
     path = save_sbm_graph(
-        rows=[r for (r, _) in edges_per_step],
-        cols=[c for (_, c) in edges_per_step],
+        rows=[r for r, _ in edges_per_step],
+        cols=[c for _, c in edges_per_step],
         n=n,
         labels=labels_per_step,
         fname=fname,
@@ -437,7 +451,7 @@ def generate_temporal_sbm_graph_optimized(
 
 
 def test_sbm_generation_and_visualization():
-    n = 100000          
+    n = 100          
     k = 4            
     p_in = 0.015      
     p_out = 0.0002     
@@ -445,10 +459,9 @@ def test_sbm_generation_and_visualization():
     start = time.time()
     path = generate_sbm_graph_universal(
         n=n, k=k, p_in=p_in, p_out=p_out,
-        directed=False,
-        ensure_connected=True,
-        mode='static',  
-        seed=42
+        directed=False, seed = 42,
+        ensure_connected=True, mode = 'static',
+        graph_type='sbm'
     )
     print("Generation time:", round(time.time()-start, 3), "sec")
     print(f"Saved in: {path}")
@@ -488,7 +501,7 @@ def test_temporal_sbm_generation():
         directed=False,
         seed=42,
         ensure_connected=True,
-        graph_type='tsbmtest'
+        graph_type='tsbm'
     )
     print("Generation time for temporal:", round(time.time()-start, 3), "sec")
     print(f"Saved in: {path}")
@@ -502,7 +515,6 @@ def test_temporal_sbm_generation():
     n = temporal_labels.shape[1]
     assert n_steps == 10, "Count of steps!"
     assert n == 100, "Count of nodes!"
-    print("✓ Checks passed")
 
     for t in [0, 3, 6, 9]:
         print(f"Visualizing step {t}...")

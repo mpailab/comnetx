@@ -12,6 +12,7 @@ from datasets import Dataset, KONECT_PATH
 
 TEST_DIR = os.path.dirname(__file__)
 GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "small")
+SBM_GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "sbm")
 PRGPT_DIR = os.path.abspath(os.path.join(TEST_DIR, "..", "baselines", "PRGPT", "data"))
 
 @pytest.fixture
@@ -168,17 +169,15 @@ def test_load_prgpt_stream_dataset():
     )
     adj, features, labels = ds.load(tensor_type="coo")
 
-    # --- базовые проверки ---
-    assert isinstance(ds.adj, torch.Tensor), "adj должен быть torch.Tensor"
-    assert ds.adj.is_sparse, "adj должен быть sparse COO"
+    assert isinstance(ds.adj, torch.Tensor), "adj must be torch.Tensor"
+    assert ds.adj.is_sparse, "adj must be sparse COO"
     assert ds.label is not None and isinstance(ds.label, torch.Tensor)
-    assert ds.label.shape[0] == len(ds.adj), "Количество снапшотов должно совпадать с длиной label"
+    assert ds.label.shape[0] == len(ds.adj), "Count of snaps must be equal to len(label)"
     n = ds.adj.shape[1]
-    assert ds.adj.shape[1] == ds.adj.shape[2], "Матрицы должны быть квадратными"
-    assert ds.label.shape[1] == n, "Размерность label должна совпадать с n"
+    assert ds.adj.shape[1] == ds.adj.shape[2], "Matrix must be nxn"
+    assert ds.label.shape[1] == n, "Dim label = n"
     assert ds.is_directed is False
 
-    # --- проверка симметрии каждого снапшота ---
     for snap in range(len(ds.adj)):
         adj_snap = ds.adj[snap].coalesce()
         adj_t = torch.sparse_coo_tensor(
@@ -189,4 +188,70 @@ def test_load_prgpt_stream_dataset():
 
         diff = (adj_snap - adj_t).coalesce()
         nnz_nonzero = (diff.values() != 0).sum().item()
-        assert nnz_nonzero == 0, f"Снапшот {snap} несимметричен, nnz={nnz_nonzero}"
+        assert nnz_nonzero == 0, f"Snap {snap} not symmetric, nnz={nnz_nonzero}"
+
+@pytest.mark.short
+def test_load_sbm_static_dataset():
+    path = SBM_GRAPHS_DIR
+    ds = Dataset(
+        dataset_name="sbm_0b_100v_4c_undir_conn",
+        path=path
+    )
+
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    assert adj is not None, "adj is None"
+    assert labels is not None, "labels is None"
+
+    assert isinstance(adj, torch.Tensor)
+    assert adj.is_sparse, "Adjacency must be sparse COO"
+    assert adj.is_coalesced(), "Sparse COO must be coalesced"
+
+    assert ds.is_directed in [True, False], "Incorrect directed flag"
+
+    n = adj.shape[0]
+    assert adj.shape == (n, n), "Wrong shape for static SBM"
+
+    if not ds.is_directed:
+        A = adj.to_dense()
+        assert torch.allclose(A, A.T), "Undirected graph must be symmetric"
+
+    assert labels.dtype == torch.long
+    assert labels.shape[0] == n, "Labels must be of shape [n]"
+    assert features is None
+
+@pytest.mark.short
+def test_load_sbm_temporal_dataset():
+    path = SBM_GRAPHS_DIR
+
+    ds = Dataset(
+        dataset_name="tsbm_10s_100v_4c_undir_conn",
+        path=path
+    )
+
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    assert adj is not None, "adj is None"
+    assert labels is not None, "labels is None"
+
+    assert isinstance(adj, torch.Tensor)
+    assert adj.is_sparse, "Temporal adjacency should be sparse COO"
+    assert adj.is_coalesced()
+
+    assert adj.dim() == 3, "Temporal SBM must be 3D tensor"
+    T, n, n2 = adj.shape
+    assert n == n2, "Adj must be square"
+    assert T > 1, "Temporal SBM must have multiple snapshots"
+
+    assert labels.shape == (T, n)
+    assert labels.dtype == torch.long
+
+    if not ds.is_directed:
+        dense = adj.to_dense()
+        for t in range(T):
+            A = dense[t]
+            assert torch.allclose(A, A.T), f"Snapshot {t} must be symmetric for undirected"
+
+    assert adj.is_coalesced(), "Temporal adjacency must be coalesced"
+
+    assert features is None
