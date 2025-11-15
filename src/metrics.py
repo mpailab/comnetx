@@ -92,36 +92,7 @@ class Metrics:
 
             return communities
 
-        if isinstance(adjacency, SparseTensor) and isinstance(assignments, torch.Tensor) and assignments.dim()==2:
-            degrees = adjacency.sum(dim=1)
-            m = degrees.sum()
-            if not directed:
-                m = m / 2
-            inv_2m = 1.0 / (2 * m)
-            degrees.view(-1, 1)
-            a_s = adjacency.matmul(assignments)
-            graph_pooled = torch.matmul(a_s.t(), assignments)
-            s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
-            modularity = (graph_pooled.diag().sum() - normalizer) * inv_2m
-            # modularity = torch.trace(graph_pooled - normalizer) * inv_2m
-            return modularity.item()
-        elif isinstance(adjacency, torch.Tensor) and isinstance(assignments, torch.Tensor) and assignments.dim()==2:
-            degrees = torch.sparse.sum(adjacency, dim=1).to_dense().view(-1, 1)
-            m = degrees.sum()
-            if not directed:
-                m = m / 2
-            inv_2m = 1.0 / (2 * m)
-            a_s = torch.sparse.mm(adjacency, assignments)
-            graph_pooled = torch.matmul(a_s.t(), assignments)
-            s_d = torch.matmul(assignments.t(), degrees)
-            normalizer = torch.matmul(s_d, s_d.t()) * inv_2m * gamma
-            modularity = (graph_pooled.diag().sum() - normalizer.diag().sum()) * inv_2m
-            return modularity.item()
-        
-        elif isinstance(assignments, torch.Tensor) and assignments.dim()==1:
-
-            def sum_along_dim(A, dim):
+        def sum_along_dim(A, dim):
                 if isinstance(A, SparseTensor):
                     return A.sum(dim=dim)
                 elif A.is_sparse:
@@ -129,6 +100,7 @@ class Metrics:
                 else:
                     return A.sum(dim=dim)
 
+        def mod(adjacency, assignments, gamma):
             if isinstance(adjacency, SparseTensor):
                 row, col, weight = adjacency.coo()
             elif adjacency.is_sparse:
@@ -139,20 +111,42 @@ class Metrics:
                 adjacency = adjacency.to_sparse()
                 row, col = adjacency.indices()
                 weight = adjacency.values()
+                
 
             k_out = sum_along_dim(adjacency, dim=1).to_dense()
             k_in = sum_along_dim(adjacency, dim=0).to_dense()
             m = weight.sum()
+
             B = gamma * (k_out[row] * k_in[col]) / m
-            # print(type(k_out), type(k_in), type(weight), type(row), type(col), type(B))
+            # print("k,k,r,c,m", k_out, k_in, row, col, m)
+            # print("k_o=", k_out[row], "k_i=", k_in[col])
 
             same_comm = (assignments[row] == assignments[col])
+
+            # print("Same coms:", same_comm, same_comm.shape)
+            # print("weight", weight)
+            # print("ASSIGNMENST:", assignments, assignments.shape)
 
             modularity = ((weight - B) * same_comm.float()).sum() / m  
             
             return modularity.item()
 
+        if ((isinstance(adjacency, SparseTensor) or isinstance(adjacency, torch.Tensor)) 
+            and isinstance(assignments, torch.Tensor) and assignments.dim()==1):
+            # main part
+            return mod(adjacency, assignments, gamma)
+            
+
+        elif ((isinstance(adjacency, SparseTensor) or isinstance(adjacency, torch.Tensor))
+               and isinstance(assignments, torch.Tensor) and assignments.dim()==2):
+            # second part
+            max_indices = torch.argmax(assignments, dim=1)
+            assignments = torch.nn.functional.one_hot(max_indices, num_classes=assignments.size(1))
+            assignments = create_sparse_community(assignments.T)
+            return mod(adjacency, assignments, gamma)
+
         elif isinstance(adjacency, tf.sparse.SparseTensor) and isinstance(assignments, tf.Tensor):
+            # second-second part
             degrees = tf.sparse.reduce_sum(adjacency, axis=0)
             m = tf.reduce_sum(degrees)
             if not directed:
