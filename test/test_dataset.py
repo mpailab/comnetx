@@ -170,25 +170,33 @@ def test_load_prgpt_stream_dataset():
     adj, features, labels = ds.load(tensor_type="coo")
 
     assert isinstance(ds.adj, torch.Tensor), "adj must be torch.Tensor"
-    assert ds.adj.is_sparse, "adj must be sparse COO"
-    assert ds.label is not None and isinstance(ds.label, torch.Tensor)
-    assert ds.label.shape[0] == len(ds.adj), "Count of snaps must be equal to len(label)"
-    n = ds.adj.shape[1]
-    assert ds.adj.shape[1] == ds.adj.shape[2], "Matrix must be nxn"
-    assert ds.label.shape[1] == n, "Dim label = n"
+    assert ds.adj.layout == torch.sparse_coo, "adj must be sparse COO"
+    assert isinstance(ds.label, torch.Tensor), "labels must be torch.Tensor"
+
+    assert ds.adj.dim() == 4, "adj must be 4D tensor [snap, batch, n, n]"
+
+    num_snaps, num_batches, n1, n2 = ds.adj.shape
+
+    assert n1 == n2, "Adjacency matrices must be square"
+    assert ds.label.shape == (num_snaps, n1), "Label must be [snap, n]"
     assert ds.is_directed is False
 
-    for snap in range(len(ds.adj)):
-        adj_snap = ds.adj[snap].coalesce()
-        adj_t = torch.sparse_coo_tensor(
-            indices=adj_snap.indices().flip(0),
-            values=adj_snap.values(),
-            size=adj_snap.shape
-        ).coalesce()
-
-        diff = (adj_snap - adj_t).coalesce()
-        nnz_nonzero = (diff.values() != 0).sum().item()
-        assert nnz_nonzero == 0, f"Snap {snap} not symmetric, nnz={nnz_nonzero}"
+    for snap in range(num_snaps):
+        for batch in range(num_batches):
+            adj_sb = ds.adj[snap, batch].coalesce()
+            adj_t = torch.sparse_coo_tensor(
+                indices=adj_sb.indices().flip(0),
+                values=adj_sb.values(),
+                size=adj_sb.shape
+            ).coalesce()
+            diff = (adj_sb - adj_t).coalesce()
+            if diff._nnz() > 0:
+                nonzero_count = (diff.values() != 0).sum().item()
+            else:
+                nonzero_count = 0
+            assert nonzero_count == 0, (
+                f"Snap {snap}, batch {batch} is not symmetric: nnz={nonzero_count}"
+            )
 
 @pytest.mark.short
 def test_load_sbm_static_dataset():

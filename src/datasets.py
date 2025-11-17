@@ -223,36 +223,48 @@ class Dataset:
 
         # ---------- STREAM (DYNAMIC) ----------
         elif dataset_type == 'stream':
-            adjs = []
-            all_labels = []
+            all_snaps_adj = []      
+            all_snaps_labels = []   
 
-            for snap in range(0, num_snapshots):
-                if snap + 1 == 5:
-                    beta = 1.0
-                edges_path = os.path.join(base_path, f'stream_{snap + 1}_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
-                gnd_path = os.path.join(base_path, f'stream_{snap + 1}_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd.pickle')
+            for snap in range(num_snapshots):
+                beta_eff = 1.0 if snap + 1 == 5 else beta
+                edges_path = os.path.join(base_path,
+                                          f"stream_{snap+1}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_edges_list.pickle")
+                gnd_path = os.path.join(base_path,
+                                    f"stream_{snap+1}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_gnd.pickle")
 
-                with open(edges_path, 'rb') as f:
-                    snap_edges = pickle.load(f)
-                with open(gnd_path, 'rb') as f:
+                with open(edges_path, "rb") as f:
+                    snap_edges_list = pickle.load(f)        
+                with open(gnd_path, "rb") as f:
                     snap_labels = torch.tensor(pickle.load(f), dtype=torch.long)
-                    all_labels.append(snap_labels)
-                
-                all_edges = np.vstack([np.array(batch) for batch in snap_edges])
 
-                edge_index = torch.tensor(all_edges, dtype=torch.long).t()
-                values = torch.ones(all_edges.shape[0], dtype=torch.float32)
+                all_snaps_labels.append(snap_labels)
 
-                adj_sparse = torch.sparse_coo_tensor(indices=edge_index, values=values, size=(num_nodes, num_nodes))
-                adj_sparse = adj_sparse.coalesce()
-                adj_t = torch.sparse_coo_tensor(indices=adj_sparse.indices().flip(0),
-                                            values=adj_sparse.values(), size=adj_sparse.shape)
-                adj_sparse = (adj_sparse + adj_t).coalesce()
+                num_batches = len(snap_edges_list)          
+                snap_adj_list = []                          
 
-                adjs.append(adj_sparse)
+                for batch_edges in snap_edges_list:
+                    batch_edges_np = np.array(batch_edges, dtype=np.int64)
+                    if batch_edges_np.ndim != 2 or batch_edges_np.shape[1] != 2:
+                        raise ValueError(f"Wrong format for batch_edges: {batch_edges_np.shape}")
 
-            self.adj =  torch.stack(adjs)
-            self.label = torch.stack(all_labels)
+                    edge_index = torch.from_numpy(batch_edges_np).long().t()
+                    values = torch.ones(edge_index.shape[1], dtype=torch.float32)
+                    # sparse adjacency
+                    A = torch.sparse_coo_tensor(indices=edge_index, values=values, 
+                                                size=(num_nodes, num_nodes)).coalesce()
+
+                    A_t = torch.sparse_coo_tensor(indices=A.indices().flip(0), values=A.values(), 
+                                                  size=A.size()).coalesce()
+
+                    A = (A + A_t).coalesce()
+                    snap_adj_list.append(A)
+
+                snap_adj_tensor = torch.stack(snap_adj_list)
+                all_snaps_adj.append(snap_adj_tensor)
+
+            self.adj = torch.stack(all_snaps_adj)
+            self.label = torch.stack(all_snaps_labels)
             self.is_directed = False
 
         else:
