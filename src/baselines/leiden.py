@@ -15,7 +15,7 @@ def sparse_tensor_to_igraph(sparse_tensor, directed=True):
 
 def leidenalg_partition(adj : torch.Tensor):
     G = sparse_tensor_to_igraph(adj.to_sparse())
-    part = la.find_partition(G, la.ModularityVertexPartition)
+    part = la.find_partition(G, la.ModularityVertexPartition, seed=True, n_iterations=2)
     return torch.tensor(part.membership, dtype=torch.long)
 
 def main():
