@@ -25,8 +25,10 @@ class Metrics:
         """
 
         adjacency = adjacency.coalesce()
+        device = adjacency.device
         row, col = adjacency.indices()
         weight = adjacency.values()  
+        assignments = assignments.to(device=device, dtype=torch.long)
 
         d_out = torch.sparse.sum(adjacency, dim=1).to_dense()
         d_in = torch.sparse.sum(adjacency, dim=0).to_dense()
