@@ -15,18 +15,17 @@ datasets_3 = ['radoslaw_email', 'munmun_digg_reply', 'topology']
 bad_datasets = ['wiki_talk_el', 'slashdot-threads', 'wiki_talk_sk', 'wiki_talk_bn', 'wiki_talk_lv', 'wiki_talk_eu', 'facebook-wosn-links', 'wiki_talk_sr']
 datasets = datasets_1 + datasets_2 + datasets_3
 
-@pytest.mark.debug
+@pytest.mark.short
 def test_modularity():
     with open(os.path.join(INFO, "modularity.json")) as _:
          true_mod_db = json.load(_)
     with open(os.path.join(INFO, "all.json")) as _:
         info = json.load(_)
-    datasets = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
-    restriction = 1100000
-    datasets = list(filter(lambda dataset: int(info[dataset]["m"]) < restriction, datasets))
-    datasets.sort(key = lambda x: info[x]["m"])
-
-    print("Number of datasets:", len(datasets))
+    # datasets = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
+    # restriction = 100000
+    # datasets = list(filter(lambda dataset: int(info[dataset]["m"]) < restriction, datasets))
+    # datasets.sort(key = lambda x: info[x]["m"])
+    datasets = datasets_1
     
     print("Dataset (is_directed) : Modularity (True modularity)")
     for dataset in datasets:
@@ -35,8 +34,8 @@ def test_modularity():
         true_mod = true_mod_db[dataset]
         is_directed = info[dataset]["d"]
         print(f"{dataset} ({is_directed}): {mod:.4} (true - {true_mod:.4})")
-        #assert mod < true_mod * 1.1
-        #assert mod > true_mod * 0.8
+        assert mod < true_mod * 1.1
+        assert mod > true_mod * 0.9
 
 @pytest.mark.long    
 def test_modularity_memory():
