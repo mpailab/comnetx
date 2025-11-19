@@ -33,7 +33,7 @@ jobs:
           pip install torch-sparse -f https://data.pyg.org/whl/torch-2.3.0+cpu.html
           # TensorFlow CPU from wheel
           pip install --only-binary=:all: 'tensorflow==2.15.0'
-          pip install psutil
+          pip install psutil, pyinstrument
 
       - name: Run unit tests
         env:
