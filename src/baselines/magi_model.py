@@ -263,11 +263,8 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
         else:
             assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
         """
-        assignments = torch.nn.functional.one_hot(
-                        torch.as_tensor(pred_labels, device=device, dtype=torch.int64),
-                        num_classes=k).float()
-        coo = adj_sparse.coo()
-        row, col, val = coo
+        
+        row, col, val = adj_sparse.coo() 
         size = adj_sparse.sizes()
         adj_torch = torch.sparse_coo_tensor(
             torch.stack([row, col], dim=0),
@@ -275,6 +272,8 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
             size=size,
             device=val.device
         ).coalesce()
+        common_device = adj_torch.device
+        assignments = torch.as_tensor(pred_labels, device=common_device, dtype=torch.int64)
         mod = Metrics.modularity(adj_torch, assignments)
 
         print(f"Modularity for k={k}: {mod:.4f}")
