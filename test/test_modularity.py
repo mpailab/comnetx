@@ -22,7 +22,7 @@ def test_modularity():
     with open(os.path.join(INFO, "all.json")) as _:
         info = json.load(_)
     datasets = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
-    restriction = 110000
+    restriction = 1100000
     datasets = list(filter(lambda dataset: int(info[dataset]["m"]) < restriction, datasets))
     datasets.sort(key = lambda x: info[x]["m"])
 
