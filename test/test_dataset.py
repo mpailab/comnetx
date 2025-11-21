@@ -164,39 +164,44 @@ def test_load_prgpt_static_dataset():
 def test_load_prgpt_stream_dataset():
     # ---------- STREAM ----------
     ds = Dataset(
-        dataset_name="stream_1_100000_2.5_3.0",
+        dataset_name="stream_5_100000_2.5_3.0",
         path=PRGPT_DIR
     )
     adj, features, labels = ds.load(tensor_type="coo")
 
-    assert isinstance(ds.adj, torch.Tensor), "adj must be torch.Tensor"
-    assert ds.adj.layout == torch.sparse_coo, "adj must be sparse COO"
-    assert isinstance(ds.label, torch.Tensor), "labels must be torch.Tensor"
+    assert adj is not None, "self.adj None"
+    assert labels is not None, "self.label None"
 
-    assert ds.adj.dim() == 4, "adj must be 4D tensor [snap, batch, n, n]"
+    if isinstance(ds.adj, list):
+        assert len(ds.adj) == 10, "10 batches"
+        n = ds.adj[0].shape[0]
+        assert all(a.shape == (n, n) for a in ds.adj)
+    else:
+        assert isinstance(ds.adj, torch.Tensor) and ds.adj.is_sparse, \
+            "adj - sparse_coo_tensor"
+        assert ds.adj.shape[0] == 10, f"10 batches, was {ds.adj.shape[0]}"
+        n = ds.adj.shape[1]
+        assert ds.adj.shape == (10, n, n), f"form of sparse-tensor: {ds.adj.shape}"
 
-    num_snaps, num_batches, n1, n2 = ds.adj.shape
+    assert isinstance(ds.label, torch.Tensor)
+    assert ds.label.dtype == torch.long
+    assert ds.label.shape[0] == n
 
-    assert n1 == n2, "Adjacency matrices must be square"
-    assert ds.label.shape == (num_snaps, n1), "Label must be [snap, n]"
-    assert ds.is_directed is False
+    num_snapshots = ds.adj.shape[0]
 
-    for snap in range(num_snaps):
-        for batch in range(num_batches):
-            adj_sb = ds.adj[snap, batch].coalesce()
-            adj_t = torch.sparse_coo_tensor(
-                indices=adj_sb.indices().flip(0),
-                values=adj_sb.values(),
-                size=adj_sb.shape
-            ).coalesce()
-            diff = (adj_sb - adj_t).coalesce()
-            if diff._nnz() > 0:
-                nonzero_count = (diff.values() != 0).sum().item()
-            else:
-                nonzero_count = 0
-            assert nonzero_count == 0, (
-                f"Snap {snap}, batch {batch} is not symmetric: nnz={nonzero_count}"
-            )
+    for snap in range(num_snapshots):
+        adj_snap = ds.adj[snap].coalesce()
+        adj_t = torch.sparse_coo_tensor(
+            indices=adj_snap.indices().flip(0),
+            values=adj_snap.values(),
+            size=adj_snap.shape
+        ).coalesce()
+        diff = (adj_snap - adj_t).coalesce()
+        nonzero_mask = diff.values() != 0
+        nnz_nonzero = nonzero_mask.sum().item()
+        assert nnz_nonzero == 0, f"Snap {snap}, nnz={nnz_nonzero}"
+
+    assert ds.is_directed is False, "undirected graph"
 
 @pytest.mark.short
 def test_load_sbm_static_dataset():

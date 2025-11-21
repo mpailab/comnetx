@@ -81,14 +81,16 @@ class Dataset:
 
             if dname.startswith("static"):
                 dataset_type = "static"
+                num_snapshots = 5
             elif dname.startswith("stream"):
                 dataset_type = "stream"
-            num_snapshots = 5 
+                num_snapshots = 10
+            snap = int(parts[1]) 
             num_nodes = int(parts[2])
             mu = float(parts[3])
             beta = float(parts[4])
             self._load_prgpt_dataset(dataset_type=dataset_type, num_nodes=num_nodes, 
-                                     mu=mu, beta=beta, num_snapshots=num_snapshots)
+                                     mu=mu, beta=beta, snap=snap, num_snapshots=num_snapshots)
         elif dname.startswith("sbm") or dname.startswith("tsbm"):
             self._load_sbm()
 
@@ -184,91 +186,51 @@ class Dataset:
                        num_nodes=10000,
                        mu=2.5,
                        beta=3.0,
+                       snap=1,
                        num_snapshots=5):
         base_path = self.path
-        # ---------- STATIC ----------
         if dataset_type == 'static':
             edges_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
             gnd_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd_list.pickle')
-
-            with open(edges_path, 'rb') as f:
-                edges_list = pickle.load(f)
-            with open(gnd_path, 'rb') as f:
-                labels_list = pickle.load(f)
-
-            adjs = []
-            all_labels = []
-
-
-            for snap in range(num_snapshots):
-                snap_edges = edges_list[snap]
-                snap_labels = torch.tensor(labels_list[snap], dtype=torch.long)
-                all_labels.append(snap_labels) 
-                edge_index = torch.tensor(snap_edges, dtype=torch.long).t() 
-                values = torch.ones(edge_index.shape[1], dtype=torch.float32)
-                adj_sparse = torch.sparse_coo_tensor(indices=edge_index, values=values,
-                                                     size=(num_nodes, num_nodes), dtype=torch.float32)
-
-                adj_sparse = adj_sparse.coalesce()
-                adj_t = torch.sparse_coo_tensor(indices=adj_sparse.indices().flip(0), 
-                                                values=adj_sparse.values(),
-                                                size=adj_sparse.shape)
-                adj_sparse = (adj_sparse + adj_t).coalesce()
-                adjs.append(adj_sparse)
-
-
-            self.adj = torch.stack(adjs)
-            self.label = torch.stack(all_labels)
-            self.is_directed = False
-
-        # ---------- STREAM (DYNAMIC) ----------
         elif dataset_type == 'stream':
-            all_snaps_adj = []      
-            all_snaps_labels = []   
-
-            for snap in range(num_snapshots):
-                beta_eff = 1.0 if snap + 1 == 5 else beta
-                edges_path = os.path.join(base_path,
-                                          f"stream_{snap+1}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_edges_list.pickle")
-                gnd_path = os.path.join(base_path,
-                                    f"stream_{snap+1}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_gnd.pickle")
-
-                with open(edges_path, "rb") as f:
-                    snap_edges_list = pickle.load(f)        
-                with open(gnd_path, "rb") as f:
-                    snap_labels = torch.tensor(pickle.load(f), dtype=torch.long)
-
-                all_snaps_labels.append(snap_labels)
-
-                num_batches = len(snap_edges_list)          
-                snap_adj_list = []                          
-
-                for batch_edges in snap_edges_list:
-                    batch_edges_np = np.array(batch_edges, dtype=np.int64)
-                    if batch_edges_np.ndim != 2 or batch_edges_np.shape[1] != 2:
-                        raise ValueError(f"Wrong format for batch_edges: {batch_edges_np.shape}")
-
-                    edge_index = torch.from_numpy(batch_edges_np).long().t()
-                    values = torch.ones(edge_index.shape[1], dtype=torch.float32)
-                    # sparse adjacency
-                    A = torch.sparse_coo_tensor(indices=edge_index, values=values, 
-                                                size=(num_nodes, num_nodes)).coalesce()
-
-                    A_t = torch.sparse_coo_tensor(indices=A.indices().flip(0), values=A.values(), 
-                                                  size=A.size()).coalesce()
-
-                    A = (A + A_t).coalesce()
-                    snap_adj_list.append(A)
-
-                snap_adj_tensor = torch.stack(snap_adj_list)
-                all_snaps_adj.append(snap_adj_tensor)
-
-            self.adj = torch.stack(all_snaps_adj)
-            self.label = torch.stack(all_snaps_labels)
-            self.is_directed = False
-
+            beta_eff = 1.0 if snap == 5 else beta
+            edges_path = os.path.join(base_path, f'stream_{snap}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_edges_list.pickle')
+            gnd_path = os.path.join(base_path, f'stream_{snap}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_gnd.pickle')  
         else:
             raise ValueError("dataset_type must be'static' or 'stream'.")
+        
+        with open(edges_path, 'rb') as f:
+            edges_list = pickle.load(f)
+        with open(gnd_path, 'rb') as f:
+            if dataset_type == 'static':
+                labels_list = pickle.load(f)
+            else:
+                snap_labels = torch.tensor(pickle.load(f), dtype=torch.long) 
+
+        adjs = []
+        all_labels = []
+        for snap in range(num_snapshots):
+            snap_edges = edges_list[snap]
+            if dataset_type == 'static':
+                snap_labels = torch.tensor(labels_list[snap], dtype=torch.long)
+                all_labels.append(snap_labels) 
+            edge_index = torch.tensor(snap_edges, dtype=torch.long).t() 
+            values = torch.ones(edge_index.shape[1], dtype=torch.float32)
+            adj_sparse = torch.sparse_coo_tensor(indices=edge_index, values=values,
+                                                     size=(num_nodes, num_nodes), dtype=torch.float32)
+
+            adj_sparse = adj_sparse.coalesce()
+            adj_t = torch.sparse_coo_tensor(indices=adj_sparse.indices().flip(0), 
+                                                values=adj_sparse.values(),
+                                                size=adj_sparse.shape)
+            adj_sparse = (adj_sparse + adj_t).coalesce()
+            adjs.append(adj_sparse)
+
+
+        self.adj = torch.stack(adjs)
+        self.label = torch.stack(all_labels) if dataset_type == 'static' else snap_labels
+        self.is_directed = False
+
 
     def _load_sbm(self, device="cpu"):
         """
