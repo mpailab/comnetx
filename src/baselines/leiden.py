@@ -9,13 +9,12 @@ def sparse_tensor_to_igraph(sparse_tensor, directed=True):
     values = st.values()
     edges = indices.t().numpy()
     graph = ig.Graph(n=sparse_tensor.shape[0], edges=edges, directed=directed)
-    if not torch.all(values == 1.0):
-        graph.es['weight'] = values.numpy()
+    graph.es['weight'] = values.numpy()
     return graph
 
 def leidenalg_partition(adj : torch.Tensor):
     G = sparse_tensor_to_igraph(adj.to_sparse())
-    part = la.find_partition(G, la.ModularityVertexPartition)
+    part = la.find_partition(G, la.ModularityVertexPartition, weights='weight', seed=True, n_iterations=2)
     return torch.tensor(part.membership, dtype=torch.long)
 
 def main():

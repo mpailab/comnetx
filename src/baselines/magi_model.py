@@ -6,7 +6,6 @@ import numpy as np
 import torch.nn.functional as F
 from torch_geometric.utils import to_undirected, add_remaining_self_loops
 from torch_sparse import SparseTensor
-from sklearnex import patch_sklearn
 from sklearn.cluster import KMeans, SpectralClustering
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -120,25 +119,33 @@ def magi(adj : torch.Tensor,
     size = list(map(int, args.size.split(',')))
     assert len(hidden) == len(size)
 
+    N = adj_sparse.sparse_sizes()[0]
+    all_nodes = torch.arange(N, device='cpu')
+
+    if edge_index.size(1) == 0:
+        return torch.arange(N, device=device, dtype=torch.long)
+
     train_loader = NeighborSampler(edge_index, adj_sparse,
                                    is_train=True,
-                                   node_idx=None,
+                                   node_idx=all_nodes,
                                    wt=args.wt,
                                    wl=args.wl,
                                    sizes=size,
                                    batch_size=args.batchsize,
                                    shuffle=True,
                                    drop_last=True,
-                                   num_workers=0)
+                                   num_workers=0,
+                                   num_nodes=N)
 
     test_loader = NeighborSampler(edge_index, adj_sparse,
                                   is_train=False,
-                                  node_idx=None,
+                                  node_idx=all_nodes,
                                   sizes=size,
                                   batch_size=512,
                                   shuffle=False,
                                   drop_last=False,
-                                  num_workers=0)
+                                  num_workers=0,
+                                  num_nodes=N)
 
     encoder = Encoder(num_features, hidden_channels=hidden,
                       dropout=args.dropout, ns=args.ns).to(device)
@@ -256,10 +263,18 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
         else:
             assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
         """
-        assignments = torch.nn.functional.one_hot(
-                        torch.as_tensor(pred_labels, device=device, dtype=torch.int64),
-                        num_classes=k).float()
-        mod = Metrics.modularity(adj_sparse, assignments)
+        
+        row, col, val = adj_sparse.coo() 
+        size = adj_sparse.sizes()
+        adj_torch = torch.sparse_coo_tensor(
+            torch.stack([row, col], dim=0),
+            val,
+            size=size,
+            device=val.device
+        ).coalesce()
+        common_device = adj_torch.device
+        assignments = torch.as_tensor(pred_labels, device=common_device, dtype=torch.int64)
+        mod = Metrics.modularity(adj_torch, assignments)
 
         print(f"Modularity for k={k}: {mod:.4f}")
 
@@ -321,7 +336,6 @@ def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
         if isinstance(feature, torch.Tensor):
             feature = feature.numpy()
         print("spectral clustering on cpu...")
-        patch_sklearn()
         Cluster = SpectralClustering(
             n_clusters=n_clusters, affinity='precomputed', random_state=0)
         f_adj = np.matmul(feature, np.transpose(feature))
@@ -339,7 +353,6 @@ def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
             if isinstance(feature, torch.Tensor):
                 feature = feature.numpy()
             print("kmeans on cpu...")
-            patch_sklearn()
             Cluster = KMeans(n_clusters=n_clusters, max_iter=10000, n_init=20)
             predict_labels = Cluster.fit_predict(feature)
             cluster_centers = torch.tensor(Cluster.cluster_centers_, dtype=torch.float32)
