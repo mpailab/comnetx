@@ -17,6 +17,18 @@ from testutils import ResourceMonitor, with_timeout, TimeoutException
 
 _DATASETS_JSON = Path(__file__).parent / "dataset_paths.json"
 
+from pyinstrument import Profiler
+
+PROFILES_DIR = Path(".profiles")
+PROFILES_DIR.mkdir(exist_ok=True)
+
+@pytest.fixture
+def prof():
+    p = Profiler()
+    p.start()
+    yield p
+    p.stop()
+
 def collect_datasets():
     """
     Читает JSON-словарь {dataset_name: dataset_path} и возвращает dict.
@@ -28,7 +40,7 @@ def collect_datasets():
         raise ValueError(f"dataset_paths.json must be an object mapping names to paths, got {type(data)}")
     return data
 
-ALL_METHODS = ["dmon", "magi", "prgpt", "leidenalg", "networkit"]
+ALL_METHODS = ["flmig", "dmon", "magi", "prgpt", "leidenalg", "networkit"]
 ALL_DATASETS = list(collect_datasets().keys())
 
 tf_spec = importlib.util.find_spec("tensorflow")
@@ -197,6 +209,45 @@ def runner_networkit():
             cmd += ["--directed"]
 
         return subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=str(root))
+    return run
+
+@pytest.fixture
+def runner_mfc_subprocess():
+    def run(ds_entry, network_type="MFC", timeout=1800):
+        script = PROJECT_ROOT / "src" / "baselines" / "MFC-TopoReg" / "cli_mfc.py"
+        cmd = [
+            sys.executable,
+            str(script),
+            "--network", network_type,
+        ]
+        if "config" in ds_entry and ds_entry["config"]:
+            cmd += ["--config", ds_entry["config"]]
+        else:
+            cmd += ["--adj-list", ds_entry["adj_list"], "--labels-list", ds_entry["labels_list"]]
+        if "out" in ds_entry and ds_entry["out"]:
+            cmd += ["--out", ds_entry["out"]]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    return run
+
+@pytest.fixture
+def runner_flmig():
+    def run(ds, dataset_name=None, Number_iter=None, Beta=None, max_rb=None):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "flmig.py"
+        cmd = [sys.executable, str(script)]
+        # если ds["adj"] — корень, передаём ещё и --dataset-name
+        cmd += ["--adj", ds["adj"]]
+        if dataset_name:
+            cmd += ["--dataset-name", dataset_name]
+        if Number_iter is not None:
+            cmd += ["--Number_iter", str(Number_iter)]
+        if Beta is not None:
+            cmd += ["--Beta", str(Beta)]
+        if max_rb is not None:
+            cmd += ["--max_rb", str(max_rb)]
+        if "out" in ds and ds["out"]:
+            cmd += ["--out", ds["out"]]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     return run
 
 @pytest.fixture

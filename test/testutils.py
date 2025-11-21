@@ -259,32 +259,37 @@ class ResourceMonitorWithGPU(ResourceMonitor):
         sys.stdout.flush()
         
     def get_summary(self) -> Dict[str, float]:
-        """Расширенная статистика с GPU"""
-        summary = super().get_summary()
-        
-        if self.gpu_available and self.gpu_mem_history:
-            summary['gpu_avg'] = sum(self.gpu_mem_history) / len(self.gpu_mem_history)
-            summary['gpu_max'] = max(self.gpu_mem_history)
-            
-        return summary
-        
+        if not self.cpu_history:
+            return {}
+        cpu_total_avg = sum(self.cpu_history) / len(self.cpu_history)
+        cpu_total_max = max(self.cpu_history)
+        mem_avg = sum(self.mem_history) / len(self.mem_history)
+        mem_max = max(self.mem_history)
+        duration = self.timestamps[-1] if self.timestamps else 0
+        return {
+            'cpu_total_avg': cpu_total_avg,
+            'cpu_total_max': cpu_total_max,
+            'cpu_per_core_avg': cpu_total_avg / self.num_cores,
+            'cpu_per_core_max': cpu_total_max / self.num_cores,
+            'mem_avg': mem_avg,
+            'mem_max': mem_max,
+            'duration': duration,
+            'num_cores': self.num_cores
+        }
+
     def print_summary(self):
-        """Вывод расширенной статистики"""
         summary = self.get_summary()
         if summary:
             print(f"\n{'='*60}")
-            print(f"Resource Usage Summary:")
+            print("Resource Usage Summary:")
             print(f"  Duration:     {summary['duration']:.2f} s")
-            print(f"  CPU Average:  {summary['cpu_avg']:.2f}%")
-            print(f"  CPU Peak:     {summary['cpu_max']:.2f}%")
+            print(f"  CPU Average:  {summary['cpu_per_core_avg']:.2f}%/core ({summary['cpu_total_avg']:.2f}% total)")
+            print(f"  CPU Peak:     {summary['cpu_per_core_max']:.2f}%/core ({summary['cpu_total_max']:.2f}% total)")
             print(f"  RAM Average:  {summary['mem_avg']:.2f} MB")
             print(f"  RAM Peak:     {summary['mem_max']:.2f} MB")
-            
-            if 'gpu_avg' in summary:
-                print(f"  GPU Average:  {summary['gpu_avg']:.2f} MB")
-                print(f"  GPU Peak:     {summary['gpu_max']:.2f} MB")
-                
+            print(f"  Cores:        {summary['num_cores']}")
             print(f"{'='*60}")
+
 
 
 class ResourceMonitorWithLogging(ResourceMonitorWithGPU):
