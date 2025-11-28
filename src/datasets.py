@@ -283,64 +283,70 @@ class Dataset:
         adj = torch.sparse_coo_tensor(indices, values, (n, n)).coalesce().to(device)
         labels_t = torch.tensor(data["labels"], dtype=torch.long, device=device)
         return adj, labels_t
-
+    
     def _load_temporal_sbm_graph(self, path, device='cpu'):
         """
         Load dynamic SBM (.pt), returns:
         - adj_sparse: torch.sparse_coo_tensor [n_steps, n, n]
         - labels_t: torch.tensor [n_steps, n]
         """
-        
         data = torch.load(path, map_location='cpu')
         meta = data.get('meta', {})
-        temporal = meta.get('temporal', False)
-        if not temporal:
-            raise ValueError("File is not a temporal SBM graph")
+        if not meta.get('temporal', False):
+            raise ValueError("Not a temporal SBM file")
 
-        n_steps = len(data['rows'])
-        n = meta['n']
+        rows_list = data['rows']
+        cols_list = data['cols']
+        labels_list = data['labels']
+
+        T = len(rows_list)
+        n = int(meta['n'])
         directed = meta.get('directed', False)
 
-        adj_snapshots = []
-        for t in range(n_steps):
-            rows = np.asarray(data['rows'][t], dtype=np.int64)
-            cols = np.asarray(data['cols'][t], dtype=np.int64)
-            if len(rows) == 0:
-                indices = torch.empty((2,0), dtype=torch.long, device=device)
-                values = torch.empty((0,), dtype=torch.float32, device=device)
-            else:
-                indices = torch.tensor(np.vstack([rows, cols]), dtype=torch.long, device=device)
-                values = torch.ones(indices.shape[1], dtype=torch.float32, device=device)
+        adjs = []
+        for t, (r_arr, c_arr) in enumerate(zip(rows_list, cols_list)):
+            r = np.asarray(r_arr, dtype=np.int64)
+            c = np.asarray(c_arr, dtype=np.int64)
+            e = len(r)
+            if e == 0:
+                adj_t = torch.sparse_coo_tensor(
+                torch.empty((2,0), dtype=torch.long, device=device),
+                torch.empty((0,), dtype=torch.float32, device=device),
+                size=(n, n), dtype=torch.float32, device=device
+            ).coalesce()
+                adjs.append(adj_t)
+                continue
+
+            # remove duplicates in this snapshot (triples are (u,v))
+            triples = np.vstack([r, c]).T
+            triples = np.unique(triples, axis=0)
+
+            # build indices for 2D snapshot
+            indices2 = torch.from_numpy(triples.T).long().to(device)
+            values2 = torch.ones(indices2.shape[1], dtype=torch.float32, device=device)
+
+            adj_sparse = torch.sparse_coo_tensor(indices2, values2, size=(n, n), dtype=torch.float32, device=device).coalesce()
 
             if not directed:
-                mirrored = torch.flip(indices, dims=[0])
-                indices = torch.cat([indices, mirrored], dim=1)
-                values = torch.cat([values, values], dim=0)
+            # mirror using transpose (create symmetric adjacency)
+            # adj_t: same indices but flipped rows<->cols
+                adj_t = torch.sparse_coo_tensor(adj_sparse.indices().flip(0), adj_sparse.values(), size=adj_sparse.shape, dtype=adj_sparse.dtype, device=device)
+                adj_sparse = (adj_sparse + adj_t).coalesce()
 
-            adj_snapshots.append(torch.sparse_coo_tensor(indices, values, (n,n), device=device).coalesce())
+        # ensure coalesced
+            adj_sparse = adj_sparse.coalesce()
+            adjs.append(adj_sparse)
 
-        all_indices = []
-        all_values = []
-        for t, adj in enumerate(adj_snapshots):
-            if adj._nnz() == 0:
-                continue
-            t_idx = torch.full((1, adj._nnz()), t, dtype=torch.long, device=device)
-            idx_3d = torch.cat([t_idx, adj.indices()], dim=0)
-            all_indices.append(idx_3d)
-            all_values.append(adj.values())
+    # stack into (T, n, n)
+        adj_3d = torch.stack(adjs, dim=0)
 
-        if all_indices:
-            indices = torch.cat(all_indices, dim=1)
-            values = torch.cat(all_values)
-        else:
-            indices = torch.empty((3,0), dtype=torch.long, device=device)
-            values = torch.empty((0,), dtype=torch.float32, device=device)
-
-        adj_sparse_3d = torch.sparse_coo_tensor(indices, values, (n_steps, n, n), device=device).coalesce()
-        labels_t = torch.stack([torch.tensor(l, dtype=torch.long, device=device) for l in data['labels']], dim=0)
-
-        return adj_sparse_3d, labels_t
-
+    # labels -> tensor (T, n)
+        labels = torch.stack([
+        torch.from_numpy(l).long().to(device) if isinstance(l, np.ndarray) else l.clone().detach().long().to(device)
+        for l in labels_list
+    ], dim=0)
+        return adj_3d, labels
+    
     def _load_konect(self, batches_num = 1):
         """
         Load dynamic dataset from KONECT collection

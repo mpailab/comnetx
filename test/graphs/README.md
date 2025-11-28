@@ -11,7 +11,7 @@
 | EAT       |     399 |       203 |  5994 |       4 |
 | UAT       |    1190 |       239 | 13599 |       4 |
 
-# SBM generation
+# SBM generation params
 To generate sbm datasets run sbm_generator with args:
 --n, type=int, Number of nodes
 --k, type=int, Number of communities
@@ -27,4 +27,10 @@ To generate sbm datasets run sbm_generator with args:
 --n_steps, type=int, Number of time steps (for temporal SBM)
 --drift_prob, type=float, Probability that a node changes community (for temporal SBM)
 --edge_persistence, type=float, Probability that an edge persists to next step (for temporal SBM)
-
+--change_frac, type=float, Fraction of E0 that we may change (adds + dels) each step (for temporal SBM)
+--enable_add, Flag to allow edges' adds (for temporal SBM)
+--enable_del, Flag to allow edges' dels (for temporal SBM)
+--use_ed_per,   if True -> each previous edge is kept with probability edge_persistence;
+                                additions then fill up to change_frac budget.
+                if False -> remove exactly num_del_target 
+                                (if enable_del) and add num_add_target (if enable_add).

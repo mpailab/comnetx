@@ -1,6 +1,6 @@
 import argparse
 
-from sbm import generate_temporal_sbm_graph_optimized, generate_sbm_graph_universal
+from sbm import generate_sbm_graph_universal, generate_temporal_sbm_graph_local
 
 def main():
     parser = argparse.ArgumentParser(description="Generate SBM or Temporal SBM graphs.")
@@ -19,11 +19,15 @@ def main():
     parser.add_argument("--n_steps", type=int, default=10, help="Number of time steps (for temporal SBM)")
     parser.add_argument("--drift_prob", type=float, default=0.01, help="Probability that a node changes community (for temporal SBM)")
     parser.add_argument("--edge_persistence", type=float, default=0.9, help="Probability that an edge persists to next step (for temporal SBM)")
+    parser.add_argument("--change_frac", type=float, default=0.01, help="Fraction of E0 that we may change (adds + dels) each step (for temporal SBM)")
+    parser.add_argument("--enable_add", action='store_true', help="Flag to allow edges' adds (for temporal SBM)")
+    parser.add_argument("--enable_del", action='store_true', help="Flag to allow edges' dels (for temporal SBM)")
+    parser.add_argument("--use_ed_per", action='store_true', help="Each previous edge is kept with probability edge_persistence (for temporal SBM)")
 
     args = parser.parse_args()
 
     if args.temporal:
-        graph = generate_temporal_sbm_graph_optimized(
+        graph = generate_temporal_sbm_graph_local(
             n=args.n,
             k=args.k,
             p_in=args.p_in,
@@ -35,7 +39,11 @@ def main():
             device=args.device,
             seed=args.seed,
             ensure_connected=args.ensure_connected,
-            graph_type='tsbm'
+            graph_type='tsbm',
+            change_frac=args.change_frac,
+            enable_add=args.enable_add,
+            enable_del=args.enable_del, 
+            use_edge_persistence=args.use_ed_per
         )
     else:
         graph = generate_sbm_graph_universal(
