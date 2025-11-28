@@ -20,7 +20,7 @@ def main():
     new_labels = adapted_dmon(adj, features, _n_epochs=args.epochs)
 
     torch.save(new_labels, args.out)
-    print("MAGI finished successfully")
+    print("DMON finished successfully")
 
 if __name__ == "__main__":
     main()

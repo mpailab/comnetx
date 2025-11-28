@@ -12,7 +12,7 @@ import tempfile
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
-from baselines.magi import magi
+from baselines.magi_model import magi
 from datasets import Dataset, KONECT_PATH
 
 
@@ -79,7 +79,7 @@ def test_magi_single_dataset(name, data_dir):
 
 def load_konect_info():
     """Load dataset info from all.json."""
-    file_path = os.path.join(KONECT_INFO, "all.json")
+    file_path = os.path.join(os.path.dirname(__file__), "dataset_paths.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
     return info
@@ -166,3 +166,22 @@ def test_magi_konect_dataset(name):
     del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
+
+@pytest.fixture(scope="class")
+def facebook_dataset():
+    ds = Dataset("elec", KONECT_PATH)
+    ds.load()
+    return ds
+
+def test_communities(facebook_dataset):
+    num_nodes = facebook_dataset.adj.shape[-1]
+    adj = facebook_dataset.adj.coalesce()
+    features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    new_labels = magi(adj, features, epochs=1, n_clusters=num_nodes)
+
+    uniq_vals = np.unique(new_labels)
+    print("UNIQUE COMMUNITIES:", uniq_vals.size, "EXPECTED:", num_nodes)
+
+    # Проверка, что все назначения уникальны и это именно 0..num_nodes-1
+    all_unique_and_full_range = set(uniq_vals.tolist()) == set(range(num_nodes))
+    print("ALL ASSIGNMENTS UNIQUE:", all_unique_and_full_range)

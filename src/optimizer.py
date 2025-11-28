@@ -79,7 +79,7 @@ class Optimizer:
                     print(f"Extending with zeros to {l} levels.")
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
-
+    
     def modularity(self, 
             gamma: float = 1, L: int = 0, directed: bool = False) -> float:
         """
@@ -89,9 +89,7 @@ class Optimizer:
         Returns:
             modularity: float 
         """
-        n = self.coms.shape[1]
-        dense_coms = Metrics.create_dense_community(self.coms, n, L).T
-        return Metrics.modularity(self.adj, dense_coms.float(), gamma, directed = directed)
+        return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
@@ -188,7 +186,7 @@ class Optimizer:
             
             # Lazy import for heavy baselines
             if self.method == "magi":
-                from baselines.magi import magi
+                from baselines.magi_model import magi
                 return magi(adj, features, labels)
             elif self.method == "prgpt:infomap":
                 from baselines.rough_PRGPT import rough_prgpt
@@ -197,13 +195,13 @@ class Optimizer:
                 from baselines.rough_PRGPT import rough_prgpt
                 return rough_prgpt(adj, refine="locale")
             elif self.method == "leidenalg":
-                from baselines.leidenalg import leidenalg_partition
+                from baselines.leiden import leidenalg_partition
                 return leidenalg_partition(adj)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
                 return adapted_dmon(adj, features, labels)
             elif self.method == "networkit":
-                from baselines.networkit import networkit_partition
+                from baselines.network import networkit_partition
                 return networkit_partition(adj)
             else:
                 raise ValueError("Unsupported baseline method name")

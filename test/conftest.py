@@ -8,7 +8,26 @@ import os, json
 os.environ["OGB_FORCE_DOWNLOAD"] = "1"
 from pathlib import Path
 
+PROJECT_PATH = Path(__file__).resolve().parent.parent
+TEST_PATH = Path(__file__).resolve().parent
+for p in (str(TEST_PATH), str(PROJECT_PATH), str(PROJECT_PATH / "src")):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+from testutils import ResourceMonitor, with_timeout, TimeoutException
+
 _DATASETS_JSON = Path(__file__).parent / "dataset_paths.json"
+
+from pyinstrument import Profiler
+
+PROFILES_DIR = Path(".profiles")
+PROFILES_DIR.mkdir(exist_ok=True)
+
+@pytest.fixture
+def prof():
+    p = Profiler()
+    p.start()
+    yield p
+    p.stop()
 
 def collect_datasets():
     """
@@ -21,7 +40,7 @@ def collect_datasets():
         raise ValueError(f"dataset_paths.json must be an object mapping names to paths, got {type(data)}")
     return data
 
-ALL_METHODS = ["dmon", "magi", "prgpt"]
+ALL_METHODS = ["flmig", "dmon", "magi", "prgpt", "leidenalg", "networkit"]
 ALL_DATASETS = list(collect_datasets().keys())
 
 tf_spec = importlib.util.find_spec("tensorflow")
@@ -106,9 +125,11 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture
 def runner_dmon():
     def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "dmon.py"
         cmd = [
             sys.executable,
-            "run_dmon_subprocess.py",
+            str(script),
             "--adj", ds["adj"],
             "--features", ds["features"],
             "--epochs", "10",
@@ -120,9 +141,11 @@ def runner_dmon():
 @pytest.fixture
 def runner_magi():
     def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "magi_model.py"
         cmd = [
             sys.executable,
-            "run_magi_subprocess.py",
+            str(script),
             "--adj", ds["adj"],
             "--features", ds["features"],
             "--epochs", "1",
@@ -135,9 +158,11 @@ def runner_magi():
 @pytest.fixture
 def runner_prgpt():
     def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "rough_PRGPT.py"
         cmd = [
             sys.executable,
-            "run_prgpt_subprocess.py",
+            str(script),
             "--adj", ds["adj"],
             "--out", ds["out"],
         ]
@@ -148,3 +173,87 @@ def runner_prgpt():
 
         return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     return run
+
+@pytest.fixture
+def runner_leidenalg():
+    def run(ds):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "leiden.py"
+        cmd = [
+            sys.executable, 
+            str(script),
+            "--adj", ds["adj"],
+            "--out", ds["out"],
+        ]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    return run
+
+@pytest.fixture
+def runner_networkit():
+    def run(ds, algorithm="leiden", directed=False):
+        from pathlib import Path
+        import sys, subprocess
+
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "network.py"
+
+        cmd = [
+            sys.executable, 
+            str(script),
+            "--adj", ds["adj"],
+            "--out", ds["out"],
+        ]
+        if algorithm in ("leiden", "plm"):
+            cmd += ["--algorithm", algorithm]
+        if directed:
+            cmd += ["--directed"]
+
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=str(root))
+    return run
+
+@pytest.fixture
+def runner_mfc_subprocess():
+    def run(ds_entry, network_type="MFC", timeout=1800):
+        script = PROJECT_ROOT / "src" / "baselines" / "MFC-TopoReg" / "cli_mfc.py"
+        cmd = [
+            sys.executable,
+            str(script),
+            "--network", network_type,
+        ]
+        if "config" in ds_entry and ds_entry["config"]:
+            cmd += ["--config", ds_entry["config"]]
+        else:
+            cmd += ["--adj-list", ds_entry["adj_list"], "--labels-list", ds_entry["labels_list"]]
+        if "out" in ds_entry and ds_entry["out"]:
+            cmd += ["--out", ds_entry["out"]]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    return run
+
+@pytest.fixture
+def runner_flmig():
+    def run(ds, dataset_name=None, Number_iter=None, Beta=None, max_rb=None):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "flmig.py"
+        cmd = [sys.executable, str(script)]
+        # если ds["adj"] — корень, передаём ещё и --dataset-name
+        cmd += ["--adj", ds["adj"]]
+        if dataset_name:
+            cmd += ["--dataset-name", dataset_name]
+        if Number_iter is not None:
+            cmd += ["--Number_iter", str(Number_iter)]
+        if Beta is not None:
+            cmd += ["--Beta", str(Beta)]
+        if max_rb is not None:
+            cmd += ["--max_rb", str(max_rb)]
+        if "out" in ds and ds["out"]:
+            cmd += ["--out", ds["out"]]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    return run
+
+@pytest.fixture
+def resource_monitor():
+    monitor = ResourceMonitor(interval=0.3)
+    monitor.start()
+    yield monitor
+    monitor.stop()
+    monitor.print_summary()

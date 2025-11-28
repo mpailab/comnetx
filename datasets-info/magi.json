@@ -1,0 +1,80 @@
+{
+    "acm": {
+        "n": 3025,
+        "m": 13128,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "amazon-computers": {
+        "n": 13752,
+        "m": 245861,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "amazon-photo": {
+        "n": 7650,
+        "m": 119081,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "bat": {
+        "n": 131,
+        "m": 1003,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "citeseer": {
+        "n": 3327,
+        "m": 4552,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "cora": {
+        "n": 2708,
+        "m": 5278,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dblp": {
+        "n": 4057,
+        "m": 3528,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "eat": {
+        "n": 399,
+        "m": 5993,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "ogbn-arxiv": {
+        "n": 169343,
+        "m": 1166243,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "ogbn-products": {
+        "n": 2449029,
+        "m": 61859012,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "pubmed": {
+        "n": 19717,
+        "m": 44324,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "reddit": {
+        "n": 232965,
+        "m": 57307946,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "uat": {
+        "n": 1190,
+        "m": 13599,
+        "d": "undirected",
+        "w": "unweighted"
+    }
+}
