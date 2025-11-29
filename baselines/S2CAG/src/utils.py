@@ -171,6 +171,9 @@ def run_SSCAG(X, k, adj_normalized, T, alpha,method="sub",dataset='acm',gamma=0.
 
   elif method == 'mod':
           Z = PowerIteration(X, adj_normalized, T, alpha)
+          print('After Z - 2!!!!!!!!!!!')
           Q = KSI_decompose_B(Z=Z, dim=k,tau=tau,gamma=gamma)
+          print('After Q - 2!!!!!!!!!!!')
   P = SNEM_rounding(Q)
+  print('After SNEM_rounding!!!!!!!!!!!')
   return P, Q
