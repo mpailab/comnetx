@@ -61,6 +61,9 @@ class Dataset:
                 self.adj = self.adj[0]
             else:
                 self._load_konect(batches_num = batches)
+        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
+            self._load_npy_format()
+            
         elif dname in magi_info:
             self.is_directed = magi_info[dname]['d'] == 'directed'
             download_flag = False
@@ -75,8 +78,7 @@ class Dataset:
                 self._save_magi(coo_adj = True)
             else:
                 self._load_npy_format(coo_adj = True)
-        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
-            self._load_npy_format()
+        
         else:
             raise ValueError(f"Unsupported dataset: {self.name}")
 
