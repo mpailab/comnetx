@@ -3,17 +3,22 @@ import sys,os
 # sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SRC_PATH = os.path.join(PROJECT_PATH, "src")
 FLMIG_root = os.path.join(PROJECT_PATH, "baselines", "FLMIG_algorithm", "FLMIG_algorithm")
-if FLMIG_root not in sys.path:
-    sys.path.insert(0, FLMIG_root)
+
+for p in (SRC_PATH, FLMIG_root):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 import torch
 import networkx as nx
 from pathlib import Path
-import os
+import numpy as np
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from GraphTools import GraphTolls
 from FLMIG import Fast_local_Move_IG
+
+
 
 def tensor_to_graph_txt(graph_tensor: torch.Tensor, save_path: str):
     """
@@ -109,6 +114,7 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 #     os.remove(path)
 
+
 def flmig_adopted(adj: torch.tensor, Number_iter=100, Beta=0.5, max_rb=10):
     """
     Args:
@@ -126,3 +132,40 @@ def flmig_adopted(adj: torch.tensor, Number_iter=100, Beta=0.5, max_rb=10):
     print("the value of all pure time ",time_run * max_rb) 
 
     os.remove(path)
+
+
+if __name__ == "__main__":
+    import argparse
+    from datasets import Dataset  # путь уже в sys.path
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--adj", type=str, required=True,
+                    help="Root directory with datasets (used by Dataset)")
+    ap.add_argument("--dataset-name", type=str, required=True,
+                    help="Dataset key (name) for Dataset")
+    ap.add_argument("--Number_iter", type=int, default=100)
+    ap.add_argument("--Beta", type=float, default=0.5)
+    ap.add_argument("--max_rb", type=int, default=10)
+    args = ap.parse_args()
+
+    # грузим через Dataset
+    ds = Dataset(args.dataset_name, path=args.adj)
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    # для FLMIG нужны только adj, делаем dense и бинаризуем
+    if adj.is_sparse:
+        A = adj.coalesce()
+        adj = torch.sparse_coo_tensor(A.indices(),
+                                      torch.where(A.values() > 0,
+                                                  torch.ones_like(A.values()),
+                                                  torch.zeros_like(A.values())),
+                                      size=A.size()).to_dense()
+    else:
+        adj = (adj > 0).to(torch.float32)
+        adj.fill_diagonal_(0.0)
+
+    flmig_adopted(adj=adj,
+                  Number_iter=args.Number_iter,
+                  Beta=args.Beta,
+                  max_rb=args.max_rb)
+

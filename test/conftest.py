@@ -212,21 +212,22 @@ def runner_networkit():
     return run
 
 @pytest.fixture
-def runner_mfc_subprocess():
-    def run(ds_entry, network_type="MFC", timeout=1800):
-        script = PROJECT_ROOT / "src" / "baselines" / "MFC-TopoReg" / "cli_mfc.py"
-        cmd = [
-            sys.executable,
-            str(script),
-            "--network", network_type,
-        ]
-        if "config" in ds_entry and ds_entry["config"]:
-            cmd += ["--config", ds_entry["config"]]
-        else:
-            cmd += ["--adj-list", ds_entry["adj_list"], "--labels-list", ds_entry["labels_list"]]
-        if "out" in ds_entry and ds_entry["out"]:
-            cmd += ["--out", ds_entry["out"]]
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+def runner_mfc():
+    def run(ds, dataset_name=None, network_type="MFC", snapshots=1):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "mfc.py"
+
+        cmd = [sys.executable, str(script)]
+        if "adj" in ds and ds["adj"]:
+            cmd += ["--adj", ds["adj"]]
+        if dataset_name:
+            cmd += ["--dataset-name", dataset_name]
+        if network_type:
+            cmd += ["--network-type", network_type]
+        if snapshots is not None:
+            cmd += ["--snapshots", str(snapshots)]
+
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     return run
 
 @pytest.fixture

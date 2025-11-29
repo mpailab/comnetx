@@ -62,6 +62,9 @@ class Dataset:
                 self.adj = self.adj[0]
             else:
                 self._load_konect(batches_num = batches)
+        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
+            self._load_npy_format()
+            
         elif dname in magi_info:
             self.is_directed = magi_info[dname]['d'] == 'directed'
             download_flag = False
