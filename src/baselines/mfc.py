@@ -2,26 +2,85 @@ import networkx as nx
 import torch
 import sys,os
 import pickle
+import numpy as np
+from pathlib import Path
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SRC_PATH = os.path.join(PROJECT_PATH, "src")
 MFC_root = os.path.join(PROJECT_PATH, "baselines", "MFC-TopoReg")
-if MFC_root not in sys.path:
-    sys.path.insert(0, MFC_root)
+for p in (SRC_PATH, MFC_root):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from Code.train import base_train, retrain_with_topo
 from Code.dataloader import get_complete_graphs, NetworkSnapshots
 from Models.GraphFiltrationLayer import WrcfLayer,build_community_graph
 from Experiments.main import Args, InitModel
 
-import torch
-import networkx as nx
+def _degree_bins_labels(adj: torch.Tensor, k_min: int = 2, k_max: int = 20) -> torch.Tensor:
+    """
+    Строит псевдо-кластеры по степеням вершин.
+    adj: sparse или dense [N,N].
+    Возвращает labels [N] с небольшим числом кластеров.
+    """
+    A = adj.coalesce() if adj.is_sparse else adj
+    if A.is_sparse:
+        rows = A.indices()[0]
+        N = A.size(0)
+        deg = torch.bincount(rows, minlength=N).float()
+    else:
+        deg = A.sum(dim=1).float()
 
-def load_graphs_from_dynamic_tensors(adj_matrices, 
-                                     labels_list, 
-                                     network_type, 
-                                     file_name, 
-                                     complete_graph=False):
-    
+    N = deg.numel()
+    k = int(min(k_max, max(k_min, N ** 0.5)))
+    if k <= 1:
+        return torch.zeros(N, dtype=torch.long)
+
+    deg_clamped = torch.clamp(deg, min=1.0)
+    log_deg = torch.log(deg_clamped)
+    qs = torch.quantile(log_deg, torch.linspace(0, 1, steps=k + 1, device=log_deg.device))
+    labels = torch.bucketize(log_deg, qs[1:-1], right=True)
+    return labels.to(torch.long)
+
+def _binarize_adj(adj: torch.Tensor) -> torch.Tensor:
+    """
+    Делает из произвольной разреженной/плотной матрицы смежности бинарную {0,1}
+    и обнуляет диагональ. Возвращает тензор того же формата (sparse или dense).
+    """
+    if adj.is_sparse:
+        A = adj.coalesce()
+        idx = A.indices()
+        vals = A.values()
+        # выкидываем self-loops
+        mask = idx[0] != idx[1]
+        idx = idx[:, mask]
+        vals = vals[mask]
+        # всё положительное считаем ребром
+        vals = torch.where(vals > 0, torch.ones_like(vals), torch.zeros_like(vals))
+        return torch.sparse_coo_tensor(idx, vals, size=A.size())
+    else:
+        A = adj.clone()
+        A.fill_diagonal_(0.0)
+        A = (A > 0).to(torch.float32)
+        return A
+
+
+def _to_dense(adj_t: torch.Tensor) -> torch.Tensor:
+    if adj_t.is_sparse:
+        return adj_t.to_dense()
+    return adj_t
+
+
+def load_graphs_from_tensors(adj_matrices,
+                             labels_list,
+                             network_type: str,
+                             file_name: str = "from_tensor",
+                             complete_graph: bool = False):
+    """
+    adj_matrices: list[Tensor] или 3D Tensor [T,N,N], sparse или dense.
+    labels_list:  list[Tensor] или 2D Tensor [T,N].
+    Возвращает snapshot_list, n_cluster так же, как оригинальный dataloader.
+    """
     if isinstance(adj_matrices, torch.Tensor) and adj_matrices.dim() == 3:
         adj_list = [adj_matrices[t] for t in range(adj_matrices.size(0))]
     elif isinstance(adj_matrices, list):
@@ -42,12 +101,14 @@ def load_graphs_from_dynamic_tensors(adj_matrices,
     graph_snapshots = []
     labels_dicts = []
     for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
-        if adj_t.dim() != 2 or adj_t.size(0) != adj_t.size(1):
+        adj_dense = _to_dense(adj_t)
+
+        if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
             raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN")
-        if labels_t.dim() != 1 or labels_t.size(0) != adj_t.size(0):
+        if labels_t.dim() != 1 or labels_t.size(0) != adj_dense.size(0):
             raise ValueError(f"Метки снапшота {t} должны быть длины N")
 
-        g = nx.from_numpy_array(adj_t.cpu().numpy())
+        g = nx.from_numpy_array(adj_dense.cpu().numpy())
         labels_dict = {i: int(labels_t[i].item()) for i in range(len(labels_t))}
         graph_snapshots.append(g)
         labels_dicts.append(labels_dict)
@@ -56,21 +117,23 @@ def load_graphs_from_dynamic_tensors(adj_matrices,
         graph_snapshots = get_complete_graphs(graph_snapshots)
 
     all_labels = torch.cat(label_snapshots)
-    num_classes = len(torch.unique(all_labels))
+    num_classes = int(torch.unique(all_labels).numel())
+    if num_classes < 2:
+        num_classes = 2
 
     snapshots = NetworkSnapshots(graph_snapshots, labels_dicts[0], network_type, file_name)
-
     return snapshots, num_classes
-
 
 def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
     if file_name == "from_tensor":
         if adj_matrix is None or labels is None:
             raise ValueError("Для 'from_tensor' нужно передать adj_matrix и labels.")
-        return load_graphs_from_dynamic_tensors(adj_matrices=adj_matrix, 
-                                                labels_list=labels, 
-                                                network_type=network_type,
-                                                file_name=file_name)
+        return load_graphs_from_tensors(
+            adj_matrices=adj_matrix,
+            labels_list=labels,
+            network_type=network_type,
+            file_name=file_name,
+        )
     else:
         raise NameError
 
@@ -157,9 +220,12 @@ def main(network_type, adj_matrix, labels):
             dgm1_new = wrcf_layer_dim1(community_graph)
             dgm_list[t] = [dgm0_new,dgm1_new]
 
-    with open("/home/egorov/comnetx/results/mfc/results_raw.pkl", 'wb') as handle:
+    from pathlib import Path
+    out_dir = Path(PROJECT_PATH) / "results" / "mfc"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with (out_dir / "results_raw.pkl").open("wb") as handle:
         pickle.dump(results_raw, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open("/home/egorov/comnetx/results/mfc/results_topo.pkl", 'wb') as handle:
+    with (out_dir / "results_topo.pkl").open("wb") as handle:
         pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor], network_type="MFC"):
@@ -172,6 +238,56 @@ def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor
     main(network_type=network_type,
          adj_matrix=adj_matrices,
          labels=labels_list)
+
+def _load_from_cli(adj_root: str, dataset_name: str | None):
+    from datasets import Dataset
+
+    if dataset_name is None:
+        raise SystemExit("For MFC CLI please provide --dataset-name DATASET_KEY")
+
+    ds = Dataset(dataset_name, path=adj_root)
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    # 1) локально приводим adjacency к бинарной для MFC
+    adj = _binarize_adj(adj)
+
+    # 2) метки: реальные если есть, иначе псевдо-кластеры по структуре
+    if labels is None:
+        labels = _degree_bins_labels(adj)
+    else:
+        labels = labels.to(torch.long)
+
+    return adj, labels
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--adj", type=str, required=True,
+                    help="Root directory with datasets (used by Dataset)")
+    ap.add_argument("--dataset-name", type=str, required=True,
+                    help="Dataset key (name) for Dataset")
+    ap.add_argument("--network-type", type=str, default="MFC",
+                    help="MFC/GEC/DAEGC/SDCN")
+    ap.add_argument("--snapshots", type=int, default=1,
+                    help="How many identical snapshots to build from loaded graph")
+    args = ap.parse_args()
+
+    # 1) загрузка через Dataset
+    adj, labels = _load_from_cli(args.adj, args.dataset_name)
+
+    # 2) размножаем снапшоты при необходимости
+    adj_list = [adj] * max(1, int(args.snapshots))
+    labels_list = [labels.clone() for _ in range(len(adj_list))]
+
+    # 3) запускаем MFC-TopoReg на тензорах
+    mfc_adopted(
+        adj_matrices=adj_list,
+        labels_list=labels_list,
+        network_type=args.network_type,
+    )
+
+
 
 # network_type = "MFC" # GEC/DAEGC/MFC/SDCN
 # adj0 = torch.tensor([

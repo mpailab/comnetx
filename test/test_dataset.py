@@ -12,6 +12,8 @@ from datasets import Dataset, KONECT_PATH
 
 TEST_DIR = os.path.dirname(__file__)
 GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "small")
+SBM_GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "sbm")
+PRGPT_DIR = os.path.abspath(os.path.join(TEST_DIR, "..", "baselines", "PRGPT", "data"))
 
 @pytest.fixture
 def temp_dataset_dir():
@@ -114,3 +116,149 @@ def test_unsupported_dataset(temp_dataset_dir):
     loader = Dataset(dataset_name="unsupported-ds", path=temp_dataset_dir)
     with pytest.raises(ValueError, match="Unsupported dataset"):
         loader.load()
+
+@pytest.mark.short
+def test_load_prgpt_static_dataset():
+    # ---------- STATIC ----------
+    ds = Dataset(
+        dataset_name="static_5_100000_2.5_3.0",
+        path=PRGPT_DIR
+    )
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    assert adj is not None, "self.adj None"
+    assert labels is not None, "self.label None"
+
+    if isinstance(ds.adj, list):
+        assert len(ds.adj) == 5, "5 batches"
+        n = ds.adj[0].shape[0]
+        assert all(a.shape == (n, n) for a in ds.adj)
+    else:
+        assert isinstance(ds.adj, torch.Tensor) and ds.adj.is_sparse, \
+            "adj - sparse_coo_tensor"
+        assert ds.adj.shape[0] == 5, f"5 batches, was {ds.adj.shape[0]}"
+        n = ds.adj.shape[1]
+        assert ds.adj.shape == (5, n, n), f"form of sparse-tensor: {ds.adj.shape}"
+
+    assert isinstance(ds.label, torch.Tensor)
+    assert ds.label.dtype == torch.long
+    assert ds.label.shape[0] == 5, "5 batches"
+    assert ds.label.shape[1] == n, f"labels len n={n}, not {ds.label.shape[1]}"
+
+    num_snapshots = ds.adj.shape[0]
+
+    for snap in range(num_snapshots):
+        adj_snap = ds.adj[snap].coalesce()
+        adj_t = torch.sparse_coo_tensor(
+            indices=adj_snap.indices().flip(0),
+            values=adj_snap.values(),
+            size=adj_snap.shape
+        ).coalesce()
+        diff = (adj_snap - adj_t).coalesce()
+        nonzero_mask = diff.values() != 0
+        nnz_nonzero = nonzero_mask.sum().item()
+        assert nnz_nonzero == 0, f"Snap {snap}, nnz={nnz_nonzero}"
+
+    assert ds.is_directed is False, "undirected graph"
+
+def test_load_prgpt_stream_dataset():
+    # ---------- STREAM ----------
+    ds = Dataset(
+        dataset_name="stream_5_100000_2.5_3.0",
+        path=PRGPT_DIR
+    )
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    assert adj is not None, "self.adj None"
+    assert labels is not None, "self.label None"
+
+    if isinstance(ds.adj, list):
+        assert len(ds.adj) == 10, "10 batches"
+        n = ds.adj[0].shape[0]
+        assert all(a.shape == (n, n) for a in ds.adj)
+    else:
+        assert isinstance(ds.adj, torch.Tensor) and ds.adj.is_sparse, \
+            "adj - sparse_coo_tensor"
+        assert ds.adj.shape[0] == 10, f"10 batches, was {ds.adj.shape[0]}"
+        n = ds.adj.shape[1]
+        assert ds.adj.shape == (10, n, n), f"form of sparse-tensor: {ds.adj.shape}"
+
+    assert isinstance(ds.label, torch.Tensor)
+    assert ds.label.dtype == torch.long
+    assert ds.label.shape[0] == n
+
+    num_snapshots = ds.adj.shape[0]
+
+    for snap in range(num_snapshots):
+        adj_snap = ds.adj[snap].coalesce()
+        adj_t = torch.sparse_coo_tensor(
+            indices=adj_snap.indices().flip(0),
+            values=adj_snap.values(),
+            size=adj_snap.shape
+        ).coalesce()
+        diff = (adj_snap - adj_t).coalesce()
+        nonzero_mask = diff.values() != 0
+        nnz_nonzero = nonzero_mask.sum().item()
+        assert nnz_nonzero == 0, f"Snap {snap}, nnz={nnz_nonzero}"
+
+    assert ds.is_directed is False, "undirected graph"
+
+@pytest.mark.short
+def test_load_sbm_static_dataset():
+    path = SBM_GRAPHS_DIR
+    ds = Dataset(
+        dataset_name="sbm_0b_100v_4c_undir_conn",
+        path=path
+    )
+
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    assert adj is not None, "adj is None"
+    assert labels is not None, "labels is None"
+
+    assert isinstance(adj, torch.Tensor)
+    assert adj.is_sparse, "Adjacency must be sparse COO"
+    assert adj.is_coalesced(), "Sparse COO must be coalesced"
+
+    assert ds.is_directed in [True, False], "Incorrect directed flag"
+
+    n = adj.shape[0]
+    assert adj.shape == (n, n), "Wrong shape for static SBM"
+
+    if not ds.is_directed:
+        A = adj.to_dense()
+        assert torch.allclose(A, A.T), "Undirected graph must be symmetric"
+
+    assert labels.dtype == torch.long
+    assert labels.shape[0] == n, "Labels must be of shape [n]"
+    assert features is None
+
+@pytest.mark.short
+def test_load_sbm_temporal_dataset():
+    path = SBM_GRAPHS_DIR
+
+    ds = Dataset(
+        dataset_name="tsbm_10b_100v_4c_undir_conn",
+        path=path
+    )
+
+    adj, features, labels = ds.load(tensor_type="coo")
+
+    assert adj is not None, "adj is None"
+    assert labels is not None, "labels is None"
+
+    assert isinstance(adj, torch.Tensor)
+    assert adj.is_sparse, "Temporal adjacency should be sparse COO"
+    assert adj.is_coalesced()
+
+    assert adj.dim() == 3, "Temporal SBM must be 3D tensor"
+    T, n, n2 = adj.shape
+    assert n == n2, "Adj must be square"
+    assert T > 1, "Temporal SBM must have multiple snapshots"
+
+    assert labels.shape == (T, n)
+    assert labels.dtype == torch.long
+
+    assert adj.is_coalesced(), "Temporal adjacency must be coalesced"
+
+    assert features is None

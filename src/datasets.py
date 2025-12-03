@@ -8,6 +8,7 @@ import numpy as np
 import scipy.sparse as sp
 import os.path
 from ogb.nodeproppred import PygNodePropPredDataset
+import pickle
 
 import time
 import json
@@ -61,6 +62,9 @@ class Dataset:
                 self.adj = self.adj[0]
             else:
                 self._load_konect(batches_num = batches)
+        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
+            self._load_npy_format()
+            
         elif dname in magi_info:
             self.is_directed = magi_info[dname]['d'] == 'directed'
             download_flag = False
@@ -78,6 +82,24 @@ class Dataset:
                 self._load_npy_format(coo_adj = True)
         elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
+        elif dname.startswith("static") or dname.startswith("stream"):
+            parts = self.name.split("_")
+
+            if dname.startswith("static"):
+                dataset_type = "static"
+                num_snapshots = 5
+            elif dname.startswith("stream"):
+                dataset_type = "stream"
+                num_snapshots = 10
+            snap = int(parts[1]) 
+            num_nodes = int(parts[2])
+            mu = float(parts[3])
+            beta = float(parts[4])
+            self._load_prgpt_dataset(dataset_type=dataset_type, num_nodes=num_nodes, 
+                                     mu=mu, beta=beta, snap=snap, num_snapshots=num_snapshots)
+        elif dname.startswith("sbm") or dname.startswith("tsbm"):
+            self._load_sbm()
+
         else:
             raise ValueError(f"Unsupported dataset: {self.name}")
 
@@ -165,6 +187,171 @@ class Dataset:
             indices = torch.from_numpy(indices_np).long()
             values = torch.from_numpy(values_np).float()
             self.adj = torch.sparse_coo_tensor(indices, values, size=adj_data.shape)
+
+    def _load_prgpt_dataset(self, dataset_type='static',
+                       num_nodes=10000,
+                       mu=2.5,
+                       beta=3.0,
+                       snap=1,
+                       num_snapshots=5):
+        base_path = self.path
+        if dataset_type == 'static':
+            edges_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
+            gnd_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd_list.pickle')
+        elif dataset_type == 'stream':
+            beta_eff = 1.0 if snap == 5 else beta
+            edges_path = os.path.join(base_path, f'stream_{snap}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_edges_list.pickle')
+            gnd_path = os.path.join(base_path, f'stream_{snap}_{num_nodes}_{mu:.1f}_{beta_eff:.1f}_gnd.pickle')  
+        else:
+            raise ValueError("dataset_type must be'static' or 'stream'.")
+        
+        with open(edges_path, 'rb') as f:
+            edges_list = pickle.load(f)
+        with open(gnd_path, 'rb') as f:
+            if dataset_type == 'static':
+                labels_list = pickle.load(f)
+            else:
+                snap_labels = torch.tensor(pickle.load(f), dtype=torch.long) 
+
+        adjs = []
+        all_labels = []
+        for snap in range(num_snapshots):
+            snap_edges = edges_list[snap]
+            if dataset_type == 'static':
+                snap_labels = torch.tensor(labels_list[snap], dtype=torch.long)
+                all_labels.append(snap_labels) 
+            edge_index = torch.tensor(snap_edges, dtype=torch.long).t() 
+            values = torch.ones(edge_index.shape[1], dtype=torch.float32)
+            adj_sparse = torch.sparse_coo_tensor(indices=edge_index, values=values,
+                                                     size=(num_nodes, num_nodes), dtype=torch.float32)
+
+            adj_sparse = adj_sparse.coalesce()
+            adj_t = torch.sparse_coo_tensor(indices=adj_sparse.indices().flip(0), 
+                                                values=adj_sparse.values(),
+                                                size=adj_sparse.shape)
+            adj_sparse = (adj_sparse + adj_t).coalesce()
+            adjs.append(adj_sparse)
+
+
+        self.adj = torch.stack(adjs)
+        self.label = torch.stack(all_labels) if dataset_type == 'static' else snap_labels
+        self.is_directed = False
+
+
+    def _load_sbm(self, device="cpu"):
+        """
+        Load sbm dataset from test/graphs/sbm
+
+        Parameters
+        ----------
+        data_type : static / temporal
+        """
+        base_path = self.path
+        file_path = os.path.join(base_path, self.name + ".pt")
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"SBM dataset file not found: {file_path}")
+        raw = torch.load(file_path, map_location="cpu")
+        meta = raw.get("meta", {})
+        is_temporal = meta.get("temporal", False)
+        is_directed = meta.get("directed", False)
+
+        if is_temporal:
+            adjs, labels = self._load_temporal_sbm_graph(file_path, device=device)
+        else:
+            adjs, labels = self._load_static_sbm_graph(file_path, device=device)
+
+        self.adj = adjs
+        self.label = labels
+        self.features = None
+        self.is_directed = is_directed
+
+    def _load_static_sbm_graph(self, fname, device='cpu'):
+        """
+        Load .pt file, returns:
+        - adj_sparse: torch.sparse_coo_tensor (shape n x n), coalesced, dtype=torch.float32
+        - labels_t: torch.tensor(labels, dtype=torch.long)
+        """
+        if not os.path.isabs(fname) and not os.path.exists(fname):
+            candidate = os.path.join(os.getcwd(), "sbm", fname)
+            if os.path.exists(candidate):
+                fname = candidate
+
+        data = torch.load(fname, map_location='cpu')  # load on cpu
+        rows = np.asarray(data["rows"], dtype=np.int64)
+        cols = np.asarray(data["cols"], dtype=np.int64)
+        n = int(data["meta"]["n"])
+        if rows.size == 0:
+            indices = torch.empty((2, 0), dtype=torch.long)
+            values = torch.empty((0,), dtype=torch.float32)
+        else:
+            indices = torch.tensor(np.vstack([rows, cols]), dtype=torch.long)
+            values = torch.ones(indices.shape[1], dtype=torch.float32)
+        adj = torch.sparse_coo_tensor(indices, values, (n, n)).coalesce().to(device)
+        labels_t = torch.tensor(data["labels"], dtype=torch.long, device=device)
+        return adj, labels_t
+    
+    def _load_temporal_sbm_graph(self, path, device='cpu'):
+        """
+        Load dynamic SBM (.pt), returns:
+        - adj_sparse: torch.sparse_coo_tensor [n_steps, n, n]
+        - labels_t: torch.tensor [n_steps, n]
+        """
+        data = torch.load(path, map_location='cpu')
+        meta = data.get('meta', {})
+        if not meta.get('temporal', False):
+            raise ValueError("Not a temporal SBM file")
+
+        rows_list = data['rows']
+        cols_list = data['cols']
+        labels_list = data['labels']
+
+        T = len(rows_list)
+        n = int(meta['n'])
+        directed = meta.get('directed', False)
+
+        adjs = []
+        for t, (r_arr, c_arr) in enumerate(zip(rows_list, cols_list)):
+            r = np.asarray(r_arr, dtype=np.int64)
+            c = np.asarray(c_arr, dtype=np.int64)
+            e = len(r)
+            if e == 0:
+                adj_t = torch.sparse_coo_tensor(
+                torch.empty((2,0), dtype=torch.long, device=device),
+                torch.empty((0,), dtype=torch.float32, device=device),
+                size=(n, n), dtype=torch.float32, device=device
+            ).coalesce()
+                adjs.append(adj_t)
+                continue
+
+            # remove duplicates in this snapshot (triples are (u,v))
+            triples = np.vstack([r, c]).T
+            triples = np.unique(triples, axis=0)
+
+            # build indices for 2D snapshot
+            indices2 = torch.from_numpy(triples.T).long().to(device)
+            values2 = torch.ones(indices2.shape[1], dtype=torch.float32, device=device)
+
+            adj_sparse = torch.sparse_coo_tensor(indices2, values2, size=(n, n), dtype=torch.float32, device=device).coalesce()
+
+            if not directed:
+            # mirror using transpose (create symmetric adjacency)
+            # adj_t: same indices but flipped rows<->cols
+                adj_t = torch.sparse_coo_tensor(adj_sparse.indices().flip(0), adj_sparse.values(), size=adj_sparse.shape, dtype=adj_sparse.dtype, device=device)
+                adj_sparse = (adj_sparse + adj_t).coalesce()
+
+        # ensure coalesced
+            adj_sparse = adj_sparse.coalesce()
+            adjs.append(adj_sparse)
+
+    # stack into (T, n, n)
+        adj_3d = torch.stack(adjs, dim=0)
+
+    # labels -> tensor (T, n)
+        labels = torch.stack([
+        torch.from_numpy(l).long().to(device) if isinstance(l, np.ndarray) else l.clone().detach().long().to(device)
+        for l in labels_list
+    ], dim=0)
+        return adj_3d, labels
     
     def _load_konect(self, batches_num = 1):
         """
