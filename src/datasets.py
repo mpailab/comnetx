@@ -74,6 +74,7 @@ class Dataset:
                     print("Downloading files...")
                     download_flag = True
                     break
+            download_flag = False #FIXME
             if download_flag:
                 self._load_magi()
                 self._save_magi(coo_adj = True)
