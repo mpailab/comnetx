@@ -26,7 +26,7 @@ torch.autograd.set_detect_anomaly(True)
 
 import argparse
 
-def train(dataset, args):
+def train(dataset, args, have_label=True):
     #prepare graph dataset and device
     if args.gpu >= 0 and torch.cuda.is_available():
         device = 'cuda:{}'.format(args.gpu)
@@ -60,35 +60,37 @@ def train(dataset, args):
         loss.backward()
         optimizer.step()
 
-        if epoch % args.verbose == 0:
-            pred = decoding_from_assignment(model.hard_dic[1])
-    #         metrics = cluster_metrics(dataset.labels, pred)
-    #         acc, nmi, f1, ari, new_pred = metrics.evaluateFromLabel(use_acc=True)
-    #         if nmi > best_cluster['nmi']:
-    #             best_cluster['nmi'] = nmi
-    #             best_cluster_result['nmi'] = [nmi, ari, acc, f1]
-    #             if args.save:
-    #                 torch.save(model.state_dict(), './save_model/{}_{}_nmi.pt'.format(args.dataset, args.num_clusters_layer[0]))
-    #         if ari > best_cluster['ari']:
-    #             best_cluster['ari'] = ari
-    #             best_cluster_result['ari'] = [nmi, ari, acc, f1]
-    #             if args.save:
-    #                 torch.save(model.state_dict(), './save_model/{}_{}_ari.pt'.format(args.dataset, args.num_clusters_layer[0]))
-    #         if acc > best_cluster['acc']:
-    #             best_cluster['acc'] = acc
-    #             best_cluster_result['acc'] = [nmi, ari, acc, f1]
-    #             if args.save:
-    #                 torch.save(model.state_dict(), './save_model/{}_{}_acc.pt'.format(args.dataset, args.num_clusters_layer[0]))
-    #         if f1 > best_cluster['f1']:
-    #             best_cluster['f1'] = f1
-    #             best_cluster_result['f1'] = [nmi, ari, acc, f1]
-    #             if args.save:
-    #                 torch.save(model.state_dict(), './save_model/{}_{}_f1.pt'.format(args.dataset, args.num_clusters_layer[0]))
-            
-    #         print(f"Epoch: {epoch} [{time()-t1:.3f}s], Loss: {loss.item():.6f} = {args.se_lamda} * {se_loss.item():.6f} + {args.lp_lamda} * {lp_loss.item():.6f}, NMI: {nmi:.6f}, ARI: {ari:.6f}, ACC: {acc:.6f}, F1: {f1:.6f}")
-    #         #print(f"train time: {t2-t1}; se_loss time: {t3-t2}; lp_loss time: {t4-t3}")
-    # #print('Total time: {:.3f}s'.format(time()-t0))
-    # print(f"Best NMI: {best_cluster_result['nmi']}, Best ARI: {best_cluster_result['ari']}, \nBest Cluster: {best_cluster}")
+        if have_label:
+            if epoch % args.verbose == 0:
+                pred = decoding_from_assignment(model.hard_dic[1])
+                # print("lab", dataset.labels, "\npred laab", pred)
+                metrics = cluster_metrics(dataset.labels, pred)
+                acc, nmi, f1, ari, new_pred = metrics.evaluateFromLabel(use_acc=True)
+                if nmi > best_cluster['nmi']:
+                    best_cluster['nmi'] = nmi
+                    best_cluster_result['nmi'] = [nmi, ari, acc, f1]
+                    if args.save:
+                        torch.save(model.state_dict(), './save_model/{}_{}_nmi.pt'.format(args.dataset, args.num_clusters_layer[0]))
+                if ari > best_cluster['ari']:
+                    best_cluster['ari'] = ari
+                    best_cluster_result['ari'] = [nmi, ari, acc, f1]
+                    if args.save:
+                        torch.save(model.state_dict(), './save_model/{}_{}_ari.pt'.format(args.dataset, args.num_clusters_layer[0]))
+                if acc > best_cluster['acc']:
+                    best_cluster['acc'] = acc
+                    best_cluster_result['acc'] = [nmi, ari, acc, f1]
+                    if args.save:
+                        torch.save(model.state_dict(), './save_model/{}_{}_acc.pt'.format(args.dataset, args.num_clusters_layer[0]))
+                if f1 > best_cluster['f1']:
+                    best_cluster['f1'] = f1
+                    best_cluster_result['f1'] = [nmi, ari, acc, f1]
+                    if args.save:
+                        torch.save(model.state_dict(), './save_model/{}_{}_f1.pt'.format(args.dataset, args.num_clusters_layer[0]))
+                
+                print(f"Epoch: {epoch} [{time()-t1:.3f}s], Loss: {loss.item():.6f} = {args.se_lamda} * {se_loss.item():.6f} + {args.lp_lamda} * {lp_loss.item():.6f}, NMI: {nmi:.6f}, ARI: {ari:.6f}, ACC: {acc:.6f}, F1: {f1:.6f}")
+                #print(f"train time: {t2-t1}; se_loss time: {t3-t2}; lp_loss time: {t4-t3}")
+    #print('Total time: {:.3f}s'.format(time()-t0))
+    print(f"Best NMI: {best_cluster_result['nmi']}, Best ARI: {best_cluster_result['ari']}, \nBest Cluster: {best_cluster}")
     print(args)
 
     return best_cluster, pred

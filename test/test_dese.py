@@ -13,14 +13,15 @@ from collections import Counter
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
-from baselines.dese import main, train
+from baselines.dese import train
 from datasets import Dataset, KONECT_PATH
+import random
 
-def main(adj, features, labels):
+def main(adj, features, labels, l):
     parser = argparse.ArgumentParser(description="Run.")
     parser.add_argument('--dataset', nargs='?', default='Computers', 
                         help='Choose a dataset from {Cora, Citeseer, Pubmed, Computers, Photo, CS and Physics}.')
-    parser.add_argument('--epochs', type=int, default=10, 
+    parser.add_argument('--epochs', type=int, default=50, 
                         help='Number of epochs.')
     parser.add_argument('--lr', type=float, default=1e-2,
                         help='Learning rate.')
@@ -40,7 +41,7 @@ def main(adj, features, labels):
                         help='Weight of se loss.')
     parser.add_argument('--lp_lamda', type=float, default=1,
                         help='Weight of lp loss.')
-    parser.add_argument('--verbose', type=int, default=20,
+    parser.add_argument('--verbose', type=int, default=10,
                         help='evaluate every verbose epochs.')
     parser.add_argument('--activation', type=str, default='relu',
                         help='elu, relu, sigmoid, None')
@@ -58,22 +59,33 @@ def main(adj, features, labels):
                         help='Draw network or not')
 
     labels = labels.tolist()
-    adj_sparse = adj.to_sparse()
-    edge_index = adj_sparse.indices()
+    edge_index = adj.coalesce().indices()
+    num_nodes = adj.size(0)
 
-    neg_edge_index = []
-    while len(neg_edge_index) < edge_index.shape[1]:
-        u = torch.randint(0, adj.shape[0], (10000,))
-        v = torch.randint(0, adj.shape[0], (10000,))
-        mask = (u != v) & (adj[u,v] == 0)
-        u, v = u[mask], v[mask]
-        neg_edge_index.append(torch.stack([u,v]))
-    neg_edge_index = torch.cat(neg_edge_index, dim=1)[:, :edge_index.shape[1]]
+    edge_set = set(map(tuple, edge_index.t().tolist()))
+
+    neg_u = []
+    neg_v = []
+    num_neg_edges = edge_index.shape[1]
+
+    while len(neg_u) < num_neg_edges:
+        u = random.randint(0, num_nodes - 1)
+        v = random.randint(0, num_nodes - 1)
+        
+        if u == v:
+            continue  
+        if (u, v) in edge_set or (v, u) in edge_set:
+            continue  
+        
+        neg_u.append(u)
+        neg_v.append(v)
+
+    neg_edge_index = torch.tensor([neg_u, neg_v], dtype=torch.long)
 
     class Dummy: pass
     dataset = Dummy()
     dataset.name = dataset
-    dataset.adj = adj_sparse
+    dataset.adj = adj
     dataset.feature = features
     dataset.labels = labels
     dataset.degrees = adj.sum(1)
@@ -89,8 +101,16 @@ def main(adj, features, labels):
     dataset.print_statistic = print_statistic
     
     args = parser.parse_args([])
-    best_cluster, out_label = train(dataset, args)
+    args.num_clusters_layer = [l]
+    args.epochs = 600
+    have_label = True
+    if labels is []:
+        have_label = False
+    best_cluster, out_label = train(dataset, args, have_label)
     print(type(out_label))
+
+    return best_cluster, out_label
+
 
 def test_dese_on_dataset():
     n = 30
@@ -147,24 +167,33 @@ def get_all_datasets():
     return datasets
 
 datasets = get_all_datasets()
-# @pytest.mark.long
-# @pytest.mark.parametrize(
-#     "name,data_dir",
-#     list(datasets.items()),
-#     ids=list(datasets.keys())
-# )
-# def test_dese_single_dataset(name, data_dir):
-#     dataset = Dataset(name, path=data_dir)
-#     adj, features, labels = dataset.load(tensor_type="dense")
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name,data_dir",
+    list(datasets.items()),
+    ids=list(datasets.keys())
+)
+def test_dese_single_dataset(name, data_dir):
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
 
-#     _, new_labels = main(adj, features, labels)
+    # print(dataset.load(tensor_type="coo"))
 
-#     assert isinstance(new_labels, torch.Tensor)
-#     assert new_labels.shape[0] == labels.shape[0]
-#     assert new_labels.dtype in (torch.int64, torch.long)
-#     assert new_labels.min() >= 0
+    # print("adj", adj, "\nfeatures", features, "\nlabels", labels)
+    # print("\nfeatures sum", torch.sum(features, dim=-1))
+    print(set(labels.tolist()))
+    l = len(set(labels.tolist()))
+    print(l)
+    best_cluster, new_labels = main(adj, features, labels, l)
+    # print(new_labels)
+    print(best_cluster)
 
-#     del adj, features, labels, new_labels
+    assert isinstance(new_labels, torch.Tensor)
+    assert new_labels.shape[0] == labels.shape[0]
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+
+    del adj, features, labels, new_labels
 
 def load_konect_info():
     """Load dataset info from all.json."""
@@ -237,5 +266,3 @@ def test_dese_konect_dataset(name):
     del adj, features, labels 
     gc.collect()
     torch.cuda.empty_cache()
-
-# test_dese_on_dataset()
