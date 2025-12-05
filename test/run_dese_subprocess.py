@@ -1,4 +1,5 @@
 import sys,os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 dese_root = os.path.join(PROJECT_PATH, "baselines", "DeSE")

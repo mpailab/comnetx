@@ -1,23 +1,19 @@
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import torch
-import numpy as np
 import sys
 import torch, gc
 import pytest
-import json
+import os
 import subprocess
 import tempfile
-import argparse
-from collections import Counter
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
-from baselines.dese import dese
+# from baselines.s2cag import main
 from datasets import Dataset, KONECT_PATH
+from baselines.s2cag import s2cag
 
-def test_dese_synthetic_dataset():
+def test_s2cag_synthetic_dataset():
     n = 30
     k = 4
     nodes_per_cluster = [15, 4, 5, 6]
@@ -35,6 +31,7 @@ def test_dese_synthetic_dataset():
         start = end
     feature = feature + torch.randn_like(feature) * 0.15
     feature = feature / feature.norm(dim=1, keepdim=True)
+    feature = abs(feature)
 
     adj = torch.zeros(n, n)
     start = 0
@@ -55,9 +52,13 @@ def test_dese_synthetic_dataset():
     adj.fill_diagonal_(0)
 
     adj = adj.to_sparse_coo()
-    print(adj, feature)
+    # print(adj, feature)
+    new_labels = s2cag(adj, feature, labels)
+    # print(new_labels)
+    assert new_labels.shape[0] == adj.size(0)
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
 
-    dese(adj=adj, features=feature, labels=labels, l=k)
 
 def get_all_datasets():
     """
@@ -72,6 +73,7 @@ def get_all_datasets():
                 datasets[name] = base_dir
     return datasets
 
+
 datasets = get_all_datasets()
 @pytest.mark.long
 @pytest.mark.parametrize(
@@ -79,72 +81,28 @@ datasets = get_all_datasets()
     list(datasets.items()),
     ids=list(datasets.keys())
 )
-def test_dese_single_dataset(name, data_dir):
+def test_s2cag_single_dataset(name, data_dir):
     dataset = Dataset(name, path=data_dir)
-    adj, features, labels = dataset.load(tensor_type="coo")
-
-    # print(dataset.load(tensor_type="coo"))
-
-    # print("adj", adj, "\nfeatures", features, "\nlabels", labels)
-    # print("\nfeatures sum", torch.sum(features, dim=-1))
-    print(set(labels.tolist()))
-    l = len(set(labels.tolist()))
-    print(l)
-    best_cluster, new_labels = dese(adj, features, labels, l)
-    # print(new_labels)
-    print(best_cluster)
-
-    assert isinstance(new_labels, torch.Tensor)
-    assert new_labels.shape[0] == labels.shape[0]
-    assert new_labels.dtype in (torch.int64, torch.long)
-    assert new_labels.min() >= 0
-
-    del adj, features, labels, new_labels
-
-def load_konect_info():
-    """Load dataset info from all.json."""
-    file_path = os.path.join(KONECT_INFO, "all.json")
-    with open(file_path, "r", encoding="utf-8") as f:
-        info = json.load(f)
-    return info
-
-def get_all_konect_datasets():
-    """Return a dict {dataset_name: Dataset object}."""
-    info = load_konect_info()
-    datasets = {}
-    for name in info.keys():
-        path = os.path.join(KONECT_PATH, name)
-        if os.path.exists(path):
-            datasets[name] = Dataset(name, KONECT_PATH)
-    return datasets
-
-KONECT_DATASETS = get_all_konect_datasets()
-
-@pytest.mark.long
-@pytest.mark.parametrize(
-    "name",
-    list(KONECT_DATASETS.keys()),
-    ids=list(KONECT_DATASETS.keys())
-)
-def test_dese_konect_dataset(name):
-    dataset = Dataset(name, path=KONECT_PATH)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     num_nodes = adj.size(0)
     features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    features = abs(features)
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
         temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
         temp_labels_path = os.path.join(tmpdir, f"labels_{name}.pt")
         torch.save(adj, temp_adj_path)
         torch.save(features, temp_features_path)
+        torch.save(labels, temp_labels_path)
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            "run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
-            # "--epochs", "40",
+            "--labels", temp_labels_path,
+            "--runs", "5",
             "--out", temp_labels_path
         ]
 
@@ -161,14 +119,6 @@ def test_dese_konect_dataset(name):
         assert new_labels.shape[0] == adj.size(0)
         assert new_labels.dtype in (torch.int64, torch.long)
         assert new_labels.min() >= 0
-        #print(proc.stdout)
-        '''
-        if proc.returncode != 0:
-            if "Unable to register cuDNN factory" in proc.stderr:
-                print("Warning: TensorFlow cuDNN factory warning detected, ignoring")
-            else:
-                pytest.fail(f"Subprocess failed for dataset {name} with error: {proc.stderr}")
-        '''
-    del adj, features, labels 
+    del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()

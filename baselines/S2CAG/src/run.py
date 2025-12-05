@@ -41,6 +41,7 @@ if fdim>0 and fdim>n_classes:
 norm_adj, features = preprocess_dataset(adj, features,
                                       tf_idf=True,
                                       sparse=True)
+# print(type(norm_adj), type(features), type(labels), sep='\n')
 
 
 features = features.toarray()
@@ -63,7 +64,6 @@ for run in range(n_runs):
     features = x
 
     t0 = time()
-    print("alarm!!!!!!!!!!!!")
 
     P, Q = run_SSCAG(features, k, norm_adj, T, alpha,method=method,dataset=dataset,gamma=gamma,tau=tau)
 

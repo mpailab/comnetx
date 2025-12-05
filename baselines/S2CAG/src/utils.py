@@ -45,6 +45,8 @@ def datagen(dataset):
         labels=data['gnd'].reshape(-1)
     n_classes = len(np.unique(labels))
 
+    # print(type(features))
+
     return adj, features, labels, n_classes
 
     return adj, features, labels, n_classes
@@ -130,23 +132,17 @@ def clustering_accuracy(y_true, y_pred):
 # @tf.function
 def PowerIteration(feature, adj_normalized, power, alpha):
   #feature = preprocessing.normalize(feature, norm='l2', axis=1)
-  print('PowerIteration!!!!!!!!!!!')
   feat0 = feature.copy()
   factor = power if alpha == 1.0 else (1.-alpha)/ (1. - np.power(alpha, power + 1))
-  print('after factor !!!!!!!!!!!')
   for _ in range(power):
-    print('PowerIteration in range!!!!!')
     feature = alpha*(adj_normalized.dot(feature)+feat0)
-    print('power!!!!!', power)
 
   feature=factor*feature
-  print('after factor*feature!!!!!!!!!')
   return feature
 
 
 
 def run_SSCAG(X, k, adj_normalized, T, alpha,method="sub",dataset='acm',gamma=0.9,tau=7):
-  print('run_SSCAG!!!!!!!!')
   x = X.sum(0)
   D = X @ x
   D[D==0]=1
@@ -162,18 +158,19 @@ def run_SSCAG(X, k, adj_normalized, T, alpha,method="sub",dataset='acm',gamma=0.
      integr=m*d*T+2*(tau+1)*n*d*(k+10)+3*n*(k+10)**2
      naive=2*(tau+1)*(n*d+m*T)*(k+10)+3*n*(k+10)**2
      if integr<naive:
+        #  print('X =', X)
          Z = PowerIteration(X, adj_normalized, T, alpha)
-         print('After Z!!!!!!!!!!!')
+        #  print('Z =', Z)
          Q= sub_randomized_svd(Z, n_components=k,n_iter=tau)
 
      else:
+        # print('X =', X)
         Q = subspace_svd(adj_normalized, X, n_components=k, n_iter=tau,n_T=T, alpha=alpha)
 
   elif method == 'mod':
+        #   print('X =', X)
           Z = PowerIteration(X, adj_normalized, T, alpha)
-          print('After Z - 2!!!!!!!!!!!')
+        #   print('Z =', Z)
           Q = KSI_decompose_B(Z=Z, dim=k,tau=tau,gamma=gamma)
-          print('After Q - 2!!!!!!!!!!!')
   P = SNEM_rounding(Q)
-  print('After SNEM_rounding!!!!!!!!!!!')
   return P, Q
