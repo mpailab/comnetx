@@ -1,23 +1,20 @@
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import torch
-import numpy as np
 import sys
 import torch, gc
 import pytest
-import json
+import os
 import subprocess
 import tempfile
-import argparse
-from collections import Counter
+import json
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
-from baselines.dese import dese
+# from baselines.s2cag import main
 from datasets import Dataset, KONECT_PATH
+from baselines.s2cag import s2cag
 
-def test_dese_synthetic_dataset():
+def test_s2cag_synthetic_dataset():
     n = 30
     k = 4
     nodes_per_cluster = [15, 4, 5, 6]
@@ -35,6 +32,7 @@ def test_dese_synthetic_dataset():
         start = end
     feature = feature + torch.randn_like(feature) * 0.15
     feature = feature / feature.norm(dim=1, keepdim=True)
+    feature = abs(feature)
 
     adj = torch.zeros(n, n)
     start = 0
@@ -55,9 +53,13 @@ def test_dese_synthetic_dataset():
     adj.fill_diagonal_(0)
 
     adj = adj.to_sparse_coo()
-    print(adj, feature)
+    # print(adj, feature)
+    new_labels = s2cag(adj, feature, labels)
+    # print(new_labels)
+    assert new_labels.shape[0] == adj.size(0)
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
 
-    dese(adj=adj, features=feature, labels=labels)
 
 def get_all_datasets():
     """
@@ -79,12 +81,13 @@ datasets = get_all_datasets()
     list(datasets.items()),
     ids=list(datasets.keys())
 )
-def test_dese_single_dataset(name, data_dir):
+def test_s2cag_single_dataset(name, data_dir):
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     num_nodes = adj.size(0)
     features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    features = abs(features)
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
         temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
@@ -95,12 +98,11 @@ def test_dese_single_dataset(name, data_dir):
 
         cmd = [
             sys.executable,
-            "run_dese_subprocess.py",
+            "run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
-            "--epochs", "10",
-            "--layer_str", "[6]",
+            "--runs", "5",
             "--out", temp_labels_path
         ]
 
@@ -120,6 +122,14 @@ def test_dese_single_dataset(name, data_dir):
     del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
+
+# small (19)
+# def load_konect_info():
+#     """Load dataset info from all.json."""
+#     file_path = os.path.join(os.path.dirname(__file__), "dataset_paths.json")
+#     with open(file_path, "r", encoding="utf-8") as f:
+#         info = json.load(f)
+#     return info
 
 def load_konect_info():
     """Load dataset info from all.json."""
@@ -146,14 +156,20 @@ KONECT_DATASETS = get_all_konect_datasets()
     list(KONECT_DATASETS.keys()),
     ids=list(KONECT_DATASETS.keys())
 )
-def test_dese_konect_dataset(name):
+def test_s2cag_konect_dataset(name):
     dataset = Dataset(name, path=KONECT_PATH)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
+    
+    new_values = adj.values().abs()
+    adj = torch.sparse_coo_tensor(
+        adj.indices(), new_values, adj.size()
+    ).coalesce() #FIXME
+
     num_nodes = adj.size(0)
-    features = torch.randn(num_nodes, 128, dtype=torch.float32) #FIXME
+    features = torch.rand(num_nodes, 128, dtype=torch.float32) #FIXME
     labels = torch.randint(low=0, high=10, size=(num_nodes,))
-    # print("adj =", adj, sep='\n------------------\n')
+    print("adj =", adj, sep='\n------------------\n')
     # print("num_nodes =", num_nodes, sep='\n------------------\n')
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
@@ -165,11 +181,63 @@ def test_dese_konect_dataset(name):
 
         cmd = [
             sys.executable,
-            "run_dese_subprocess.py",
+            "run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
-            "--epochs", "10",
+            "--runs", "1",
+            "--out", temp_labels_path
+        ]
+
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            print(f"Subprocess failed with code {proc.returncode}")
+            print("stdout:", proc.stdout)
+            print("stderr:", proc.stderr)
+            pytest.fail(f"Subprocess failed for dataset {name}")
+
+        new_labels = torch.load(temp_labels_path)
+
+        assert isinstance(new_labels, torch.Tensor)
+        assert new_labels.shape[0] == adj.size(0)
+        assert new_labels.dtype in (torch.int64, torch.long)
+        assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
+    gc.collect()
+    torch.cuda.empty_cache()
+
+def test_s2cag_single_konect_dataset():
+    name = "com-lj"
+    dataset = Dataset(name, KONECT_PATH)
+    adj, features, labels = dataset.load(tensor_type="coo")
+    adj = adj.coalesce()
+    
+    new_values = adj.values().abs()
+    adj = torch.sparse_coo_tensor(
+        adj.indices(), new_values, adj.size()
+    ).coalesce() #FIXME
+    
+    num_nodes = adj.size(0)
+    if labels is None:
+        num_classes = 16
+        labels = torch.randint(0, num_classes, (num_nodes,), dtype=torch.long)
+    features = torch.rand(num_nodes, 128, dtype=torch.float32)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
+        temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
+        temp_labels_path = os.path.join(tmpdir, f"labels_{name}.pt")
+        torch.save(adj, temp_adj_path)
+        torch.save(features, temp_features_path)
+        torch.save(labels, temp_labels_path)
+
+        cmd = [
+            sys.executable,
+            "run_s2cag_subprocess.py",
+            "--adj", temp_adj_path,
+            "--features", temp_features_path,
+            "--labels", temp_labels_path,
+            "--runs", "5",
             "--out", temp_labels_path
         ]
 

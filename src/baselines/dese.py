@@ -1,4 +1,5 @@
 import sys,os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 dese_root = os.path.join(PROJECT_PATH, "baselines", "DeSE")
@@ -95,11 +96,66 @@ def train(dataset, args, have_label=True):
 
     return best_cluster, pred
 
+def data_preprocess(adj, features, labels):
+    labels = labels.tolist()
+    edge_index = adj.coalesce().indices()
+    num_nodes = adj.size(0)
+
+    edge_set = set(map(tuple, edge_index.t().tolist()))
+
+    neg_u = []
+    neg_v = []
+    num_neg_edges = edge_index.shape[1]
+
+    while len(neg_u) < num_neg_edges:
+        u = random.randint(0, num_nodes - 1)
+        v = random.randint(0, num_nodes - 1)
+        
+        if u == v:
+            continue  
+        if (u, v) in edge_set or (v, u) in edge_set:
+            continue  
+        
+        neg_u.append(u)
+        neg_v.append(v)
+
+    neg_edge_index = torch.tensor([neg_u, neg_v], dtype=torch.long)
+
+    class Dummy: pass
+    dataset = Dummy()
+    dataset.name = dataset
+    dataset.adj = adj
+    dataset.feature = features
+    dataset.labels = labels
+    dataset.degrees = adj.sum(1)
+    dataset.neg_edge_index = neg_edge_index
+    dataset.num_nodes = adj.shape[0]
+    dataset.num_edges = int(adj.sum())
+    dataset.num_features = features.shape[1]
+    dataset.num_classes = len(set(labels))
+
+    def print_statistic():
+        print(f"=== {dataset.name} | {adj.shape[0]} nodes | {dataset.num_edges//2} edges | {dataset.num_classes} classes ===")
+        # print(f"Label dist: {dict(Counter(labels))}")
+    dataset.print_statistic = print_statistic
+    return dataset
+
+def dese(adj, features, labels, args):
+    dataset = data_preprocess(adj, features, labels)
+    
+    have_label = True
+    if labels is []:
+        have_label = False
+    best_cluster, out_label = train(dataset, args, have_label)
+    print(type(out_label))
+
+    return best_cluster, out_label
+
 def main():
     parser = argparse.ArgumentParser(description="Run.")
     parser.add_argument('--dataset', nargs='?', default='Computers', 
                         help='Choose a dataset from {Cora, Citeseer, Pubmed, Computers, Photo, CS and Physics}.')
-    parser.add_argument('--epochs', type=int, default=100, 
+    parser.add_argument('--epochs', type=int, default=10, 
                         help='Number of epochs.')
     parser.add_argument('--lr', type=float, default=1e-2,
                         help='Learning rate.')
@@ -138,55 +194,20 @@ def main():
     
     parser.add_argument("--adj", required=True)
     parser.add_argument("--features", required=True)
+    parser.add_argument("--labels", required=True)
     parser.add_argument("--out", required=True)
 
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
+    adj = torch.sparse_coo_tensor(
+        adj.indices(),
+        adj.values().float(),
+        adj.size()
+    ).coalesce()
     features = torch.load(args.features)
-
-    edge_index = adj.coalesce().indices()
-    num_nodes = adj.size(0)
-
-    edge_set = set(map(tuple, edge_index.t().tolist()))
-
-    neg_u = []
-    neg_v = []
-    num_neg_edges = edge_index.shape[1]
-
-    while len(neg_u) < num_neg_edges:
-        u = random.randint(0, num_nodes - 1)
-        v = random.randint(0, num_nodes - 1)
-        
-        if u == v:
-            continue  
-        if (u, v) in edge_set or (v, u) in edge_set:
-            continue  
-        
-        neg_u.append(u)
-        neg_v.append(v)
-
-    neg_edge_index = torch.tensor([neg_u, neg_v], dtype=torch.long)
-
-    class Dummy: pass
-    dataset = Dummy()
-    dataset.name = dataset
-    dataset.adj = adj
-    dataset.feature = features
-    # dataset.labels = labels
-    dataset.degrees = adj.sum(1)
-    dataset.neg_edge_index = neg_edge_index
-    dataset.num_nodes = adj.shape[0]
-    dataset.num_edges = int(adj.sum())
-    dataset.num_features = features.shape[1]
-    # dataset.num_classes = len(set(labels))
-
-    def print_statistic():
-        print(f"=== {dataset.name} | {adj.shape[0]} nodes | {dataset.num_edges//2} edges | {dataset.num_classes} classes ===")
-        # print(f"Label dist: {dict(Counter(labels))}")
-    dataset.print_statistic = print_statistic
-    
-    _, new_labels = train(dataset, args)
+    labels = torch.load(args.labels)
+    best_cluster, new_labels = dese(adj, features, labels, args)
 
     torch.save(new_labels, args.out)
     print("DeSE finished successfully")
