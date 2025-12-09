@@ -20,7 +20,7 @@ torch.autograd.set_detect_anomaly(True)
 
 import argparse
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
-from baselines.dese import train
+from baselines.dese import dese
 import random
 
 
@@ -67,6 +67,7 @@ def main():
     
     parser.add_argument("--adj", required=True)
     parser.add_argument("--features", required=True)
+    parser.add_argument("--labels", required=True)
     parser.add_argument("--out", required=True)
 
     args = parser.parse_args()
@@ -78,49 +79,8 @@ def main():
         adj.size()
     ).coalesce()
     features = torch.load(args.features)
-
-    edge_index = adj.coalesce().indices()
-    num_nodes = adj.size(0)
-
-    edge_set = set(map(tuple, edge_index.t().tolist()))
-
-    neg_u = []
-    neg_v = []
-    num_neg_edges = edge_index.shape[1]
-
-    while len(neg_u) < num_neg_edges:
-        u = random.randint(0, num_nodes - 1)
-        v = random.randint(0, num_nodes - 1)
-        
-        if u == v:
-            continue  
-        if (u, v) in edge_set or (v, u) in edge_set:
-            continue  
-        
-        neg_u.append(u)
-        neg_v.append(v)
-
-    neg_edge_index = torch.tensor([neg_u, neg_v], dtype=torch.long)
-
-    class Dummy: pass
-    dataset = Dummy()
-    dataset.name = dataset
-    dataset.adj = adj
-    dataset.feature = features
-    dataset.labels = [] #labels
-    dataset.degrees = adj.sum(1)
-    dataset.neg_edge_index = neg_edge_index
-    dataset.num_nodes = adj.shape[0]
-    dataset.num_edges = int(adj.sum())
-    dataset.num_features = features.shape[1]
-    dataset.num_classes = 0 #len(set(labels))
-
-    def print_statistic():
-        print(f"=== {dataset.name} | {adj.shape[0]} nodes | {dataset.num_edges//2} edges | {dataset.num_classes} classes ===")
-        # print(f"Label dist: {dict(Counter(labels))}")
-    dataset.print_statistic = print_statistic
-
-    _, new_labels = train(dataset, args)
+    labels = torch.load(args.labels)
+    best_cluster, new_labels = dese(adj, features, labels, args)
 
     torch.save(new_labels, args.out)
     print("DeSE finished successfully")

@@ -57,7 +57,7 @@ def test_dese_synthetic_dataset():
     adj = adj.to_sparse_coo()
     print(adj, feature)
 
-    dese(adj=adj, features=feature, labels=labels, l=k)
+    dese(adj=adj, features=feature, labels=labels)
 
 def get_all_datasets():
     """
@@ -81,25 +81,46 @@ datasets = get_all_datasets()
 )
 def test_dese_single_dataset(name, data_dir):
     dataset = Dataset(name, path=data_dir)
-    adj, features, labels = dataset.load(tensor_type="coo")
+    adj, features, labels = dataset.load()
+    adj = adj.coalesce()
+    num_nodes = adj.size(0)
+    features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
+        temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
+        temp_labels_path = os.path.join(tmpdir, f"labels_{name}.pt")
+        torch.save(adj, temp_adj_path)
+        torch.save(features, temp_features_path)
+        torch.save(labels, temp_labels_path)
 
-    # print(dataset.load(tensor_type="coo"))
+        cmd = [
+            sys.executable,
+            "run_dese_subprocess.py",
+            "--adj", temp_adj_path,
+            "--features", temp_features_path,
+            "--labels", temp_labels_path,
+            "--epochs", "10",
+            "--layer_str", "[6]",
+            "--gpu", "1",
+            "--out", temp_labels_path
+        ]
 
-    # print("adj", adj, "\nfeatures", features, "\nlabels", labels)
-    # print("\nfeatures sum", torch.sum(features, dim=-1))
-    print(set(labels.tolist()))
-    l = len(set(labels.tolist()))
-    print(l)
-    best_cluster, new_labels = dese(adj, features, labels, l)
-    # print(new_labels)
-    print(best_cluster)
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            print(f"Subprocess failed with code {proc.returncode}")
+            print("stdout:", proc.stdout)
+            print("stderr:", proc.stderr)
+            pytest.fail(f"Subprocess failed for dataset {name}")
 
-    assert isinstance(new_labels, torch.Tensor)
-    assert new_labels.shape[0] == labels.shape[0]
-    assert new_labels.dtype in (torch.int64, torch.long)
-    assert new_labels.min() >= 0
+        new_labels = torch.load(temp_labels_path)
 
+        assert isinstance(new_labels, torch.Tensor)
+        assert new_labels.shape[0] == adj.size(0)
+        assert new_labels.dtype in (torch.int64, torch.long)
+        assert new_labels.min() >= 0
     del adj, features, labels, new_labels
+    gc.collect()
+    torch.cuda.empty_cache()
 
 def load_konect_info():
     """Load dataset info from all.json."""
@@ -131,20 +152,25 @@ def test_dese_konect_dataset(name):
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     num_nodes = adj.size(0)
-    features = torch.randn(num_nodes, 128, dtype=torch.float32)
+    features = torch.randn(num_nodes, 128, dtype=torch.float32) #FIXME
+    labels = torch.randint(low=0, high=10, size=(num_nodes,))
+    # print("adj =", adj, sep='\n------------------\n')
+    # print("num_nodes =", num_nodes, sep='\n------------------\n')
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
         temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
         temp_labels_path = os.path.join(tmpdir, f"labels_{name}.pt")
         torch.save(adj, temp_adj_path)
         torch.save(features, temp_features_path)
+        torch.save(labels, temp_labels_path)
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            "run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
-            # "--epochs", "40",
+            "--labels", temp_labels_path,
+            "--epochs", "10",
             "--out", temp_labels_path
         ]
 
@@ -161,14 +187,6 @@ def test_dese_konect_dataset(name):
         assert new_labels.shape[0] == adj.size(0)
         assert new_labels.dtype in (torch.int64, torch.long)
         assert new_labels.min() >= 0
-        #print(proc.stdout)
-        '''
-        if proc.returncode != 0:
-            if "Unable to register cuDNN factory" in proc.stderr:
-                print("Warning: TensorFlow cuDNN factory warning detected, ignoring")
-            else:
-                pytest.fail(f"Subprocess failed for dataset {name} with error: {proc.stderr}")
-        '''
-    del adj, features, labels 
+    del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
