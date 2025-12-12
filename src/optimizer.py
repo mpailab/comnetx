@@ -201,7 +201,6 @@ class Optimizer:
                 res = adapted_dmon(adj, features, labels, timing_info = timing_info)
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
-<<<<<<< HEAD
                 return networkit_partition(adj)
             elif self.method == "mfc":
                 from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
@@ -236,7 +235,6 @@ class Optimizer:
                 )
                 uniq, remap = torch.unique(labels, sorted=True, return_inverse=True)
                 return remap.to(torch.long)
-=======
                 res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "dese":
                 from baselines.dese import dese
@@ -244,7 +242,6 @@ class Optimizer:
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
                 res = s2cag(adj, features, labels, timing_info = timing_info)
->>>>>>> origin/develop
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info['conversion_time']
