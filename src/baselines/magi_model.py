@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch_geometric.utils import to_undirected, add_remaining_self_loops
 from torch_sparse import SparseTensor
 from sklearn.cluster import KMeans, SpectralClustering
+import time
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -33,6 +34,7 @@ def magi(adj : torch.Tensor,
          n_clusters : int = -1, 
          device=None, 
          args=None,
+         timing_info=None,
          **kwargs):
 
     """
@@ -97,6 +99,7 @@ def magi(adj : torch.Tensor,
     
     print("device: ", device)
 
+    time_s = time.time()
     features = features.to(device)
     if labels is None:
         num_nodes = adj.size(0)
@@ -110,6 +113,9 @@ def magi(adj : torch.Tensor,
     edge_index = to_undirected(add_remaining_self_loops(edge_index)[0])
     new_values = torch.ones(edge_index.size(1), device=device)
     adj_sparse = SparseTensor(row=edge_index[0].to(device), col=edge_index[1].to(device), value=new_values, sparse_sizes=(N, N))
+    time_e = time.time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
 
     hidden = list(map(int, args.hidden_channels.split(',')))
     if args.projection == '':
