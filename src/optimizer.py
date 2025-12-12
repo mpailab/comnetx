@@ -202,6 +202,12 @@ class Optimizer:
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
                 res = networkit_partition(adj, timing_info = timing_info)
+            elif self.method == "dese":
+                from baselines.dese import dese
+                res = dese(adj, features, labels, timing_info = timing_info)
+            elif self.method == "s2cag":
+                from baselines.s2cag import s2cag
+                res = s2cag(adj, features, labels, timing_info = timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info['conversion_time']
@@ -267,7 +273,7 @@ class Optimizer:
 
             # Restoring the community of the original graph
             new_coms = old_idx[coms[inverse]]
-
+            
             # Store new communities at the level l
             self.coms[l, ext_mask[l]] = new_coms
 

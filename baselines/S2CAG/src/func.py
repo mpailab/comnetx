@@ -13,7 +13,6 @@ from sklearn.utils.extmath import svd_flip, safe_sparse_dot
 
 
 def SNEM_rounding(vectors, T=100):
-    print("in SNEM_rounding")
     vectors = as_float_array(vectors)
     n_samples = vectors.shape[0]
     n_feats = vectors.shape[1]
@@ -30,10 +29,7 @@ def SNEM_rounding(vectors, T=100):
     #vectors_discrete = preprocessing.normalize(vectors_discrete, norm='l2', axis=0)
 
     for _ in range(T):
-        print("in SNEM_rounding in range")
-        print(vectors.shape, vectors_discrete.shape)
         Q = vectors.T.dot(vectors_discrete)
-        print("after dot")
         Q=np.matrix(Q)
         Q=np.asarray(Q)
         vectors_discrete = vectors.dot(Q)
@@ -50,7 +46,7 @@ def SNEM_rounding(vectors, T=100):
         vectors_sum = np.sqrt(vectors_discrete.sum(axis=0))
         vectors_sum[vectors_sum==0]=1
         vectors_discrete = vectors_discrete*1.0/vectors_sum
-    print("in SNEM_rounding after range")
+
     return labels
 
 
@@ -67,7 +63,6 @@ def KSI_decompose_B(Z, dim, tau=100,gamma=0.9):
     D_Z_3 = Z.dot(D_Z_2)
     D_sum = D_Z_3.sum()
 
-    print("in KSI_decompose_B")
     for i in range(tau):
         Z_T=Z.T.dot(Q)
         A_Z=Z.dot(Z_T)
@@ -207,7 +202,6 @@ def sub_randomized_svd(
     random_state="warn",
     n_oversamples=10,
 ):
-    print('sub_randomized_svd!!!!!!!!!!!!!!!!')
     if isinstance(Z, (sparse.lil_matrix, sparse.dok_matrix)):
         warnings.warn(
             "Calculating SVD of a {} is expensive. "
@@ -253,7 +247,9 @@ def sub_randomized_svd(
         Q=safe_sparse_dot(Z.T,Q)
     Q = safe_sparse_dot(Z, Q)
 
+    # print('Q =', Q)
     Q, _ = linalg.qr(Q, mode="economic")
+    
 
     # project M to the (k + p) dimensional space using the basis vectors
     B=safe_sparse_dot(Z.T,Q).T
