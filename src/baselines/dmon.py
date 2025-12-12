@@ -10,6 +10,7 @@ from scipy.sparse import base
 import sklearn.metrics
 import torch
 import warnings
+import time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 warnings.simplefilter("ignore")
@@ -141,6 +142,7 @@ def adapted_dmon(adj: torch.Tensor,
         ftrs : torch.Tensor,
         lbls : torch.Tensor | None = None,
         args=None,
+        timing_info=None,
         **kwargs):
   """
   DMON method
@@ -170,12 +172,16 @@ def adapted_dmon(adj: torch.Tensor,
             _learning_rate = 0.001 #min - 0
         args = Args()
 
+  time_s = time.time()
   graph, features = torch_to_tf_sparse_tensor(adj), torch_to_tf_sparse_tensor(ftrs)
   adjacency = torch_to_scipy_csr(adj)
   if lbls != None:
     labels_numpy = lbls.detach().cpu().numpy().flatten()
     label_indices = np.where(labels_numpy != -1)[0]
     know_labels = labels_numpy[label_indices]
+  time_e = time.time()
+  if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
 
   features_dense = tf.sparse.to_dense(features) if isinstance(features, tf.SparseTensor) else features
   n_nodes = tf.shape(graph)[0]

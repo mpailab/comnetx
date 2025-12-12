@@ -2,6 +2,7 @@ import argparse
 import leidenalg as la
 import igraph as ig
 import torch
+import time
 
 def sparse_tensor_to_igraph(sparse_tensor, directed=True):
     st = sparse_tensor.coalesce()
@@ -12,8 +13,14 @@ def sparse_tensor_to_igraph(sparse_tensor, directed=True):
     graph.es['weight'] = values.numpy()
     return graph
 
-def leidenalg_partition(adj : torch.Tensor):
+def leidenalg_partition(adj : torch.Tensor, timing_info=None):
+    time_s = time.time()
     G = sparse_tensor_to_igraph(adj.to_sparse())
+    time_e = time.time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
+
+
     part = la.find_partition(G, la.ModularityVertexPartition, weights='weight', seed=True, n_iterations=2)
     return torch.tensor(part.membership, dtype=torch.long)
 

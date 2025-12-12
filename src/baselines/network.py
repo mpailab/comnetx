@@ -1,6 +1,7 @@
 import argparse
 import networkit as nk
 import torch
+import time
 
 def sparse_tensor_to_networkit(sparse_tensor, directed=False):
     indices = sparse_tensor.coalesce().indices()
@@ -16,8 +17,13 @@ def sparse_tensor_to_networkit(sparse_tensor, directed=False):
     
     return graph
 
-def networkit_partition(adj: torch.Tensor, algorithm="leiden"):
+def networkit_partition(adj: torch.Tensor, algorithm="leiden", timing_info=None):
+    time_s = time.time()
     graph = sparse_tensor_to_networkit(adj)
+    time_e = time.time()
+    
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
 
     if algorithm == "leiden":
         detector = nk.community.ParallelLeiden(graph)
