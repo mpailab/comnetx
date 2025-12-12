@@ -132,7 +132,16 @@ def daegc_trainer(
             A_pred, z, Q = model(features, adj)
 
         A_pred, z, q = model(features, adj)
-        re_loss = F.binary_cross_entropy(A_pred.view(-1), adj_label.view(-1))
+        bce_input = A_pred.view(-1).float()
+        bce_input = torch.sigmoid(bce_input).clamp(1e-7, 1 - 1e-7)
+        bce_target = adj_label.to_dense().view(-1).float().to(bce_input.device)
+        if bce_target.device != A_pred.device:
+            bce_target = bce_target.to(A_pred.device)
+        if torch.isnan(A_pred).any() or torch.isinf(A_pred).any():
+            raise ValueError("A_pred contains NaN/Inf before BCE")
+        if torch.isnan(bce_target).any() or torch.isinf(bce_target).any():
+            raise ValueError("target contains NaN/Inf before BCE")
+        re_loss = F.binary_cross_entropy(bce_input, bce_target)
 
         if topo:
             loss = topo(adj,q) + re_loss
@@ -148,7 +157,9 @@ def daegc_trainer(
             if int(idx)>=9 and args.file_name == "Data/Cora":
                 train_acc = 0
             else:
-                train_acc = get_acc(A_pred, adj_label.to_dense())
+                A_mat = A_pred.view(N, N)
+                Y_mat = adj_label.to_dense().view(N, N)
+                train_acc = get_acc(A_mat, Y_mat)
             print("Epoch:", '%04d' % (epoch + 1), 
               "extra_loss=", "{:.5f}".format(loss.item() - re_loss.item()),
               "re_loss=", "{:.5f}".format(re_loss.item()),
@@ -223,7 +234,7 @@ def sdcn_trainer(
         adj:torch.Tensor,
         args:dict, 
         topo:TopoLoss,
-        idx:str
+        idx:str 
     ):
     adj = graph_normalization(adj)
     # features = torch.eye(adj.shape[0]).cuda()
