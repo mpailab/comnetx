@@ -62,19 +62,24 @@ def torch_to_scipy(adj_t, features_t, labels_t):
 
     return adj, features, labels, n_classes
 
-# Ваши torch-тензоры
-
-def s2cag(adj_torch, features_torch, labels: torch.Tensor | None = None,
-          dataset = 'dataset', T = 15, n_runs = 1, alpha= 0.8, 
-          fdim = 0, method = 'sub', gamma = 1, tau = 50):
+def s2cag(adj_torch, features_torch, 
+          labels: torch.Tensor | None = None,
+          timing_info=None,
+          dataset = 'dataset', T = 15, n_runs = 1, 
+          alpha= 0.8, fdim = 0, method = 'sub', 
+          gamma = 1, tau = 50):
+    time_s = time()
     if labels is None:
         num_nodes = adj_torch.size(0)
         labels_torch = torch.arange(num_nodes)
     adj, features, labels, n_classes = torch_to_scipy(adj_torch, features_torch, labels_torch)
 
-    # теперь можно запускать алгоритм
     norm_adj, features = preprocess_dataset(adj, features, sparse=True, tf_idf=True)
     # print(type(norm_adj), type(features), type(labels))
+    
+    time_e = time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
 
     features = features.toarray()
     n, d = features.shape

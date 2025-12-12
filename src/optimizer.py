@@ -204,10 +204,10 @@ class Optimizer:
                 res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "dese":
                 from baselines.dese import dese
-                return dese(adj, features, labels)
+                res = dese(adj, features, labels, timing_info = timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
-                return s2cag(adj, features, labels)
+                res = s2cag(adj, features, labels, timing_info = timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info['conversion_time']

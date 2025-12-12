@@ -136,7 +136,9 @@ def data_preprocess(adj, features, labels):
 
 def dese(adj, features, 
          labels: torch.Tensor | None = None, 
-         args=None):
+         args=None,
+         timing_info=None):
+    time_s = time()
     if labels is None:
         num_nodes = adj.size(0)
         labels = torch.arange(num_nodes)
@@ -171,6 +173,11 @@ def dese(adj, features,
     else:
         args.num_clusters_layer = [num_clusters]
         args.embed_dim = features_dim
+
+    time_e = time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
+
     best_cluster, out_label = train(dataset, args)
     # print(type(out_label))
     print("out_label =", out_label)
