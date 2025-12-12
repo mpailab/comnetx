@@ -105,6 +105,32 @@ def test_run_magi():
 
 
 @pytest.mark.long
+def test_run_dese():
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
+    communities = torch.tensor([[1, 1, 1, 3]])
+    features = torch.randn(4, 16, dtype=torch.float32)
+    opt = Optimizer(A, communities=communities, features=features, method="dese")
+    nodes_mask = torch.tensor([1, 1, 1, 0]).bool()
+    print("communities:", communities)
+    print("nodes_mask:", nodes_mask)
+    opt.run(nodes_mask)
+    print()
+    print(opt.coms.to_dense())
+
+@pytest.mark.long
+def test_run_s2cag():
+    A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
+    communities = torch.tensor([[1, 1, 1, 3]])
+    features = abs(torch.randn(4, 16, dtype=torch.float32))
+    opt = Optimizer(A, communities=communities, features=features, method="s2cag")
+    nodes_mask = torch.tensor([1, 1, 1, 0]).bool()
+    print("communities:", communities)
+    print("nodes_mask:", nodes_mask)
+    opt.run(nodes_mask)
+    print()
+    print(opt.coms.to_dense())
+
+@pytest.mark.long
 def test_run_dmon():
     A = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]]).to_sparse_coo()
     communities = torch.tensor([[1, 1, 1, 3]])
@@ -217,6 +243,77 @@ def test_run_magi_on_custom_dataset(name):
     print(adj.shape, nodes_mask.sum())
     opt.run(nodes_mask)
 
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets,
+)
+def test_run_dese_on_custom_dataset(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="dese")
+
+    top_level_coms = opt.coms[0]  # size (num_nodes,)
+
+    coo = adj if not adj.is_sparse else adj.to_dense()
+    if adj.is_sparse:
+        edges = adj._indices().t()
+    else:
+        edges = torch.nonzero(adj) 
+
+    found = False
+    for i, j in edges:
+        ci, cj = top_level_coms[i].item(), top_level_coms[j].item()
+        if ci != cj:
+            com1_nodes = (top_level_coms == ci)
+            com2_nodes = (top_level_coms == cj)
+            nodes_mask = com1_nodes | com2_nodes
+            found = True
+            break
+
+    if not found:
+        raise RuntimeError("No communities with edge between them")
+
+    print(adj.shape, nodes_mask.sum())
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets,
+)
+def test_run_s2cag_on_custom_dataset(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="s2cag")
+
+    top_level_coms = opt.coms[0]  # size (num_nodes,)
+
+    coo = adj if not adj.is_sparse else adj.to_dense()
+    if adj.is_sparse:
+        edges = adj._indices().t()
+    else:
+        edges = torch.nonzero(adj) 
+
+    found = False
+    for i, j in edges:
+        ci, cj = top_level_coms[i].item(), top_level_coms[j].item()
+        if ci != cj:
+            com1_nodes = (top_level_coms == ci)
+            com2_nodes = (top_level_coms == cj)
+            nodes_mask = com1_nodes | com2_nodes
+            found = True
+            break
+
+    if not found:
+        raise RuntimeError("No communities with edge between them")
+
+    print(adj.shape, nodes_mask.sum())
+    opt.run(nodes_mask)
 
 
 @pytest.mark.long
@@ -313,6 +410,91 @@ def test_run_magi_on_isolated_communities(name):
     print(f"{adj.shape}, nodes_mask sum: {nodes_mask.sum()}")
     opt.run(nodes_mask)
 
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets
+)
+def test_run_dese_on_isolated_communities(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="dese")
+
+    top_level_coms = opt.coms[0]  # shape (num_nodes,)
+    num_nodes = adj.shape[0]
+
+    unique_coms = torch.unique(top_level_coms)
+    found = False
+
+    row, col = adj._indices()
+    for i in range(len(unique_coms)):
+        for j in range(i + 1, len(unique_coms)):
+            com1_mask = (top_level_coms == unique_coms[i])
+            com2_mask = (top_level_coms == unique_coms[j])
+            com1_nodes = com1_mask.nonzero(as_tuple=True)[0]
+            com2_nodes = com2_mask.nonzero(as_tuple=True)[0]
+
+            mask1 = torch.isin(row, com1_nodes)
+            mask2 = torch.isin(col, com2_nodes)
+            has_edge = (mask1 & mask2).any()
+
+            if not has_edge:
+                nodes_mask = com1_mask | com2_mask
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise RuntimeError("No two isolated communities found")
+
+    print(f"{adj.shape}, nodes_mask sum: {nodes_mask.sum()}")
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets
+)
+def test_run_s2cag_on_isolated_communities(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="s2cag")
+
+    top_level_coms = opt.coms[0]  # shape (num_nodes,)
+    num_nodes = adj.shape[0]
+
+    unique_coms = torch.unique(top_level_coms)
+    found = False
+
+    row, col = adj._indices()
+    for i in range(len(unique_coms)):
+        for j in range(i + 1, len(unique_coms)):
+            com1_mask = (top_level_coms == unique_coms[i])
+            com2_mask = (top_level_coms == unique_coms[j])
+            com1_nodes = com1_mask.nonzero(as_tuple=True)[0]
+            com2_nodes = com2_mask.nonzero(as_tuple=True)[0]
+
+            mask1 = torch.isin(row, com1_nodes)
+            mask2 = torch.isin(col, com2_nodes)
+            has_edge = (mask1 & mask2).any()
+
+            if not has_edge:
+                nodes_mask = com1_mask | com2_mask
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise RuntimeError("No two isolated communities found")
+
+    print(f"{adj.shape}, nodes_mask sum: {nodes_mask.sum()}")
+    opt.run(nodes_mask)
 
 
 @pytest.mark.long
@@ -369,7 +551,99 @@ def test_run_magi_partial_mask(name):
     print(f"Adj shape: {adj.shape}, Masked nodes: {nodes_mask.sum()}")
     opt.run(nodes_mask)
 
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets
+)
+def test_run_dese_partial_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
 
+    communities = labels.unsqueeze(0)  # 1 уровень сообществ
+
+    opt = Optimizer(adj, features=features, method="dese", communities=communities)
+
+    top_level_coms = opt.coms[0]  # shape (num_nodes,)
+    unique_coms = torch.unique(top_level_coms)
+    print("top_level_coms:", top_level_coms)
+    print("unique_coms:", unique_coms)
+    for i in range(len(unique_coms)):
+        com_nodes = torch.where(top_level_coms == unique_coms[i])[0]
+        print(f"Сообщество {unique_coms[i]} содержит {len(com_nodes)} узлов")
+    found = False
+    for i in range(len(unique_coms)):
+        for j in range(i + 1, len(unique_coms)):
+            com1_nodes = torch.where(top_level_coms == unique_coms[i])[0]
+            com2_nodes = torch.where(top_level_coms == unique_coms[j])[0]
+
+            if len(com1_nodes) > 1 and len(com2_nodes) > 1:
+                num1 = max(1, len(com1_nodes)//2)
+                num2 = max(1, len(com2_nodes)//2)
+                subset1 = com1_nodes[torch.randperm(len(com1_nodes))[:num1]]
+                subset2 = com2_nodes[torch.randperm(len(com2_nodes))[:num2]]
+
+                nodes_mask = torch.zeros(adj.shape[0], dtype=torch.bool)
+                nodes_mask[subset1] = True
+                nodes_mask[subset2] = True
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise RuntimeError("Не удалось найти два сообщества с достаточным числом узлов")
+
+    print(f"Adj shape: {adj.shape}, Masked nodes: {nodes_mask.sum()}")
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets
+)
+def test_run_s2cag_partial_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    communities = labels.unsqueeze(0)  # 1 уровень сообществ
+
+    opt = Optimizer(adj, features=features, method="s2cag", communities=communities)
+
+    top_level_coms = opt.coms[0]  # shape (num_nodes,)
+    unique_coms = torch.unique(top_level_coms)
+    print("top_level_coms:", top_level_coms)
+    print("unique_coms:", unique_coms)
+    for i in range(len(unique_coms)):
+        com_nodes = torch.where(top_level_coms == unique_coms[i])[0]
+        print(f"Сообщество {unique_coms[i]} содержит {len(com_nodes)} узлов")
+    found = False
+    for i in range(len(unique_coms)):
+        for j in range(i + 1, len(unique_coms)):
+            com1_nodes = torch.where(top_level_coms == unique_coms[i])[0]
+            com2_nodes = torch.where(top_level_coms == unique_coms[j])[0]
+
+            if len(com1_nodes) > 1 and len(com2_nodes) > 1:
+                num1 = max(1, len(com1_nodes)//2)
+                num2 = max(1, len(com2_nodes)//2)
+                subset1 = com1_nodes[torch.randperm(len(com1_nodes))[:num1]]
+                subset2 = com2_nodes[torch.randperm(len(com2_nodes))[:num2]]
+
+                nodes_mask = torch.zeros(adj.shape[0], dtype=torch.bool)
+                nodes_mask[subset1] = True
+                nodes_mask[subset2] = True
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise RuntimeError("Не удалось найти два сообщества с достаточным числом узлов")
+
+    print(f"Adj shape: {adj.shape}, Masked nodes: {nodes_mask.sum()}")
+    opt.run(nodes_mask)
 
 
 @pytest.mark.long
@@ -389,6 +663,35 @@ def test_run_magi_on_true_mask(name):
     nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
     opt.run(nodes_mask)
 
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets
+)
+def test_run_dese_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="dese")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name",
+    datasets
+)
+def test_run_s2cag_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="s2cag")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
 
 
 @pytest.mark.long
@@ -500,6 +803,78 @@ def test_run_networkit_on_true_mask(name):
     nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
     opt.run(nodes_mask)
 
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_flmig_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="flmig")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_mfc_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="mfc")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_prgpt_infomap_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="prgpt:infomap")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_prgpt_locale_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="prgpt:locale")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_leiden_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="leidenalg")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_networkit_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="networkit")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
 
 @pytest.mark.short
 def test_update_adj():

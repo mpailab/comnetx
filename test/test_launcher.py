@@ -1,7 +1,10 @@
-import sys
+import subprocess, sys
 import os
 import pytest
+import re
 from pathlib import Path
+import signal, time
+import shutil 
 
 TEST_PATH = Path(__file__).resolve().parent
 PROJECT_PATH = TEST_PATH.parent
@@ -61,7 +64,11 @@ def test_dynamic_launcher_magi(dyn_dataset):
 
 """
 @pytest.mark.debug
-def test_dynamic_networkit_bad_datasets(resource_monitor):
+@pytest.mark.parametrize("repeat", range(15))
+def test_dynamic_networkit_bad_datasets(resource_monitor, prof, repeat):
+    profiles_dir = Path(".profiles")
+    profiles_dir.mkdir(exist_ok=True)
+
     for dataset in ["sociopatterns-hypertext", "radoslaw_email"]:
         print(f"\n\nProcessing dataset: {dataset}")
         try:

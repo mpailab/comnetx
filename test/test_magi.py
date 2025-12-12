@@ -15,7 +15,6 @@ KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dat
 from baselines.magi_model import magi
 from datasets import Dataset, KONECT_PATH
 
-
 def get_all_datasets():
     """
     Сreate dict with all datasets in test directory.
