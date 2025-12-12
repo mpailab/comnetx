@@ -49,6 +49,7 @@ class Optimizer:
         self.local_algorithm_fn = local_algorithm_fn
 
         self.verbose = verbose
+        self.conversion_time = 0.0
     
     def _set_communities(self, communities, replace_subcoms_depth = False):
         n = self.nodes_num
@@ -179,32 +180,32 @@ class Optimizer:
                         features: torch.Tensor,
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
-        
+        timing_info = {'conversion_time' : 0.0}
         with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:
-                return self.local_algorithm_fn(adj, features, limited, labels)
-            
-            # Lazy import for heavy baselines
-            if self.method == "magi":
+                res = self.local_algorithm_fn(adj, features, limited, labels)
+            elif self.method == "magi":
                 from baselines.magi_model import magi
-                return magi(adj, features, labels)
+                res = magi(adj, features, labels, timing_info = timing_info)
             elif self.method == "prgpt:infomap":
                 from baselines.rough_PRGPT import rough_prgpt
-                return rough_prgpt(adj, refine="infomap")
+                res = rough_prgpt(adj, refine="infomap", timing_info = timing_info)
             elif self.method == "prgpt:locale":
                 from baselines.rough_PRGPT import rough_prgpt
-                return rough_prgpt(adj, refine="locale")
+                res = rough_prgpt(adj, refine="locale", timing_info = timing_info)
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
-                return leidenalg_partition(adj)
+                res = leidenalg_partition(adj, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
-                return adapted_dmon(adj, features, labels)
+                res = adapted_dmon(adj, features, labels, timing_info = timing_info)
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
-                return networkit_partition(adj)
+                res = networkit_partition(adj, timing_info = timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")
+        self.conversion_time += timing_info['conversion_time']
+        return res
 
     @staticmethod
     def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:

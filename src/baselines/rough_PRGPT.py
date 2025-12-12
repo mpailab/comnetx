@@ -37,7 +37,8 @@ def to_com_tensor(clus_res, origin_num_nodes, reverse_mapping):
 
 def rough_prgpt(adj : torch.Tensor, 
 #                device=None,
-                refine=None):
+                refine=None,
+                timing_info=None):
     
     """
     PRGPT method "as is"
@@ -57,10 +58,14 @@ def rough_prgpt(adj : torch.Tensor,
     num_MLP_lyr_tmp = 4 # Number of MLP layers in binary classifier
 
     # ====================
+    time_s = time.time()
     inx = adj.coalesce().indices()
     origin_num_nodes = adj.size()[0]
     tst_edges = list(zip(inx[0].tolist(), inx[1].tolist()))
     tst_edges = list(filter(lambda x: x[0] >= x[1], tst_edges))
+    time_e = time.time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
 
     all_nodes = set()
     for u, v in tst_edges:
