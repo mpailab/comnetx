@@ -228,7 +228,7 @@ def main(network_type, adj_matrix, labels):
     with (out_dir / "results_topo.pkl").open("wb") as handle:
         pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor], network_type="MFC"):
+def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor], network_type="MFC", return_labels=False):
     """
     Args:
         adj_matrices: list[torch.Tensor], each one [N, N].
@@ -238,6 +238,44 @@ def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor
     main(network_type=network_type,
          adj_matrix=adj_matrices,
          labels=labels_list)
+
+    out_dir = Path(PROJECT_PATH) / "results" / "mfc"
+    
+    if return_labels:
+        raw_pkl = out_dir / "results_raw.pkl"
+        assert raw_pkl.is_file(), "results_raw.pkl not found"
+        
+        with raw_pkl.open("rb") as f:
+            raw = pickle.load(f)
+        assert isinstance(raw, list) and len(raw) >= 1
+        
+        snap = raw[0]
+        Z, Q, adj_out, labels_out = snap
+        
+        import numpy as np
+        Q = np.asarray(Q)
+        
+        labels = torch.tensor(np.argmax(Q, axis=1), dtype=torch.long)
+        
+        # Очищаем результаты (опционально, чтобы не засорять диск)
+        # (out_dir / "results_raw.pkl").unlink(missing_ok=True)
+        # (out_dir / "results_topo.pkl").unlink(missing_ok=True)
+        assert labels.shape[0] == adj_matrices[0].shape[0], \
+            f"Labels size mismatch: {labels.shape[0]} vs {adj_matrices[0].shape[0]}"
+
+        return labels
+
+    else:
+        raw_pkl = out_dir / "results_raw.pkl"
+        assert raw_pkl.is_file(), "results_raw.pkl not found after main()"
+        
+        with raw_pkl.open("rb") as f:
+            raw = pickle.load(f)
+        print("MFC completed successfully!")
+        print(f"Results saved to: {out_dir}")
+        print(f"- results_raw.pkl: {len(raw)} snapshots")
+        print(f"- results_topo.pkl: topological regularized results")
+        return None
 
 def _load_from_cli(adj_root: str, dataset_name: str | None):
     from datasets import Dataset

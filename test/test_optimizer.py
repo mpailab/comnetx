@@ -346,6 +346,78 @@ def test_run_dmon_on_true_mask(name):
     nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
     opt.run(nodes_mask)
 
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_flmig_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="flmig")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_mfc_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="mfc")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_prgpt_infomap_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="prgpt:infomap")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_prgpt_locale_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="prgpt:locale")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_leiden_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="leidenalg")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
+
+@pytest.mark.long
+@pytest.mark.parametrize("name", datasets)
+def test_run_networkit_on_true_mask(name):
+    data_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    dataset = Dataset(name, path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    opt = Optimizer(adj, features=features, method="networkit")
+
+    nodes_mask = torch.ones(adj.shape[0], dtype=torch.bool)
+    opt.run(nodes_mask)
 
 @pytest.mark.short
 def test_update_adj():
