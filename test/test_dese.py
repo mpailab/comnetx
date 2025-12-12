@@ -16,6 +16,7 @@ KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dat
 
 from baselines.dese import dese
 from datasets import Dataset, KONECT_PATH
+from optimizer import Optimizer
 
 def test_dese_synthetic_dataset():
     n = 30
@@ -59,6 +60,48 @@ def test_dese_synthetic_dataset():
 
     dese(adj=adj, features=feature, labels=labels)
 
+def test_dese_synthetic_dataset_WO_labels():
+    n = 30
+    k = 4
+    nodes_per_cluster = [15, 4, 5, 6]
+
+    # labels = []
+    # for c, size in enumerate(nodes_per_cluster):
+    #     labels.extend([c] * size)
+    # # labels = torch.tensor(labels)
+
+    feature = torch.zeros(n, 5)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        feature[start:end, c*10:(c+1)*10] = 1.0
+        start = end
+    feature = feature + torch.randn_like(feature) * 0.15
+    feature = feature / feature.norm(dim=1, keepdim=True)
+
+    adj = torch.zeros(n, n)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        idx = torch.arange(start, end)
+        i, j = torch.meshgrid(idx, idx, indexing='ij')
+        mask = torch.rand(size, size) < 0.4
+        mask = torch.triu(mask, 1)
+        adj[i[mask], j[mask]] = 1
+        adj[j[mask], i[mask]] = 1
+        start = end
+
+    inter = torch.rand(n, n) < 0.003
+    inter = inter & (torch.triu(torch.ones(n,n), 1) > 0)
+    adj[inter] = 1
+    adj.T[inter] = 1
+    adj.fill_diagonal_(0)
+
+    adj = adj.to_sparse_coo()
+    print(adj, feature)
+
+    dese(adj=adj, features=feature, labels=None)
+
 def get_all_datasets():
     """
     Сreate dict with all datasets in test directory.
@@ -100,8 +143,6 @@ def test_dese_single_dataset(name, data_dir):
             "--features", temp_features_path,
             "--labels", temp_labels_path,
             "--epochs", "10",
-            "--layer_str", "[6]",
-            "--gpu", "1",
             "--out", temp_labels_path
         ]
 
@@ -190,3 +231,4 @@ def test_dese_konect_dataset(name):
     del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
+

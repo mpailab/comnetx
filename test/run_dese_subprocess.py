@@ -80,7 +80,7 @@ def main():
     ).coalesce()
     features = torch.load(args.features)
     labels = torch.load(args.labels)
-    best_cluster, new_labels = dese(adj, features, labels, args)
+    new_labels = dese(adj, features, labels, args)
 
     torch.save(new_labels, args.out)
     print("DeSE finished successfully")

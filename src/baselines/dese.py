@@ -15,6 +15,7 @@ import torch.optim as optim
 from time import time, strftime, localtime
 import os
 import numpy as np
+from torch_geometric.utils import negative_sampling
 import random
 import dgl
 import matplotlib.pyplot as plt
@@ -27,14 +28,14 @@ torch.autograd.set_detect_anomaly(True)
 
 import argparse
 
-def train(dataset, args, have_label=True):
+def train(dataset, args):
     #prepare graph dataset and device
     if args.gpu >= 0 and torch.cuda.is_available():
         device = 'cuda:{}'.format(args.gpu)
     else:
         device = 'cpu'
     device = 'cpu'
-    print(device)
+    # print(device)
     dataset = dataset
     
     dataset.print_statistic()
@@ -61,35 +62,34 @@ def train(dataset, args, have_label=True):
         loss.backward()
         optimizer.step()
 
-        if have_label:
-            if epoch % args.verbose == 0:
-                pred = decoding_from_assignment(model.hard_dic[1])
-                # print("lab", dataset.labels, "\npred laab", pred)
-                metrics = cluster_metrics(dataset.labels, pred)
-                acc, nmi, f1, ari, new_pred = metrics.evaluateFromLabel(use_acc=True)
-                if nmi > best_cluster['nmi']:
-                    best_cluster['nmi'] = nmi
-                    best_cluster_result['nmi'] = [nmi, ari, acc, f1]
-                    if args.save:
-                        torch.save(model.state_dict(), './save_model/{}_{}_nmi.pt'.format(args.dataset, args.num_clusters_layer[0]))
-                if ari > best_cluster['ari']:
-                    best_cluster['ari'] = ari
-                    best_cluster_result['ari'] = [nmi, ari, acc, f1]
-                    if args.save:
-                        torch.save(model.state_dict(), './save_model/{}_{}_ari.pt'.format(args.dataset, args.num_clusters_layer[0]))
-                if acc > best_cluster['acc']:
-                    best_cluster['acc'] = acc
-                    best_cluster_result['acc'] = [nmi, ari, acc, f1]
-                    if args.save:
-                        torch.save(model.state_dict(), './save_model/{}_{}_acc.pt'.format(args.dataset, args.num_clusters_layer[0]))
-                if f1 > best_cluster['f1']:
-                    best_cluster['f1'] = f1
-                    best_cluster_result['f1'] = [nmi, ari, acc, f1]
-                    if args.save:
-                        torch.save(model.state_dict(), './save_model/{}_{}_f1.pt'.format(args.dataset, args.num_clusters_layer[0]))
-                
-                print(f"Epoch: {epoch} [{time()-t1:.3f}s], Loss: {loss.item():.6f} = {args.se_lamda} * {se_loss.item():.6f} + {args.lp_lamda} * {lp_loss.item():.6f}, NMI: {nmi:.6f}, ARI: {ari:.6f}, ACC: {acc:.6f}, F1: {f1:.6f}")
-                #print(f"train time: {t2-t1}; se_loss time: {t3-t2}; lp_loss time: {t4-t3}")
+        if epoch % args.verbose == 0:
+            pred = decoding_from_assignment(model.hard_dic[1])
+            # print("lab", dataset.labels, "\npred laab", pred)
+            metrics = cluster_metrics(dataset.labels, pred)
+            acc, nmi, f1, ari, new_pred = metrics.evaluateFromLabel(use_acc=True)
+            if nmi > best_cluster['nmi']:
+                best_cluster['nmi'] = nmi
+                best_cluster_result['nmi'] = [nmi, ari, acc, f1]
+                if args.save:
+                    torch.save(model.state_dict(), './save_model/{}_{}_nmi.pt'.format(args.dataset, args.num_clusters_layer[0]))
+            if ari > best_cluster['ari']:
+                best_cluster['ari'] = ari
+                best_cluster_result['ari'] = [nmi, ari, acc, f1]
+                if args.save:
+                    torch.save(model.state_dict(), './save_model/{}_{}_ari.pt'.format(args.dataset, args.num_clusters_layer[0]))
+            if acc > best_cluster['acc']:
+                best_cluster['acc'] = acc
+                best_cluster_result['acc'] = [nmi, ari, acc, f1]
+                if args.save:
+                    torch.save(model.state_dict(), './save_model/{}_{}_acc.pt'.format(args.dataset, args.num_clusters_layer[0]))
+            if f1 > best_cluster['f1']:
+                best_cluster['f1'] = f1
+                best_cluster_result['f1'] = [nmi, ari, acc, f1]
+                if args.save:
+                    torch.save(model.state_dict(), './save_model/{}_{}_f1.pt'.format(args.dataset, args.num_clusters_layer[0]))
+            
+            print(f"Epoch: {epoch} [{time()-t1:.3f}s], Loss: {loss.item():.6f} = {args.se_lamda} * {se_loss.item():.6f} + {args.lp_lamda} * {lp_loss.item():.6f}, NMI: {nmi:.6f}, ARI: {ari:.6f}, ACC: {acc:.6f}, F1: {f1:.6f}")
+            #print(f"train time: {t2-t1}; se_loss time: {t3-t2}; lp_loss time: {t4-t3}")
     #print('Total time: {:.3f}s'.format(time()-t0))
     print(f"Best NMI: {best_cluster_result['nmi']}, Best ARI: {best_cluster_result['ari']}, \nBest Cluster: {best_cluster}")
     print(args)
@@ -100,36 +100,30 @@ def data_preprocess(adj, features, labels):
     labels = labels.tolist()
     edge_index = adj.coalesce().indices()
     num_nodes = adj.size(0)
+    # num_neg_edges = min(edge_index.size(1), num_nodes * 5)
+    num_neg_edges = edge_index.size(1)
 
-    edge_set = set(map(tuple, edge_index.t().tolist()))
+    print("edge_index ===", edge_index)
 
-    neg_u = []
-    neg_v = []
-    num_neg_edges = edge_index.shape[1]
+    neg_edge_index = negative_sampling(
+        edge_index,
+        num_nodes=num_nodes,
+        num_neg_samples=num_neg_edges,   
+        method='sparse'                   
+    ).to(torch.long)
 
-    while len(neg_u) < num_neg_edges:
-        u = random.randint(0, num_nodes - 1)
-        v = random.randint(0, num_nodes - 1)
-        
-        if u == v:
-            continue  
-        if (u, v) in edge_set or (v, u) in edge_set:
-            continue  
-        
-        neg_u.append(u)
-        neg_v.append(v)
-
-    neg_edge_index = torch.tensor([neg_u, neg_v], dtype=torch.long)
+    print("edge_index in data_preprocess =", edge_index)
 
     class Dummy: pass
     dataset = Dummy()
-    dataset.name = dataset
+    dataset.name = 'name'
     dataset.adj = adj
+    dataset.edge_index = edge_index
     dataset.feature = features
     dataset.labels = labels
     dataset.degrees = adj.sum(1)
     dataset.neg_edge_index = neg_edge_index
-    dataset.num_nodes = adj.shape[0]
+    dataset.num_nodes = num_nodes
     dataset.num_edges = int(adj.sum())
     dataset.num_features = features.shape[1]
     dataset.num_classes = len(set(labels))
@@ -140,16 +134,47 @@ def data_preprocess(adj, features, labels):
     dataset.print_statistic = print_statistic
     return dataset
 
-def dese(adj, features, labels, args):
+def dese(adj, features, 
+         labels: torch.Tensor | None = None, 
+         args=None):
+    if labels is None:
+        num_nodes = adj.size(0)
+        labels = torch.arange(num_nodes)
+    num_clusters = labels.shape[0]
     dataset = data_preprocess(adj, features, labels)
-    
-    have_label = True
-    if labels is []:
-        have_label = False
-    best_cluster, out_label = train(dataset, args, have_label)
-    print(type(out_label))
 
-    return best_cluster, out_label
+    # print("features ===", features.shape)
+    features_dim = features.shape[-1]
+
+    if args is None:
+        class Args:
+            dataset = 'Computers'
+            epochs = 1
+            lr = 1e-2
+            height = 2
+            gpu = 0
+            decay_rate = None
+            num_clusters_layer = [num_clusters]
+            layer_str = '[3]'
+            embed_dim = features_dim
+            se_lamda = 0.01
+            lp_lamda = 1
+            verbose = 20
+            activation = 'relu'
+            k = 2
+            dropout = 0.1
+            beta_f = 0.2
+            seed = 42
+            save = False
+            fig_network = False
+        args = Args()
+    else:
+        args.num_clusters_layer = [num_clusters]
+        args.embed_dim = features_dim
+    best_cluster, out_label = train(dataset, args)
+    # print(type(out_label))
+    print("out_label =", out_label)
+    return out_label
 
 def main():
     parser = argparse.ArgumentParser(description="Run.")
@@ -207,7 +232,7 @@ def main():
     ).coalesce()
     features = torch.load(args.features)
     labels = torch.load(args.labels)
-    best_cluster, new_labels = dese(adj, features, labels, args)
+    new_labels = dese(adj, features, labels, args)
 
     torch.save(new_labels, args.out)
     print("DeSE finished successfully")

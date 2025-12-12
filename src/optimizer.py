@@ -180,7 +180,7 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         
-        with print_zone(self.verbose >= 3):
+        with print_zone(self.verbose >= 0):
             if self.local_algorithm_fn is not None:
                 return self.local_algorithm_fn(adj, features, limited, labels)
             
@@ -203,6 +203,12 @@ class Optimizer:
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
                 return networkit_partition(adj)
+            elif self.method == "dese":
+                from baselines.dese import dese
+                return dese(adj, features, labels)
+            elif self.method == "s2cag":
+                from baselines.s2cag import s2cag
+                return s2cag(adj, features, labels)
             else:
                 raise ValueError("Unsupported baseline method name")
 
@@ -265,8 +271,11 @@ class Optimizer:
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(coms.device)
 
             # Restoring the community of the original graph
+            print("coms =", coms)
+            print("coms[inverse] =", coms[inverse])
+            print("old_idx =", old_idx)
             new_coms = old_idx[coms[inverse]]
-
+            print("new_coms =", new_coms)
             # Store new communities at the level l
             self.coms[l, ext_mask[l]] = new_coms
 

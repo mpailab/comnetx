@@ -64,10 +64,12 @@ def torch_to_scipy(adj_t, features_t, labels_t):
 
 # Ваши torch-тензоры
 
-def s2cag(adj_torch, features_torch, labels_torch,
-          dataset = 'dataset', T = 15, n_runs = 5, alpha= 0.8, 
+def s2cag(adj_torch, features_torch, labels: torch.Tensor | None = None,
+          dataset = 'dataset', T = 15, n_runs = 1, alpha= 0.8, 
           fdim = 0, method = 'sub', gamma = 1, tau = 50):
-
+    if labels is None:
+        num_nodes = adj_torch.size(0)
+        labels_torch = torch.arange(num_nodes)
     adj, features, labels, n_classes = torch_to_scipy(adj_torch, features_torch, labels_torch)
 
     # теперь можно запускать алгоритм
