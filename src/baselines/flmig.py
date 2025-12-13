@@ -115,23 +115,60 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 #     os.remove(path)
 
 
-def flmig_adopted(adj: torch.tensor, Number_iter=100, Beta=0.5, max_rb=10):
+def flmig_adopted(adj: torch.Tensor, Number_iter=100, Beta=0.5, max_rb=10, return_labels=False):
     """
     Args:
-        adj: torch.Tensor [n, n]
-        Number_iter: int, optional(default = 100) - the number of iterations in the algorithm
-        Beta: float, optional(default = 0.5)
-        max_rb: int, optional(default = 10) - the number of iterations of the algorithm itself
+        return_labels: если True, возвращает лучший community labels вместо print'ов
+    Returns:
+        tuple(Q_max, Q_avg, Q_std, time_run) или tuple(labels)
     """
-    path = tensor_to_graph_txt(adj, PROJECT_PATH + "/src/baselines/graph.txt")
+    path = tensor_to_graph_txt(adj, str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"))
 
-    Q_max, Q_avg, Q_std,time_run = de_main(path, Number_iter, Beta, max_rb)
-    print("the value of Q_max",Q_max)
-    print("the value of Q_avg",Q_avg)
-    print("the value of Q_std",Q_std)
-    print("the value of all pure time ",time_run * max_rb) 
-
+    best_community = None
+    best_mod = -np.inf
+    
+    Q_list = []
+    Time_list = []
+    Community_list = []
+    
+    for nb_run in range(max_rb):
+        print(f"rb {nb_run}")
+        communities = Fast_local_Move_IG(Number_iter, Beta, path)
+        mod, community, tim = communities.Run_FMLIG()
+        
+        Q_list.append(mod)
+        Time_list.append(tim)
+        Community_list.append(community)
+        
+        if mod > best_mod:
+            best_mod = mod
+            best_community = community
+    
+    communities = Fast_local_Move_IG(Number_iter, Beta, path)
+    
+    Q_avg = communities.avg(Q_list)
+    Q_max = communities.max(Q_list)
+    Q_std = communities.stdev(Q_list)
+    time_run = communities.avg(Time_list)
+    
     os.remove(path)
+    
+    if return_labels:
+        N = adj.size(0)
+        labels = torch.zeros(N, dtype=torch.long)
+        for node, com in best_community.items():
+            node_idx = int(node)
+            if 0 <= node_idx < N:
+                labels[node_idx] = int(com)
+
+        return labels
+    else:
+        print("the value of Q_max", Q_max)
+        print("the value of Q_avg", Q_avg)
+        print("the value of Q_std", Q_std)
+        print("the value of all pure time ", time_run * max_rb)
+        return Q_max, Q_avg, Q_std, time_run
+
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 NAME=""
 DOCKER=docker
-IMAGE="pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel"  
+IMAGE=nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 REUSE=0
 SHM_SIZE="2g"
 
@@ -91,5 +91,41 @@ $DOCKER start $NAME
 SCRIPT_DIR="$( cd -- "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "[INFO] Installing packages in container..."
-$DOCKER exec -w "$PROJECT_ROOT" "$NAME" bash ./scripts/install_packages.sh
+echo "[INFO] Installing system packages (Python 3.10, pip, build deps)..."
+$DOCKER exec "$NAME" bash -lc "
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update &&
+    apt-get install -y \
+        python3.10 python3.10-distutils python3.10-venv \
+        python3-pip \
+        build-essential git curl &&
+    ln -sf /usr/bin/python3.10 /usr/bin/python &&
+    ln -sf /usr/bin/pip3 /usr/bin/pip
+"
+
+echo "[INFO] Installing Python packages..."
+$DOCKER exec "$NAME" bash -lc "
+    set -e
+    python -m pip install --upgrade pip &&
+    python -m pip install \
+        'numpy==1.26.3' \
+        'scipy==1.14.0' \
+        'munkres==1.1.4' &&
+    python -m pip install \
+        'torch==2.1.0+cu118' \
+        'torchvision==0.16.0+cu118' \
+        'torchaudio==2.1.0+cu118' \
+        --index-url https://download.pytorch.org/whl/cu118 &&
+    python -m pip install \
+        'torch_scatter==2.1.2+pt21cu118' \
+        -f https://data.pyg.org/whl/torch-2.1.0+cu118.html &&
+    python -m pip install 'torch_geometric==2.5.3' &&
+    python -m pip install \
+        'dgl==1.1.2+cu118' \
+        -f https://data.dgl.ai/wheels/cu118/repo.html &&
+    python -m pip install packaging &&
+    python -m pip install matplotlib
+"
+
+echo "[INFO] All Python packages installed."

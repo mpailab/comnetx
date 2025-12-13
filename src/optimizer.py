@@ -201,6 +201,40 @@ class Optimizer:
                 res = adapted_dmon(adj, features, labels, timing_info = timing_info)
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
+                return networkit_partition(adj)
+            elif self.method == "mfc":
+                from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
+                adj_bin = _binarize_adj(adj)
+                if labels is None:
+                    init_labels = _degree_bins_labels(adj_bin)
+                else:
+                    init_labels = labels.to(torch.long)
+                return mfc_adopted(
+                    adj_matrices=[adj_bin],
+                    labels_list=[init_labels],
+                    network_type="MFC",
+                    return_labels=True,
+                )
+            elif self.method == "flmig":
+                from baselines.flmig import flmig_adopted
+                if adj.is_sparse:
+                    A = adj.coalesce()
+                    adj_dense = torch.sparse_coo_tensor(
+                        A.indices(),
+                        torch.where(A.values() > 0,
+                                    torch.ones_like(A.values()),
+                                    torch.zeros_like(A.values())),
+                        size=A.size(),
+                    ).to_dense()
+                else:
+                    adj_dense = (adj > 0).to(torch.float32)
+                    adj_dense.fill_diagonal_(0.0)
+                labels = flmig_adopted(
+                    adj=adj_dense,
+                    return_labels=True,
+                )
+                uniq, remap = torch.unique(labels, sorted=True, return_inverse=True)
+                return remap.to(torch.long)
                 res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "dese":
                 from baselines.dese import dese
