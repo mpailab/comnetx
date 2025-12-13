@@ -19,7 +19,7 @@ Options:
   --mem-per-task G   request 2^k GB per task (optional)
   -h, --help         show this message and exit
 
-Run 1, 2, 4 or 8 commands in parallel using srun. Each argument is
+Run 1 to 8 commands in parallel using srun. Each argument is
 executed with "bash -lc" so you can pass compound shell commands
 as a single quoted string.
 USAGE
@@ -75,14 +75,11 @@ if (( $# == 0 )); then
   exit 1
 fi
 
-case $# in
-  1|2|4|8) ;;
-  *)
-    echo "Error: got $# arguments, but only 1, 2, 4 or 8 are allowed." >&2
-    usage
-    exit 1
-    ;;
-esac
+if (( $# > 8 )); then
+  echo "Error: at most 8 commands are supported." >&2
+  usage
+  exit 1
+fi
 
 # List of commands we need to run; each index maps to SLURM_PROCID.
 commands=("$@")
