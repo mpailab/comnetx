@@ -272,11 +272,8 @@ class Optimizer:
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(coms.device)
 
             # Restoring the community of the original graph
-            print("coms =", coms)
-            print("coms[inverse] =", coms[inverse])
-            print("old_idx =", old_idx)
             new_coms = old_idx[coms[inverse]]
-            print("new_coms =", new_coms)
+            
             # Store new communities at the level l
             self.coms[l, ext_mask[l]] = new_coms
 
