@@ -489,7 +489,7 @@ def main() -> None:
     test_dir = Path(__file__).resolve().parent
     repo_root = test_dir.parent
     print(repo_root)
-    all_json = repo_root / "datasets-info" / "all.json"
+    all_json = repo_root / "datasets-info" / "konect.json"
     small_root = test_dir / "graphs" / "small"
     out_path = test_dir / "dataset_paths.json"
 

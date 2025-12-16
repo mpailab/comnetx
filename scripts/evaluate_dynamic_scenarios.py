@@ -13,7 +13,7 @@ sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
 from datasets import INFO
 
-with open(os.path.join(INFO, "all.json")) as _:
+with open(os.path.join(INFO, "konect.json")) as _:
     info = json.load(_)
 DATASETS = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
 

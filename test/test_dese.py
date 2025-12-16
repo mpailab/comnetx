@@ -164,8 +164,8 @@ def test_dese_single_dataset(name, data_dir):
     torch.cuda.empty_cache()
 
 def load_konect_info():
-    """Load dataset info from all.json."""
-    file_path = os.path.join(KONECT_INFO, "all.json")
+    """Load dataset info from konect.json."""
+    file_path = os.path.join(KONECT_INFO, "konect.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
     return info
