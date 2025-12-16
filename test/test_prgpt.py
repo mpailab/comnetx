@@ -14,8 +14,8 @@ from datasets import Dataset, KONECT_PATH
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
 def load_konect_info():
-    """Load dataset info from all.json."""
-    file_path = os.path.join(KONECT_INFO, "all.json")
+    """Load dataset info from konect.json."""
+    file_path = os.path.join(KONECT_INFO, "konect.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
     return info

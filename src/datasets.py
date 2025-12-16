@@ -45,11 +45,9 @@ class Dataset:
               (n, n)-tensor if batches is None
         features - #TODO (to Drobyshev) add info for shape
         label - #TODO (to Drobyshev) add info for shape
-        """
-        
-        
+        """    
 
-        with open(os.path.join(INFO, "all.json")) as _:
+        with open(os.path.join(INFO, "konect.json")) as _:
             info = json.load(_)
         with open(os.path.join(INFO, "magi.json")) as _:
                 magi_info = json.load(_)
@@ -421,7 +419,7 @@ class Dataset:
                 print(line)
 
 def list_konect_datasets():
-    with open(os.path.join(INFO, "all.json")) as _:
+    with open(os.path.join(INFO, "konect.json")) as _:
         info = json.load(_)
     datasets = list(info.keys())
     max_name_len = max(map(len, datasets))

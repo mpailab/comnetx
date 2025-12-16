@@ -125,15 +125,15 @@ def test_s2cag_single_dataset(name, data_dir):
 
 # small (19)
 # def load_konect_info():
-#     """Load dataset info from all.json."""
+#     """Load dataset info from konect.json."""
 #     file_path = os.path.join(os.path.dirname(__file__), "dataset_paths.json")
 #     with open(file_path, "r", encoding="utf-8") as f:
 #         info = json.load(f)
 #     return info
 
 def load_konect_info():
-    """Load dataset info from all.json."""
-    file_path = os.path.join(KONECT_INFO, "all.json")
+    """Load dataset info from konect.json."""
+    file_path = os.path.join(KONECT_INFO, "konect.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
     return info
