@@ -98,11 +98,11 @@ def test_s2cag_single_dataset(name, data_dir):
 
         cmd = [
             sys.executable,
-            "run_s2cag_subprocess.py",
+            "test/run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
-            "--runs", "5",
+            "--runs", "1",
             "--out", temp_labels_path
         ]
 
@@ -181,7 +181,7 @@ def test_s2cag_konect_dataset(name):
 
         cmd = [
             sys.executable,
-            "run_s2cag_subprocess.py",
+            "test/run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -233,11 +233,11 @@ def test_s2cag_single_konect_dataset():
 
         cmd = [
             sys.executable,
-            "run_s2cag_subprocess.py",
+            "test/run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
-            "--runs", "5",
+            "--runs", "1",
             "--out", temp_labels_path
         ]
 

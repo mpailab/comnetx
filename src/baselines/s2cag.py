@@ -71,8 +71,8 @@ def s2cag(adj_torch, features_torch,
     time_s = time()
     if labels is None:
         num_nodes = adj_torch.size(0)
-        labels_torch = torch.arange(num_nodes)
-    adj, features, labels, n_classes = torch_to_scipy(adj_torch, features_torch, labels_torch)
+        labels = torch.arange(num_nodes)
+    adj, features, labels, n_classes = torch_to_scipy(adj_torch, features_torch, labels)
 
     norm_adj, features = preprocess_dataset(adj, features, sparse=True, tf_idf=True)
     # print(type(norm_adj), type(features), type(labels))

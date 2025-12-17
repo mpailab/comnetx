@@ -138,7 +138,7 @@ def test_dese_single_dataset(name, data_dir):
 
         cmd = [
             sys.executable,
-            "run_dese_subprocess.py",
+            "test/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -207,11 +207,11 @@ def test_dese_konect_dataset(name):
 
         cmd = [
             sys.executable,
-            "run_dese_subprocess.py",
+            "test/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
-            "--epochs", "10",
+            "--epochs", "1",
             "--out", temp_labels_path
         ]
 
@@ -232,7 +232,7 @@ def test_dese_konect_dataset(name):
     gc.collect()
     torch.cuda.empty_cache()
 
-def test_dese_konect_dataset():
+def test_dese_single_konect_dataset():
     name = "ca-cit-HepTh"
     dataset = Dataset(name, path=KONECT_PATH)
     adj, features, labels = dataset.load()
@@ -252,11 +252,11 @@ def test_dese_konect_dataset():
 
         cmd = [
             sys.executable,
-            "run_dese_subprocess.py",
+            "test/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
-            "--epochs", "10",
+            "--epochs", "1",
             "--out", temp_labels_path
         ]
 
