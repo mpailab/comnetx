@@ -1,0 +1,16 @@
+{
+  "VERBOSE": 1,
+  
+  "DATASETS": ["wiki_talk_ht"],
+  "BATCHES": [1],
+  
+  "BASELINES": ["prgpt:infomap", "prgpt:locale", "leidenalg", "networkit",
+                "mfc", "flmig", "dese", "s2cag", "dmon", "magi"],
+  "MODES": ["smart", "naive"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [5],
+    "smart_neighborhood_step": [1]
+  }
+}
