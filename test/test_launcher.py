@@ -26,19 +26,19 @@ for p in (PROJECT_PATH, PROJECT_PATH / "src", TEST_PATH):
 from launcher import dynamic_launch
 from testutils import with_timeout, TimeoutException
 
-@pytest.mark.short
+@pytest.mark.long
 def test_dynamic_prgpt():
     for method in ["prgpt:locale", "prgpt:infomap"]:
         for mode in ["smart", "naive", "raw"]:
             dynamic_launch("wiki_talk_ht", 10, method, mode = mode)
 
-@pytest.mark.short  
+@pytest.mark.long  
 def test_dynamic_leidenalg_networkit():
     for method in ["leidenalg", "networkit"]:
         for mode in ["smart", "naive", "raw"]:
             dynamic_launch("wiki_talk_ht", 10, method, mode = mode)
 
-@pytest.mark.short  
+@pytest.mark.long  
 def test_dynamic_magi():
     for mode in ["smart", "naive", "raw"]:
         dynamic_launch("wiki_talk_ht", 1, "magi", mode = mode)
@@ -61,6 +61,51 @@ def test_dynamic_networkit_bad_datasets():
 def test_dynamic_launcher_magi(dyn_dataset):
     for mode in ["smart", "naive"]:
         dynamic_launch(dyn_dataset, 100, "magi", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_dmon(dyn_dataset):
+    for mode in ["smart", "naive"]:
+        dynamic_launch(dyn_dataset, 100, "dmon", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_leiden(dyn_dataset):
+    for mode in ["smart", "naive"]:
+        dynamic_launch(dyn_dataset, 100, "leidenalg", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_mfc(dyn_dataset):
+    for mode in ["smart", "naive"]:
+        dynamic_launch(dyn_dataset, 100, "mfc", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_flmig(dyn_dataset):
+    for mode in ["smart", "naive"]:
+        dynamic_launch(dyn_dataset, 100, "flmig", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_dese(dyn_dataset):
+    for mode in ["smart", "naive"]:
+        dynamic_launch(dyn_dataset, 100, "dese", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_s2cag(dyn_dataset):
+    for mode in ["smart", "naive"]:
+        dynamic_launch(dyn_dataset, 100, "s2cag", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_prgpt(dyn_dataset):
+    for method in ["prgpt:infomap", "prgpt:locale"]:
+        for mode in ["smart", "naive"]:
+            dynamic_launch(dyn_dataset, 100, method, mode=mode)
+
+
 
 """
 @pytest.mark.debug
