@@ -19,7 +19,7 @@ datasets = datasets_1 + datasets_2 + datasets_3
 def test_modularity():
     with open(os.path.join(INFO, "modularity.json")) as _:
          true_mod_db = json.load(_)
-    with open(os.path.join(INFO, "all.json")) as _:
+    with open(os.path.join(INFO, "konect.json")) as _:
         info = json.load(_)
     # datasets = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
     # restriction = 100000

@@ -51,4 +51,4 @@ class Metrics:
             modularity += (actual_weight - gamma * expected_weight)
         modularity /=  m
 
-        return modularity
+        return modularity.item()
