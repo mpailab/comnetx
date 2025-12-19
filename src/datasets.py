@@ -45,11 +45,9 @@ class Dataset:
               (n, n)-tensor if batches is None
         features - #TODO (to Drobyshev) add info for shape
         label - #TODO (to Drobyshev) add info for shape
-        """
-        
-        
+        """    
 
-        with open(os.path.join(INFO, "all.json")) as _:
+        with open(os.path.join(INFO, "konect.json")) as _:
             info = json.load(_)
         with open(os.path.join(INFO, "magi.json")) as _:
                 magi_info = json.load(_)
@@ -74,7 +72,6 @@ class Dataset:
                     print("Downloading files...")
                     download_flag = True
                     break
-            download_flag = False #FIXME
             if download_flag:
                 self._load_magi()
                 self._save_magi(coo_adj = True)
@@ -355,31 +352,68 @@ class Dataset:
     
     def _load_konect(self, batches_num = 1):
         """
-        Load dynamic dataset from KONECT collection
+        Загружает граф KONECT в соответствии со стратегией батчинга
 
-        Parameters
-        ----------
-        batches_num : 1, 10, 100, 1000, 10000, 100000
-            Default: 1
+        Args:
+            batches_num: "N" | "p:n" | "real"
+                - "N": N равных батчей (готовый файл out.{self.name}.{N}_batches для N = 1, 10, 100, 1000)
+                - "p:n" : Стратегия с доминирующим первым батчем.
+                      `p` — целое число из ряда 9, 99, 999, ... (соответствует 9%, 99%, 99.9%, ...).
+                      Первый батч содержит p% данных, оставшиеся (100-p)% делятся на `n` частей.
+                      Пример: "999:10" → 99.9% + 10x0.01% батчей.
+                      (файл out.{self.name}.{p+1}_batches + постобработка)
+                - "real" : исходные временные метки (файл out.{self.name}.sort)
+            По умолчанию "1" (весь граф — один батч).
         """
-        filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_num}_batches")
+        # Определение нужного файла
+        batches_num = str(batches_num)
+        if batches_num == "real":
+            filepath = os.path.join(self.path, self.name, f"out.{self.name}.sort")
+        elif ":" in batches_num:  # p:n стратегия
+            p_str, n_str = batches_num.split(":")
+            p, n = int(p_str), int(n_str)
+            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{p+1}_batches")
+        else:  # N стратегия
+            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_num}_batches")
+
+        # Чтение файла
         with open(filepath) as _:
             first_string = _.readline()
             num_nodes = int(first_string.split()[0])
             max_index = num_nodes - 1
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
-        #FiXME -- don't add nodes with no edges
-        # nodes_set = set(i.tolist() + j.tolist())
-        # print(len(nodes_set), min(nodes_set), max(nodes_set))
-        adjs = []
-        for num in range(batches_num):
-            mask = (t == num)
-            adj_index = np.vstack((i[mask], j[mask]))
-            adj = torch.sparse_coo_tensor(adj_index, w[mask], size=(num_nodes, num_nodes)).coalesce()
-            if not self.is_directed:
-                adj = adj + torch.t(adj)
-            adjs.append(adj)
+
+        def make_adj(i_arr, j_arr, w_arr):
+            idx = np.vstack((i_arr, j_arr))
+            adj = torch.sparse_coo_tensor(idx, w_arr, size=(num_nodes, num_nodes)).coalesce()
+            return adj if self.is_directed else adj + torch.t(adj)
+
+        if ":" in batches_num:
+            mask = (t < p)
+            adj = make_adj(i[mask], j[mask], w[mask]) # Объединяем первые p батчей в один
+            adjs = [adj]
+
+            # Делим последний p-й батч на n равных частей
+            mask = (t == p)
+            i_last, j_last, w_last = i[mask], j[mask], w[mask]
+
+            step = len(i_last) // n
+            remainder = len(i_last) % n
+            start = 0
+            for part in range(n):
+                size = step + (1 if part < remainder else 0)
+                end = start + size
+                if size > 0:
+                    adj = make_adj(i_last[start:end], j_last[start:end], w_last[start:end])
+                    adjs.append(adj)
+                start = end
+
+        else:
+            time_values = np.unique(t)
+            masks = [(t == tv) for tv in time_values]
+            adjs = [make_adj(i[mask], j[mask], w[mask]) for mask in masks]
+
         self.adj = torch.stack(adjs) # 3-dimensional tensor
     
     def _save_konect(self, path = None, int_weights = True):
@@ -421,7 +455,7 @@ class Dataset:
                 print(line)
 
 def list_konect_datasets():
-    with open(os.path.join(INFO, "all.json")) as _:
+    with open(os.path.join(INFO, "konect.json")) as _:
         info = json.load(_)
     datasets = list(info.keys())
     max_name_len = max(map(len, datasets))

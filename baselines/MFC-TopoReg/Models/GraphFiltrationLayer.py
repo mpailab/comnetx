@@ -61,7 +61,11 @@ def WRCF_Index(G, dim, card):
 
     # Compute the persistence pairs with Gudhi
 
-    st = wrcf(nx.from_numpy_matrix(G))
+    if hasattr(nx, "from_numpy_matrix"):
+        G_nx = nx.from_numpy_matrix(G)
+    else:
+        G_nx = nx.from_numpy_array(G)
+    st = wrcf(G_nx)
     dgm = st.persistence()
     pairs = st.persistence_pairs()
 

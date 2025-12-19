@@ -46,6 +46,6 @@ pip install --no-cache-dir \
     -f https://data.pyg.org/whl/torch-2.1.0+cu118.html \
     ogb matplotlib tensorflow==2.14.0 pytest debugpy scikit-learn-intelex 
 
-pip install --no-cache-dir leidenalg networkx==2.8.7 gudhi pot seaborn umap eagerpy
+pip install --no-cache-dir leidenalg networkit==2.8.7 gudhi seaborn POT eagerpy umap-learn
 
 echo "[INFO] Done!"

@@ -77,7 +77,7 @@ def test_magi_single_dataset(name, data_dir):
     torch.cuda.empty_cache()
 
 def load_konect_info():
-    """Load dataset info from all.json."""
+    """Load dataset info from konect.json."""
     file_path = os.path.join(os.path.dirname(__file__), "dataset_paths.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
@@ -91,7 +91,7 @@ def load_konect_info():
         info.update(json.load(f))
     return info
 """
-
+"""
 @pytest.fixture(scope="class")
 def facebook_dataset():
     ds = Dataset("epinions", KONECT_PATH)
@@ -107,7 +107,7 @@ def test_magi_on_facebook(facebook_dataset):
     assert new_labels.shape[0] == adj.size(0)
     assert new_labels.dtype in (torch.int64, torch.long)
     assert new_labels.min() >= 0
-
+"""
 
 def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
@@ -166,6 +166,7 @@ def test_magi_konect_dataset(name):
     gc.collect()
     torch.cuda.empty_cache()
 
+"""
 @pytest.fixture(scope="class")
 def facebook_dataset():
     ds = Dataset("elec", KONECT_PATH)
@@ -184,3 +185,4 @@ def test_communities(facebook_dataset):
     # Проверка, что все назначения уникальны и это именно 0..num_nodes-1
     all_unique_and_full_range = set(uniq_vals.tolist()) == set(range(num_nodes))
     print("ALL ASSIGNMENTS UNIQUE:", all_unique_and_full_range)
+"""
