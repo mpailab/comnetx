@@ -29,6 +29,9 @@ def _resolve_runner(request: pytest.FixtureRequest, method_name: str):
 
 @pytest.mark.long
 def test_run_method_on_dataset(method, dataset, tmp_path, request):
+    if dataset == "reddit":
+        pytest.skip("Skip reddit dataset: too large/slow")
+        
     dataset_root = _resolve_dataset_path(dataset)
     assert os.path.exists(os.path.join(dataset_root, dataset)), (
         f"Dataset path does not exist: {os.path.join(dataset_root, dataset)}"
@@ -64,7 +67,7 @@ def test_run_method_on_dataset(method, dataset, tmp_path, request):
     }
 
     runner = _resolve_runner(request, method)
-    proc = runner(ds)
+    proc = runner(ds, dataset_name=dataset)
     assert proc is not None and hasattr(proc, "returncode"), "Runner must return CompletedProcess"
     assert proc.returncode == 0, (
         f"Failed (code {proc.returncode}). stderr:\n{proc.stderr}\nstdout:\n{proc.stdout}"

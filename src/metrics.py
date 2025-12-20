@@ -2,12 +2,16 @@ import torch
 import tensorflow as tf
 import time
 import numpy as np
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances, adjusted_rand_score, f1_score
 from torch_sparse import SparseTensor
 from scipy.optimize import linear_sum_assignment
 
 # import tensorflow as tensor 
 # import torch as tensor 
+def _to_numpy(x):
+    if isinstance(x, torch.Tensor):
+        return x.detach().cpu().numpy()
+    return np.asarray(x)
 
 class Metrics:
 
@@ -54,6 +58,30 @@ class Metrics:
 
         return modularity.item()
 
+    def purity_score(true_labels, pred_labels):
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+
+        classes, y_true_idx = np.unique(y_true, return_inverse=True)
+        clusters, y_pred_idx = np.unique(y_pred, return_inverse=True)
+        n_classes = classes.shape[0]
+        n_clusters = clusters.shape[0]
+
+        contingency = np.zeros((n_classes, n_clusters), dtype=np.int64)
+        np.add.at(contingency, (y_true_idx, y_pred_idx), 1)
+
+        max_over_classes = contingency.max(axis=0)
+        return max_over_classes.sum() / y_true.shape[0]
+
+    def ari_score(true_labels, pred_labels):
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return adjusted_rand_score(y_true, y_pred)
+
+    def macro_f1(true_labels, pred_labels):
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return f1_score(y_true, y_pred, average="macro")
     
     def accuracy(true_labels, pred_labels) -> float:
         """

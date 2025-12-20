@@ -3,6 +3,7 @@ import torch
 import sys,os
 import pickle
 import numpy as np
+import time
 from pathlib import Path
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -228,16 +229,53 @@ def main(network_type, adj_matrix, labels):
     with (out_dir / "results_topo.pkl").open("wb") as handle:
         pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-def mfc_adopted(adj_matrices: list[torch.Tensor], labels_list: list[torch.Tensor], network_type="MFC", return_labels=False):
+def mfc_adopted(
+    adj: torch.Tensor,
+    labels: torch.Tensor | None = None,
+    network_type: str = "MFC",
+    return_labels: bool = False,
+    timing_info: dict | None = None,
+):
     """
-    Args:
-        adj_matrices: list[torch.Tensor], each one [N, N].
-        labels_list: list[torch.Tensor], each one [N].
-        network_type: str, optional (default="MFC"), MFC/GEC/DAEGC/MFC/SDCN.
+    Запуск MFC-TopoReg на одном графе.
+
+    Parameters
+    ----------
+    adj : torch.Tensor
+        Adjacency matrix [N, N], sparse или dense.
+    labels : torch.Tensor or None
+        Начальные метки [N]. Если None, строятся псевдо-кластеры по степеням.
+    network_type : str
+        MFC/GEC/DAEGC/SDCN.
+    return_labels : bool
+        Если True, вернуть кластерные метки для узлов.
+    timing_info : dict or None
+        Словарь, куда накапливается conversion_time.
     """
-    main(network_type=network_type,
-         adj_matrix=adj_matrices,
-         labels=labels_list)
+
+    if timing_info is None:
+        timing_info = {}
+
+    t0 = time.time()
+    adj_bin = _binarize_adj(adj)
+    if labels is None:
+        init_labels = _degree_bins_labels(adj_bin)
+    else:
+        init_labels = labels.to(torch.long)
+    t1 = time.time()
+    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
+
+    adj_matrices = [adj_bin]
+    labels_list = [init_labels]
+
+    t0 = time.time()
+    main(
+        network_type=network_type,
+        adj_matrix=adj_matrices,
+        labels=labels_list,
+    )
+    t1 = time.time()
+    timing_info["conversion_time"] += (t1 - t0)
 
     out_dir = Path(PROJECT_PATH) / "results" / "mfc"
     
@@ -314,17 +352,14 @@ if __name__ == "__main__":
     # 1) загрузка через Dataset
     adj, labels = _load_from_cli(args.adj, args.dataset_name)
 
-    # 2) размножаем снапшоты при необходимости
-    adj_list = [adj] * max(1, int(args.snapshots))
-    labels_list = [labels.clone() for _ in range(len(adj_list))]
-
-    # 3) запускаем MFC-TopoReg на тензорах
-    mfc_adopted(
-        adj_matrices=adj_list,
-        labels_list=labels_list,
-        network_type=args.network_type,
-    )
-
+    # 2) размножаем при необходимости
+    for _ in range(max(1, int(args.snapshots))):
+        _ = mfc_adopted(
+            adj=adj,
+            labels=labels,
+            network_type=args.network_type,
+            return_labels=False,
+        )
 
 
 # network_type = "MFC" # GEC/DAEGC/MFC/SDCN
