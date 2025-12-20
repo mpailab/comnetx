@@ -12,10 +12,10 @@ deprecation._PRINT_DEPRECATION_WARNINGS = False
 from time import time
 from scipy import sparse
 from sklearn.cluster import KMeans
-from utils import *
+from utils_s2cag import *
 from sklearn.utils.extmath import randomized_svd
 from sklearn import cluster
-from utils import preprocess_dataset, run_SSCAG, clustering_accuracy
+from utils_s2cag import preprocess_dataset, run_SSCAG, clustering_accuracy
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
 
