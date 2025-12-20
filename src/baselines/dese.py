@@ -92,7 +92,7 @@ def train(dataset, args):
             #print(f"train time: {t2-t1}; se_loss time: {t3-t2}; lp_loss time: {t4-t3}")
     #print('Total time: {:.3f}s'.format(time()-t0))
     print(f"Best NMI: {best_cluster_result['nmi']}, Best ARI: {best_cluster_result['ari']}, \nBest Cluster: {best_cluster}")
-    print(args)
+    # print(args)
 
     return best_cluster, pred
 
@@ -103,7 +103,7 @@ def data_preprocess(adj, features, labels):
     # num_neg_edges = min(edge_index.size(1), num_nodes * 5)
     num_neg_edges = edge_index.size(1)
 
-    print("edge_index ===", edge_index)
+    # print("edge_index ===", edge_index)
 
     neg_edge_index = negative_sampling(
         edge_index,
@@ -112,7 +112,7 @@ def data_preprocess(adj, features, labels):
         method='sparse'                   
     ).to(torch.long)
 
-    print("edge_index in data_preprocess =", edge_index)
+    # print("edge_index in data_preprocess =", edge_index)
 
     class Dummy: pass
     dataset = Dummy()
@@ -137,7 +137,8 @@ def data_preprocess(adj, features, labels):
 def dese(adj, features, 
          labels: torch.Tensor | None = None, 
          args=None,
-         timing_info=None):
+         timing_info=None, 
+         n_epochs=1):
     time_s = time()
     if labels is None:
         num_nodes = adj.size(0)
@@ -151,7 +152,7 @@ def dese(adj, features,
     if args is None:
         class Args:
             dataset = 'Computers'
-            epochs = 1
+            epochs = n_epochs
             lr = 1e-2
             height = 2
             gpu = 0
@@ -182,6 +183,56 @@ def dese(adj, features,
     # print(type(out_label))
     print("out_label =", out_label)
     return out_label
+
+def dese_metrics(adj, features, 
+         labels: torch.Tensor | None = None, 
+         args=None,
+         timing_info=None,
+         n_epochs=1):
+    time_s = time()
+    if labels is None:
+        num_nodes = adj.size(0)
+        labels = torch.arange(num_nodes)
+    num_clusters = labels.shape[0]
+    dataset = data_preprocess(adj, features, labels)
+
+    # print("features ===", features.shape)
+    features_dim = features.shape[-1]
+
+    if args is None:
+        class Args:
+            dataset = 'Computers'
+            epochs = n_epochs
+            lr = 1e-2
+            height = 2
+            gpu = 0
+            decay_rate = None
+            num_clusters_layer = [num_clusters]
+            layer_str = '[3]'
+            embed_dim = features_dim
+            se_lamda = 0.01
+            lp_lamda = 1
+            verbose = 20
+            activation = 'relu'
+            k = 2
+            dropout = 0.1
+            beta_f = 0.2
+            seed = 42
+            save = False
+            fig_network = False
+        args = Args()
+    else:
+        args.num_clusters_layer = [num_clusters]
+        args.embed_dim = features_dim
+
+    time_e = time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
+
+    metrics, out_label = train(dataset, args)
+    # print(type(out_label))
+    # print("out_label =", out_label)
+    return out_label, metrics
 
 def main():
     parser = argparse.ArgumentParser(description="Run.")

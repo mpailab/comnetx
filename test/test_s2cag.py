@@ -133,7 +133,7 @@ def test_s2cag_single_dataset(name, data_dir):
 
 def load_konect_info():
     """Load dataset info from konect.json."""
-    file_path = os.path.join(KONECT_INFO, "konect.json")
+    file_path = os.path.join(KONECT_INFO, "konect_sorted.json")
     with open(file_path, "r", encoding="utf-8") as f:
         info = json.load(f)
     return info
@@ -166,10 +166,9 @@ def test_s2cag_konect_dataset(name):
         adj.indices(), new_values, adj.size()
     ).coalesce() #FIXME
 
-    num_nodes = adj.size(0)
-    features = torch.rand(num_nodes, 128, dtype=torch.float32) #FIXME
-    labels = torch.randint(low=0, high=10, size=(num_nodes,))
-    print("adj =", adj, sep='\n------------------\n')
+    # num_nodes = adj.size(0)
+    # labels = torch.randint(low=0, high=10, size=(num_nodes,))
+    # print("adj =", adj, sep='\n------------------\n')
     # print("num_nodes =", num_nodes, sep='\n------------------\n')
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
