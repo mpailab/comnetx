@@ -10,6 +10,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
+PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+test_root = os.path.join(PROJECT_PATH, "test")
+
 # from baselines.s2cag import main
 from datasets import Dataset, KONECT_PATH
 from baselines.s2cag import s2cag
@@ -56,6 +59,8 @@ def test_s2cag_synthetic_dataset():
     # print(adj, feature)
     new_labels = s2cag(adj, feature, labels)
     # print(new_labels)
+    print("PROJECT_PATH =", PROJECT_PATH)
+
     assert new_labels.shape[0] == adj.size(0)
     assert new_labels.dtype in (torch.int64, torch.long)
     assert new_labels.min() >= 0
@@ -98,7 +103,7 @@ def test_s2cag_single_dataset(name, data_dir):
 
         cmd = [
             sys.executable,
-            "test/run_s2cag_subprocess.py",
+            test_root + "/run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -180,7 +185,7 @@ def test_s2cag_konect_dataset(name):
 
         cmd = [
             sys.executable,
-            "test/run_s2cag_subprocess.py",
+            test_root + "/run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -232,7 +237,7 @@ def test_s2cag_single_konect_dataset():
 
         cmd = [
             sys.executable,
-            "test/run_s2cag_subprocess.py",
+            test_root + "/run_s2cag_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
