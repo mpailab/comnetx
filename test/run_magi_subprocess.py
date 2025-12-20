@@ -12,13 +12,14 @@ def main():
     parser.add_argument("--features", required=True)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batchsize", type=int, default=2048)
+    parser.add_argument("--n-clusters", type=int, default=None)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
     features = torch.load(args.features)
 
-    new_labels = magi(adj, features, epochs=args.epochs, batchsize=args.batchsize)
+    new_labels = magi(adj, features, epochs=args.epochs, batchsize=args.batchsize, n_clusters=args.n_clusters)
 
     torch.save(new_labels, args.out)
     print("MAGI finished successfully")

@@ -166,6 +166,59 @@ def test_magi_konect_dataset(name):
     gc.collect()
     torch.cuda.empty_cache()
 
+@pytest.mark.long
+@pytest.mark.parametrize(
+    "name,data_dir",
+    list(datasets.items()),
+    ids=list(datasets.keys())
+)
+def test_magi_many_clusters_respect_true_k(name, data_dir):
+    """Проверка, что при завышенном K MAGI не старается равномерно заполнить все кластеры."""
+    ds = Dataset(name, path=data_dir)
+    adj, features, labels = ds.load()
+    adj = adj.coalesce()
+    num_nodes = adj.size(0)
+
+    true_labels = labels.long()
+    true_k = torch.unique(true_labels).numel()
+
+    requested_k = max(true_k * 5, true_k + 20)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adj_path = os.path.join(tmpdir, f"{name}_adj.pt")
+        feat_path = os.path.join(tmpdir, f"{name}_feat.pt")
+        out_path = os.path.join(tmpdir, f"{name}_labels.pt")
+
+        torch.save(adj, adj_path)
+        torch.save(features, feat_path)
+
+        cmd = [
+            sys.executable,
+            "run_magi_subprocess.py",
+            "--adj", adj_path,
+            "--features", feat_path,
+            "--epochs", "1",
+            "--batchsize", "1024",
+            "--n-clusters", str(requested_k),
+            "--out", out_path,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            print("stdout:", proc.stdout)
+            print("stderr:", proc.stderr)
+            pytest.fail(f"MAGI subprocess failed for dataset {name}")
+
+        pred = torch.load(out_path).long()
+
+    assert pred.shape[0] == num_nodes
+    assert pred.min() >= 0
+
+    used_k = torch.unique(pred).numel()
+    empty_k = requested_k - used_k
+
+    assert used_k > true_k
+    assert used_k >= 0.8 * requested_k
+
 """
 @pytest.fixture(scope="class")
 def facebook_dataset():
