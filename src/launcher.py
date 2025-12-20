@@ -35,7 +35,6 @@ def dynamic_launch(dataset_name : str, batches_num : int,
         else:
             affected_nodes_mask = opt.update_adj(batch)
         
-        acc = None
         conversion_time_s = opt.conversion_time
         time_s = time.time()
         if mode == "smart":
@@ -45,7 +44,6 @@ def dynamic_launch(dataset_name : str, batches_num : int,
             labels = opt.coms if mode == "naive" else None
             coms = opt.local_algorithm(opt.adj, opt.features, labels = labels)
             opt._set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
-            acc = opt.accuracy(labels)
         time_e = time.time()
         conversion_time_e = opt.conversion_time
 
@@ -53,7 +51,7 @@ def dynamic_launch(dataset_name : str, batches_num : int,
         conversion_time = conversion_time_e - conversion_time_s
 
         mod = opt.modularity(directed = ds.is_directed)
-        results.append({'modularity' : mod, 'time': total_time - conversion_time, 'accuracy': acc})
+        results.append({'modularity' : mod, 'time': total_time - conversion_time})
 
     with print_zone(verbose >= 1):
         total_time = sum(map(lambda x: x["time"], results))
