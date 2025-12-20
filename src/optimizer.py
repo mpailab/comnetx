@@ -97,7 +97,40 @@ class Optimizer:
             modularity: float
         """
         return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)
-       
+    
+    def accuracy(self, 
+            pred_labels: torch.tensor, L: int = 0) -> float:
+        """
+        Args:
+            pred_labels: torch.Tensor [n_nodes]
+            L: int, optional (default=0)
+        Returns:
+            accuracy: float 
+        """
+        return Metrics.accuracy(self.coms[L], pred_labels[L])
+    
+    def nmi(self, 
+            pred_labels: torch.tensor, L: int = 0) -> float:
+        """
+        Args:
+            pred_labels: torch.Tensor [n_nodes]
+            L: int, optional (default=0)
+        Returns:
+            nmi: float 
+        """
+        return Metrics.nmi(self.coms[L], pred_labels[L])
+    
+    def balanced_acc(self, 
+            pred_labels: torch.tensor, L: int = 0) -> float:
+        """
+        Args:
+            pred_labels: torch.Tensor [n_nodes]
+            L: int, optional (default=0)
+        Returns:
+            balanced_acc: float 
+        """
+        return Metrics.balanced_acc(self.coms[L], pred_labels[L])
+        
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
         Change the graph based on the current batch of updates.
@@ -197,7 +230,7 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
-        with print_zone(self.verbose >= 3):
+        with print_zone(self.verbose >= 0):
             if self.local_algorithm_fn is not None:
                 res = self.local_algorithm_fn(adj, features, limited, labels)
             elif self.method == "magi":
@@ -241,6 +274,7 @@ class Optimizer:
                 res = dese(adj, features, labels, timing_info = timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
+                # print("features =", features)
                 res = s2cag(adj, features, labels, timing_info = timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")

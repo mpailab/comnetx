@@ -26,3 +26,9 @@ https://github.com/kundtx/MFC-TopoReg
 
 FLMIF_algorithm
 https://github.com/salahinfo/FLMIG_algorithm
+
+DeSE
+https://github.com/SELGroup/DeSE
+
+S2CAG
+https://github.com/HKBU-LAGAS/S2CAG
