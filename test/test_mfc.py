@@ -79,8 +79,8 @@ def test_mfc_on_small_datasets(name):
     assert adj.ndim == 2 and adj.size(0) == adj.size(1)
     assert labels.ndim == 1 and labels.size(0) == adj.size(0)
 
-    mfc_adopted(adj_matrices=[adj],
-                labels_list=[labels],
+    mfc_adopted(adj=adj,
+                labels=labels,
                 network_type="MFC")
 
     out_dir = Path(PROJECT_PATH) / "results" / "mfc"
