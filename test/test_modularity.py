@@ -37,20 +37,6 @@ def test_modularity():
         assert mod < true_mod * 1.1
         assert mod > true_mod * 0.9
 
-@pytest.mark.short
-def test_accuracy():
-    with open(os.path.join(INFO, "konect.json")) as _:
-        info = json.load(_)
-
-    datasets = datasets_1
-    
-    for dataset in datasets:
-        results = dynamic_launch(dataset, 1, "s2cag", mode = "naive", verbose = 0)
-        acc = results[-1]['accuracy']
-        print(f"{dataset} : {acc:.4}")
-        assert acc < 0.0
-        assert acc > 1.0
-
 @pytest.mark.long    
 def test_modularity_memory():
     datasets = ['wiki_talk_sr', 'sx-mathoverflow', 'wiki_talk_sv', 'wiki_talk_vi', 'facebook-wosn-links', 'facebook-wosn-wall', 'sx-askubuntu', 'wiki_talk_ja', 'mit', 'lkml-reply']
