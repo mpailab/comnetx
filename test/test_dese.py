@@ -14,6 +14,9 @@ from collections import Counter
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
+PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+test_root = os.path.join(PROJECT_PATH, "test")
+
 from baselines.dese import dese
 from datasets import Dataset, KONECT_PATH
 from optimizer import Optimizer
@@ -138,7 +141,7 @@ def test_dese_single_dataset(name, data_dir):
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            test_root + "/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -207,7 +210,7 @@ def test_dese_konect_dataset(name):
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            test_root + "/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -252,7 +255,7 @@ def test_dese_single_konect_dataset():
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            test_root + "/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,

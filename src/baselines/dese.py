@@ -138,14 +138,17 @@ def dese(adj, features,
          labels: torch.Tensor | None = None, 
          args=None,
          timing_info=None, 
-         n_epochs=1):
+         n_epochs=1,
+         num_clusters=None,
+         metrics_mod=None):
     time_s = time()
     if labels is None:
         num_nodes = adj.size(0)
         labels = torch.arange(num_nodes)
-    num_clusters = labels.shape[0]
+    if num_clusters is None:
+        num_clusters = len(torch.unique(labels))
+    
     dataset = data_preprocess(adj, features, labels)
-
     # print("features ===", features.shape)
     features_dim = features.shape[-1]
 
@@ -162,57 +165,7 @@ def dese(adj, features,
             embed_dim = features_dim
             se_lamda = 0.01
             lp_lamda = 1
-            verbose = 20
-            activation = 'relu'
-            k = 2
-            dropout = 0.1
-            beta_f = 0.2
-            seed = 42
-            save = False
-            fig_network = False
-        args = Args()
-    else:
-        args.num_clusters_layer = [num_clusters]
-        args.embed_dim = features_dim
-
-    time_e = time()
-    if timing_info is not None:
-        timing_info['conversion_time'] = time_e - time_s
-
-    best_cluster, out_label = train(dataset, args)
-    # print(type(out_label))
-    print("out_label =", out_label)
-    return out_label
-
-def dese_metrics(adj, features, 
-         labels: torch.Tensor | None = None, 
-         args=None,
-         timing_info=None,
-         n_epochs=1):
-    time_s = time()
-    if labels is None:
-        num_nodes = adj.size(0)
-        labels = torch.arange(num_nodes)
-    num_clusters = labels.shape[0]
-    dataset = data_preprocess(adj, features, labels)
-
-    # print("features ===", features.shape)
-    features_dim = features.shape[-1]
-
-    if args is None:
-        class Args:
-            dataset = 'Computers'
-            epochs = n_epochs
-            lr = 1e-2
-            height = 2
-            gpu = 0
-            decay_rate = None
-            num_clusters_layer = [num_clusters]
-            layer_str = '[3]'
-            embed_dim = features_dim
-            se_lamda = 0.01
-            lp_lamda = 1
-            verbose = 20
+            verbose = 10
             activation = 'relu'
             k = 2
             dropout = 0.1
@@ -231,8 +184,10 @@ def dese_metrics(adj, features,
 
     metrics, out_label = train(dataset, args)
     # print(type(out_label))
-    # print("out_label =", out_label)
-    return out_label, metrics
+    print("out_label =", out_label)
+    if metrics_mod==True:
+        return out_label, metrics
+    return out_label
 
 def main():
     parser = argparse.ArgumentParser(description="Run.")
