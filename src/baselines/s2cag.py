@@ -76,7 +76,7 @@ def s2cag(adj_torch: torch.Tensor,
     
     if features_torch is None:
         num_nodes = adj_torch.size(0)
-        print("ALARM ==================================")
+        # print("ALARM ==================================")
         features_torch = torch.rand(num_nodes, 128, dtype=torch.float32)
 
     adj, features, labels, n_classes = torch_to_scipy(adj_torch, features_torch, labels)
@@ -106,7 +106,7 @@ def s2cag(adj_torch: torch.Tensor,
         features = x
 
         t0 = time()
-        print(features, k, norm_adj, sep='\n')
+        # print(features, k, norm_adj, sep='\n')
         P, Q = run_SSCAG(features, k, norm_adj, T, alpha,method=method,dataset=dataset,gamma=gamma,tau=tau)
 
 
@@ -185,7 +185,7 @@ def s2cag_metrics(adj_torch: torch.Tensor,
         features = x
 
         t0 = time()
-        print(features, k, norm_adj, sep='\n')
+        # print(features, k, norm_adj, sep='\n')
         P, Q = run_SSCAG(features, k, norm_adj, T, alpha,method=method,dataset=dataset,gamma=gamma,tau=tau)
 
 
