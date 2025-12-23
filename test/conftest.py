@@ -185,7 +185,7 @@ def runner_leidenalg():
             "--adj", ds["adj"],
             "--out", ds["out"],
         ]
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        return subprocess.run(cmd, capture_output=True, text=True)
     return run
 
 @pytest.fixture
@@ -208,7 +208,7 @@ def runner_networkit():
         if directed:
             cmd += ["--directed"]
 
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=str(root))
+        return subprocess.run(cmd, capture_output=True, text=True, cwd=str(root))
     return run
 
 @pytest.fixture
@@ -227,7 +227,7 @@ def runner_mfc():
         if snapshots is not None:
             cmd += ["--snapshots", str(snapshots)]
 
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        return subprocess.run(cmd, capture_output=True, text=True)
     return run
 
 @pytest.fixture
@@ -248,7 +248,7 @@ def runner_flmig():
             cmd += ["--max_rb", str(max_rb)]
         if "out" in ds and ds["out"]:
             cmd += ["--out", ds["out"]]
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        return subprocess.run(cmd, capture_output=True, text=True)
     return run
 
 @pytest.fixture

@@ -31,7 +31,7 @@ from metrics import Metrics
 def magi(adj : torch.Tensor, 
          features : torch.Tensor, 
          labels : torch.Tensor | None = None, 
-         n_clusters : int = -1, 
+         n_clusters: int | None = None, 
          device=None, 
          args=None,
          timing_info=None,
@@ -54,7 +54,7 @@ def magi(adj : torch.Tensor,
 
     n_clusters: int, optional
         Number of clusters.
-        Default: -1 
+        Default: None 
 
     device: torch.device or None, optional
         Device for computing: 'cuda', 'cpu'
@@ -101,11 +101,15 @@ def magi(adj : torch.Tensor,
 
     time_s = time.time()
     features = features.to(device)
-    if labels is None:
-        num_nodes = adj.size(0)
-        labels = torch.arange(num_nodes, device=device)
+    if n_clusters is None:
+        if labels is None:
+            num_nodes = adj.size(0)
+            labels = torch.arange(num_nodes, device=device)
+        else:
+            labels = labels.to(device)
+        inferred_k = len(torch.unique(labels))
     else:
-        labels = labels.to(device)
+        inferred_k = n_clusters
 
     N, num_features = features.shape[0], features.shape[-1]
 
@@ -165,9 +169,6 @@ def magi(adj : torch.Tensor,
         num_nodes = adj.size(0)
         labels = torch.arange(num_nodes)
 
-    if n_clusters == -1:
-        n_clusters = len(torch.unique(labels))
-
     model.train()
     for epoch in range(args.epochs):
         total_loss = 0
@@ -201,17 +202,32 @@ def magi(adj : torch.Tensor,
 
     embeddings = F.normalize(z_all, p=2, dim=1)
 
-    k_max = min(40, adj_sparse.sparse_sizes()[0])
-    k_min = min(2, k_max)
-    if k_max <= k_min:
-        num_clusters = k_max
-        new_labels = torch.zeros(adj_sparse.sparse_sizes()[0], dtype=torch.long, device=device)
+    if inferred_k is not None and inferred_k > 0:
+        pred_labels, _ = clustering(
+            feature=embeddings,
+            n_clusters=inferred_k,
+            kmeans_device=args.kmeans_device,
+            batch_size=args.kmeans_batch,
+            tol=1e-4,
+            device=device,
+            spectral_clustering=False,
+        )
+        new_labels = torch.as_tensor(pred_labels, dtype=torch.long, device=device)
     else:
-        num_clusters, new_labels = find_best_k_with_modularity(adj_sparse, embeddings, range(k_min, k_max), device=device)
-    if not isinstance(new_labels, torch.Tensor):
-        new_labels = torch.tensor(new_labels, dtype=torch.long, device=device)
-    else:
-        new_labels = new_labels.to(dtype=torch.long, device=device)
+        k_max = min(40, adj_sparse.sparse_sizes()[0])
+        k_min = min(2, k_max)
+        if k_max <= k_min:
+            num_clusters = k_max
+            new_labels = torch.zeros(adj_sparse.sparse_sizes()[0],
+                                     dtype=torch.long, device=device)
+        else:
+            num_clusters, new_labels = find_best_k_with_modularity(
+                adj_sparse, embeddings, range(k_min, k_max), device=device
+            )
+        if not isinstance(new_labels, torch.Tensor):
+            new_labels = torch.tensor(new_labels, dtype=torch.long, device=device)
+        else:
+            new_labels = new_labels.to(dtype=torch.long, device=device)
 
     return new_labels
 
@@ -357,11 +373,13 @@ def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
             predict_labels = predict_labels.numpy()
         else:
             if isinstance(feature, torch.Tensor):
-                feature = feature.numpy()
+                feature = feature.detach().cpu().numpy()
             print("kmeans on cpu...")
             Cluster = KMeans(n_clusters=n_clusters, max_iter=10000, n_init=20)
             predict_labels = Cluster.fit_predict(feature)
-            cluster_centers = torch.tensor(Cluster.cluster_centers_, dtype=torch.float32)
+            cluster_centers = torch.tensor(
+                Cluster.cluster_centers_, dtype=torch.float32
+            )
 
     return predict_labels, cluster_centers
 
@@ -371,13 +389,20 @@ def main():
     parser.add_argument("--features", required=True)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batchsize", type=int, default=2048)
+    parser.add_argument("--n-clusters", type=int, default=None)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
     features = torch.load(args.features)
 
-    new_labels = magi(adj, features, epochs=args.epochs, batchsize=args.batchsize)
+    new_labels = magi(
+        adj,
+        features,
+        epochs=args.epochs,
+        batchsize=args.batchsize,
+        n_clusters=args.n_clusters,
+    )
 
     torch.save(new_labels, args.out)
     print("MAGI finished successfully")

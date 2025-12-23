@@ -1,4 +1,5 @@
 import sys,os
+import time
 # SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # sys.path.append(os.path.dirname(SCRIPT_DIR))
 
@@ -115,44 +116,81 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 #     os.remove(path)
 
 
-def flmig_adopted(adj: torch.Tensor, Number_iter=100, Beta=0.5, max_rb=10, return_labels=False):
+def flmig_adopted(
+    adj: torch.Tensor,
+    Number_iter: int = 100,
+    Beta: float = 0.5,
+    max_rb: int = 10,
+    return_labels: bool = False,
+    timing_info: dict | None = None,
+):
     """
     Args:
-        return_labels: если True, возвращает лучший community labels вместо print'ов
-    Returns:
-        tuple(Q_max, Q_avg, Q_std, time_run) или tuple(labels)
+        adj: torch.Tensor [n, n], sparse или dense.
+        Number_iter: int, optional
+        Beta: float, optional
+        max_rb: int, optional
+        return_labels: если True — вернуть метки кластеров, иначе метрики
+        timing_info: dict | None — сюда накапливаем conversion_time.
     """
-    path = tensor_to_graph_txt(adj, str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"))
+    if timing_info is None:
+        timing_info = {}
+
+    # --- приведение к dense и бинаризация + запись во временный файл ---
+    t0 = time.time()
+
+    if adj.is_sparse:
+        A = adj.coalesce()
+        adj_dense = torch.sparse_coo_tensor(
+            A.indices(),
+            torch.where(
+                A.values() > 0,
+                torch.ones_like(A.values()),
+                torch.zeros_like(A.values()),
+            ),
+            size=A.size(),
+        ).to_dense()
+    else:
+        adj_dense = (adj > 0).to(torch.float32)
+        adj_dense.fill_diagonal_(0.0)
+
+    path = tensor_to_graph_txt(
+        adj_dense,
+        str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"),
+    )
+
+    t1 = time.time()
+    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
     best_community = None
     best_mod = -np.inf
-    
+
     Q_list = []
     Time_list = []
     Community_list = []
-    
+
     for nb_run in range(max_rb):
         print(f"rb {nb_run}")
         communities = Fast_local_Move_IG(Number_iter, Beta, path)
         mod, community, tim = communities.Run_FMLIG()
-        
+
         Q_list.append(mod)
         Time_list.append(tim)
         Community_list.append(community)
-        
+
         if mod > best_mod:
             best_mod = mod
             best_community = community
-    
+
     communities = Fast_local_Move_IG(Number_iter, Beta, path)
-    
+
     Q_avg = communities.avg(Q_list)
     Q_max = communities.max(Q_list)
     Q_std = communities.stdev(Q_list)
     time_run = communities.avg(Time_list)
-    
+
     os.remove(path)
-    
+
     if return_labels:
         N = adj.size(0)
         labels = torch.zeros(N, dtype=torch.long)
@@ -160,7 +198,6 @@ def flmig_adopted(adj: torch.Tensor, Number_iter=100, Beta=0.5, max_rb=10, retur
             node_idx = int(node)
             if 0 <= node_idx < N:
                 labels[node_idx] = int(com)
-
         return labels
     else:
         print("the value of Q_max", Q_max)
@@ -170,39 +207,25 @@ def flmig_adopted(adj: torch.Tensor, Number_iter=100, Beta=0.5, max_rb=10, retur
         return Q_max, Q_avg, Q_std, time_run
 
 
-
 if __name__ == "__main__":
     import argparse
-    from datasets import Dataset  # путь уже в sys.path
+    from datasets import Dataset
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--adj", type=str, required=True,
-                    help="Root directory with datasets (used by Dataset)")
-    ap.add_argument("--dataset-name", type=str, required=True,
-                    help="Dataset key (name) for Dataset")
-    ap.add_argument("--Number_iter", type=int, default=100)
-    ap.add_argument("--Beta", type=float, default=0.5)
-    ap.add_argument("--max_rb", type=int, default=10)
+    ...
     args = ap.parse_args()
 
-    # грузим через Dataset
     ds = Dataset(args.dataset_name, path=args.adj)
     adj, features, labels = ds.load(tensor_type="coo")
 
-    # для FLMIG нужны только adj, делаем dense и бинаризуем
-    if adj.is_sparse:
-        A = adj.coalesce()
-        adj = torch.sparse_coo_tensor(A.indices(),
-                                      torch.where(A.values() > 0,
-                                                  torch.ones_like(A.values()),
-                                                  torch.zeros_like(A.values())),
-                                      size=A.size()).to_dense()
-    else:
-        adj = (adj > 0).to(torch.float32)
-        adj.fill_diagonal_(0.0)
+    labels = flmig_adopted(
+        adj=adj,                      # sparse или dense, внутри всё приведётся
+        Number_iter=args.Number_iter,
+        Beta=args.Beta,
+        max_rb=args.max_rb,
+        return_labels=True,
+    )
 
-    flmig_adopted(adj=adj,
-                  Number_iter=args.Number_iter,
-                  Beta=args.Beta,
-                  max_rb=args.max_rb)
+    if args.out is not None:
+        torch.save(labels, args.out)
 
