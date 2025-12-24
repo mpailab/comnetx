@@ -105,6 +105,53 @@ def test_dese_synthetic_dataset_WO_labels():
 
     dese(adj=adj, features=feature, labels=None)
 
+def test_dese_synthetic_dataset_WO_feat():
+    n = 30
+    k = 4
+    nodes_per_cluster = [15, 4, 5, 6]
+
+    labels = []
+    for c, size in enumerate(nodes_per_cluster):
+        labels.extend([c] * size)
+    # labels = torch.tensor(labels)
+
+
+    adj = torch.zeros(n, n)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        idx = torch.arange(start, end)
+        i, j = torch.meshgrid(idx, idx, indexing='ij')
+        mask = torch.rand(size, size) < 0.4
+        mask = torch.triu(mask, 1)
+        adj[i[mask], j[mask]] = 1
+        adj[j[mask], i[mask]] = 1
+        start = end
+
+    inter = torch.rand(n, n) < 0.003
+    inter = inter & (torch.triu(torch.ones(n,n), 1) > 0)
+    adj[inter] = 1
+    adj.T[inter] = 1
+    adj.fill_diagonal_(0)
+
+    adj = adj.to_sparse_coo()
+    # print(adj, feature)
+
+    dese(adj=adj, features=None, labels=None)
+
+def get_all_datasets():
+    """
+    Сreate dict with all datasets in test directory.
+    """
+    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    datasets = {}
+    if os.path.isdir(base_dir):
+        for name in os.listdir(base_dir):
+            path = os.path.join(base_dir, name)
+            if os.path.isdir(path):
+                datasets[name] = base_dir
+    return datasets
+
 def get_all_datasets():
     """
     Сreate dict with all datasets in test directory.

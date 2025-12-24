@@ -16,6 +16,7 @@ test_root = os.path.join(PROJECT_PATH, "test")
 # from baselines.s2cag import main
 from datasets import Dataset, KONECT_PATH
 from baselines.s2cag import s2cag
+from metrics import Metrics
 
 def test_s2cag_synthetic_dataset():
     n = 30
@@ -36,6 +37,91 @@ def test_s2cag_synthetic_dataset():
     feature = feature + torch.randn_like(feature) * 0.15
     feature = feature / feature.norm(dim=1, keepdim=True)
     feature = abs(feature)
+
+    adj = torch.zeros(n, n)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        idx = torch.arange(start, end)
+        i, j = torch.meshgrid(idx, idx, indexing='ij')
+        mask = torch.rand(size, size) < 0.4
+        mask = torch.triu(mask, 1)
+        adj[i[mask], j[mask]] = 1
+        adj[j[mask], i[mask]] = 1
+        start = end
+
+    inter = torch.rand(n, n) < 0.003
+    inter = inter & (torch.triu(torch.ones(n,n), 1) > 0)
+    adj[inter] = 1
+    adj.T[inter] = 1
+    adj.fill_diagonal_(0)
+
+    adj = adj.to_sparse_coo()
+    # print(adj, feature)
+    new_labels = s2cag(adj, feature, labels)
+    # print(new_labels)
+    print("PROJECT_PATH =", PROJECT_PATH)
+
+    assert new_labels.shape[0] == adj.size(0)
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+
+def test_s2cag_synthetic_dataset_WO_labels():
+    n = 30
+    k = 4
+    nodes_per_cluster = [15, 4, 5, 6]
+
+    feature = torch.zeros(n, 5)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        feature[start:end, c*10:(c+1)*10] = 1.0
+        start = end
+    feature = feature + torch.randn_like(feature) * 0.15
+    feature = feature / feature.norm(dim=1, keepdim=True)
+    feature = abs(feature)
+
+    adj = torch.zeros(n, n)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        idx = torch.arange(start, end)
+        i, j = torch.meshgrid(idx, idx, indexing='ij')
+        mask = torch.rand(size, size) < 0.4
+        mask = torch.triu(mask, 1)
+        adj[i[mask], j[mask]] = 1
+        adj[j[mask], i[mask]] = 1
+        start = end
+
+    inter = torch.rand(n, n) < 0.003
+    inter = inter & (torch.triu(torch.ones(n,n), 1) > 0)
+    adj[inter] = 1
+    adj.T[inter] = 1
+    adj.fill_diagonal_(0)
+
+    adj = adj.to_sparse_coo()
+    # print(adj, feature)
+    new_labels = s2cag(adj, feature, labels=None)
+    # print(new_labels)
+    print("PROJECT_PATH =", PROJECT_PATH)
+
+    # print(set(new_labels.numpy()))
+
+    assert new_labels.shape[0] == adj.size(0)
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+
+def test_s2cag_synthetic_dataset_WO_feat():
+    n = 30
+    k = 4
+    nodes_per_cluster = [15, 4, 5, 6]
+
+    labels = []
+    for c, size in enumerate(nodes_per_cluster):
+        labels.extend([c] * size)
+    labels = torch.tensor(labels)
+
+    feature = None
 
     adj = torch.zeros(n, n)
     start = 0
@@ -90,9 +176,6 @@ def test_s2cag_single_dataset(name, data_dir):
     dataset = Dataset(name, path=data_dir)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
-    num_nodes = adj.size(0)
-    features = torch.randn(num_nodes, 128, dtype=torch.float32)
-    features = abs(features)
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
         temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
@@ -119,6 +202,11 @@ def test_s2cag_single_dataset(name, data_dir):
             pytest.fail(f"Subprocess failed for dataset {name}")
 
         new_labels = torch.load(temp_labels_path)
+
+        print("labels =", labels)
+        print("new_labels =", new_labels)
+
+        print("acc =", Metrics.accuracy(labels, new_labels))        
 
         assert isinstance(new_labels, torch.Tensor)
         assert new_labels.shape[0] == adj.size(0)

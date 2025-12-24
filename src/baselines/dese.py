@@ -134,7 +134,8 @@ def data_preprocess(adj, features, labels):
     dataset.print_statistic = print_statistic
     return dataset
 
-def dese(adj, features, 
+def dese(adj, 
+         features: torch.Tensor | None = None, 
          labels: torch.Tensor | None = None, 
          args=None,
          timing_info=None, 
@@ -145,6 +146,9 @@ def dese(adj, features,
     if labels is None:
         num_nodes = adj.size(0)
         labels = torch.arange(num_nodes)
+    elif len(labels.shape) == 2:
+        labels = labels.squeeze()
+
     if num_clusters is None:
         num_clusters = len(torch.unique(labels))
     
@@ -184,7 +188,7 @@ def dese(adj, features,
 
     metrics, out_label = train(dataset, args)
     # print(type(out_label))
-    print("out_label =", out_label)
+    # print("out_label =", out_label)
     if metrics_mod==True:
         return out_label, metrics
     return out_label
