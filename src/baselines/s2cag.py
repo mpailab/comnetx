@@ -152,7 +152,9 @@ def s2cag(adj_torch: torch.Tensor,
     if labels is None:
         num_nodes = adj_torch.size(0)
         labels = torch.arange(num_nodes)
-    
+    elif len(labels.shape) == 2:
+        labels = labels.squeeze()
+
     if features_torch is None:
         features_torch = generate_graph_features(adj_torch, embedding_dim=8, alpha=0.9, power=10)
 

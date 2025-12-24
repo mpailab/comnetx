@@ -46,8 +46,10 @@ class Optimizer:
 
         if features is None:
             self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype)
+            self.feat_gen = True
         else:
             self.features = features.float() # FIXME add any type support
+            self.feat_gen = False
        
         self._set_communities(communities)
         self.method = method
@@ -230,7 +232,7 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
-        with print_zone(self.verbose >= 0):
+        with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:
                 res = self.local_algorithm_fn(adj, features, limited, labels)
             elif self.method == "magi":
@@ -271,11 +273,17 @@ class Optimizer:
                 return remap.to(torch.long)
             elif self.method == "dese":
                 from baselines.dese import dese
-                res = dese(adj, features, labels, timing_info = timing_info)
+                if self.feat_gen:
+                    raise ValueError("dese cann`t work without real features")
+                else:
+                    res = dese(adj, features, labels, timing_info=timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
-                # print("features =", features)
+                # print("features =", features.shape)
+                if self.feat_gen:
+                    features = None
                 res = s2cag(adj, features, labels, timing_info = timing_info)
+                # print("Alarm1")
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info['conversion_time']
