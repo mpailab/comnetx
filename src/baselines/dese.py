@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from collections import Counter
 import networkx as nx
+from node2vec import Node2Vec
 from matplotlib.colors import ListedColormap
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 torch.autograd.set_detect_anomaly(True)
@@ -134,7 +135,74 @@ def data_preprocess(adj, features, labels):
     dataset.print_statistic = print_statistic
     return dataset
 
-def dese(adj, features, 
+def generate_node2vec_embeddings(
+    adj_matrix: torch.Tensor, 
+    embedding_dim: int = 64, 
+    walk_length: int = 10, 
+    num_walks: int = 20, 
+    p: float = 1.0, 
+    q: float = 1.0,
+    workers: int = 4
+    ) -> torch.Tensor:
+    """
+    Args:
+    ----------
+        adj_matrix : torch.Tensor
+        embedding_dim : int
+        walk_length : int
+        num_walks : int
+        p : float
+        q : float
+        workers : int
+        
+    Return:
+        torch.Tensor
+    """
+    
+    if adj_matrix.is_sparse:
+        adj_matrix = adj_matrix.coalesce()
+        indices = adj_matrix.indices().cpu().numpy()
+        values = adj_matrix.values().cpu().numpy()
+        
+        num_nodes = adj_matrix.size(0)
+        G = nx.Graph()
+        G.add_nodes_from(range(num_nodes))
+        
+        edges = list(zip(indices[0], indices[1]))
+        G.add_edges_from(edges)
+        
+    else:
+        adj_np = adj_matrix.cpu().numpy()
+        G = nx.from_numpy_array(adj_np)
+
+    node2vec_model = Node2Vec(
+        G, 
+        dimensions=embedding_dim, 
+        walk_length=walk_length, 
+        num_walks=num_walks, 
+        p=p, 
+        q=q,
+        workers=workers, 
+        quiet=True # Отключить лишний вывод
+    )
+    
+    model = node2vec_model.fit(window=10, min_count=1, batch_words=4)
+
+    num_nodes = adj_matrix.size(0)
+    embeddings = torch.zeros((num_nodes, embedding_dim))
+    
+    for node_idx in range(num_nodes):
+        node_key = str(node_idx)
+        if node_key in model.wv:
+            vector = model.wv[node_key]
+            embeddings[node_idx] = torch.from_numpy(vector)
+        else:
+            embeddings[node_idx] = torch.randn(embedding_dim)
+
+    return embeddings
+
+def dese(adj, 
+         features: torch.Tensor | None = None, 
          labels: torch.Tensor | None = None, 
          args=None,
          timing_info=None, 
@@ -147,6 +215,9 @@ def dese(adj, features,
         labels = torch.arange(num_nodes)
     if num_clusters is None:
         num_clusters = len(torch.unique(labels))
+
+    if features is None:
+        features = generate_node2vec_embeddings(adj, embedding_dim=64)
     
     dataset = data_preprocess(adj, features, labels)
     # print("features ===", features.shape)
