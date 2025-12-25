@@ -157,23 +157,7 @@ def test_magi_metrics_on_small_graphs(name, data_dir):
     all_metrics[name] = metrics_entry
 
     with open(METRICS_JSON, "w", encoding="utf-8") as f:
-        json.dump(all_metrics, f, indent=2, ensure_ascii=False)import sys
-import os
-import pytest
-import torch
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(os.path.join(PROJECT_PATH, "src"))
-
-from launcher import dynamic_launch
-from datasets import INFO
-from datasets import Dataset, KONECT_PATH
-
-from baselines.s2cag import s2cag_metrics
-from baselines.dese import dese_metrics
-from metrics import Metrics
+        json.dump(all_metrics, f, indent=2, ensure_ascii=False)import sysS
 
 def test_s2cag_acc():
     n = 30
