@@ -435,7 +435,7 @@ class DSE1(torch.nn.Module):
         for k in range(2, self.height+1):
             entropy_values = [self.calculate_entropy(row) for row in assignmatrix[k]]
             if any(torch.isnan(e).item() for e in entropy_values):
-                print(assignmatrix[k])
+                # print(assignmatrix[k])
                 raise ValueError("NaN found in entropy calculation")
             onehot_loss += torch.mean(torch.stack(entropy_values))
         return onehot_loss

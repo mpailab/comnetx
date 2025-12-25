@@ -2,7 +2,7 @@ import torch
 import tensorflow as tf
 import time
 import numpy as np
-from sklearn.metrics import pairwise_distances, adjusted_rand_score, f1_score
+from sklearn.metrics import pairwise_distances, adjusted_rand_score, f1_score, normalized_mutual_info_score, balanced_accuracy_score
 from torch_sparse import SparseTensor
 from scipy.optimize import linear_sum_assignment
 
@@ -117,51 +117,20 @@ class Metrics:
             true_labels: torch.Tensor [n_nodes] 
             pred_labels: torch.Tensor [n_nodes] 
         Returns:
-            accuracy: float 
+            nmi: float 
         """
-        true_labels = true_labels.flatten().long()
-        pred_labels = pred_labels.flatten().long()
-        n = true_labels.size(0)
-
-        def get_entropy(labels):
-            _, counts = torch.unique(labels, return_counts=True)
-            probs = counts.float() / n
-            return -torch.sum(probs * torch.log(probs + 1e-12))
-
-        u_labels, u_inv = torch.unique(true_labels, return_inverse=True)
-        v_labels, v_inv = torch.unique(pred_labels, return_inverse=True)
-        
-        combined = u_inv * v_labels.size(0) + v_inv
-        counts_uv = torch.bincount(combined, minlength=u_labels.size(0) * v_labels.size(0))
-        probs_uv = counts_uv.float() / n
-        
-        h_u = get_entropy(true_labels)
-        h_v = get_entropy(pred_labels)
-        h_uv = -torch.sum(probs_uv * torch.log(probs_uv + 1e-12))
-        
-        mi = h_u + h_v - h_uv
-        
-        nmi = mi / torch.sqrt(h_u * h_v + 1e-12)
-        
-        return nmi.item()
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return normalized_mutual_info_score(y_true, y_pred)
 
     def balanced_acc(true_labels, pred_labels) -> float:
-        true_labels = true_labels.flatten().long()
-        pred_labels = pred_labels.flatten().long()
-        
-        unique_classes = torch.unique(true_labels)
-        recalls = []
-        
-        for cls in unique_classes:
-            true_mask = (true_labels == cls)
-            
-            tp = torch.sum((pred_labels == cls) & true_mask).float()
-            
-            actual_total = torch.sum(true_mask).float()
-            
-            recall = tp / (actual_total + 1e-12)
-            recalls.append(recall)
-        
-        balanced_acc = torch.stack(recalls).mean()
-        
-        return balanced_acc.item()
+        """
+        Args:
+            true_labels: torch.Tensor [n_nodes] 
+            pred_labels: torch.Tensor [n_nodes] 
+        Returns:
+            balanced_acc: float 
+        """
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return balanced_accuracy_score(y_true, y_pred)

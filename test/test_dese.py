@@ -14,6 +14,9 @@ from collections import Counter
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
+PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+test_root = os.path.join(PROJECT_PATH, "test")
+
 from baselines.dese import dese
 from datasets import Dataset, KONECT_PATH
 from optimizer import Optimizer
@@ -102,6 +105,53 @@ def test_dese_synthetic_dataset_WO_labels():
 
     dese(adj=adj, features=feature, labels=None)
 
+def test_dese_synthetic_dataset_WO_feat():
+    n = 30
+    k = 4
+    nodes_per_cluster = [15, 4, 5, 6]
+
+    labels = []
+    for c, size in enumerate(nodes_per_cluster):
+        labels.extend([c] * size)
+    # labels = torch.tensor(labels)
+
+
+    adj = torch.zeros(n, n)
+    start = 0
+    for c, size in enumerate(nodes_per_cluster):
+        end = start + size
+        idx = torch.arange(start, end)
+        i, j = torch.meshgrid(idx, idx, indexing='ij')
+        mask = torch.rand(size, size) < 0.4
+        mask = torch.triu(mask, 1)
+        adj[i[mask], j[mask]] = 1
+        adj[j[mask], i[mask]] = 1
+        start = end
+
+    inter = torch.rand(n, n) < 0.003
+    inter = inter & (torch.triu(torch.ones(n,n), 1) > 0)
+    adj[inter] = 1
+    adj.T[inter] = 1
+    adj.fill_diagonal_(0)
+
+    adj = adj.to_sparse_coo()
+    # print(adj, feature)
+
+    dese(adj=adj, features=None, labels=None)
+
+def get_all_datasets():
+    """
+    Сreate dict with all datasets in test directory.
+    """
+    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
+    datasets = {}
+    if os.path.isdir(base_dir):
+        for name in os.listdir(base_dir):
+            path = os.path.join(base_dir, name)
+            if os.path.isdir(path):
+                datasets[name] = base_dir
+    return datasets
+
 def get_all_datasets():
     """
     Сreate dict with all datasets in test directory.
@@ -138,7 +188,7 @@ def test_dese_single_dataset(name, data_dir):
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            test_root + "/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -207,7 +257,7 @@ def test_dese_konect_dataset(name):
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            test_root + "/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
@@ -252,7 +302,7 @@ def test_dese_single_konect_dataset():
 
         cmd = [
             sys.executable,
-            "test/run_dese_subprocess.py",
+            test_root + "/run_dese_subprocess.py",
             "--adj", temp_adj_path,
             "--features", temp_features_path,
             "--labels", temp_labels_path,
