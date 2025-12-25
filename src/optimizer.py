@@ -132,6 +132,36 @@ class Optimizer:
             balanced_acc: float 
         """
         return Metrics.balanced_acc(self.coms[L], pred_labels[L])
+
+    def purity(self, pred_labels: torch.tensor, L: int = 0) -> float:
+        """
+        Args:
+            pred_labels: torch.Tensor [n_nodes]
+            L: int, optional (default=0)
+        Returns:
+            purity_score: float 
+        """
+        return Metrics.purity_score(self.coms[L], pred_labels[L])
+
+    def ari(self, pred_labels: torch.tensor, L: int = 0) -> float:
+        """
+        Args:
+            pred_labels: torch.Tensor [n_nodes]
+            L: int, optional (default=0)
+        Returns:
+            ari_score: float 
+        """
+        return Metrics.ari_score(self.coms[L], pred_labels[L])
+
+    def macro_f1(self, pred_labels: torch.tensor, L: int = 0) -> float:
+        """
+        Args:
+            pred_labels: torch.Tensor [n_nodes]
+            L: int, optional (default=0)
+        Returns:
+            macro_f1: float 
+        """
+        return Metrics.macro_f1(self.coms[L], pred_labels[L])    
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
