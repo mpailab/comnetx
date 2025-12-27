@@ -1,0 +1,42 @@
+import argparse
+import leidenalg as la
+import igraph as ig
+import torch
+import time
+
+def sparse_tensor_to_igraph(sparse_tensor, directed=True):
+    st = sparse_tensor.coalesce()
+    indices = st.indices()
+    values = st.values()
+    edges = indices.t().numpy()
+    graph = ig.Graph(n=sparse_tensor.shape[0], edges=edges, directed=directed)
+    graph.es['weight'] = values.numpy()
+    return graph
+
+def leidenalg_partition(adj : torch.Tensor, timing_info=None):
+    time_s = time.time()
+    G = sparse_tensor_to_igraph(adj.to_sparse())
+    time_e = time.time()
+    if timing_info is not None:
+        timing_info['conversion_time'] = time_e - time_s
+
+
+    part = la.find_partition(G, la.ModularityVertexPartition, weights='weight', seed=True, n_iterations=2)
+    return torch.tensor(part.membership, dtype=torch.long)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--adj", required=True)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
+
+    adj = torch.load(args.adj)
+    if not adj.is_sparse:
+        adj = adj.to_sparse()
+
+    labels = leidenalg_partition(adj)
+    torch.save(labels, args.out)
+    print("LEIDEN finished successfully")
+
+if __name__ == "__main__":
+    main()

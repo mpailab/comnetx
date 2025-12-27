@@ -1,0 +1,32 @@
+cmd : path  number_of_iteration  Beta  path_of_ground_truth   number_of_runtime
+ samall real network datset
+python3  FLMIG.py  /home/yacine/Desktop/real_network/football.gml  100  0.5  /home/yacine/Desktop/real_network/football.txt 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/dolphins.gml  100  0.5  /home/yacine/Desktop/real_network/dolphins.txt 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/polbooks.gml  100  0.5  /home/yacine/Desktop/real_network/polbooks.txt 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/karate.gml  100  0.5  /home/yacine/Desktop/real_network/karate.txt 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/lesmis.gml  200  0.4  None 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/adjnoun.gml  200  0.5  None 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/jazz.txt  200  0.5  None 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/metabolic.txt  200  0.5  None 50
+
+big real network datest
+for the big data the number of iteration [10,20,30]
+python3  FLMIG.py  /home/yacine/Desktop/real_network/com-amazon.ungraph.txt  20  0.5  None 50
+python3  FLMIG.py  /home/yacine/Desktop/real_network/com-dblp.ungraph.txt  20  0.5  None 50
+
+
+LFR benchmark
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.05.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.05.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.1.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.1.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.15.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.15.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.2.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.2.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.25.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.25.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.3.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.3.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.35.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.35.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.4.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.4.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.45.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.45.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.5.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.5.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.55.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.55.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.6.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.6.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.65.dat  100  0.5  /home/yacine/Desktop/LFR/community_mu_0.65.dat 50
+python3  FLMIG.py  /home/yacine/Desktop/LFR/network_mu_0.7.dat   100  0.5  /home/yacine/Desktop/LFR/community_mu_0.7.dat 50
