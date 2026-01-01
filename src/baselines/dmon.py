@@ -165,9 +165,8 @@ def adapted_dmon(adj: torch.Tensor,
         class Args:
             _architecture = [64]
             _collapse_regularization = 1
-            _dropout_rate = 0 #min - 0, max - 1
-            _n_clusters_optimal = find_best_n_clusters(adj, ftrs)
-            _n_clusters = _n_clusters_optimal #min - 0
+            _dropout_rate = 0.5 #min - 0, max - 1
+            _n_clusters = 16 #min - 0
             _n_epochs = 1000 #min - 0
             _learning_rate = 0.001 #min - 0
         args = Args()
@@ -186,14 +185,17 @@ def adapted_dmon(adj: torch.Tensor,
   features_dense = tf.sparse.to_dense(features) if isinstance(features, tf.SparseTensor) else features
   n_nodes = tf.shape(graph)[0]
   feature_size = tf.shape(features_dense)[1]
-  graph_normalized = utils.normalize_graph_tf_sparse(copy_sparse_tensor(graph))
-  
+  normalized = utils.normalize_graph(adjacency.copy())
+  graph_normalized = convert_scipy_sparse_to_sparse_tensor(normalized)
+
+  # Create model input placeholders of appropriate size
   input_features = tf.keras.layers.Input(shape=(feature_size,))
   input_graph = tf.keras.layers.Input((n_nodes,), sparse=True)
   input_adjacency = tf.keras.layers.Input((n_nodes,), sparse=True)
 
   model = build_dmon(input_features, input_graph, input_adjacency, args)
 
+# Computes the gradients wrt. the sum of losses, returns a list of them.
   def grad(model, inputs):
     with tf.GradientTape() as tape:
       _ = model(inputs, training=True)
@@ -206,23 +208,20 @@ def adapted_dmon(adj: torch.Tensor,
   for epoch in range(args._n_epochs):
     loss_values, grads = grad(model, [features, graph_normalized, graph])
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    print(f'epoch {epoch}, losses: ' +
-         ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
+    # print(f'epoch {epoch}, losses: ' +
+    #      ' '.join([f'{loss_value.numpy():.4f}' for loss_value in loss_values]))
 
   # Obtain the cluster assignments.
   _, assignments = model([features, graph_normalized, graph], training=False)
   assignments = assignments.numpy()
 
-  clusters = assignments.argmax(axis=1)  # Convert soft to hard clusters.
-  # print("Clusters shape:", clusters.shape)        
-  # print("Clusters type:", clusters.dtype)         
+  clusters = assignments.argmax(axis=1)  # Convert soft to hard clusters.     
   # print("Unique clusters:", np.unique(clusters))  
   # print("Cluster sizes:", np.bincount(clusters))  
   if not isinstance(clusters, torch.Tensor):
       clusters_tensor = torch.from_numpy(clusters).long()
   else:
-      clusters_tensor = clusters.long()
-  # print("Cluster sizes:", torch.bincount(clusters_tensor)) 
+      clusters_tensor = clusters.long() 
   # Prints some metrics used in the paper.
   print('Conductance:', metrics.conductance(adjacency, clusters))
   print('Modularity:', metrics.modularity(adjacency, clusters))
@@ -234,87 +233,9 @@ def adapted_dmon(adj: torch.Tensor,
      precision = metrics.pairwise_precision(know_labels, clusters[label_indices])
      recall = metrics.pairwise_recall(know_labels, clusters[label_indices])
      print('F1:', 2 * precision * recall / (precision + recall))
-  print("Returning clusters_tensor:", type(clusters_tensor), clusters_tensor.shape)
+#   print("Returning clusters_tensor:", type(clusters_tensor), clusters_tensor.shape)
   return clusters_tensor
 
-def find_best_n_clusters(adj, features, min_k=2, max_k=None, step=2):
-    if max_k is None:
-        n_nodes = adj.shape[0]
-        max_k = min(40, n_nodes // 2, n_nodes - 1)
-        max_k = max(max_k, min_k + 1)
-    
-    # print(f"Searching for best n_clusters in range [{min_k}, {max_k}] with step {step}")
-    
-    best_modularity = -float('inf')
-    best_k = min_k
-    modularity_scores = []
-    
-    adj_scipy = torch_to_scipy_csr(adj)
-    
-    for k in range(min_k, max_k + 1, step):
-        # print(f"Testing k={k}...")
-        k_best_modularity = -float('inf')
-        class Args:
-                    _architecture = [64]
-                    _collapse_regularization = 1
-                    _dropout_rate = 0
-                    _n_clusters = k
-                    _n_epochs = 10  
-                    _learning_rate = 0.001
-        clusters = adapted_dmon_internal(adj, features, None, Args())
-                
-        mod_score = metrics.modularity(adj_scipy, clusters)
-        k_best_modularity = max(k_best_modularity, mod_score)
-        
-        if k_best_modularity > best_modularity:
-            best_modularity = k_best_modularity
-            best_k = k
-        
-        modularity_scores.append((k, k_best_modularity))
-        # print(f"k={k}, best modularity: {k_best_modularity:.4f}, current best: k={best_k} (mod={best_modularity:.4f})")
-    
-    # print("\n" + "="*50)
-    # print("MODULARITY OPTIMIZATION RESULTS:")
-    # for k, mod in modularity_scores:
-    #     print(f"k={k}: modularity = {mod:.4f}")
-    # print(f"BEST: k={best_k} with modularity = {best_modularity:.4f}")
-    # print("="*50)
-    
-    return best_k
-
-
-def adapted_dmon_internal(adj: torch.Tensor, ftrs: torch.Tensor, lbls: torch.Tensor | None = None, args=None):
-    
-    graph, features = torch_to_tf_sparse_tensor(adj), torch_to_tf_sparse_tensor(ftrs)
-    
-    features_dense = tf.sparse.to_dense(features) if isinstance(features, tf.SparseTensor) else features
-    n_nodes = tf.shape(graph)[0]
-    feature_size = tf.shape(features_dense)[1]
-    graph_normalized = utils.normalize_graph_tf_sparse(copy_sparse_tensor(graph))
-    
-    input_features = tf.keras.layers.Input(shape=(feature_size,))
-    input_graph = tf.keras.layers.Input((n_nodes,), sparse=True)
-    input_adjacency = tf.keras.layers.Input((n_nodes,), sparse=True)
-
-    model = build_dmon(input_features, input_graph, input_adjacency, args)
-
-    def grad(model, inputs):
-        with tf.GradientTape() as tape:
-            _ = model(inputs, training=True)
-            loss_value = sum(model.losses)
-        return model.losses, tape.gradient(loss_value, model.trainable_variables)
-    
-    optimizer = tf.keras.optimizers.Adam(args._learning_rate)
-    model.compile(optimizer, None)
-
-    for epoch in range(args._n_epochs):
-        loss_values, grads = grad(model, [features, graph_normalized, graph])
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
-    _, assignments = model([features, graph_normalized, graph], training=False)
-    assignments = assignments.numpy()
-    clusters = assignments.argmax(axis=1)
-    return clusters
   
 def main():
     parser = argparse.ArgumentParser()

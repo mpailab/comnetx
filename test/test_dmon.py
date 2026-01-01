@@ -126,7 +126,7 @@ def test_dmon_konect_dataset(name):
 
 
 def test_dmon_single_konect_dataset():
-    dataset = Dataset("youtube-u-growth", KONECT_PATH)
+    dataset = Dataset("wiki_talk_ht", KONECT_PATH)
     adj, features, labels = dataset.load(tensor_type="coo")
     adj = adj.coalesce()
     num_nodes = adj.size(0)
