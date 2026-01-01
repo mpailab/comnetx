@@ -57,7 +57,7 @@ def de_main(path, Number_iter, Beta, max_rb):
     nb_run = 0
 
     while nb_run < max_rb :
-        print("rb",nb_run)
+        # print("rb",nb_run)
         communities = Fast_local_Move_IG( Number_iter, Beta, path)
         mod,community,tim = communities.Run_FMLIG() 
         #print(community)
@@ -169,10 +169,14 @@ def flmig_adopted(
     Time_list = []
     Community_list = []
 
+    # print("ALARM ================")
+
     for nb_run in range(max_rb):
-        print(f"rb {nb_run}")
+        # print(f"rb {nb_run}, max_rb {max_rb}")
         communities = Fast_local_Move_IG(Number_iter, Beta, path)
         mod, community, tim = communities.Run_FMLIG()
+
+        # print("community =", community)
 
         Q_list.append(mod)
         Time_list.append(tim)
@@ -183,6 +187,8 @@ def flmig_adopted(
             best_community = community
 
     communities = Fast_local_Move_IG(Number_iter, Beta, path)
+
+    # print("communities =", communities)
 
     Q_avg = communities.avg(Q_list)
     Q_max = communities.max(Q_list)
