@@ -661,7 +661,7 @@ def test_sbm_generation_and_visualization():
     # plt.close()
 
 def test_temporal_sbm_generation():
-    # --- generate
+    # generate
     start = time.time()
     path = generate_temporal_sbm_graph_local(
         n=100,
@@ -683,14 +683,14 @@ def test_temporal_sbm_generation():
     print("Generation time:", round(time.time() - start, 3), "sec")
     print("Saved in:", path)
 
-    # --- load
+    # load
     temporal_adjs, temporal_labels = load_temporal_sbm_graph(path)
 
     print("Shapes:")
     print("  temporal_adjs:", temporal_adjs.shape)
     print("  temporal_labels:", temporal_labels.shape)
 
-    # --- basic checks
+    # basic checks
     assert temporal_adjs.dim() == 3
     assert temporal_adjs.is_sparse
     assert temporal_labels.dim() == 2
@@ -701,14 +701,14 @@ def test_temporal_sbm_generation():
     assert n == n2
 
 
-    # --- NEW: symmetry check for each snapshot (for undirected case)
+    # symmetry check for each snapshot (for undirected case)
     print("\nChecking symmetry of snapshots...")
     for t in range(T):
         assert check_snapshot_symmetric(temporal_adjs, t), \
             f"Snapshot {t} is not symmetric"
 
 
-    # --- drift sanity
+    # drift sanity
     drift_counts = []
     for t in range(1, T):
         diff = (temporal_labels[t] != temporal_labels[t-1]).sum().item()
@@ -716,7 +716,7 @@ def test_temporal_sbm_generation():
     print("Drift counts per step:", drift_counts)
 
 
-    # --- edge-change sanity
+    # edge-change sanity
     edges_per_step = []
     for t in range(T):
         idx = temporal_adjs[t].coalesce().indices().cpu().numpy()
@@ -736,7 +736,7 @@ def test_temporal_sbm_generation():
         assert removed <= base_edges * 0.01 + 5
 
 
-    # --- visual
+    # visual
     for t in [0, 3, 6, 9]:
         print(f"Visualizing step {t}...")
         A = temporal_adjs[t].to_dense().cpu().numpy()

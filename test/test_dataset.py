@@ -12,7 +12,7 @@ from datasets import Dataset, KONECT_PATH
 
 TEST_DIR = os.path.dirname(__file__)
 GRAPHS_DIR = "/auto/datasets/graphs/small"
-SBM_GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "sbm")
+SBM_GRAPHS_DIR = "/auto/datasets/graphs/sbm"
 PRGPT_DIR = "/auto/datasets/graphs/comnetx/baselines/PRGPT/data"
 
 @pytest.fixture
@@ -234,7 +234,7 @@ def test_load_prgpt_stream_dataset():
 
     assert ds.is_directed is False, "undirected graph"
 
-@pytest.mark.debug
+@pytest.mark.short
 def test_load_sbm_static_dataset():
     path = SBM_GRAPHS_DIR
     ds = Dataset(
@@ -264,7 +264,7 @@ def test_load_sbm_static_dataset():
     assert labels.shape[0] == n, "Labels must be of shape [n]"
     assert features is None
 
-@pytest.mark.debug
+@pytest.mark.short
 def test_load_sbm_temporal_dataset():
     path = SBM_GRAPHS_DIR
 
