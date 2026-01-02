@@ -10,6 +10,7 @@ sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from baselines.leiden import sparse_tensor_to_igraph, leidenalg_partition
 from datasets import Dataset, KONECT_PATH
+from metrics import Metrics
 
 @pytest.fixture(scope="class")
 def facebook_dataset():
@@ -53,3 +54,19 @@ def test_partition_2():
     coms = leidenalg_partition(adj_matrix)
     assert len(coms) == 4
     assert len(set(coms.tolist())) == 2
+    
+@pytest.mark.long
+def test_leidenalg_single_konect_dataset():
+    dataset = Dataset("wiki_talk_ht", KONECT_PATH)
+    adj, features, labels = dataset.load(tensor_type="coo")
+    adj = adj.coalesce()
+
+    coms = leidenalg_partition(adj)
+    mod = Metrics.modularity(adj, coms.float(), 1.0, directed = True)
+    print(f"Final modularity: {mod:.2}")
+
+    assert isinstance(coms, torch.Tensor)
+    assert coms.dtype in (torch.int64, torch.long)
+    assert coms.min() >= 0
+
+    del adj, features, labels, coms

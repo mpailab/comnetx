@@ -8,7 +8,8 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from baselines.network import sparse_tensor_to_networkit, networkit_partition
-from datasets import Dataset
+from datasets import Dataset, KONECT_PATH
+from metrics import Metrics
 
 @pytest.mark.short
 def test_edge_list_correctness():
@@ -76,3 +77,19 @@ def test_networkit_on_citeseer():
     assert new_labels.dtype in (torch.int64, torch.long)
     assert new_labels.min() >= 0
     del adj, features, labels, new_labels
+    
+@pytest.mark.long
+def test_networkit_single_konect_dataset():
+    dataset = Dataset("wiki_talk_ht", KONECT_PATH)
+    adj, features, labels = dataset.load(tensor_type="coo")
+    adj = adj.coalesce()
+
+    coms = networkit_partition(adj)
+    mod = Metrics.modularity(adj, coms.float(), 1.0, directed = True)
+    print(f"Final modularity: {mod:.2}")
+
+    assert isinstance(coms, torch.Tensor)
+    assert coms.dtype in (torch.int64, torch.long)
+    assert coms.min() >= 0
+
+    del adj, features, labels, coms
