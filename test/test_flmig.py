@@ -147,3 +147,55 @@ def test_flmig_konect_dataset(name):
     del adj, features, labels, new_labels
     gc.collect()
     torch.cuda.empty_cache()
+ 
+def test_flmig_single_konect_dataset():
+    name = "munmun_digg_reply"
+    dataset = Dataset(name, KONECT_PATH)
+    adj, features, labels = dataset.load(tensor_type="coo")
+    adj = adj.coalesce()
+    
+    print("adj.indices =", adj.indices()[0][:100])
+    print("adj.indices =", adj.indices()[1][:100])
+
+    new_values = adj.values().abs()
+    adj = torch.sparse_coo_tensor(
+        adj.indices(), new_values, adj.size()
+    ).coalesce() #FIXME
+    
+    num_nodes = adj.size(0)
+    if labels is None:
+        num_classes = 16
+        labels = torch.randint(0, num_classes, (num_nodes,), dtype=torch.long)
+    features = torch.rand(num_nodes, 128, dtype=torch.float32)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")
+        temp_features_path = os.path.join(tmpdir, f"features_{name}.pt")
+        temp_labels_path = os.path.join(tmpdir, f"labels_{name}.pt")
+        torch.save(adj, temp_adj_path)
+        torch.save(features, temp_features_path)
+        torch.save(labels, temp_labels_path)
+
+        cmd = [
+            sys.executable,
+            test_root + "/run_flmig_subprocess.py",
+            "--adj", temp_adj_path,
+            "--out", temp_labels_path
+        ]
+
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            print(f"Subprocess failed with code {proc.returncode}")
+            print("stdout:", proc.stdout)
+            print("stderr:", proc.stderr)
+            pytest.fail(f"Subprocess failed for dataset {name}")
+
+        new_labels = torch.load(temp_labels_path)
+
+        assert isinstance(new_labels, torch.Tensor)
+        assert new_labels.shape[0] == adj.size(0)
+        assert new_labels.dtype in (torch.int64, torch.long)
+        assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
+    gc.collect()
+    torch.cuda.empty_cache()

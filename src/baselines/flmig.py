@@ -115,10 +115,9 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 #     os.remove(path)
 
-
 def flmig_adopted(
     adj: torch.Tensor,
-    Number_iter: int = 100,
+    Number_iter: int = 10,
     Beta: float = 0.5,
     max_rb: int = 10,
     return_labels: bool = False,
@@ -150,6 +149,7 @@ def flmig_adopted(
             ),
             size=A.size(),
         ).to_dense()
+        adj_dense.fill_diagonal_(0.0)
     else:
         adj_dense = (adj > 0).to(torch.float32)
         adj_dense.fill_diagonal_(0.0)

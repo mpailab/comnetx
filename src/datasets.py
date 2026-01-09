@@ -9,6 +9,8 @@ import scipy.sparse as sp
 import os.path
 from ogb.nodeproppred import PygNodePropPredDataset
 import pickle
+import os
+import scipy.io as io
 
 import time
 import json
@@ -51,6 +53,8 @@ class Dataset:
             info = json.load(_)
         with open(os.path.join(INFO, "magi.json")) as _:
                 magi_info = json.load(_)
+        with open(os.path.join(INFO, "s2cag.json")) as _:
+            s2cag_info = json.load(_)
         
         dname = self.name.lower()
         if self.name in info:
@@ -63,6 +67,14 @@ class Dataset:
         elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
             
+        elif dname in s2cag_info:
+            self.is_directed = s2cag_info[dname]['d'] == 'directed'
+            for filename in {f"{dname}.mat"}:
+                if not os.path.isfile(os.path.join(self.path, filename)):
+                    print(f"file not found: {filename}")
+                    print("path =", os.path.join(self.path, filename))
+            self._load_s2cag_dataset()
+
         elif dname in magi_info:
             self.is_directed = magi_info[dname]['d'] == 'directed'
             download_flag = False
@@ -112,36 +124,93 @@ class Dataset:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
         return self.adj, self.features, self.label
 
-    def _load_magi(self):
-        name = self.name.lower()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if name in {"cora", "citeseer", "pubmed"}:
-                dataset = Planetoid(root=tmpdir, name=name.capitalize())
-                data = dataset[0]
+    def _load_s2cag_dataset(self):
+        name = self.name
+        # print("path", self.path)
+        path = os.path.join(self.path, f'{name}.mat')
+        
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Файл {path} не найден.")
 
-            elif name == "reddit":
-                dataset = Reddit(root=tmpdir)
-                data = dataset[0]
+        try:
+            data = io.loadmat(path)
+        except Exception as e:
+            raise RuntimeError(f"Ошибка чтения .mat файла: {e}")
 
-            elif name.startswith("ogbn-"):
-                dataset = PygNodePropPredDataset(name=name, root=tmpdir)
-                split_idx = dataset.get_idx_split()
-                data = dataset[0]
-                data.y = data.y.view(-1)
-            elif name.startswith("amazon-"):
-                amazon_name = name.replace("amazon-", "").capitalize()
-                dataset = Amazon(root=tmpdir, name=amazon_name)
-                data = dataset[0]
+        # --- 1. ЗАГРУЗКА ГРАФА (ADJACENCY) ---
+        adj_scipy = data.get('W') if 'W' in data else data.get('adj')
+        if adj_scipy is None:
+            raise ValueError("Не найден ключ 'W' или 'adj'.")
+
+        # Приводим к float и разреженному формату
+        adj_scipy = adj_scipy.astype(float)
+        if not sp.issparse(adj_scipy):
+            adj_scipy = sp.csc_matrix(adj_scipy)
+
+        # Получаем количество узлов N
+        n_nodes = adj_scipy.shape[0]
+
+        # Конвертация в PyTorch Sparse Tensor
+        # Обязательно делаем coalesce(), чтобы упорядочить индексы
+        adj_coo = adj_scipy.tocoo()
+        row = torch.from_numpy(adj_coo.row.astype(np.int64))
+        col = torch.from_numpy(adj_coo.col.astype(np.int64))
+        edge_index = torch.stack([row, col], dim=0)
+        values = torch.from_numpy(adj_coo.data.astype(np.float32))
+        
+        self.adj = torch.sparse_coo_tensor(edge_index, values, size=adj_coo.shape).coalesce()
+
+        # --- 2. ЗАГРУЗКА ПРИЗНАКОВ (FEATURES) ---
+        features_np = data.get('fea') if 'fea' in data else data.get('features')
+        
+        if features_np is None:
+            # Если признаков нет, используем единичную матрицу
+            features_np = sp.eye(n_nodes)
+        
+        if sp.issparse(features_np):
+            features_np = features_np.toarray()
+        
+        features_np = features_np.astype(np.float32)
+        self.features = torch.from_numpy(features_np)
+
+        # !!! ГЛАВНОЕ ИСПРАВЛЕНИЕ ОШИБКИ DIMENSION !!!
+        # Проверяем, не перепутаны ли размерности (N x D против D x N)
+        # Если число строк в фичах не совпадает с числом узлов, но число столбцов совпадает - транспонируем.
+        if self.features.shape[0] != n_nodes:
+            if self.features.shape[1] == n_nodes:
+                # print(f"Transposing features from {self.features.shape} to match {n_nodes} nodes.")
+                self.features = self.features.t()
             else:
-                raise ValueError(f"Unknown MAGI-compatible dataset: {self.name}")
+                # Если размерности совсем не совпадают, это критическая ошибка данных
+                raise ValueError(f"Feature shape {self.features.shape} mismatch with Adjacency shape {self.adj.shape}")
 
-        edge_index = data.edge_index
-        num_nodes = data.num_nodes if hasattr(data, "num_nodes") else data.x.size(0)
-        values = torch.ones(edge_index.size(1), dtype=torch.float32)
-        self.adj = torch.sparse_coo_tensor(edge_index, values, size=(num_nodes, num_nodes))
+        # Защита от 1D тензоров (превращаем вектор в матрицу [N, 1])
+        if self.features.dim() == 1:
+            self.features = self.features.unsqueeze(1)
 
-        self.features = data.x
-        self.label = data.y
+        # --- 3. ЗАГРУЗКА МЕТОК (LABELS) ---
+        if 'gnd' in data:
+            labels_raw = data['gnd']
+        elif 'label' in data:
+            labels_raw = data['label']
+        else:
+            labels_raw = None
+
+        if labels_raw is not None:
+            # Превращаем в 1D массив
+            labels_raw = labels_raw.reshape(-1)
+            
+            # !!! ИСПРАВЛЕНИЕ ОШИБКИ INDEX OUT OF BOUNDS !!!
+            # Если минимум 1, сдвигаем к 0. 
+            # Дополнительно: проверяем, чтобы классы шли подряд (0, 1, 2...), это важно для one-hot encoding
+            if labels_raw.min() == 1:
+                labels_raw = labels_raw - 1
+            
+            self.labels = torch.from_numpy(labels_raw).long()
+            self.n_classes = len(torch.unique(self.labels))
+        else:
+            self.labels = None
+            self.n_classes = 0
 
     def _save_magi(self, coo_adj = False):
         dname = self.name.lower()

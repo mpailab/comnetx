@@ -1,0 +1,50 @@
+{
+    "s2_citeseer": {
+        "n": 3327,
+        "m": 4732,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_wiki": {
+        "n": 2405,
+        "m": 14001,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_acm": {
+        "n": 3025,
+        "m": 16153,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_amazon_photos": {
+        "n": 7487,
+        "m": 119043,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_corafull": {
+        "n": 19793,
+        "m": 63421,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_pubmed": {
+        "n": 19717,
+        "m": 64041,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_dblp": {
+        "n": 4057,
+        "m": 2502276,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "s2_arxiv": {
+        "n": 169343,
+        "m": 1327142,
+        "d": "undirected",
+        "w": "unweighted"
+    }
+}
