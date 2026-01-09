@@ -159,214 +159,170 @@ def load_temporal_sbm_graph(path, device='cpu'):
 
     return adj_3d, labels
 
-def generate_sbm_graph_universal(n, k, p_in, p_out, 
-                       batch_size=None, directed=False, device='cpu', seed=None, 
-                       ensure_connected=True, mode='auto', graph_type='sbm'
-):
-    """
-    Params:
-        n : int nodes
-        k : int communities
-        p_in : float probability of edge within community
-        p_out : float probability of edge between communities
-        directed : bool
-        device : str
-        seed : int | None
-        ensure_connected (bool): delete isolated nodes
-        mode (str): 'static', 'batch' or 'auto' 
-    Returns:
-        if mode='static'  (adj, labels)
-        if mode='batch'  (adj_batches, label_batches)
+def generate_sbm_graph_universal(n, k, p_in, p_out, batch_size=None, directed=False, seed=None,
+                                 mode='auto', graph_type='sbm',
+                                 max_degree=None, auto_degree_factor=2.0):
+    """ 
+    Params: 
+    n : int nodes 
+    k : int communities 
+    p_in : float probability of edge within community 
+    p_out : float probability of edge between communities 
+    directed : bool 
+    seed : int | None 
+    mode (str): 'static', 'batch' or 'auto' 
+    max_degree : int | None hard upper bound on vertex degree 
+    auto_degree_factor : float multiplier for automatic max_degree 
+    Returns: if mode='static' (adj, labels) 
+            if mode='batch' (adj_batches, label_batches) 
     """
     rng = np.random.default_rng(seed)
 
-    base_size = n // k
-    block_sizes = [base_size] * k
-    for i in range(n - base_size * k):
+    # --------------------------------------------------
+    # Blocks
+    # --------------------------------------------------
+    base = n // k
+    block_sizes = [base] * k
+    for i in range(n - base * k):
         block_sizes[i % k] += 1
+
     block_start = np.cumsum([0] + block_sizes[:-1])
 
-    labels = np.concatenate([
-        np.full(size, i, dtype=np.int64)
-        for i, size in enumerate(block_sizes)
-    ])
-    # labels_t = torch.tensor(labels, dtype=torch.long, device=device) 
+    labels = np.concatenate([np.full(sz, i, dtype=np.int32)
+                             for i, sz in enumerate(block_sizes)])
+    # --------------------------------------------------
+    # Automatic max_degree
+    # --------------------------------------------------
+    if max_degree is None:
+        exp_deg = []
+        for i in range(k):
+            ni = block_sizes[i]
+            exp_deg.append((ni - 1) * p_in + (n - ni) * p_out)
+        max_degree = int(auto_degree_factor * max(exp_deg))
+        if max_degree <= 0:
+            max_degree = None
 
+    # --------------------------------------------------
+    # Mode
+    # --------------------------------------------------
     if mode == 'auto':
-        if n >= 10000 or (batch_size and batch_size < n):
-            mode = 'batch'
-        else:
-            mode = 'static'
+        mode = 'batch' if (n >= 10000 or (batch_size and batch_size < n)) else 'static'
 
     batches_field = batch_size if (mode == 'batch' and batch_size is not None) else 0
-    connected_field = 'conn' if ensure_connected else 'unconn'
     fname = (
         f"{graph_type}_{batches_field}b_{n}v_{k}c_"
-        f"{'dir' if directed else 'undir'}_"
-        f"{connected_field}.pt"
+        f"{'dir' if directed else 'undir'}_conn.pt"
     )
+
+    # --------------------------------------------------
+    # Edge containers
+    # --------------------------------------------------
+    edges = set()
+    deg = np.zeros(n, dtype=np.int32)
+
+    def add_edge(u, v):
+        if u == v:
+            return
+        if max_degree is not None:
+            if deg[u] >= max_degree or deg[v] >= max_degree:
+                return
+        if directed:
+            edges.add((u, v))
+            deg[u] += 1
+        else:
+            a, b = (u, v) if u < v else (v, u)
+            if (a, b) not in edges:
+                edges.add((a, b))
+                deg[a] += 1
+                deg[b] += 1
+
+    # ==================================================
+    # SKELETON (CONNECT)
+    # ==================================================
+
+    # intra-block skeleton (each block connected)
+    for b in range(k):
+        start = block_start[b]
+        size = block_sizes[b]
+        if size <= 1:
+            continue
+        nodes = np.arange(start, start + size, dtype=np.int32)
+        rng.shuffle(nodes)
+        for i in range(size - 1):
+            add_edge(nodes[i], nodes[i + 1])
+
+    # inter-block skeleton (blocks connected together)
+    reps = [block_start[b] for b in range(k)]
+    for i in range(len(reps) - 1):
+        add_edge(reps[i], reps[i + 1])
+
+    # ==================================================
+    # SBM EDGE SAMPLING
+    # ==================================================
+
     if mode == 'static':
-        rows = []
-        cols = []
+
         for i in range(k):
-            si = block_start[i]
-            ni = block_sizes[i]
-            u = np.arange(si, si + ni, dtype=np.int64)
-            j_range = range(i, k) if not directed else range(0, k)
-            for j in j_range:
-                sj = block_start[j]
-                nj = block_sizes[j]
-                v = np.arange(sj, sj + nj, dtype=np.int64)
+            u_block = np.arange(
+                block_start[i],
+                block_start[i] + block_sizes[i],
+                dtype=np.int32
+            )
+
+            for j in range(i if not directed else 0, k):
+                v_block = np.arange(
+                    block_start[j],
+                    block_start[j] + block_sizes[j],
+                    dtype=np.int32
+                )
 
                 p = p_in if i == j else p_out
-
-                if ni == 0 or nj == 0:
+                if p <= 0:
                     continue
 
-                if not directed and i == j:
-                    mask = rng.random((ni, ni)) < p
-                    ui, vj = np.nonzero(np.triu(mask, k=1))
-                    if ui.size > 0:
-                        rows.extend(u[ui].tolist())
-                        cols.extend(v[vj].tolist())
-                        rows.extend(v[vj].tolist())
-                        cols.extend(u[ui].tolist())
-
-                else:
-                    mask = rng.random((ni, nj)) < p
-                    ui, vj = np.nonzero(mask)
-                    if ui.size > 0:
-                        rows.extend((u[ui]).tolist())
-                        cols.extend((v[vj]).tolist())
-                        if (not directed) and (j != i):
-                            rows.extend((v[vj]).tolist())
-                            cols.extend((u[ui]).tolist())
-
-        if ensure_connected:
-            if len(rows) == 0:
-                for b in range(k):
-                    if block_sizes[b] >= 2:
-                        a = block_start[b]
-                        bidx = block_start[b] + 1
-                        rows.append(a); cols.append(bidx)
-                        if not directed:
-                            rows.append(bidx); cols.append(a)
-            deg = np.zeros(n, dtype=np.int64)
-            if len(rows) > 0:
-                np.add.at(deg, np.asarray(rows, dtype=np.int64), 1)
-                np.add.at(deg, np.asarray(cols, dtype=np.int64), 1)
-            isolated = np.where(deg == 0)[0]
-            for vtx in isolated:
-                block_v = labels[vtx]
-                same_block_start = block_start[block_v]
-                same_block_size = block_sizes[block_v]
-                if same_block_size <= 1:
-                    continue
-                candidates = np.arange(same_block_start, same_block_start + same_block_size, dtype=np.int64)
-                candidates = candidates[candidates != vtx]
-                u_choice = int(rng.choice(candidates))
-                rows.append(int(vtx)); cols.append(u_choice)
-                if not directed:
-                    rows.append(int(u_choice)); cols.append(int(vtx))
-        saved_path = save_sbm_graph(rows=rows, cols=cols, n=n, labels=labels, fname=fname,
-                                    meta={"mode": "static", "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes},
-                                    directed=directed, connected=ensure_connected)
-        return saved_path
-
-    # --- BATCH mode
-    elif mode == 'batch':
-        if batch_size is None:
-            batch_size = 10
-
-        rows = []
-        cols = []
-
-        for start in range(0, n, batch_size):
-            end = min(start + batch_size, n)
-            batch_labels = labels[start:end]
-            batch_n = end - start
-            for i in range(k):
-                local_idx = np.where(batch_labels == i)[0]
-                if local_idx.size == 0:
-                    continue
-                u_local_global = (start + local_idx).astype(np.int64) 
-
-                for j in range(k):
-                    sj = block_start[j]
-                    nj = block_sizes[j]
-                    if nj == 0:
+                for u in u_block:
+                    if max_degree is not None and deg[u] >= max_degree:
                         continue
-                    v_global = np.arange(sj, sj + nj, dtype=np.int64)
 
-                    p = p_in if i == j else p_out
-
-                    if not directed and i == j:
-                        mask = rng.random((u_local_global.size, v_global.size)) < p
-                        ui, vj = np.nonzero(mask)
-                        if ui.size > 0:
-                            gu = u_local_global[ui]
-                            gv = v_global[vj]
-                            sel = np.where(gu < gv)[0]
-                            if sel.size > 0:
-                                rows.extend(gu[sel].tolist())
-                                cols.extend(gv[sel].tolist())
-                                rows.extend(gv[sel].tolist())
-                                cols.extend(gu[sel].tolist())
+                    if i == j and not directed:
+                        candidates = v_block[v_block > u]
                     else:
-                        mask = rng.random((u_local_global.size, v_global.size)) < p
-                        ui, vj = np.nonzero(mask)
-                        if ui.size > 0:
-                            rows.extend(u_local_global[ui].tolist())
-                            cols.extend(v_global[vj].tolist())
-                            if not directed and i != j:
-                                rows.extend(v_global[vj].tolist())
-                                cols.extend(u_local_global[ui].tolist())
+                        candidates = v_block
 
-        if ensure_connected:
-            if len(rows) == 0:
-                for b in range(k):
-                    if block_sizes[b] >= 2:
-                        a = block_start[b]
-                        bidx = block_start[b] + 1
-                        rows.append(a); cols.append(bidx)
-                        if not directed:
-                            rows.append(bidx); cols.append(a)
+                    if candidates.size == 0:
+                        continue
 
-            deg = np.zeros(n, dtype=np.int64)
-            if len(rows) > 0:
-                np.add.at(deg, np.asarray(rows, dtype=np.int64), 1)
-                np.add.at(deg, np.asarray(cols, dtype=np.int64), 1)
-            isolated = np.where(deg == 0)[0]
-            for vtx in isolated:
-                block_v = labels[vtx]
-                same_block_start = block_start[block_v]
-                same_block_size = block_sizes[block_v]
-                if same_block_size <= 1:
-                    continue
-                candidates = np.arange(same_block_start, same_block_start + same_block_size, dtype=np.int64)
-                candidates = candidates[candidates != vtx]
-                u_choice = int(rng.choice(candidates))
-                rows.append(int(vtx)); cols.append(u_choice)
-                if not directed:
-                    rows.append(int(u_choice)); cols.append(int(vtx))
+                    # Bernoulli thinning (local, memory-safe)
+                    mask = rng.random(candidates.size) < p
+                    for v in candidates[mask]:
+                        add_edge(u, int(v))
 
-        saved_path = save_sbm_graph(rows=rows, cols=cols, n=n, labels=labels, fname=fname,
-                                    meta={"mode": "batch", "batch_size": batch_size, "p_in": p_in, "p_out": p_out, "block_sizes": block_sizes},
-                                    directed=directed, connected=ensure_connected)
-        return saved_path
+    # ==================================================
+    # SAVE
+    # ==================================================
+    rows = []
+    cols = []
 
+    if directed:
+        for (u, v) in edges:
+            rows.append(u)
+            cols.append(v)
     else:
-        raise ValueError(f"Error mode: {mode}")
+        for (u, v) in edges:
+            rows.append(u)
+            cols.append(v)
+            rows.append(v)
+            cols.append(u)
 
-def generate_temporal_sbm_graph_local(n, k, p_in, p_out, n_steps=10, 
-                                      drift_prob=0.01, edge_persistence=0.99,
-                                      directed=False, device='cpu', seed=None, ensure_connected=True,
-                                      graph_type='tsbm', change_frac=0.001,
-                                      enable_add=True, enable_del=True, use_edge_persistence=False,
-):
-    """
-    Temporal SBM generator with controllable local changes.
+    return save_sbm_graph(rows=rows,cols=cols,n=n,labels=labels,fname=fname,
+                          meta=dict(mode=mode,p_in=p_in,p_out=p_out,
+                                    block_sizes=block_sizes,max_degree=max_degree),
+                                    directed=directed,connected=True)
 
+def generate_temporal_sbm_graph_local(n, k, p_in, p_out, n_steps=10, drift_prob=0.01, directed=False, seed=None,
+                                      graph_type='tsbm', change_frac=0.001, enable_add=True, enable_del=True,
+                                      max_degree=None, auto_degree_factor=2.0):
+    """"
     Params:
         n : int nodes
         k : int communities
@@ -375,264 +331,243 @@ def generate_temporal_sbm_graph_local(n, k, p_in, p_out, n_steps=10,
         n_steps : int number of snaps
         drift_prob : float probability of node's community change
         directed : bool
-        device : str
         seed : int | None
-        ensure_connected : bool delete isolated nodes
         change_frac: float fraction of E0 that we may change (adds + dels) each step.
         enable_add, enable_del: bool to allow only adds / only dels / both.
-        use_edge_persistence: bool if True -> each previous edge is kept with probability edge_persistence;
-                                additions then fill up to change_frac budget.
-                                if False -> remove exactly num_del_target 
-                                (if enable_del) and add num_add_target (if enable_add).
+        max_degree : int | None hard upper bound on vertex degree
+        auto_degree_factor : float multiplier for automatic max_degree
     Returns:
         path (saved .pt)  -- uses save_sbm_graph 
     """
     rng = np.random.default_rng(seed)
 
-    # block sizes and initial labels
-    base_size = n // k
-    block_sizes = [base_size] * k
-    for i in range(n - base_size * k):
+    # =====================================================
+    # Blocks & labels
+    # =====================================================
+    base = n // k
+    block_sizes = [base] * k
+    for i in range(n - base * k):
         block_sizes[i % k] += 1
-    labels = np.concatenate([np.full(sz, i, dtype=np.int64) for i, sz in enumerate(block_sizes)])
+
+    block_start = np.cumsum([0] + block_sizes[:-1])
+    labels = np.concatenate([
+        np.full(sz, i, dtype=np.int32)
+        for i, sz in enumerate(block_sizes)
+    ])
     labels_per_step = [labels.copy()]
 
-    def sample_block_edges(u_nodes, v_nodes, p):
-        if len(u_nodes) == 0 or len(v_nodes) == 0 or p <= 0.0:
-            return []
-        m = len(u_nodes); nv = len(v_nodes)
-        total = m * nv
-        if total <= 5_000_000:
-            mask = rng.random((m, nv)) < p
-            ui, vj = np.nonzero(mask)
-            return [(int(u_nodes[i]), int(v_nodes[j])) for i, j in zip(ui, vj)]
+    # =====================================================
+    # Automatic max_degree
+    # =====================================================
+    if max_degree is None:
+        exp_deg = []
+        for i in range(k):
+            ni = block_sizes[i]
+            exp_deg.append((ni - 1) * p_in + (n - ni) * p_out)
+        max_degree = int(auto_degree_factor * max(exp_deg))
+        if max_degree <= 0:
+            max_degree = None
+
+    # =====================================================
+    # Helpers
+    # =====================================================
+    def add_edge(edges, deg, u, v):
+        if u == v:
+            return False
+        if max_degree is not None:
+            if deg[u] >= max_degree or deg[v] >= max_degree:
+                return False
+
+        if directed:
+            if (u, v) in edges:
+                return False
+            edges.add((u, v))
+            deg[u] += 1
         else:
-            out = []
-            for i, u in enumerate(u_nodes):
-                mask_row = rng.random(nv) < p
-                vj = np.nonzero(mask_row)[0]
-                for j in vj:
-                    out.append((int(u), int(v_nodes[j])))
-            return out
+            a, b = (u, v) if u < v else (v, u)
+            if (a, b) in edges:
+                return False
+            edges.add((a, b))
+            deg[a] += 1
+            deg[b] += 1
+        return True
 
-    # initial edges (snapshot 0)
-    edges0 = set()
+    def remove_edge(edges, deg, e):
+        edges.remove(e)
+        u, v = e
+        deg[u] -= 1
+        if not directed:
+            deg[v] -= 1
+
+    def edgeset_to_arrays(es):
+        if not es:
+            return np.array([], dtype=np.int64), np.array([], dtype=np.int64)
+        arr = np.array(list(es), dtype=np.int64)
+        arr = arr[arr[:, 0] != arr[:, 1]]
+        order = np.lexsort((arr[:, 1], arr[:, 0]))
+        arr = arr[order]
+        return arr[:, 0], arr[:, 1]
+
+    # =====================================================
+    # t = 0 : SKELETON + SBM
+    # =====================================================
+    skeleton = set()
+    edges = set()
+    deg = np.zeros(n, dtype=np.int32)
+
+    # intra-block skeleton
+    for b in range(k):
+        start = block_start[b]
+        size = block_sizes[b]
+        if size <= 1:
+            continue
+        nodes = np.arange(start, start + size)
+        rng.shuffle(nodes)
+        for i in range(size - 1):
+            add_edge(skeleton, deg, nodes[i], nodes[i + 1])
+
+    # inter-block skeleton
+    reps = [block_start[b] for b in range(k)]
+    for i in range(len(reps) - 1):
+        add_edge(skeleton, deg, reps[i], reps[i + 1])
+
+    edges |= skeleton
+
+    # SBM edges
     for i in range(k):
-        u_nodes = np.where(labels == i)[0]
+        u_nodes = np.arange(block_start[i], block_start[i] + block_sizes[i])
         for j in range(i if not directed else 0, k):
-            v_nodes = np.where(labels == j)[0]
-            if len(u_nodes) == 0 or len(v_nodes) == 0:
-                continue
+            v_nodes = np.arange(block_start[j], block_start[j] + block_sizes[j])
             p = p_in if i == j else p_out
-            pairs = sample_block_edges(u_nodes, v_nodes, p)
-            if not directed:
-                for (a, b) in pairs:
-                    if a == b:
-                        continue
-                    a0, b0 = (a, b) if a < b else (b, a)
-                    edges0.add((a0, b0))
-            else:
-                for (a, b) in pairs:
-                    if a == b:
-                        continue
-                    edges0.add((int(a), int(b)))
+            if p <= 0:
+                continue
 
-    # ensure connectedness cheaply (intra-block)
-    if ensure_connected:
-        deg = np.zeros(n, dtype=np.int64)
-        for (u, v) in edges0:
+            for u in u_nodes:
+                if max_degree is not None and deg[u] >= max_degree:
+                    continue
+                if i == j and not directed:
+                    v_eff = v_nodes[v_nodes > u]
+                else:
+                    v_eff = v_nodes
+
+                mask = rng.random(v_eff.size) < p
+                for v in v_eff[mask]:
+                    add_edge(edges, deg, int(u), int(v))
+
+    prev_edges = set(edges)
+
+    rows, cols = edgeset_to_arrays(prev_edges)
+    rows_per_step = [rows]
+    cols_per_step = [cols]
+
+    # =====================================================
+    # Dynamics
+    # =====================================================
+    E0 = max(1, len(prev_edges))
+    eff_E0 = E0 * (2 if not directed else 1)
+    num_changes = max(1, int(math.ceil(eff_E0 * change_frac)))
+    num_del = num_changes // 2
+    num_add = num_changes - num_del
+
+    for t in range(1, n_steps):
+        new_edges = set(prev_edges)
+        deg = np.zeros(n, dtype=np.int32)
+        for (u, v) in new_edges:
             deg[u] += 1
             if not directed:
                 deg[v] += 1
-        isolated = np.where(deg == 0)[0]
-        for vtx in isolated:
-            block_v = int(labels[vtx])
-            same_block = np.where(labels == block_v)[0]
-            same_block = same_block[same_block != vtx]
-            if len(same_block) > 0:
-                u_choice = int(rng.choice(same_block))
-                if directed:
-                    edges0.add((vtx, u_choice))
-                else:
-                    a,b = (vtx, u_choice) if vtx < u_choice else (u_choice, vtx)
-                    edges0.add((a,b))
 
-    # canonicalize undirected edges (u<v) and remove self-loops / duplicates
-    if not directed:
-        edges0 = {(u,v) if u < v else (v,u) for (u,v) in edges0 if u != v}
-    else:
-        edges0 = {(u,v) for (u,v) in edges0 if u != v}
+        changed = False
 
-    prev_edges = set(edges0)  # make a copy
-    # num_changes determined only by snapshot 0
-    E0 = max(1, len(prev_edges))
-    # in undirected case treat each undirected edge as 2 units (as requested)
-    effective_E0 = E0 * (2 if not directed else 1)
-    num_changes = max(1, int(math.ceil(effective_E0 * float(change_frac))))
-    # split into add/del targets per step (we will enforce enable_add/enable_del when using)
-    num_del_target = num_changes // 2
+        # deletions (non-skeleton only)
+        if enable_del:
+            removable = list(new_edges - skeleton)
+            if removable:
+                del_cnt = min(num_del, len(removable))
+                to_del = rng.choice(removable, size=del_cnt, replace=False)
+                for e in to_del:
+                    remove_edge(new_edges, deg, e)
+                    changed = True
 
-    rows_per_step = []
-    cols_per_step = []
+        #additions
+        if enable_add:
+            adds = 0
+            trials = 0
+            max_trials = num_add * 50
 
-    # helper to convert set of edges -> sorted arrays (unique guaranteed by set)
-    def edgeset_to_sorted_arrays(es):
-        if not es:
-            return np.array([], dtype=np.int64), np.array([], dtype=np.int64)
-        arr = np.array(list(es), dtype=np.int64)  # shape (E,2)
-        # remove possible self-loops just in case
-        arr = arr[arr[:,0] != arr[:,1]]
-        # sort lexicographically by (u,v)
-        order = np.lexsort((arr[:,1], arr[:,0]))
-        arr = arr[order]
-        return arr[:,0].astype(np.int64), arr[:,1].astype(np.int64)
-
-    # save t=0 (sorted, unique)
-    r0, c0 = edgeset_to_sorted_arrays(prev_edges)
-    rows_per_step.append(r0); cols_per_step.append(c0)
-
-    # temporal evolution
-    for t in range(1, n_steps):
-        # start from previous snapshot
-        if use_edge_persistence:
-            if enable_del:
-                # keep edge with probability edge_persistence
-                new_edges = {e for e in prev_edges if rng.random() < edge_persistence}
-            else:
-                new_edges = set(prev_edges)
-            deletions_done = len(prev_edges) - len(new_edges)
-            remaining_budget = max(0, num_changes - deletions_done)
-            add_target = remaining_budget if enable_add else 0
-        else:
-            if enable_del:
-                prev_list = list(prev_edges)
-                del_count = min(num_del_target, len(prev_list))
-                if del_count > 0:
-                    del_idx = rng.choice(len(prev_list), size=del_count, replace=False)
-                    to_delete = {prev_list[i] for i in del_idx}
-                else:
-                    to_delete = set()
-                new_edges = set(prev_edges - to_delete)
-                deletions_done = len(to_delete)
-            else:
-                new_edges = set(prev_edges)
-                deletions_done = 0
-            remaining_budget = max(0, num_changes - deletions_done)
-
-        # additions (try to add up to add_target new edges)
-        adds = set()
-        while len(adds) < num_changes:
-            u = int(rng.integers(0, n)); v = int(rng.integers(0, n))
-            if u == v:
-                continue
-            if not directed:
-                a,b = (u,v) if u < v else (v,u)
-                if (a,b) in new_edges or (a,b) in adds:
+            while adds < num_add and trials < max_trials:
+                trials += 1
+                u = int(rng.integers(0, n))
+                v = int(rng.integers(0, n))
+                if u == v:
                     continue
-                # sample according to SBM probabilities using current labels
-                p = p_in if labels[a] == labels[b] else p_out
-                if rng.random() < p:
-                    adds.add((a,b))
-            else:
-                if (u,v) in new_edges or (u,v) in adds:
-                    continue
+
                 p = p_in if labels[u] == labels[v] else p_out
                 if rng.random() < p:
-                    adds.add((u,v))
-        # apply additions
-        new_edges.update(adds)
+                    if add_edge(new_edges, deg, u, v):
+                        adds += 1
+                        changed = True
 
-        # ensure no self-loops, canonicalize undirected and remove duplicates
-        if not directed:
-            new_edges = {(u,v) if u < v else (v,u) for (u,v) in new_edges if u != v}
-        else:
-            new_edges = {(u,v) for (u,v) in new_edges if u != v}
-
-        # determine involved nodes (endpoints of adds and deletions) for drift
-        involved_nodes = set()
-        if use_edge_persistence:
-            dels = prev_edges - new_edges
-            for (u,v) in dels:
-                involved_nodes.add(u); involved_nodes.add(v)
-        else:
-            if enable_del:
-                try:
-                    for (u,v) in to_delete:
-                        involved_nodes.add(u); involved_nodes.add(v)
-                except UnboundLocalError:
-                    pass
-        for (u,v) in adds:
-            involved_nodes.add(u); involved_nodes.add(v)
-
-        # drift for involved nodes
-        if len(involved_nodes) > 0 and drift_prob > 0:
-            for node in list(involved_nodes):
-                if rng.random() < drift_prob:
-                    old = int(labels[node])
-                    choices = [x for x in range(k) if x != old]
-                    if not choices: 
+        # CHANGE IN SNAP
+        if not changed:
+            # try delete
+            removable = list(new_edges - skeleton)
+            if removable:
+                e = removable[rng.integers(len(removable))]
+                remove_edge(new_edges, deg, e)
+            else:
+                # or force one SBM-add
+                for _ in range(1000):
+                    u = int(rng.integers(0, n))
+                    v = int(rng.integers(0, n))
+                    if u == v:
                         continue
-                    labels[node] = int(rng.choice(choices))
-                    # edges kept as-is (locality)
+                    p = p_in if labels[u] == labels[v] else p_out
+                    if rng.random() < p:
+                        if add_edge(new_edges, deg, u, v):
+                            break
 
-        # ensure connectedness cheaply
-        if ensure_connected:
-            deg = np.zeros(n, dtype=np.int64)
-            for (u,v) in new_edges:
-                deg[u] += 1
-                if not directed: deg[v] += 1
-            isolated = np.where(deg == 0)[0]
-            for vtx in isolated:
-                same_block = np.where(labels == labels[vtx])[0]
-                same_block = same_block[same_block != vtx]
-                if len(same_block) == 0: continue
-                u_choice = int(rng.choice(same_block))
-                if directed:
-                    new_edges.add((vtx, u_choice))
-                else:
-                    a,b = (vtx, u_choice) if vtx < u_choice else (u_choice, vtx)
-                    new_edges.add((a,b))
+        # local drift
+        if drift_prob > 0:
+            touched = set()
+            for (u, v) in new_edges.symmetric_difference(prev_edges):
+                touched.add(u)
+                touched.add(v)
 
-        # final canonicalization and uniqueness again
-        if not directed:
-            new_edges = {(u,v) if u < v else (v,u) for (u,v) in new_edges if u != v}
-        else:
-            new_edges = {(u,v) for (u,v) in new_edges if u != v}
+            for u in touched:
+                if rng.random() < drift_prob:
+                    old = labels[u]
+                    choices = [x for x in range(k) if x != old]
+                    if choices:
+                        labels[u] = int(rng.choice(choices))
 
-        prev_edges = set(new_edges)
-
-        # convert to sorted arrays and store
-        r_arr, c_arr = edgeset_to_sorted_arrays(prev_edges)
-        rows_per_step.append(r_arr); cols_per_step.append(c_arr)
+        prev_edges = new_edges
+        r, c = edgeset_to_arrays(prev_edges)
+        rows_per_step.append(r)
+        cols_per_step.append(c)
         labels_per_step.append(labels.copy())
 
-    # final save
-    connected_field = 'conn' if ensure_connected else 'unconn'
-    fname = f"{graph_type}_{n_steps}b_{n}v_{k}c_{'dir' if directed else 'undir'}_{connected_field}.pt"
-    meta = dict(graph_type=graph_type, n_steps=n_steps, k=k,
-                p_in=p_in, p_out=p_out, drift_prob=drift_prob,
-                edge_persistence=edge_persistence, change_frac=change_frac,
-                enable_add=enable_add, enable_del=enable_del, use_edge_persistence=use_edge_persistence,
-                directed=directed, n=n)
+    # =====================================================
+    # Save
+    # =====================================================
+    fname = f"{graph_type}_{n_steps}b_{n}v_{k}c_{'dir' if directed else 'undir'}_conn.pt"
+    meta = dict(graph_type=graph_type,p_in=p_in, p_out=p_out, k=k,
+                max_degree=max_degree,auto_degree_factor=auto_degree_factor)
 
-    path = save_sbm_graph(
-        rows=rows_per_step, cols=cols_per_step, n=n,
-        labels=labels_per_step, fname=fname, meta=meta,
-        temporal=True, directed=directed, connected=ensure_connected
-    )
-    return path
+    return save_sbm_graph(rows=rows_per_step,cols=cols_per_step,n=n,
+                          labels=labels_per_step,fname=fname,meta=meta,
+                          temporal=True,directed=directed,connected=True)
   
 def test_sbm_generation_and_visualization():
     n = 100          
     k = 4            
     p_in = 0.015      
-    p_out = 0.0002     
+    p_out = 0.0002
 
     start = time.time()
     path = generate_sbm_graph_universal(
         n=n, k=k, p_in=p_in, p_out=p_out,
-        directed=False, seed = 42,
-        ensure_connected=True, mode = 'static',
+        directed=False, seed = 10, mode = 'static',
         graph_type='sbm'
     )
     print("Generation time:", round(time.time()-start, 3), "sec")
@@ -647,18 +582,18 @@ def test_sbm_generation_and_visualization():
     assert len(labels) == n, "Len labels!"
     assert adj.is_coalesced(), "Coalesced!"
 
-    # A_np = adj.to_dense().cpu().numpy()
-    # G = nx.from_numpy_array(A_np)
-    # colors = [plt.cm.tab10(int(c)) for c in labels.cpu().numpy()]
+    A_np = adj.to_dense().cpu().numpy()
+    G = nx.from_numpy_array(A_np)
+    colors = [plt.cm.tab10(int(c)) for c in labels.cpu().numpy()]
 
-    # plt.figure(figsize=(7, 7))
-    # pos = nx.spring_layout(G, seed=42, k=0.15)
-    # nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=40, alpha=0.8)
-    # nx.draw_networkx_edges(G, pos, alpha=0.3, width=0.5)
-    # plt.title("Stochastic Block Model", fontsize=14)
-    # plt.axis('off')
-    # plt.savefig("graph.png", dpi=150)
-    # plt.close()
+    plt.figure(figsize=(7, 7))
+    pos = nx.spring_layout(G, seed=42, k=0.15)
+    nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=40, alpha=0.8)
+    nx.draw_networkx_edges(G, pos, alpha=0.3, width=0.5)
+    plt.title("Stochastic Block Model", fontsize=14)
+    plt.axis('off')
+    plt.savefig("graph.png", dpi=150)
+    plt.close()
 
 def test_temporal_sbm_generation():
     # generate
@@ -670,10 +605,8 @@ def test_temporal_sbm_generation():
         p_out=0.01,
         n_steps=10,
         drift_prob=0.05,
-        edge_persistence=0.95,
         directed=False,
         seed=42,
-        ensure_connected=True,
         graph_type='tsbm',
 
         change_frac=0.001,
@@ -755,6 +688,5 @@ def test_temporal_sbm_generation():
         plt.close()
         print(f"Saved graph_temp_{t}.png")
 
-#test_temporal_sbm_generation()
-
-#test_sbm_generation_and_visualization()
+# test_temporal_sbm_generation()
+# test_sbm_generation_and_visualization()
