@@ -170,7 +170,11 @@ def adapted_dmon(adj: torch.Tensor,
             _n_epochs = 1000 #min - 0
             _learning_rate = 0.001 #min - 0
         args = Args()
-
+  num_nodes = adj.shape[0]
+  args._n_clusters = min(args._n_clusters, num_nodes)
+  # if ftrs is not None and torch.is_tensor(ftrs):
+  #       if ftrs.abs().sum() == 0:
+  #           ftrs = torch.eye(num_nodes, dtype=torch.float32)
   time_s = time.time()
   graph, features = torch_to_tf_sparse_tensor(adj), torch_to_tf_sparse_tensor(ftrs)
   adjacency = torch_to_scipy_csr(adj)
@@ -214,14 +218,11 @@ def adapted_dmon(adj: torch.Tensor,
   # Obtain the cluster assignments.
   _, assignments = model([features, graph_normalized, graph], training=False)
   assignments = assignments.numpy()
-
   clusters = assignments.argmax(axis=1)  # Convert soft to hard clusters.     
   # print("Unique clusters:", np.unique(clusters))  
   # print("Cluster sizes:", np.bincount(clusters))  
-  if not isinstance(clusters, torch.Tensor):
-      clusters_tensor = torch.from_numpy(clusters).long()
-  else:
-      clusters_tensor = clusters.long() 
+  _, clusters = np.unique(clusters, return_inverse=True)
+  clusters_tensor = torch.from_numpy(clusters).long()
   # Prints some metrics used in the paper.
   print('Conductance:', metrics.conductance(adjacency, clusters))
   print('Modularity:', metrics.modularity(adjacency, clusters))
