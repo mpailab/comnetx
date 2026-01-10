@@ -195,12 +195,13 @@ class Optimizer:
         if (step <= 0) or visited.all() or not visited.any():
             return visited
 
+        A = adj.coalesce()
         if not is_symmetric:
-            idx = adj.indices()
-            AT = torch.sparse_coo_tensor(idx.flip(0), adj.values(), adj.shape).coalesce()
-            A_sym = (adj + AT).coalesce()
+            idx = A.indices()
+            AT = torch.sparse_coo_tensor(idx.flip(0), A.values(), A.shape).coalesce()
+            A_sym = (A + AT).coalesce()
         else:
-            A_sym = adj.coalesce()
+            A_sym = A
 
         frontier = visited.clone()
         for _ in range(step):
