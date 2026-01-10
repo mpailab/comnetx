@@ -175,7 +175,6 @@ class Optimizer:
 
         """
 
-
         if self.size != batch.size():
             raise ValueError(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
        
@@ -184,77 +183,36 @@ class Optimizer:
         affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool)
         affected_nodes_mask[affected_nodes] = True
 
-
         return affected_nodes_mask
-   
+
     @staticmethod
-    def neighborhood(adj: Union[torch.Tensor, 'sparse.COO'],
+    def neighborhood(adj: torch.Tensor,
                     nodes_mask: torch.Tensor,
-                    step: int = 1) -> torch.Tensor:
-        """
-        Args:
-            adj : Union[torch.Tensor, sparse.COO]
-            nodes_mask : torch.BoolTensor
-            step : int, optional (default=1)
-        Returns:
-            visited: torch.BoolTensor
-        """
+                    step: int = 1,
+                    is_symmetric=False) -> torch.Tensor:
+
         visited = nodes_mask.clone()
-
-
-        if step <= 0:
+        if (step <= 0) or visited.all() or not visited.any():
             return visited
 
-
-        if isinstance(adj, torch.Tensor) and adj.is_sparse:
-            # Use sparse matmul for frontier expansion (faster than per-edge masking)
-            A = adj.coalesce()
-            AT = torch.sparse_coo_tensor(A.indices().flip(0), A.values(), size=A.size()).coalesce()
-            A_sym = (A + AT).coalesce()
-
-
-            # Work with float vector for spmm, keep boolean for masks
-            frontier = visited.clone()
-            for _ in range(step):
-                if not frontier.any():
-                    break
-                y = torch.sparse.mm(A_sym, frontier.to(dtype=A_sym.dtype).unsqueeze(1)).squeeze(1)
-                new_nodes = y > 0
-                new_frontier = new_nodes & (~visited)
-                visited = visited | new_nodes
-                frontier = new_frontier
-
-
-            return visited
-                   
-        elif hasattr(adj, 'coords'):
-            rows, cols = adj.coords
-            visited_np = visited.cpu().numpy()
-           
-            for k in range(step):
-                if not visited_np.any():
-                    break
-               
-                frontier_indices = np.where(visited_np)[0]
-               
-                mask_out = np.isin(rows, frontier_indices)
-                if mask_out.any():
-                    neighbors_out = cols[mask_out]
-                    visited_np[neighbors_out] = True
-               
-                mask_in = np.isin(cols, frontier_indices)
-                if mask_in.any():
-                    neighbors_in = rows[mask_in]
-                    visited_np[neighbors_in] = True
-
-
-            visited = torch.tensor(visited_np, device=visited.device)
-           
+        if not is_symmetric:
+            idx = adj.indices()
+            AT = torch.sparse_coo_tensor(idx.flip(0), adj.values(), adj.shape).coalesce()
+            A_sym = (adj + AT).coalesce()
         else:
-            raise TypeError(f"Unsupported matrix type: {type(adj)}")
-       
-        return visited
+            A_sym = adj.coalesce()
 
+        frontier = visited.clone()
+        for _ in range(step):
+            if not frontier.any() or visited.all():
+                break
+            y = torch.sparse.mm(A_sym, frontier.to(dtype=A_sym.dtype).unsqueeze(1)).squeeze(1)
+            new_nodes = y > 0
+            new_frontier = new_nodes & (~visited)
+            visited = visited | new_nodes
+            frontier = new_frontier
+
+        return visited
 
     def local_algorithm(self,
                         adj: torch.Tensor,
