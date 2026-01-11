@@ -54,7 +54,8 @@ def compute_neighborhood_sizes(dataset_name, batches_strategy, max_step=5, skip_
         
         # Для step>0 - последовательно расширяем окрестность
         for step in range(1, max_step + 1):
-            current_mask = Optimizer.neighborhood(opt.adj, current_mask, step=1)
+            current_mask = Optimizer.neighborhood(opt.adj, current_mask, step=1,
+                                                  is_symmetric = not ds.is_directed)
             neighborhood_sizes_for_batch.append(current_mask.sum().item())
         
         batch_neighborhood_sizes.append(neighborhood_sizes_for_batch)
