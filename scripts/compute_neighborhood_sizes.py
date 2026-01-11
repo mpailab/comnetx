@@ -198,11 +198,45 @@ def main(max_nodes=None, max_edges=None, p_values=None, n_values=None, max_step=
     return results
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Анализ размеров окрестностей для датасетов konect')
+    description = """
+    Скрипт для анализа размеров окрестностей в динамических графах KONECT.
+    
+    Вычисляет размеры окрестностей для различных стратегий батчинга "p:n",
+    где p определяет процент ребер в первом батче, а n - количество остальных батчей.
+    
+    Примеры стратегий:
+      "9:10" - 90% ребер в первом батче, остальные 10 батчей по 1% ребер в каждом
+      "99:100" - 99% ребер в первом батче, осальные 100 батчей по 0.01% каждом
+      "999:100" - 99.9% ребер в первом батче, осальные 100 батчей по 0.001% каждом
+    """
+    
+    epilog = """
+    Примеры использования:
+    
+    1. Базовый запуск с параметрами по умолчанию:
+       python compute_neighborhood_sizes.py
+    
+    2. Ограничить датасеты по размеру:
+       python compute_neighborhood_sizes.py --max-nodes 1000 --max-edges 5000
+    
+    3. Использовать только определенные стратегии:
+       python compute_neighborhood_sizes.py --p-values 9 99 --n-values 10
+    
+    4. Анализировать окрестности только до 3 шагов:
+       python compute_neighborhood_sizes.py --max-step 3
+    
+    Результаты сохраняются в директории results/neighborhood_analysis.json
+    """
+
+    parser = argparse.ArgumentParser(
+        description=description,
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument('--max-nodes', type=int, default=None, 
-                       help='Максимальное количество узлов в датасете')
+                       help='Максимальное количество узлов в датасете (по умолчанию: без ограничений)')
     parser.add_argument('--max-edges', type=int, default=None,
-                       help='Максимальное количество ребер в датасете')
+                       help='Максимальное количество ребер в датасете (по умолчанию: без ограничений)')
     parser.add_argument('--n-values', type=int, nargs='+', default=[10, 100],
                        help='Значения n для стратегий p:n')
     parser.add_argument('--p-values', type=int, nargs='+', default=[9, 99],
@@ -211,6 +245,10 @@ if __name__ == "__main__":
                        help='Максимальный шаг окрестности (r)')
     
     args = parser.parse_args()
+
+    if not all(p in {9, 99, 999} for p in args.p_values):
+        print("Ошибка: возможные значения для p - 9, 99, 999")
+        sys.exit(1)
     
     main(
         max_nodes=args.max_nodes, 
