@@ -236,6 +236,12 @@ class Optimizer:
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
                 res = leidenalg_partition(adj, timing_info = timing_info)
+            elif self.method == "ldleiden":
+                from baselines.ldleiden import ldleiden_partition
+                res = ldleiden_partition(adj, timing_info = timing_info)
+            elif self.method == "dfleiden":
+                from baselines.dfleiden import dfleiden_partition
+                res = dfleiden_partition(adj, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
                 res = adapted_dmon(adj, features, labels, timing_info = timing_info)
