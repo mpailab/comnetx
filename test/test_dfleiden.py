@@ -33,7 +33,7 @@ def _to_sparse(adj: torch.Tensor) -> torch.Tensor:
     return adj.to_sparse_coo().coalesce()
 
 
-@pytest.mark.short
+@pytest.mark.debug
 def test_dfleiden_partition_basic():
     adj = _to_sparse(_basic_adj())
     timing_info = {}
@@ -46,7 +46,7 @@ def test_dfleiden_partition_basic():
     assert "conversion_time" in timing_info
 
 
-@pytest.mark.short
+@pytest.mark.debug
 def test_single_community():
     adj = _to_sparse(torch.tensor([
         [0, 1, 1],
@@ -58,7 +58,7 @@ def test_single_community():
     assert labels.unique().numel() == 1
 
 
-@pytest.mark.short
+@pytest.mark.debug
 def test_partition_2():
     adj = _to_sparse(_basic_adj())
     labels = _run_or_skip(lambda: dfleiden_partition(adj))
@@ -69,7 +69,7 @@ def test_partition_2():
     assert labels[0] != labels[2]
 
 
-@pytest.mark.short
+@pytest.mark.debug
 def test_optimizer_dfleiden_branch():
     adj = _to_sparse(_basic_adj())
     features = torch.zeros((adj.size(0), 1), dtype=torch.float32)
@@ -79,7 +79,7 @@ def test_optimizer_dfleiden_branch():
     assert labels.shape[0] == adj.shape[0]
 
 
-@pytest.mark.long
+@pytest.mark.debug
 def test_dfleiden_on_cora():
     data_dir = "/auto/datasets/graphs/small"
     dataset = Dataset("cora", path=data_dir)
@@ -94,7 +94,7 @@ def test_dfleiden_on_cora():
     del adj, features, labels, new_labels
 
 
-@pytest.mark.long
+@pytest.mark.debug
 def test_dfleiden_on_citeseer():
     data_dir = "/auto/datasets/graphs/small"
     dataset = Dataset("citeseer", path=data_dir)
