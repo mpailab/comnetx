@@ -37,11 +37,11 @@ def compute_neighborhood_sizes(dataset_name, batches_strategy, max_step=5, skip_
 
         if batch_idx == 0:
             opt = Optimizer(batch)
+            if skip_first_batch:
+                continue
             active_nodes = batch.coalesce().indices().unique()
             affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool)
             affected_nodes_mask[active_nodes] = True
-            if skip_first_batch:
-                continue
         else:
             affected_nodes_mask = opt.update_adj(batch)
         
@@ -62,22 +62,35 @@ def compute_neighborhood_sizes(dataset_name, batches_strategy, max_step=5, skip_
     
     return batch_neighborhood_sizes
 
-def main(max_nodes=None, max_edges=None, p_values=None, n_values=None, max_step=5):
+def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None, 
+         p_values=None, n_values=None, max_step=5, output_file=None):
     """
     Основная функция
     
     Args:
         max_nodes: максимальное количество узлов в датасете (None - без ограничений)
+        min_nodes: минимальное количество узлов в датасете (None - без ограничений)
         max_edges: максимальное количество ребер в датасете (None - без ограничений)
+        min_edges: минимальное количество ребер в датасете (None - без ограничений)
         p_values: значения p для стратегий p:n
         n_values: значения n для стратегий p:n
         max_step: максимальный шаг окрестности (r)
+        output_file: путь для сохранения результатов (None - использовать значение по умолчанию)
     """
     # Устанавливаем значения по умолчанию
     if p_values is None:
         p_values = [9, 99, 999]
     if n_values is None:
         n_values = [10, 100, 1000]
+    
+    # Проверяем корректность ограничений
+    if max_nodes is not None and min_nodes is not None and max_nodes < min_nodes:
+        print("Ошибка: max_nodes должен быть больше или равен min_nodes")
+        sys.exit(1)
+    
+    if max_edges is not None and min_edges is not None and max_edges < min_edges:
+        print("Ошибка: max_edges должен быть больше или равен min_edges")
+        sys.exit(1)
     
     # Загружаем информацию о датасетах konect
     info_path = os.path.join(INFO, "konect.json")
@@ -100,7 +113,11 @@ def main(max_nodes=None, max_edges=None, p_values=None, n_values=None, max_step=
         # Проверяем ограничения
         if max_nodes is not None and n_nodes > max_nodes:
             continue
+        if min_nodes is not None and n_nodes < min_nodes:
+            continue
         if max_edges is not None and n_edges > max_edges:
+            continue
+        if min_edges is not None and n_edges < min_edges:
             continue
         
         filtered_datasets.append(dataset_name)
@@ -111,12 +128,35 @@ def main(max_nodes=None, max_edges=None, p_values=None, n_values=None, max_step=
     if not datasets_by_nodes:
         print("Нет датасетов, удовлетворяющих заданным ограничениям")
         return {}
+
+    # Определяем путь для сохранения файла
+    if output_file is None:
+        results_dir = os.path.join(PROJECT_PATH, "results")
+        os.makedirs(results_dir, exist_ok=True)
+        output_file = os.path.join(results_dir, "neighborhood_analysis.json")
+    else:
+        # Создаем директорию для выходного файла, если она не существует
+        output_dir = os.path.dirname(output_file)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
     
     print(f"Будет обработано датасетов: {len(datasets_by_nodes)}")
-    if max_nodes is not None:
-        print(f"Ограничение по узлам: не более {max_nodes}")
-    if max_edges is not None:
-        print(f"Ограничение по ребрам: не более {max_edges}")
+    if min_nodes is not None or max_nodes is not None:
+        node_range = []
+        if min_nodes is not None:
+            node_range.append(f"не менее {min_nodes}")
+        if max_nodes is not None:
+            node_range.append(f"не более {max_nodes}")
+        print(f"Ограничение по узлам: {', '.join(node_range)}")
+    
+    if min_edges is not None or max_edges is not None:
+        edge_range = []
+        if min_edges is not None:
+            edge_range.append(f"не менее {min_edges}")
+        if max_edges is not None:
+            edge_range.append(f"не более {max_edges}")
+        print(f"Ограничение по ребрам: {', '.join(edge_range)}")
+    
     print(f"Стратегии: p={p_values}, n={n_values}")
     print(f"Максимальный шаг окрестности: {max_step}")
     
@@ -162,16 +202,14 @@ def main(max_nodes=None, max_edges=None, p_values=None, n_values=None, max_step=
                 "strategies": dataset_results
             }
     
-        results_dir = os.path.join(PROJECT_PATH, "results")
-        os.makedirs(results_dir, exist_ok=True)
-        output_file = os.path.join(results_dir, f"neighborhood_analysis.json")
-        
         # Добавляем метаданные
         metadata = {
             "generated_at": datetime.now().isoformat(),
             "parameters": {
                 "max_nodes": max_nodes,
+                "min_nodes": min_nodes,
                 "max_edges": max_edges,
+                "min_edges": min_edges,
                 "p_values": p_values,
                 "n_values": n_values,
                 "max_step": max_step
@@ -181,8 +219,8 @@ def main(max_nodes=None, max_edges=None, p_values=None, n_values=None, max_step=
         
         with open(output_file, 'w') as f:
             json.dump(metadata, f, indent=1)
-    
-        print(f"\nРезультаты для {dataset_name} сохранены в: {output_file}")
+        
+        print(f"\nРезультаты сохранены в: {output_file}")
     
     # Выводим статистику
     if results:
@@ -217,7 +255,7 @@ if __name__ == "__main__":
        python compute_neighborhood_sizes.py
     
     2. Ограничить датасеты по размеру:
-       python compute_neighborhood_sizes.py --max-nodes 1000 --max-edges 5000
+       python compute_neighborhood_sizes.py --max-nodes 1000 --min-nodes 100 --max-edges 5000 --min-edges 1000
     
     3. Использовать только определенные стратегии:
        python compute_neighborhood_sizes.py --p-values 9 99 --n-values 10
@@ -225,7 +263,13 @@ if __name__ == "__main__":
     4. Анализировать окрестности только до 3 шагов:
        python compute_neighborhood_sizes.py --max-step 3
     
-    Результаты сохраняются в директории results/neighborhood_analysis.json
+    5. Указать путь для сохранения результатов:
+       python compute_neighborhood_sizes.py --output-file /путь/к/результатам/мой_анализ.json
+    
+    6. Комбинированный пример:
+       python compute_neighborhood_sizes.py --min-nodes 500 --max-nodes 5000 --p-values 9 99 --n-values 10 100 --max-step 5 --output-file ./custom_results.json
+
+    Результаты по умолчанию сохраняются в директории results/neighborhood_analysis.json
     """
 
     parser = argparse.ArgumentParser(
@@ -233,16 +277,32 @@ if __name__ == "__main__":
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    
+    # Ограничения по узлам
     parser.add_argument('--max-nodes', type=int, default=None, 
                        help='Максимальное количество узлов в датасете (по умолчанию: без ограничений)')
+    parser.add_argument('--min-nodes', type=int, default=None,
+                       help='Минимальное количество узлов в датасете (по умолчанию: без ограничений)')
+    
+    # Ограничения по ребрам
     parser.add_argument('--max-edges', type=int, default=None,
                        help='Максимальное количество ребер в датасете (по умолчанию: без ограничений)')
+    parser.add_argument('--min-edges', type=int, default=None,
+                       help='Минимальное количество ребер в датасете (по умолчанию: без ограничений)')
+    
+    # Параметры стратегий
     parser.add_argument('--n-values', type=int, nargs='+', default=[10, 100],
                        help='Значения n для стратегий p:n')
     parser.add_argument('--p-values', type=int, nargs='+', default=[9, 99],
                        help='Значения p для стратегий p:n')
+    
+    # Параметр шага окрестности
     parser.add_argument('--max-step', type=int, default=5,
                        help='Максимальный шаг окрестности (r)')
+    
+    # Параметр пути для сохранения
+    parser.add_argument('--output-file', type=str, default=None,
+                       help='Путь для сохранения JSON файла с результатами (по умолчанию: results/neighborhood_analysis.json)')
     
     args = parser.parse_args()
 
@@ -251,9 +311,12 @@ if __name__ == "__main__":
         sys.exit(1)
     
     main(
-        max_nodes=args.max_nodes, 
+        max_nodes=args.max_nodes,
+        min_nodes=args.min_nodes,
         max_edges=args.max_edges,
+        min_edges=args.min_edges,
         p_values=args.p_values,
         n_values=args.n_values,
-        max_step=args.max_step
+        max_step=args.max_step,
+        output_file=args.output_file
     )
