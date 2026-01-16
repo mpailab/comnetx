@@ -242,11 +242,19 @@ def plot_heatmap_percentage_by_strategy(df, output_dir, skip_first_batch=False):
         for dataset in strategy_df['dataset'].unique():
             dataset_df = strategy_df[strategy_df['dataset'] == dataset]
             
+            # Получаем информацию о числе вершин в датасете
+            if not dataset_df.empty:
+                n_nodes = dataset_df['total_nodes'].iloc[0]
+            else:
+                n_nodes = 0
+            
             for r in sorted(dataset_df['r'].unique()):
                 r_data = dataset_df[dataset_df['r'] == r]
                 avg_percentage = r_data['percentage_of_nodes'].mean()
                 summary_data.append({
                     'dataset': dataset,
+                    'n_nodes': n_nodes,
+                    'dataset_with_nodes': f"{dataset}\n(n={n_nodes})",
                     'r': r,
                     'percentage': avg_percentage
                 })
@@ -256,33 +264,47 @@ def plot_heatmap_percentage_by_strategy(df, output_dir, skip_first_batch=False):
         
         df_summary = pd.DataFrame(summary_data)
         
-        # Создаем pivot таблицу для heatmap
-        pivot_data = df_summary.pivot_table(
-            index='dataset',
-            columns='r',
-            values='percentage',
-            aggfunc='mean'
-        )
-        
-        # Сортируем датасеты по общему числу вершин (если доступно)
+        # Сортируем датасеты по общему числу вершин
         try:
-            # Пытаемся отсортировать по total_nodes
+            # Сортируем по n_nodes
             datasets_with_nodes = []
-            for dataset in pivot_data.index:
-                node_data = strategy_df[strategy_df['dataset'] == dataset]
+            for dataset in df_summary['dataset'].unique():
+                node_data = df_summary[df_summary['dataset'] == dataset]
                 if not node_data.empty:
-                    total_nodes = node_data['total_nodes'].iloc[0]
-                    datasets_with_nodes.append((dataset, total_nodes))
+                    n_nodes = node_data['n_nodes'].iloc[0]
+                    datasets_with_nodes.append((dataset, n_nodes))
             
             if datasets_with_nodes:
                 datasets_with_nodes.sort(key=lambda x: x[1])
-                sorted_datasets = [d[0] for d in datasets_with_nodes]
-                pivot_data = pivot_data.reindex(sorted_datasets)
-        except:
-            pass  # Если не удалось отсортировать, оставляем как есть
+                # Создаем маппинг для сортировки
+                dataset_order = [d[0] for d in datasets_with_nodes]
+                # Создаем соответствующий порядок для dataset_with_nodes
+                dataset_with_nodes_order = []
+                for dataset, n_nodes in datasets_with_nodes:
+                    dataset_with_nodes_order.append(f"{dataset}\n(n={n_nodes})")
+                
+                # Создаем pivot таблицу для heatmap
+                pivot_data = df_summary.pivot_table(
+                    index='dataset_with_nodes',
+                    columns='r',
+                    values='percentage',
+                    aggfunc='mean'
+                )
+                
+                # Переиндексируем в правильном порядке
+                pivot_data = pivot_data.reindex(dataset_with_nodes_order)
+        except Exception as e:
+            # Если не удалось отсортировать, используем dataset_with_nodes как есть
+            print(f"  Предупреждение: не удалось отсортировать датасеты: {e}")
+            pivot_data = df_summary.pivot_table(
+                index='dataset_with_nodes',
+                columns='r',
+                values='percentage',
+                aggfunc='mean'
+            )
         
         # Создаем heatmap
-        plt.figure(figsize=(12, max(6, len(pivot_data) * 0.4)), dpi=300)
+        plt.figure(figsize=(12, max(6, len(pivot_data) * 0.5)), dpi=300)
         
         sns.heatmap(
             pivot_data,
@@ -297,7 +319,7 @@ def plot_heatmap_percentage_by_strategy(df, output_dir, skip_first_batch=False):
         plt.title(f'Процент вершин в окрестности (стратегия: {strategy}){title_suffix}', 
                   fontsize=14, fontweight='bold')
         plt.xlabel('Радиус окрестности (r)', fontsize=12)
-        plt.ylabel('Датасет', fontsize=12)
+        plt.ylabel('Датасет (число вершин)', fontsize=12)
         
         # Настраиваем цветовую шкалу
         plt.tight_layout()
@@ -406,6 +428,185 @@ def plot_heatmap_relative_by_strategy(df, output_dir, skip_first_batch=False):
         plt.savefig(savepath, bbox_inches='tight', dpi=300)
         print(f"Сохранен график: {savepath}")
         plt.close()
+
+def plot_heatmap_absolute_sizes(df, output_dir, skip_first_batch=False):
+    """
+    Строит общий heatmap для абсолютных значений размеров окрестностей
+    для всех стратегий и датасетов
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    title_suffix = " (без первого батча)" if skip_first_batch else ""
+    
+    # Подготавливаем данные для heatmap
+    summary_data = []
+    
+    # Группируем по датасетам и стратегиям
+    for dataset in df['dataset'].unique():
+        dataset_df = df[df['dataset'] == dataset]
+        n_nodes = dataset_df['total_nodes'].iloc[0] if 'total_nodes' in dataset_df.columns else 0
+        
+        for strategy in dataset_df['strategy'].unique():
+            strategy_df = dataset_df[dataset_df['strategy'] == strategy]
+            
+            # Для каждого r вычисляем средний абсолютный размер окрестности
+            for r in sorted(strategy_df['r'].unique()):
+                r_data = strategy_df[strategy_df['r'] == r]
+                avg_size = r_data['neighborhood_size'].mean()
+                summary_data.append({
+                    'dataset': dataset,
+                    'strategy': strategy,
+                    'r': r,
+                    'avg_size': avg_size,
+                    'total_nodes': n_nodes,
+                    'dataset_strategy': f"{dataset} ({strategy})"
+                })
+    
+    if not summary_data:
+        print("Нет данных для построения heatmap абсолютных значений")
+        return
+    
+    df_summary = pd.DataFrame(summary_data)
+    
+    # Создаем pivot таблицу для heatmap
+    # Вариант 1: по датасетам и стратегиям (строки) и r (столбцы)
+    pivot_data = df_summary.pivot_table(
+        index='dataset_strategy',
+        columns='r',
+        values='avg_size',
+        aggfunc='mean'
+    )
+    
+    # Сортируем строки по общему числу вершин в датасете
+    try:
+        # Создаем маппинг dataset_strategy -> total_nodes
+        dataset_nodes = {}
+        for _, row in df_summary.iterrows():
+            if row['dataset_strategy'] not in dataset_nodes:
+                dataset_nodes[row['dataset_strategy']] = row['total_nodes']
+        
+        # Сортируем строки по total_nodes
+        sorted_rows = sorted(pivot_data.index, key=lambda x: dataset_nodes.get(x, 0))
+        pivot_data = pivot_data.reindex(sorted_rows)
+    except:
+        pass  # Если не удалось отсортировать, оставляем как есть
+    
+    # Создаем heatmap
+    plt.figure(figsize=(14, max(8, len(pivot_data) * 0.3)), dpi=300)
+    
+    # Используем логарифмическую шкалу цветов для лучшей визуализации больших диапазонов
+    sns.heatmap(
+        pivot_data,
+        annot=True,
+        fmt='.0f',  # целые числа для абсолютных значений
+        cmap='YlOrRd',
+        cbar_kws={'label': 'Абсолютный размер окрестности'},
+        linewidths=0.5,
+        linecolor='gray',
+        norm=plt.cm.colors.LogNorm()  # Логарифмическая шкала цветов
+    )
+    
+    plt.title(f'Абсолютные размеры окрестностей{title_suffix}', 
+              fontsize=16, fontweight='bold')
+    plt.xlabel('Радиус окрестности (r)', fontsize=14)
+    plt.ylabel('Датасет (стратегия)', fontsize=14)
+    
+    # Настраиваем цветовую шкалу
+    plt.tight_layout()
+    
+    filename = f'heatmap_absolute_sizes{"_no_first" if skip_first_batch else ""}.jpeg'
+    savepath = output_dir / filename
+    plt.savefig(savepath, bbox_inches='tight', dpi=300)
+    print(f"Сохранен график: {savepath}")
+    plt.close()
+    
+    # Вариант 2: heatmap только по датасетам (усредненные по стратегиям)
+    plot_heatmap_absolute_by_dataset(df, output_dir, skip_first_batch)
+
+def plot_heatmap_absolute_by_dataset(df, output_dir, skip_first_batch=False):
+    """
+    Строит heatmap абсолютных значений, усредненных по стратегиям для каждого датасета
+    """
+    output_dir = Path(output_dir)
+    title_suffix = " (без первого батча)" if skip_first_batch else ""
+    
+    # Подготавливаем данные для heatmap
+    summary_data = []
+    
+    # Группируем по датасетам
+    for dataset in df['dataset'].unique():
+        dataset_df = df[df['dataset'] == dataset]
+        n_nodes = dataset_df['total_nodes'].iloc[0] if 'total_nodes' in dataset_df.columns else 0
+        
+        # Для каждого r вычисляем средний абсолютный размер окрестности по всем стратегиям
+        for r in sorted(dataset_df['r'].unique()):
+            r_data = dataset_df[dataset_df['r'] == r]
+            avg_size = r_data['neighborhood_size'].mean()
+            summary_data.append({
+                'dataset': dataset,
+                'r': r,
+                'avg_size': avg_size,
+                'total_nodes': n_nodes
+            })
+    
+    if not summary_data:
+        return
+    
+    df_summary = pd.DataFrame(summary_data)
+    
+    # Создаем pivot таблицу для heatmap
+    pivot_data = df_summary.pivot_table(
+        index='dataset',
+        columns='r',
+        values='avg_size',
+        aggfunc='mean'
+    )
+    
+    # Сортируем датасеты по общему числу вершин
+    try:
+        datasets_with_nodes = []
+        for dataset in pivot_data.index:
+            node_data = df_summary[df_summary['dataset'] == dataset]
+            if not node_data.empty:
+                total_nodes = node_data['total_nodes'].iloc[0]
+                datasets_with_nodes.append((dataset, total_nodes))
+        
+        if datasets_with_nodes:
+            datasets_with_nodes.sort(key=lambda x: x[1])
+            sorted_datasets = [d[0] for d in datasets_with_nodes]
+            pivot_data = pivot_data.reindex(sorted_datasets)
+    except:
+        pass  # Если не удалось отсортировать, оставляем как есть
+    
+    # Создаем heatmap
+    plt.figure(figsize=(12, max(6, len(pivot_data) * 0.4)), dpi=300)
+    
+    # Используем логарифмическую шкалу цветов
+    sns.heatmap(
+        pivot_data,
+        annot=True,
+        fmt='.0f',
+        cmap='YlOrRd',
+        cbar_kws={'label': 'Абсолютный размер окрестности (среднее по стратегиям)'},
+        linewidths=0.5,
+        linecolor='gray',
+        norm=plt.cm.colors.LogNorm()  # Логарифмическая шкала цветов
+    )
+    
+    plt.title(f'Абсолютные размеры окрестностей (усредненные по стратегиям){title_suffix}', 
+              fontsize=14, fontweight='bold')
+    plt.xlabel('Радиус окрестности (r)', fontsize=12)
+    plt.ylabel('Датасет', fontsize=12)
+    
+    # Настраиваем цветовую шкалу
+    plt.tight_layout()
+    
+    filename = f'heatmap_absolute_by_dataset{"_no_first" if skip_first_batch else ""}.jpeg'
+    savepath = output_dir / filename
+    plt.savefig(savepath, bbox_inches='tight', dpi=300)
+    print(f"Сохранен график: {savepath}")
+    plt.close()
 
 def generate_report(df, output_dir, skip_first_batch=False):
     """
@@ -539,7 +740,7 @@ def generate_report(df, output_dir, skip_first_batch=False):
             print(f"  Минимальный рост: {min_relative_r5:.2f}x")
     
     print(f"\nПодробный отчет сохранен в: {report_file}")
-
+    
 def main():
     parser = argparse.ArgumentParser(description='Анализ размеров окрестностей из JSON файла')
     parser.add_argument('json_file', type=str, help='Путь к JSON файлу с данными')
@@ -547,6 +748,9 @@ def main():
                        help='Директория для сохранения результатов анализа')
     parser.add_argument('--skip-first-batch', action='store_true',
                        help='Пропустить первый батч в анализе (по умолчанию не пропускается)')
+    # Добавляем новый флаг для опциональной отрисовки графиков датасетов
+    parser.add_argument('--skip-dataset-plots', action='store_true',
+                       help='Пропустить отрисовку графиков для отдельных датасетов (пункты 1 и 2)')
     
     args = parser.parse_args()
     
@@ -588,17 +792,27 @@ def main():
     # Строим графики
     print("\nСтроим графики...")
     
-    print("\n1. Pointplot относительные значения по датасетам:")
-    plot_relative_pointplots(df, output_dir, skip_first_batch)
+    # Определяем, нужно ли строить графики для отдельных датасетов
+    skip_dataset_plots = args.skip_dataset_plots
     
-    print("\n2. Pointplot процентное соотношение по датасетам:")
-    plot_percentage_pointplots(df, output_dir, skip_first_batch)
+    if not skip_dataset_plots:
+        print("\n1. Pointplot относительные значения по датасетам:")
+        plot_relative_pointplots(df, output_dir, skip_first_batch)
+        
+        print("\n2. Pointplot процентное соотношение по датасетам:")
+        plot_percentage_pointplots(df, output_dir, skip_first_batch)
+    else:
+        print("\nПропускаем графики для отдельных датасетов (пункты 1 и 2)")
     
+    # Эти графики всегда строятся (пункты 3-5)
     print("\n3. Heatmap процентного соотношения по стратегиям:")
     plot_heatmap_percentage_by_strategy(df, output_dir, skip_first_batch)
     
     print("\n4. Heatmap относительных значений по стратегиям:")
     plot_heatmap_relative_by_strategy(df, output_dir, skip_first_batch)
+    
+    print("\n5. Общий heatmap абсолютных значений:")
+    plot_heatmap_absolute_sizes(df, output_dir, skip_first_batch)
     
     print(f"\nАнализ завершен!")
     print(f"Результаты сохранены в: {output_dir.absolute()}")
