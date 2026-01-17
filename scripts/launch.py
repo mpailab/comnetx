@@ -28,6 +28,7 @@ MACHINE = conf.get("MACHINE", MACHINE_DEFAULT)
 
 # output
 VERBOSE = conf.get("VERBOSE", 1) # 0, 1, 2, 3
+CATCH_ERRORS = conf.get("CATCH_ERRORS", True)
 
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
@@ -127,9 +128,12 @@ def measure():
                                 verbose=VERBOSE
                             )
                         except Exception as e:
-                            err_tuple = (algname, dataset, batches_num, str(e))
-                            errors.append(err_tuple)
-                            print(f"Error {e} on:", dataset, batches_num, algname)
+                            if CATCH_ERRORS:  # ловим ошибки только если флаг True
+                                err_tuple = (algname, dataset, batches_num, str(e))
+                                errors.append(err_tuple)
+                                print(f"Error {e} on:", dataset, batches_num, algname)
+                            else:  # иначе пробрасываем ошибку дальше
+                                raise
                         else:
                             db[algname][dataset][MACHINE][str(batches_num)] = results
                             save(db, errors)
