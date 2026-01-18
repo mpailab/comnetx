@@ -1,0 +1,15 @@
+{
+  "VERBOSE": 1,
+  
+  "DATASETS": ["facebook-wosn-links"],
+  "BATCHES": ["999:100"],
+  
+  "BASELINES": ["prgpt:infomap", "prgpt:locale", "leidenalg", "networkit"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [1, 5],
+    "smart_neighborhood_step": [1]
+  }
+}
