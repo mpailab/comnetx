@@ -69,15 +69,18 @@ class Dataset:
             
         elif dname in s2cag_info:
             self.is_directed = s2cag_info[dname]['d'] == 'directed'
-            for filename in {f"{dname}.mat"}:
-                if not os.path.isfile(os.path.join(self.path, filename)):
+            for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_adj.npy"}:
+                if not os.path.isfile(os.path.join(self.path, dname, filename)):
                     print(f"file not found: {filename}")
                     print("path =", os.path.join(self.path, filename))
-            self._load_s2cag_dataset()
+            self._load_npy_format()
+            self.adj = self.adj.unsqueeze(0)
+            # print(self.adj)
 
         elif dname in magi_info:
             self.is_directed = magi_info[dname]['d'] == 'directed'
             download_flag = False
+            print("Alarm. here")
             for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"}:
                 if not os.path.isfile(os.path.join(self.path, dname, filename)):
                     print(f"file not found: {filename}")
@@ -89,6 +92,9 @@ class Dataset:
                 self._save_magi(coo_adj = True)
             else:
                 self._load_npy_format(coo_adj = True)
+
+            self.adj = self.adj.unsqueeze(0)
+            print("self.afj=", self.adj)
         elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
         elif dname.startswith("static") or dname.startswith("stream"):
@@ -123,94 +129,6 @@ class Dataset:
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
         return self.adj, self.features, self.label
-
-    def _load_s2cag_dataset(self):
-        name = self.name
-        # print("path", self.path)
-        path = os.path.join(self.path, f'{name}.mat')
-        
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Файл {path} не найден.")
-
-        try:
-            data = io.loadmat(path)
-        except Exception as e:
-            raise RuntimeError(f"Ошибка чтения .mat файла: {e}")
-
-        # --- 1. ЗАГРУЗКА ГРАФА (ADJACENCY) ---
-        adj_scipy = data.get('W') if 'W' in data else data.get('adj')
-        if adj_scipy is None:
-            raise ValueError("Не найден ключ 'W' или 'adj'.")
-
-        # Приводим к float и разреженному формату
-        adj_scipy = adj_scipy.astype(float)
-        if not sp.issparse(adj_scipy):
-            adj_scipy = sp.csc_matrix(adj_scipy)
-
-        # Получаем количество узлов N
-        n_nodes = adj_scipy.shape[0]
-
-        # Конвертация в PyTorch Sparse Tensor
-        # Обязательно делаем coalesce(), чтобы упорядочить индексы
-        adj_coo = adj_scipy.tocoo()
-        row = torch.from_numpy(adj_coo.row.astype(np.int64))
-        col = torch.from_numpy(adj_coo.col.astype(np.int64))
-        edge_index = torch.stack([row, col], dim=0)
-        values = torch.from_numpy(adj_coo.data.astype(np.float32))
-        
-        self.adj = torch.sparse_coo_tensor(edge_index, values, size=adj_coo.shape).coalesce()
-
-        # --- 2. ЗАГРУЗКА ПРИЗНАКОВ (FEATURES) ---
-        features_np = data.get('fea') if 'fea' in data else data.get('features')
-        
-        if features_np is None:
-            # Если признаков нет, используем единичную матрицу
-            features_np = sp.eye(n_nodes)
-        
-        if sp.issparse(features_np):
-            features_np = features_np.toarray()
-        
-        features_np = features_np.astype(np.float32)
-        self.features = torch.from_numpy(features_np)
-
-        # !!! ГЛАВНОЕ ИСПРАВЛЕНИЕ ОШИБКИ DIMENSION !!!
-        # Проверяем, не перепутаны ли размерности (N x D против D x N)
-        # Если число строк в фичах не совпадает с числом узлов, но число столбцов совпадает - транспонируем.
-        if self.features.shape[0] != n_nodes:
-            if self.features.shape[1] == n_nodes:
-                # print(f"Transposing features from {self.features.shape} to match {n_nodes} nodes.")
-                self.features = self.features.t()
-            else:
-                # Если размерности совсем не совпадают, это критическая ошибка данных
-                raise ValueError(f"Feature shape {self.features.shape} mismatch with Adjacency shape {self.adj.shape}")
-
-        # Защита от 1D тензоров (превращаем вектор в матрицу [N, 1])
-        if self.features.dim() == 1:
-            self.features = self.features.unsqueeze(1)
-
-        # --- 3. ЗАГРУЗКА МЕТОК (LABELS) ---
-        if 'gnd' in data:
-            labels_raw = data['gnd']
-        elif 'label' in data:
-            labels_raw = data['label']
-        else:
-            labels_raw = None
-
-        if labels_raw is not None:
-            # Превращаем в 1D массив
-            labels_raw = labels_raw.reshape(-1)
-            
-            # !!! ИСПРАВЛЕНИЕ ОШИБКИ INDEX OUT OF BOUNDS !!!
-            # Если минимум 1, сдвигаем к 0. 
-            # Дополнительно: проверяем, чтобы классы шли подряд (0, 1, 2...), это важно для one-hot encoding
-            if labels_raw.min() == 1:
-                labels_raw = labels_raw - 1
-            
-            self.labels = torch.from_numpy(labels_raw).long()
-            self.n_classes = len(torch.unique(self.labels))
-        else:
-            self.labels = None
-            self.n_classes = 0
 
     def _save_magi(self, coo_adj = False):
         dname = self.name.lower()

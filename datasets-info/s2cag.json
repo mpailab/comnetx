@@ -1,47 +1,47 @@
 {
-    "s2_citeseer": {
+    "citeseer_s2": {
         "n": 3327,
         "m": 4732,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_wiki": {
+    "wiki_s2": {
         "n": 2405,
         "m": 14001,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_acm": {
+    "acm_s2": {
         "n": 3025,
         "m": 16153,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_amazon_photos": {
+    "amazon_photos_s2": {
         "n": 7487,
         "m": 119043,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_corafull": {
+    "corafull_s2": {
         "n": 19793,
         "m": 63421,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_pubmed": {
+    "pubmed_s2": {
         "n": 19717,
         "m": 64041,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_dblp": {
+    "dblp_s2": {
         "n": 4057,
         "m": 2502276,
         "d": "undirected",
         "w": "unweighted"
     },
-    "s2_arxiv": {
+    "arxiv_s2": {
         "n": 169343,
         "m": 1327142,
         "d": "undirected",

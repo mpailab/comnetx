@@ -101,7 +101,7 @@ class Optimizer:
         return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)
     
     def accuracy(self, 
-            pred_labels: torch.tensor, L: int = 0) -> float:
+            true_labels: torch.tensor, L: int = 0) -> float:
         """
         Args:
             pred_labels: torch.Tensor [n_nodes]
@@ -109,10 +109,10 @@ class Optimizer:
         Returns:
             accuracy: float 
         """
-        return Metrics.accuracy(self.coms[L], pred_labels[L])
+        return Metrics.accuracy(true_labels[L], self.coms[L])
     
     def nmi(self, 
-            pred_labels: torch.tensor, L: int = 0) -> float:
+            true_labels: torch.tensor, L: int = 0) -> float:
         """
         Args:
             pred_labels: torch.Tensor [n_nodes]
@@ -120,10 +120,10 @@ class Optimizer:
         Returns:
             nmi: float 
         """
-        return Metrics.nmi(self.coms[L], pred_labels[L])
+        return Metrics.nmi(true_labels[L], self.coms[L])
     
     def balanced_acc(self, 
-            pred_labels: torch.tensor, L: int = 0) -> float:
+            true_labels: torch.tensor, L: int = 0) -> float:
         """
         Args:
             pred_labels: torch.Tensor [n_nodes]
@@ -131,9 +131,9 @@ class Optimizer:
         Returns:
             balanced_acc: float 
         """
-        return Metrics.balanced_acc(self.coms[L], pred_labels[L])
+        return Metrics.balanced_acc(true_labels[L], self.coms[L])
 
-    def purity(self, pred_labels: torch.tensor, L: int = 0) -> float:
+    def purity(self, true_labels: torch.tensor, L: int = 0) -> float:
         """
         Args:
             pred_labels: torch.Tensor [n_nodes]
@@ -141,9 +141,9 @@ class Optimizer:
         Returns:
             purity_score: float 
         """
-        return Metrics.purity_score(self.coms[L], pred_labels[L])
+        return Metrics.purity_score(true_labels[L], self.coms[L])
 
-    def ari(self, pred_labels: torch.tensor, L: int = 0) -> float:
+    def ari(self, true_labels: torch.tensor, L: int = 0) -> float:
         """
         Args:
             pred_labels: torch.Tensor [n_nodes]
@@ -151,9 +151,9 @@ class Optimizer:
         Returns:
             ari_score: float 
         """
-        return Metrics.ari_score(self.coms[L], pred_labels[L])
+        return Metrics.ari_score(true_labels[L], self.coms[L])
 
-    def macro_f1(self, pred_labels: torch.tensor, L: int = 0) -> float:
+    def macro_f1(self, true_labels: torch.tensor, L: int = 0) -> float:
         """
         Args:
             pred_labels: torch.Tensor [n_nodes]
@@ -161,7 +161,7 @@ class Optimizer:
         Returns:
             macro_f1: float 
         """
-        return Metrics.macro_f1(self.coms[L], pred_labels[L])    
+        return Metrics.macro_f1(true_labels[L], self.coms[L])    
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """

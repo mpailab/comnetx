@@ -117,9 +117,9 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 def flmig_adopted(
     adj: torch.Tensor,
-    Number_iter: int = 10,
+    Number_iter: int = 20,
     Beta: float = 0.5,
-    max_rb: int = 10,
+    max_rb: int = 50,
     return_labels: bool = False,
     timing_info: dict | None = None,
 ):
