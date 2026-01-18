@@ -144,9 +144,9 @@ def s2cag(adj_torch: torch.Tensor,
           features_torch: torch.Tensor | None = None, 
           labels: torch.Tensor | None = None,
           timing_info=None,
-          dataset = 'dataset', T = 15, n_runs = 1, 
-          alpha= 0.8, fdim = 0, method = 'sub', 
-          gamma = 1, tau = 50,
+          dataset = 'dataset', T = 10, n_runs = 5, 
+          alpha= 1.0, fdim = 0, method = 'sub', 
+          gamma = 1.0, tau = 7,
           metrics_mod=None):
     time_s = time()
     if labels is None:

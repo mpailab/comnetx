@@ -299,7 +299,7 @@ def test_s2cag_konect_dataset(name):
     torch.cuda.empty_cache()
 
 def test_s2cag_single_konect_dataset():
-    name = "com-lj"
+    name = "dblp-cite"
     dataset = Dataset(name, KONECT_PATH)
     adj, features, labels = dataset.load(tensor_type="coo")
     adj = adj.coalesce()
@@ -309,11 +309,14 @@ def test_s2cag_single_konect_dataset():
         adj.indices(), new_values, adj.size()
     ).coalesce() #FIXME
     
-    num_nodes = adj.size(0)
-    if labels is None:
-        num_classes = 16
-        labels = torch.randint(0, num_classes, (num_nodes,), dtype=torch.long)
-    features = torch.rand(num_nodes, 128, dtype=torch.float32)
+    # num_nodes = adj.size(0)
+    # if labels is None:
+    #     num_classes = 16
+    #     labels = torch.randint(0, num_classes, (num_nodes,), dtype=torch.long)
+    # features = torch.rand(num_nodes, 128, dtype=torch.float32)
+
+    features = None
+    labels = None
 
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_adj_path = os.path.join(tmpdir, f"adj_{name}.pt")

@@ -52,6 +52,13 @@ def dynamic_launch(dataset_name : str, batches_num,
         conversion_time = conversion_time_e - conversion_time_s
 
         mod = opt.modularity(directed = ds.is_directed)
+        
+        # acc = opt.accuracy(labels)
+        # nmi = opt.nmi(labels)
+        # ari = opt.ari(labels)
+        # f1 = opt.macro_f1(labels)
+        # print("nmi =", nmi, "ari =", ari, "acc =", acc, "f1 =", f1)
+
         results.append({'modularity' : mod, 'time': total_time - conversion_time})
 
     with print_zone(verbose >= 1):
