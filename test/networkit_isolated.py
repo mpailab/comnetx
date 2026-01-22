@@ -14,6 +14,6 @@ for p in (PROJECT_PATH, PROJECT_PATH / "src", TEST_PATH):
 from launcher import dynamic_launch
  
 if __name__ == "__main__":
-    dataset, batches, method, mode, verbose = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], int(sys.argv[5])
-    results = dynamic_launch(dataset, batches, method, mode=mode, verbose=verbose)
+    dataset, batches_strategy, method, mode, verbose = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+    results = dynamic_launch(dataset, batches_strategy, method, mode=mode, verbose=verbose)
     print(json.dumps({"results": results}))

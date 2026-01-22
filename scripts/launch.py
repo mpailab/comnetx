@@ -99,7 +99,7 @@ def measure():
     db = {}
     errors = []
     for dataset in DATASETS:
-        for batches_num in BATCHES:
+        for batches_strategy in BATCHES:
             for method in METHODS:
                 for mode in MODES:
                     if mode == "smart" and SMART_PARAMS_GRID:
@@ -120,7 +120,7 @@ def measure():
                         try:
                             results = dynamic_launch(
                                 dataset, 
-                                batches_num,
+                                batches_strategy,
                                 method, 
                                 mode=mode,
                                 smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
@@ -129,13 +129,13 @@ def measure():
                             )
                         except Exception as e:
                             if CATCH_ERRORS:  # ловим ошибки только если флаг True
-                                err_tuple = (algname, dataset, batches_num, str(e))
+                                err_tuple = (algname, dataset, batches_strategy, str(e))
                                 errors.append(err_tuple)
-                                print(f"Error {e} on:", dataset, batches_num, algname)
+                                print(f"Error {e} on:", dataset, batches_strategy, algname)
                             else:  # иначе пробрасываем ошибку дальше
                                 raise
                         else:
-                            db[algname][dataset][MACHINE][str(batches_num)] = results
+                            db[algname][dataset][MACHINE][str(batches_strategy)] = results
                             save(db, errors)
     return db, errors
 

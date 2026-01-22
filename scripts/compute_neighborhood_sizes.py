@@ -26,7 +26,7 @@ def compute_neighborhood_sizes(dataset_name, batches_strategy, max_step=5, skip_
     """
     # Загружаем датасет с указанной стратегией батчинга
     ds = Dataset(dataset_name, path=KONECT_PATH)
-    ds.load(batches=batches_strategy)
+    ds.load(batches_strategy=batches_strategy)
     
     batches = torch.unbind(ds.adj)
     

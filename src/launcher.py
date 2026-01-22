@@ -7,18 +7,18 @@ from datasets import KONECT_PATH, INFO, Dataset
 from optimizer import Optimizer
 from our_utils import print_zone
 
-def dynamic_launch(dataset_name : str, batches_num,
+def dynamic_launch(dataset_name : str, batches_strategy,
                     underlying_static_method : str,
                     mode : str = "smart",
                     smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
                     verbose : int = 1):
 
     ds = Dataset(dataset_name, path = KONECT_PATH)
-    ds.load(batches = batches_num)
+    ds.load(batches_strategy = batches_strategy)
 
     with print_zone(verbose >= 1):
         print("-----------------------------------------------")
-        print(f"Dataset: {dataset_name} ({batches_num} batches)")
+        print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
         sufix = f"L:{smart_subcoms_depth}-r:{smart_neighborhood_step}" if mode == "smart" else mode
         print(f"Baseline: {underlying_static_method}-{sufix}")
     results = []
