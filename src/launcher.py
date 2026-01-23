@@ -30,9 +30,22 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                             subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
                             method = underlying_static_method,
                             verbose = verbose)
-            active_nodes = batch.coalesce().indices().unique()
-            affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool)
-            affected_nodes_mask[active_nodes] = True
+            if ":" in batches_strategy:
+                #TODO сделать загрузку посчитанного разбиения первого батча для стратегий "9:N", "99:N", "999:N"
+                # Сейчас считаем разбиение "на ходу" самым быстрым алгоритмом
+                opt.method = "ldleiden"
+                n = opt.nodes_num
+                l = opt.subcoms_depth
+                coms = opt.local_algorithm(opt.adj, opt.features)
+                coms = coms.repeat(l).reshape((l, n)) # Пропагируем сообщества вверх на все уровни
+                #FIXME перенести функционал выше в функцию _set_communities
+                opt._set_communities(communities = coms)
+                opt.method = underlying_static_method
+                continue
+            else:
+                active_nodes = batch.coalesce().indices().unique()
+                affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool)
+                affected_nodes_mask[active_nodes] = True
         else:
             affected_nodes_mask = opt.update_adj(batch)
         
