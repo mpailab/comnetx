@@ -3,7 +3,7 @@ import time
 import torch
 
 try:
-    from dynamic_graphs_communities import DFLeiden
+    from dynamic_graphs_communities import AlgorithmOptions, DFLeiden
 except ImportError as exc:
     _BACKEND_IMPORT_ERROR = exc
     raise ImportError("dynamic_graphs_communities is required for DFLeiden") from _BACKEND_IMPORT_ERROR
@@ -16,8 +16,10 @@ def dfleiden_partition(
     timing_info=None,
 ) -> torch.Tensor:
     time_s = time.time()
+    if options is not None:
+        options = AlgorithmOptions(**options)
     algo = DFLeiden(nodes_num=adj.size(0), directed=directed, options=options)
-    algo.init(adj)
+    algo.update(adj)
     time_e = time.time()
     if timing_info is not None:
         timing_info["conversion_time"] = time_e - time_s
