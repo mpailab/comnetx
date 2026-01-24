@@ -63,8 +63,14 @@ def dynamic_launch(dataset_name : str, batches_strategy,
 
         total_time = time_e - time_s
         conversion_time = conversion_time_e - conversion_time_s
-
         mod = opt.modularity(directed = ds.is_directed)
+        with print_zone(verbose >= 2):
+            print(f"Modularity: {mod:.2}")
+            if underlying_static_method == "ldleiden" and mode in {"naive", "raw"}:
+                algorithm_time = opt.last_timing_info["algorithm_time"]
+                print(f"Algorithm time: {algorithm_time:.2}")
+            else:
+                print(f"Time: {total_time - conversion_time:.2}")
         
         # acc = opt.accuracy(labels)
         # nmi = opt.nmi(labels)
@@ -74,9 +80,13 @@ def dynamic_launch(dataset_name : str, batches_strategy,
 
         results.append({'modularity' : mod, 'time': total_time - conversion_time})
 
-    with print_zone(verbose >= 1):
-        total_time = sum(map(lambda x: x["time"], results))
+    total_time = sum(map(lambda x: x["time"], results))
+    with print_zone(verbose == 1):
         print(f"Final modularity: {mod:.2}")
+        print(f"Total time: {total_time:.2}")
+        print("-----------------------------------------------")
+    with print_zone(verbose >= 2):
+        print("-")
         print(f"Total time: {total_time:.2}")
         print("-----------------------------------------------")
     return results

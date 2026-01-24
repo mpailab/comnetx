@@ -24,7 +24,12 @@ def ldleiden_partition(
     if timing_info is not None:
         timing_info["conversion_time"] = time_e - time_s
 
+    time_s = time.time()
     algo.apply()
+    time_e = time.time()
+    if timing_info is not None:
+        timing_info["algorithm_time"] = time_e - time_s
+
     return algo.partition().to(torch.long)
 
 
