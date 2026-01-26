@@ -3,7 +3,7 @@ import time
 import torch
 
 try:
-    from dynamic_graphs_communities import LDLeiden
+    from dynamic_graphs_communities import AlgorithmOptions, LDLeiden
 except ImportError as exc:
     _BACKEND_IMPORT_ERROR = exc
     raise ImportError("dynamic_graphs_communities is required for LDLeiden") from _BACKEND_IMPORT_ERROR
@@ -16,13 +16,20 @@ def ldleiden_partition(
     timing_info=None,
 ) -> torch.Tensor:
     time_s = time.time()
+    if options is not None:
+        options = AlgorithmOptions(**options)
     algo = LDLeiden(nodes_num=adj.size(0), directed=directed, options=options)
-    algo.init(adj)
+    algo.update(adj)
     time_e = time.time()
     if timing_info is not None:
         timing_info["conversion_time"] = time_e - time_s
 
+    time_s = time.time()
     algo.apply()
+    time_e = time.time()
+    if timing_info is not None:
+        timing_info["algorithm_time"] = time_e - time_s
+
     return algo.partition().to(torch.long)
 
 

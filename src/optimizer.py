@@ -58,6 +58,7 @@ class Optimizer:
 
         self.verbose = verbose
         self.conversion_time = 0.0
+        self.last_timing_info = None
     
     def _set_communities(self, communities, replace_subcoms_depth = False):
         n = self.nodes_num
@@ -282,6 +283,7 @@ class Optimizer:
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info['conversion_time']
+        self.last_timing_info = timing_info
         return res
 
     @staticmethod
