@@ -7,6 +7,8 @@ use_gpu=0
 custom_cpus_per_task=""
 # Memory per task requested from Slurm in gigabytes (powers of two).
 mem_per_task_gb=""
+# Task name used for container paths.
+task_name="dynamic-graphs"
 
 # Short help shown when the user passes no arguments or an invalid count.
 usage() {
@@ -14,6 +16,7 @@ usage() {
 Usage: srun_multi_task.sh [options] <cmd1> [cmd2 ... cmd8]
 
 Options:
+  --task NAME        task to benchmark (dynamic-graphs|comnetx, default: dynamic-graphs)
   --gpu              request one GPU per command (default: CPU only)
   --cpus-per-task N  override CPU cores per command (default: 128/num_cmds)
   --mem-per-task G   request 2^k GB per task (optional)
@@ -51,6 +54,14 @@ while [[ $# -gt 0 ]]; do
       mem_per_task_gb="$2"
       shift 2
       ;;
+    --task)
+      if [[ $# -lt 2 ]]; then
+        echo "--task requires a value" >&2
+        exit 1
+      fi
+      task_name="$2"
+      shift 2
+      ;;
     --)
       shift
       break
@@ -80,6 +91,15 @@ if (( $# > 8 )); then
   usage
   exit 1
 fi
+
+case "$task_name" in
+  dynamic-graphs|comnetx)
+    ;;
+  *)
+    echo "Error: --task must be one of: dynamic-graphs, comnetx" >&2
+    exit 1
+    ;;
+esac
 
 # List of commands we need to run; each index maps to SLURM_PROCID.
 commands=("$@")
@@ -127,10 +147,10 @@ if [[ -n "$mem_per_task_gb" ]]; then
 fi
 
 # Container settings reused in the srun command.
-container_image="/scratch/konovalovay/dyn_graphs_cpp.sqsh"
-container_workdir="/dynamic-graphs"
-container_mounts="/scratch/konovalovay/dynamic-graphs:/dynamic-graphs,"\
-"/scratch/bokovgv/datasets/graphs/konect:/dynamic-graphs/datasets"
+container_image="/scratch/bokovgv/${task_name}.sqsh"
+container_workdir="/${task_name}"
+container_mounts="/scratch/konovalovay/${task_name}:/${task_name},"\
+"/scratch/bokovgv/datasets/graphs/konect:/${task_name}/datasets"
 
 # Serialize the commands into bash array literal syntax so the inner
 # bash process sees the same array with proper quoting.

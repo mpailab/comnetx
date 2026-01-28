@@ -29,7 +29,7 @@ class Dataset:
         self.features = None
         self.label = None
 
-    def load(self, tensor_type : str = "coo", batches = None) -> torch.Tensor:
+    def load(self, tensor_type : str = "coo", batches_strategy = None) -> torch.Tensor:
         """
         Load dataset
 
@@ -42,7 +42,7 @@ class Dataset:
         Returns
         -------
         adj - (l, n, n)-tensor, where l is number of batches
-              (n, n)-tensor if batches is None
+              (n, n)-tensor if batches_strategy is None
         features - #TODO (to Drobyshev) add info for shape
         label - #TODO (to Drobyshev) add info for shape
         """    
@@ -55,11 +55,11 @@ class Dataset:
         dname = self.name.lower()
         if self.name in info:
             self.is_directed = info[self.name]['d'] == 'directed'
-            if batches == None:
-                self._load_konect(batches_num = 1)
+            if batches_strategy == None:
+                self._load_konect(batches_strategy = "1")
                 self.adj = self.adj[0]
             else:
-                self._load_konect(batches_num = batches)
+                self._load_konect(batches_strategy = batches_strategy)
         elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
             
@@ -350,12 +350,12 @@ class Dataset:
     ], dim=0)
         return adj_3d, labels
     
-    def _load_konect(self, batches_num = 1):
+    def _load_konect(self, batches_strategy = "1"):
         """
         Загружает граф KONECT в соответствии со стратегией батчинга
 
         Args:
-            batches_num: "N" | "p:n" | "real"
+            batches_strategy: "N" | "p:n" | "real"
                 - "N": N равных батчей (готовый файл out.{self.name}.{N}_batches для N = 1, 10, 100, 1000)
                 - "p:n" : Стратегия с доминирующим первым батчем.
                       `p` — целое число из ряда 9, 99, 999, ... (соответствует 9%, 99%, 99.9%, ...).
@@ -366,15 +366,15 @@ class Dataset:
             По умолчанию "1" (весь граф — один батч).
         """
         # Определение нужного файла
-        batches_num = str(batches_num)
-        if batches_num == "real":
+        batches_strategy = str(batches_strategy)
+        if batches_strategy == "real":
             filepath = os.path.join(self.path, self.name, f"out.{self.name}.sort")
-        elif ":" in batches_num:  # p:n стратегия
-            p_str, n_str = batches_num.split(":")
+        elif ":" in batches_strategy:  # p:n стратегия
+            p_str, n_str = batches_strategy.split(":")
             p, n = int(p_str), int(n_str)
             filepath = os.path.join(self.path, self.name, f"out.{self.name}.{p+1}_batches")
         else:  # N стратегия
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_num}_batches")
+            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_strategy}_batches")
 
         # Чтение файла
         with open(filepath) as _:
@@ -389,7 +389,7 @@ class Dataset:
             adj = torch.sparse_coo_tensor(idx, w_arr, size=(num_nodes, num_nodes)).coalesce()
             return adj if self.is_directed else adj + torch.t(adj)
 
-        if ":" in batches_num:
+        if ":" in batches_strategy:
             mask = (t < p)
             adj = make_adj(i[mask], j[mask], w[mask]) # Объединяем первые p батчей в один
             adjs = [adj]
@@ -421,11 +421,11 @@ class Dataset:
         edges_num = main_adj._nnz()
         nodes_num = main_adj.size(0)
         if main_adj.ndim == 2:
-            batches_num = 1
+            batches_strategy = 1
             adjs = [main_adj]
         elif main_adj.ndim == 3:
-            batches_num = main_adj.shape[0]
-            adjs = [main_adj[i] for i in range(batches_num)]
+            batches_strategy = main_adj.shape[0]
+            adjs = [main_adj[i] for i in range(batches_strategy)]
         else:
             raise ValueError(f"Unsupported adjacency ndim: {main_adj.ndim}")
         lines = []
@@ -446,7 +446,7 @@ class Dataset:
             output_dir = os.path.join(path, self.name)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-            filepath = os.path.join(output_dir, f"out.{self.name}.{batches_num}_batches")
+            filepath = os.path.join(output_dir, f"out.{self.name}.{batches_strategy}_batches")
             with open(filepath, "w") as f:
                 for line in lines:
                     f.write(line + '\n')

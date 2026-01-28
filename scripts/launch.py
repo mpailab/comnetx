@@ -28,6 +28,7 @@ MACHINE = conf.get("MACHINE", MACHINE_DEFAULT)
 
 # output
 VERBOSE = conf.get("VERBOSE", 1) # 0, 1, 2, 3
+CATCH_ERRORS = conf.get("CATCH_ERRORS", True)
 
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
@@ -98,7 +99,7 @@ def measure():
     db = {}
     errors = []
     for dataset in DATASETS:
-        for batches_num in BATCHES:
+        for batches_strategy in BATCHES:
             for method in METHODS:
                 for mode in MODES:
                     if mode == "smart" and SMART_PARAMS_GRID:
@@ -119,7 +120,7 @@ def measure():
                         try:
                             results = dynamic_launch(
                                 dataset, 
-                                batches_num,
+                                batches_strategy,
                                 method, 
                                 mode=mode,
                                 smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
@@ -127,11 +128,14 @@ def measure():
                                 verbose=VERBOSE
                             )
                         except Exception as e:
-                            err_tuple = (algname, dataset, batches_num, str(e))
-                            errors.append(err_tuple)
-                            print(f"Error {e} on:", dataset, batches_num, algname)
+                            if CATCH_ERRORS:  # ловим ошибки только если флаг True
+                                err_tuple = (algname, dataset, batches_strategy, str(e))
+                                errors.append(err_tuple)
+                                print(f"Error {e} on:", dataset, batches_strategy, algname)
+                            else:  # иначе пробрасываем ошибку дальше
+                                raise
                         else:
-                            db[algname][dataset][MACHINE][str(batches_num)] = results
+                            db[algname][dataset][MACHINE][str(batches_strategy)] = results
                             save(db, errors)
     return db, errors
 

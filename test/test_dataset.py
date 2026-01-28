@@ -57,7 +57,7 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     assert ds.features is not None
     assert ds.label is not None
 
-@pytest.mark.parametrize("batches_num", [
+@pytest.mark.parametrize("batches_strategy", [
     "1",           # N стратегия
     "10",          # N стратегия  
     "real",        # raw timestamps
@@ -66,10 +66,10 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     "999:10",     # p:n стратегия
 ])
 @pytest.mark.short
-def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_num):
+def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy):
     """Тестирует различные стратегии батчинга."""
     ds = Dataset(dataset_name="wiki_talk_cy", path=KONECT_PATH)
-    ds.load(batches=batches_num)
+    ds.load(batches_strategy=batches_strategy)
     adj = ds.adj
     
     # Базовые проверки
@@ -79,14 +79,14 @@ def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_num):
     assert adj.shape[1] == adj.shape[2]  # квадратные матрицы
     
     # Проверка количества батчей
-    if batches_num == "real":
+    if batches_strategy == "real":
         assert adj.shape[0] > 0  # Должен быть хотя бы один батч
-    elif ":" in batches_num:
-        n = int(batches_num.split(":")[1])
+    elif ":" in batches_strategy:
+        n = int(batches_strategy.split(":")[1])
         # 1 схлопнутый + n разделённых (неверно при больших значения p и n и мальньком числе ребер в датасете !)
         assert adj.shape[0] == 1 + n 
     else:
-        assert adj.shape[0] == int(batches_num)  # N батчей
+        assert adj.shape[0] == int(batches_strategy)  # N батчей
 
 @pytest.mark.short
 def test_load_wiki_talk_ht_dataset(temp_dataset_dir):

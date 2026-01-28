@@ -54,6 +54,37 @@ def test_partition_2():
     coms = leidenalg_partition(adj_matrix)
     assert len(coms) == 4
     assert len(set(coms.tolist())) == 2
+
+
+@pytest.mark.long
+def test_leidenalg_on_cora():
+    data_dir = "/auto/datasets/graphs/small"
+    dataset = Dataset("cora", path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    new_labels = leidenalg_partition(adj.to_dense())
+
+    assert isinstance(new_labels, torch.Tensor)
+    assert new_labels.shape[0] == labels.shape[0]
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
+
+
+@pytest.mark.long
+def test_leidenalg_on_citeseer():
+    data_dir = "/auto/datasets/graphs/small"
+    dataset = Dataset("citeseer", path=data_dir)
+    adj, features, labels = dataset.load(tensor_type="coo")
+
+    new_labels = leidenalg_partition(adj.to_dense())
+
+    assert isinstance(new_labels, torch.Tensor)
+    assert new_labels.shape[0] == labels.shape[0]
+    assert new_labels.dtype in (torch.int64, torch.long)
+    assert new_labels.min() >= 0
+    del adj, features, labels, new_labels
+
     
 @pytest.mark.long
 def test_leidenalg_single_konect_dataset():

@@ -57,7 +57,7 @@ def de_main(path, Number_iter, Beta, max_rb):
     nb_run = 0
 
     while nb_run < max_rb :
-        print("rb",nb_run)
+        # print("rb",nb_run)
         communities = Fast_local_Move_IG( Number_iter, Beta, path)
         mod,community,tim = communities.Run_FMLIG() 
         #print(community)
@@ -115,12 +115,11 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 #     os.remove(path)
 
-
 def flmig_adopted(
     adj: torch.Tensor,
-    Number_iter: int = 100,
+    Number_iter: int = 20,
     Beta: float = 0.5,
-    max_rb: int = 10,
+    max_rb: int = 50,
     return_labels: bool = False,
     timing_info: dict | None = None,
 ):
@@ -150,6 +149,7 @@ def flmig_adopted(
             ),
             size=A.size(),
         ).to_dense()
+        adj_dense.fill_diagonal_(0.0)
     else:
         adj_dense = (adj > 0).to(torch.float32)
         adj_dense.fill_diagonal_(0.0)
@@ -169,10 +169,14 @@ def flmig_adopted(
     Time_list = []
     Community_list = []
 
+    # print("ALARM ================")
+
     for nb_run in range(max_rb):
-        print(f"rb {nb_run}")
+        # print(f"rb {nb_run}, max_rb {max_rb}")
         communities = Fast_local_Move_IG(Number_iter, Beta, path)
         mod, community, tim = communities.Run_FMLIG()
+
+        # print("community =", community)
 
         Q_list.append(mod)
         Time_list.append(tim)
@@ -183,6 +187,8 @@ def flmig_adopted(
             best_community = community
 
     communities = Fast_local_Move_IG(Number_iter, Beta, path)
+
+    # print("communities =", communities)
 
     Q_avg = communities.avg(Q_list)
     Q_max = communities.max(Q_list)
