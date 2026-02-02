@@ -190,3 +190,9 @@ baselines/**/data/
 *.pkl
 *.npz
 **/chpt/
+baselines/*/real_network/
+baselines/GraphChallenge/
+**/imgs/
+results/*.json
+test/graphs/small_konect/
+test/*.json
