@@ -97,6 +97,7 @@ class Optimizer:
         Returns:
             modularity: float
         """
+        from metrics import Metrics
         return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)    
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
