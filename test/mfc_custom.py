@@ -26,7 +26,7 @@ label_num_dic = {"acm": 3, "bat": 4, "dblp": 4, "eat": 4, "uat": 4}
 COMPLETE_GRAPH = False
 def load_graphs(file_name,network_type):
     if file_name in graph_pkl:
-        return load_graphs_pkl('/auto/datasets/graphs/small' + file_name +'/'+file_name,network_type)
+        return load_graphs_pkl(PROJECT_PATH + '/test/graphs/small/' + file_name +'/'+file_name,network_type)
     else:
         raise NameError  
     

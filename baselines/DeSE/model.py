@@ -154,6 +154,7 @@ class Assign_layer(torch.nn.Module):
 
 def KNN(x, k):
     x1 = x.detach().numpy()
+    #x1 = x.detach().cpu().numpy()
     nbrs = NearestNeighbors(n_neighbors=k, algorithm='auto').fit(x1)
     distances, indices = nbrs.kneighbors(x1)
     rows = np.repeat(np.arange(x1.shape[0]), k)

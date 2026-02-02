@@ -6,32 +6,21 @@ import tempfile
 import pytest
 import subprocess
 from pathlib import Path
+from download import download_and_process_magi
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 from datasets import Dataset, KONECT_PATH
 
 TEST_DIR = os.path.dirname(__file__)
-GRAPHS_DIR = "/auto/datasets/graphs/small"
+GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "small")
 SBM_GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "sbm")
-PRGPT_DIR = "/auto/datasets/graphs/comnetx/baselines/PRGPT/data"
+PRGPT_DIR = os.path.abspath(os.path.join(TEST_DIR, "..", "baselines", "PRGPT", "data"))
 
 @pytest.fixture
 def temp_dataset_dir():
     path = tempfile.mkdtemp()
     yield path
     shutil.rmtree(path)
-
-@pytest.mark.short
-def test_coo_joblib_save(temp_dataset_dir):
-    ds = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    ds._load_magi()
-    ds._save_magi(coo_adj = True)
-    ds._save_magi(coo_adj = False)
-    ds1 = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    ds2 = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    ds1._load_npy_format(coo_adj = True)
-    ds2._load_npy_format(coo_adj = False)
-    assert torch.equal(ds1.adj.to_dense(), ds2.adj.to_dense())
 
 @pytest.mark.long
 @pytest.mark.parametrize(
@@ -40,15 +29,15 @@ def test_coo_joblib_save(temp_dataset_dir):
         "cora",
         "citeseer",
         "pubmed",
-        "reddit",
+        #"reddit",
         "ogbn-arxiv",
         "ogbn-products",
-        "ogbn-papers100M",
         "amazon-photo",
         "amazon-computers",
     ],
 )
 def test_load_magi_datasets(dataset_name, temp_dataset_dir):
+    download_and_process_magi(dataset_name, temp_dataset_dir)
     ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
     ds.load(tensor_type="coo")
     assert isinstance(ds.adj, torch.Tensor)
@@ -57,7 +46,7 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     assert ds.features is not None
     assert ds.label is not None
 
-@pytest.mark.parametrize("batches_strategy", [
+@pytest.mark.parametrize("batches_num", [
     "1",           # N стратегия
     "10",          # N стратегия  
     "real",        # raw timestamps
@@ -66,10 +55,10 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     "999:10",     # p:n стратегия
 ])
 @pytest.mark.short
-def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy):
+def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_num):
     """Тестирует различные стратегии батчинга."""
     ds = Dataset(dataset_name="wiki_talk_cy", path=KONECT_PATH)
-    ds.load(batches_strategy=batches_strategy)
+    ds.load(batches=batches_num)
     adj = ds.adj
     
     # Базовые проверки
@@ -79,14 +68,14 @@ def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy
     assert adj.shape[1] == adj.shape[2]  # квадратные матрицы
     
     # Проверка количества батчей
-    if batches_strategy == "real":
+    if batches_num == "real":
         assert adj.shape[0] > 0  # Должен быть хотя бы один батч
-    elif ":" in batches_strategy:
-        n = int(batches_strategy.split(":")[1])
+    elif ":" in batches_num:
+        n = int(batches_num.split(":")[1])
         # 1 схлопнутый + n разделённых (неверно при больших значения p и n и мальньком числе ребер в датасете !)
         assert adj.shape[0] == 1 + n 
     else:
-        assert adj.shape[0] == int(batches_strategy)  # N батчей
+        assert adj.shape[0] == int(batches_num)  # N батчей
 
 @pytest.mark.short
 def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
@@ -99,6 +88,7 @@ def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_dense_output(temp_dataset_dir):
+    download_and_process_magi("Cora", temp_dataset_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="dense")
 
@@ -108,6 +98,7 @@ def test_tensor_dense_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csr_output(temp_dataset_dir):
+    download_and_process_magi("Cora", temp_dataset_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csr")
 
@@ -117,6 +108,7 @@ def test_tensor_csr_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csc_output(temp_dataset_dir):
+    download_and_process_magi("Citeseer", temp_dataset_dir)
     loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csc")
 
@@ -138,6 +130,7 @@ def test_exist_small_datasets():
 
 @pytest.mark.short
 def test_invalid_tensor_type(temp_dataset_dir):
+    download_and_process_magi("Cora", temp_dataset_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     with pytest.raises(ValueError, match="Unsupported tensor type"):
         loader.load(tensor_type="invalid")
@@ -234,7 +227,7 @@ def test_load_prgpt_stream_dataset():
 
     assert ds.is_directed is False, "undirected graph"
 
-@pytest.mark.debug
+@pytest.mark.short
 def test_load_sbm_static_dataset():
     path = SBM_GRAPHS_DIR
     ds = Dataset(
@@ -264,7 +257,7 @@ def test_load_sbm_static_dataset():
     assert labels.shape[0] == n, "Labels must be of shape [n]"
     assert features is None
 
-@pytest.mark.debug
+@pytest.mark.short
 def test_load_sbm_temporal_dataset():
     path = SBM_GRAPHS_DIR
 

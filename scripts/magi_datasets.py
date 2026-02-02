@@ -9,7 +9,7 @@ import joblib
 JOBLIB_EXTS = {".joblib", ".pkl"} 
 
 ROOT = Path(__file__).resolve().parents[1]
-SMALL = "/auto/datasets/graphs/small"
+SMALL = ROOT / "test" / "graphs" / "small"
 OUT_DIR = ROOT / "datasets-info"
 OUT_PATH = OUT_DIR / "magi.json"
 

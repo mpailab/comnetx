@@ -4,7 +4,7 @@ import pickle
 import os
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-Data_root = "/auto/datasets/graphs/small"
+Data_root = os.path.join(PROJECT_PATH, "test", "graphs", "small")
 
 datasets = ["acm", "bat", "dblp", "eat", "uat"]
 

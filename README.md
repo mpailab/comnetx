@@ -36,6 +36,6 @@ srun --nodes=1 \
      --container-workdir /scratch/<USER>/comnetx \
      --container-mounts=/scratch/drobyshevas/comnetx:/scratch/drobyshevas/comnetx, \
      /scratch/bokovgv/datasets/graphs/konect:/auto/datasets/graphs/dynamic_konect_project_datasets/, \
-     /scratch/bokovgv/datasets/graphs/small:/auto/datasets/graphs/small  \
+     /scratch/bokovgv/datasets/graphs/small:/home/drobyshev/comnetx2/comnetx/test/graphs/small  \
       --pty bash
 ```

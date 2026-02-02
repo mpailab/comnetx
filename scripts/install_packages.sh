@@ -31,6 +31,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 REQUIREMENTS_PATH="$PROJECT_ROOT/baselines/PRGPT/requirements.txt"
 REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd -P )"
+WHEEL_DIR="${PROJECT_ROOT}/wheels"
 
 git config --global --add safe.directory "$REPO_ROOT"
 
@@ -47,5 +48,7 @@ pip install --no-cache-dir \
     ogb matplotlib tensorflow==2.14.0 pytest debugpy scikit-learn-intelex 
 
 pip install --no-cache-dir leidenalg networkit==2.8.7 gudhi seaborn POT eagerpy umap-learn
+
+python -m pip install ${WHEEL_DIR}/dynamic_graphs_communities-0.1.0-cp310-cp310-manylinux_2_17_x86_64.whl
 
 echo "[INFO] Done!"

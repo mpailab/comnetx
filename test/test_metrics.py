@@ -13,7 +13,7 @@ from datasets import Dataset, KONECT_PATH
 from metrics import Metrics
 
 TEST_DIR = os.path.dirname(__file__)
-GRAPHS_DIR = "/auto/datasets/graphs/small"
+GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "small")
 SBM_GRAPHS_DIR = os.path.join(TEST_DIR, "graphs", "sbm")
 
 METRICS_JSON = os.path.join(TEST_DIR, "magi_metrics_small.json")
@@ -22,7 +22,7 @@ def get_all_datasets():
     """
     Сreate dict with all datasets in test directory.
     """
-    base_dir = "/auto/datasets/graphs/small"
+    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     datasets = {}
     if os.path.isdir(base_dir):
         for name in os.listdir(base_dir):

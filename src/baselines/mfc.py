@@ -258,10 +258,20 @@ def mfc_adopted(
 
     t0 = time.time()
     adj_bin = _binarize_adj(adj)
-    if labels is None:
+    N = adj_bin.size(0)
+    if labels is None or labels.numel() == 0:
+        print(f"🔄 Генерируем псевдо-labels для N={N}")
         init_labels = _degree_bins_labels(adj_bin)
     else:
         init_labels = labels.to(torch.long)
+        if init_labels.size(0) != N:
+            print(f"⚠️  Labels size {init_labels.size(0)} != N={N}, генерируем новые")
+            init_labels = _degree_bins_labels(adj_bin)
+    
+    assert init_labels.size(0) == N, f"После фикса всё равно не совпадает: {init_labels.size(0)} != {N}"
+    
+    adj_matrices = [adj_bin]
+    labels_list = [init_labels]
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 

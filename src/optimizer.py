@@ -6,7 +6,6 @@ from typing import Union, Optional, Callable
 
 # Internal imports
 import sparse
-from metrics import Metrics
 from our_utils import print_zone
 
 
@@ -58,7 +57,6 @@ class Optimizer:
 
         self.verbose = verbose
         self.conversion_time = 0.0
-        self.last_timing_info = None
     
     def _set_communities(self, communities, replace_subcoms_depth = False):
         n = self.nodes_num
@@ -99,70 +97,7 @@ class Optimizer:
         Returns:
             modularity: float
         """
-        return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)
-    
-    def accuracy(self, 
-            true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            accuracy: float 
-        """
-        return Metrics.accuracy(true_labels[L], self.coms[L])
-    
-    def nmi(self, 
-            true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            nmi: float 
-        """
-        return Metrics.nmi(true_labels[L], self.coms[L])
-    
-    def balanced_acc(self, 
-            true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            balanced_acc: float 
-        """
-        return Metrics.balanced_acc(true_labels[L], self.coms[L])
-
-    def purity(self, true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            purity_score: float 
-        """
-        return Metrics.purity_score(true_labels[L], self.coms[L])
-
-    def ari(self, true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            ari_score: float 
-        """
-        return Metrics.ari_score(true_labels[L], self.coms[L])
-
-    def macro_f1(self, true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            macro_f1: float 
-        """
-        return Metrics.macro_f1(true_labels[L], self.coms[L])    
+        return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)    
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
@@ -176,6 +111,7 @@ class Optimizer:
 
         """
 
+
         if self.size != batch.size():
             raise ValueError(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
        
@@ -184,37 +120,77 @@ class Optimizer:
         affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool)
         affected_nodes_mask[affected_nodes] = True
 
+
         return affected_nodes_mask
-
+   
     @staticmethod
-    def neighborhood(adj: torch.Tensor,
+    def neighborhood(adj: Union[torch.Tensor, 'sparse.COO'],
                     nodes_mask: torch.Tensor,
-                    step: int = 1,
-                    is_symmetric=False) -> torch.Tensor:
-
+                    step: int = 1) -> torch.Tensor:
+        """
+        Args:
+            adj : Union[torch.Tensor, sparse.COO]
+            nodes_mask : torch.BoolTensor
+            step : int, optional (default=1)
+        Returns:
+            visited: torch.BoolTensor
+        """
         visited = nodes_mask.clone()
-        if (step <= 0) or visited.all() or not visited.any():
+
+
+        if step <= 0:
             return visited
 
-        A = adj.coalesce()
-        if not is_symmetric:
-            idx = A.indices()
-            AT = torch.sparse_coo_tensor(idx.flip(0), A.values(), A.shape).coalesce()
+
+        if isinstance(adj, torch.Tensor) and adj.is_sparse:
+            # Use sparse matmul for frontier expansion (faster than per-edge masking)
+            A = adj.coalesce()
+            AT = torch.sparse_coo_tensor(A.indices().flip(0), A.values(), size=A.size()).coalesce()
             A_sym = (A + AT).coalesce()
+
+
+            # Work with float vector for spmm, keep boolean for masks
+            frontier = visited.clone()
+            for _ in range(step):
+                if not frontier.any():
+                    break
+                y = torch.sparse.mm(A_sym, frontier.to(dtype=A_sym.dtype).unsqueeze(1)).squeeze(1)
+                new_nodes = y > 0
+                new_frontier = new_nodes & (~visited)
+                visited = visited | new_nodes
+                frontier = new_frontier
+
+
+            return visited
+                   
+        elif hasattr(adj, 'coords'):
+            rows, cols = adj.coords
+            visited_np = visited.cpu().numpy()
+           
+            for k in range(step):
+                if not visited_np.any():
+                    break
+               
+                frontier_indices = np.where(visited_np)[0]
+               
+                mask_out = np.isin(rows, frontier_indices)
+                if mask_out.any():
+                    neighbors_out = cols[mask_out]
+                    visited_np[neighbors_out] = True
+               
+                mask_in = np.isin(cols, frontier_indices)
+                if mask_in.any():
+                    neighbors_in = rows[mask_in]
+                    visited_np[neighbors_in] = True
+
+
+            visited = torch.tensor(visited_np, device=visited.device)
+           
         else:
-            A_sym = A
-
-        frontier = visited.clone()
-        for _ in range(step):
-            if not frontier.any() or visited.all():
-                break
-            y = torch.sparse.mm(A_sym, frontier.to(dtype=A_sym.dtype).unsqueeze(1)).squeeze(1)
-            new_nodes = y > 0
-            new_frontier = new_nodes & (~visited)
-            visited = visited | new_nodes
-            frontier = new_frontier
-
+            raise TypeError(f"Unsupported matrix type: {type(adj)}")
+       
         return visited
+
 
     def local_algorithm(self,
                         adj: torch.Tensor,
@@ -237,12 +213,6 @@ class Optimizer:
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
                 res = leidenalg_partition(adj, timing_info = timing_info)
-            elif self.method == "ldleiden":
-                from baselines.ldleiden import ldleiden_partition
-                res = ldleiden_partition(adj, timing_info = timing_info)
-            elif self.method == "dfleiden":
-                from baselines.dfleiden import dfleiden_partition
-                res = dfleiden_partition(adj, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
                 res = adapted_dmon(adj, features, labels, timing_info = timing_info)
@@ -283,13 +253,28 @@ class Optimizer:
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info['conversion_time']
-        self.last_timing_info = timing_info
         return res
 
     @staticmethod
     def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:
-        return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
-       
+        #return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t())) previous
+        #new
+        result = torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
+        result_values = result.values()
+        result_values.clamp_(min=0.0)
+        return result
+    
+    @staticmethod
+    def safe_clamp_sparse(t: torch.Tensor) -> torch.Tensor:
+        """Обнуляет negative в sparse/dense."""
+        if t.is_sparse:
+            t = t.coalesce()
+        if t.is_sparse and t._nnz() > 0:
+            t_clone = t.clone()  # Не mutate original
+            t_clone.values().clamp_(min=0.0)
+            return t_clone.coalesce()
+        return torch.clamp(t, min=0.0)
+
     def run(self, nodes_mask: torch.Tensor) -> None:
         """
         Run Optimizer on nodes

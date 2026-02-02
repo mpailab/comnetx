@@ -1,18 +1,13 @@
 import torch
-from torch_geometric.datasets import Planetoid, Reddit, Amazon
 
-from ogb.nodeproppred import PygNodePropPredDataset
-import tempfile
-import pandas as pd
 import numpy as np
-import scipy.sparse as sp
 import os.path
-from ogb.nodeproppred import PygNodePropPredDataset
-import pickle
 
 import time
 import json
 import joblib
+import pickle
+
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,7 +24,7 @@ class Dataset:
         self.features = None
         self.label = None
 
-    def load(self, tensor_type : str = "coo", batches_strategy = None) -> torch.Tensor:
+    def load(self, tensor_type : str = "coo", batches = None) -> torch.Tensor:
         """
         Load dataset
 
@@ -42,7 +37,7 @@ class Dataset:
         Returns
         -------
         adj - (l, n, n)-tensor, where l is number of batches
-              (n, n)-tensor if batches_strategy is None
+              (n, n)-tensor if batches is None
         features - #TODO (to Drobyshev) add info for shape
         label - #TODO (to Drobyshev) add info for shape
         """    
@@ -55,30 +50,35 @@ class Dataset:
         dname = self.name.lower()
         if self.name in info:
             self.is_directed = info[self.name]['d'] == 'directed'
-            if batches_strategy == None:
-                self._load_konect(batches_strategy = "1")
+            if batches == None:
+                self._load_konect(batches_num = 1)
                 self.adj = self.adj[0]
             else:
-                self._load_konect(batches_strategy = batches_strategy)
+                self._load_konect(batches_num = batches)
         elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
             self._load_npy_format()
             
-        elif dname in magi_info:
-            self.is_directed = magi_info[dname]['d'] == 'directed'
-            download_flag = False
-            for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"}:
-                if not os.path.isfile(os.path.join(self.path, dname, filename)):
-                    print(f"file not found: {filename}")
-                    print("Downloading files...")
-                    download_flag = True
-                    break
-            if download_flag:
-                self._load_magi()
-                self._save_magi(coo_adj = True)
-            else:
-                self._load_npy_format(coo_adj = True)
-        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
-            self._load_npy_format()
+        elif dname in magi_info or dname in {"acm", "bat", "dblp", "eat", "uat"}:
+            if dname in magi_info:
+                self.is_directed = magi_info[dname]['d'] == 'directed'
+            
+            # ПРОВЕРЯЕМ ТОЛЬКО ЛОКАЛЬНЫЕ ФАЙЛЫ
+            load_dir = os.path.join(self.path, dname)
+            required_files = {
+                f"{dname}_feat.npy", 
+                f"{dname}_label.npy", 
+                f"{dname}_coo_adj.joblib"  # или f"{dname}_adj.npy"
+            }
+            
+            if not os.path.exists(load_dir) or not required_files.issubset(os.listdir(load_dir)):
+                raise FileNotFoundError(
+                    f"Dataset {dname} files not found in {load_dir}. "
+                    f"Required: {required_files}. "
+                    f"Run `python download.py {dname}` first."
+                )
+            
+            self._load_npy_format(coo_adj=True)
+
         elif dname.startswith("static") or dname.startswith("stream"):
             parts = self.name.split("_")
 
@@ -112,78 +112,39 @@ class Dataset:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
         return self.adj, self.features, self.label
 
-    def _load_magi(self):
-        name = self.name.lower()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if name in {"cora", "citeseer", "pubmed"}:
-                dataset = Planetoid(root=tmpdir, name=name.capitalize())
-                data = dataset[0]
-
-            elif name == "reddit":
-                dataset = Reddit(root=tmpdir)
-                data = dataset[0]
-
-            elif name.startswith("ogbn-"):
-                dataset = PygNodePropPredDataset(name=name, root=tmpdir)
-                split_idx = dataset.get_idx_split()
-                data = dataset[0]
-                data.y = data.y.view(-1)
-            elif name.startswith("amazon-"):
-                amazon_name = name.replace("amazon-", "").capitalize()
-                dataset = Amazon(root=tmpdir, name=amazon_name)
-                data = dataset[0]
-            else:
-                raise ValueError(f"Unknown MAGI-compatible dataset: {self.name}")
-
-        edge_index = data.edge_index
-        num_nodes = data.num_nodes if hasattr(data, "num_nodes") else data.x.size(0)
-        values = torch.ones(edge_index.size(1), dtype=torch.float32)
-        self.adj = torch.sparse_coo_tensor(edge_index, values, size=(num_nodes, num_nodes))
-
-        self.features = data.x
-        self.label = data.y
-
-    def _save_magi(self, coo_adj = False):
-        dname = self.name.lower()
-        save_dir = os.path.join(self.path, dname)
-        os.makedirs(save_dir, exist_ok=True)
-
-        np.save(os.path.join(save_dir, f'{dname}_feat.npy'), self.features.numpy())
-        np.save(os.path.join(save_dir, f'{dname}_label.npy'), self.label.numpy())
-
-        adj = self.adj.coalesce()
-
-        if coo_adj:
-            adj_data = {
-                'indices': adj.indices().numpy(),
-                'values': adj.values().numpy(),
-                'shape': adj.shape
-            }
-            joblib.dump(adj_data, os.path.join(save_dir, f'{dname}_coo_adj.joblib'))
-        else:
-            adj_dense = adj.to_dense().numpy()
-            np.save(os.path.join(save_dir, f'{dname}_adj.npy'), adj_dense)
-
-    def _load_npy_format(self, coo_adj = False):
+    def _load_npy_format(self, coo_adj=True):
         dname = self.name.lower()
         load_dir = os.path.join(self.path, dname)
 
-        features = np.load(os.path.join(load_dir, f"{dname}_feat.npy"))
-        labels = np.load(os.path.join(load_dir, f"{dname}_label.npy"))
-        self.features = torch.tensor(features, dtype=torch.float)
-        self.label = torch.tensor(labels, dtype=torch.long)
-
-        if coo_adj:
-            adj_data = joblib.load(os.path.join(load_dir, f"{dname}_coo_adj.joblib"))
-            self.adj = torch.sparse_coo_tensor(adj_data['indices'], adj_data['values'], size=adj_data['shape'])
-        else:
-            adj_data = np.load(os.path.join(load_dir, f"{dname}_adj.npy"), allow_pickle=True)
-            rows, cols = adj_data.nonzero()
+        feat_path = os.path.join(load_dir, f"{dname}_feat.npy")
+        label_path = os.path.join(load_dir, f"{dname}_label.npy")
+        
+        self.features = torch.tensor(np.load(feat_path), dtype=torch.float)
+        self.label = torch.tensor(np.load(label_path), dtype=torch.long)
+        coo_path = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
+        dense_path = os.path.join(load_dir, f"{dname}_adj.npy")
+        
+        if coo_adj and os.path.exists(coo_path):
+            adj_data = joblib.load(coo_path)
+            self.adj = torch.sparse_coo_tensor(
+                adj_data['indices'], 
+                adj_data['values'], 
+                size=adj_data['shape']
+            )
+        elif os.path.exists(dense_path):
+            adj_data = np.load(dense_path, allow_pickle=True)
+            rows, cols = np.nonzero(adj_data)
             values_np = adj_data[rows, cols]
-            indices_np = np.vstack((rows, cols))
-            indices = torch.from_numpy(indices_np).long()
+            
+            indices = torch.from_numpy(np.vstack((rows, cols))).long()
             values = torch.from_numpy(values_np).float()
             self.adj = torch.sparse_coo_tensor(indices, values, size=adj_data.shape)
+        else:
+            raise FileNotFoundError(
+                f"No adjacency file found for {dname} in {load_dir}. "
+                f"Expected: {coo_path} or {dense_path}"
+            )
+
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,
@@ -237,8 +198,8 @@ class Dataset:
 
     def _load_sbm(self, device="cpu"):
         """
-        Load sbm dataset
-        
+        Load sbm dataset from test/graphs/sbm
+
         Parameters
         ----------
         data_type : static / temporal
@@ -269,7 +230,7 @@ class Dataset:
         - labels_t: torch.tensor(labels, dtype=torch.long)
         """
         if not os.path.isabs(fname) and not os.path.exists(fname):
-            candidate = os.path.join(PROJECT_DIR, "test", "graphs", "sbm", fname)
+            candidate = os.path.join(os.getcwd(), "sbm", fname)
             if os.path.exists(candidate):
                 fname = candidate
 
@@ -350,12 +311,12 @@ class Dataset:
     ], dim=0)
         return adj_3d, labels
     
-    def _load_konect(self, batches_strategy = "1"):
+    def _load_konect(self, batches_num = 1):
         """
         Загружает граф KONECT в соответствии со стратегией батчинга
 
         Args:
-            batches_strategy: "N" | "p:n" | "real"
+            batches_num: "N" | "p:n" | "real"
                 - "N": N равных батчей (готовый файл out.{self.name}.{N}_batches для N = 1, 10, 100, 1000)
                 - "p:n" : Стратегия с доминирующим первым батчем.
                       `p` — целое число из ряда 9, 99, 999, ... (соответствует 9%, 99%, 99.9%, ...).
@@ -366,15 +327,15 @@ class Dataset:
             По умолчанию "1" (весь граф — один батч).
         """
         # Определение нужного файла
-        batches_strategy = str(batches_strategy)
-        if batches_strategy == "real":
+        batches_num = str(batches_num)
+        if batches_num == "real":
             filepath = os.path.join(self.path, self.name, f"out.{self.name}.sort")
-        elif ":" in batches_strategy:  # p:n стратегия
-            p_str, n_str = batches_strategy.split(":")
+        elif ":" in batches_num:  # p:n стратегия
+            p_str, n_str = batches_num.split(":")
             p, n = int(p_str), int(n_str)
             filepath = os.path.join(self.path, self.name, f"out.{self.name}.{p+1}_batches")
         else:  # N стратегия
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_strategy}_batches")
+            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_num}_batches")
 
         # Чтение файла
         with open(filepath) as _:
@@ -389,7 +350,7 @@ class Dataset:
             adj = torch.sparse_coo_tensor(idx, w_arr, size=(num_nodes, num_nodes)).coalesce()
             return adj if self.is_directed else adj + torch.t(adj)
 
-        if ":" in batches_strategy:
+        if ":" in batches_num:
             mask = (t < p)
             adj = make_adj(i[mask], j[mask], w[mask]) # Объединяем первые p батчей в один
             adjs = [adj]
@@ -421,11 +382,11 @@ class Dataset:
         edges_num = main_adj._nnz()
         nodes_num = main_adj.size(0)
         if main_adj.ndim == 2:
-            batches_strategy = 1
+            batches_num = 1
             adjs = [main_adj]
         elif main_adj.ndim == 3:
-            batches_strategy = main_adj.shape[0]
-            adjs = [main_adj[i] for i in range(batches_strategy)]
+            batches_num = main_adj.shape[0]
+            adjs = [main_adj[i] for i in range(batches_num)]
         else:
             raise ValueError(f"Unsupported adjacency ndim: {main_adj.ndim}")
         lines = []
@@ -446,7 +407,7 @@ class Dataset:
             output_dir = os.path.join(path, self.name)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-            filepath = os.path.join(output_dir, f"out.{self.name}.{batches_strategy}_batches")
+            filepath = os.path.join(output_dir, f"out.{self.name}.{batches_num}_batches")
             with open(filepath, "w") as f:
                 for line in lines:
                     f.write(line + '\n')
@@ -473,8 +434,8 @@ def list_konect_datasets():
         print(pstring, sep="\t")
 
 def save_small_datasets_in_konect_format():
-    dir_small_datasets = "/auto/datasets/graphs/small"
-    dir_output = "/auto/datasets/graphs/small_konect"
+    dir_small_datasets = os.path.join(PROJECT_DIR, "test/graphs/small")
+    dir_output = os.path.join(PROJECT_DIR, "test/graphs/small_konect")
     os.makedirs(dir_output, exist_ok = True)
     for dname in os.listdir(dir_small_datasets):
         print(dname)

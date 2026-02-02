@@ -1,6 +1,5 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import torch
 import numpy as np
 import sys
 import torch, gc
@@ -8,8 +7,6 @@ import pytest
 import json
 import subprocess
 import tempfile
-import argparse
-from collections import Counter
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
@@ -143,20 +140,7 @@ def get_all_datasets():
     """
     Сreate dict with all datasets in test directory.
     """
-    base_dir = "/auto/datasets/graphs/small"
-    datasets = {}
-    if os.path.isdir(base_dir):
-        for name in os.listdir(base_dir):
-            path = os.path.join(base_dir, name)
-            if os.path.isdir(path):
-                datasets[name] = base_dir
-    return datasets
-
-def get_all_datasets():
-    """
-    Сreate dict with all datasets in test directory.
-    """
-    base_dir = "/auto/datasets/graphs/small"
+    base_dir = os.path.join(os.path.dirname(__file__), "graphs", "small")
     datasets = {}
     if os.path.isdir(base_dir):
         for name in os.listdir(base_dir):
