@@ -174,3 +174,19 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 test/exper_dmon.py
+
+# cached graphs
+/test/graphs/small/
+test/graphs/graph.png
+test/graphs/graph_temp_0.png
+test/graphs/graph_temp_3.png
+test/graphs/graph_temp_6.png
+test/graphs/graph_temp_9.png
+*.sqsh
+data/
+**/datasets/
+**/output/
+baselines/**/data/
+*.pkl
+*.npz
+**/chpt/
