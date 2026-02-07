@@ -6,7 +6,6 @@ from typing import Union, Optional, Callable
 
 # Internal imports
 import sparse
-from metrics import Metrics
 from our_utils import print_zone
 
 
@@ -99,70 +98,8 @@ class Optimizer:
         Returns:
             modularity: float
         """
-        return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)
-    
-    def accuracy(self, 
-            true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            accuracy: float 
-        """
-        return Metrics.accuracy(true_labels[L], self.coms[L])
-    
-    def nmi(self, 
-            true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            nmi: float 
-        """
-        return Metrics.nmi(true_labels[L], self.coms[L])
-    
-    def balanced_acc(self, 
-            true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            balanced_acc: float 
-        """
-        return Metrics.balanced_acc(true_labels[L], self.coms[L])
-
-    def purity(self, true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            purity_score: float 
-        """
-        return Metrics.purity_score(true_labels[L], self.coms[L])
-
-    def ari(self, true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            ari_score: float 
-        """
-        return Metrics.ari_score(true_labels[L], self.coms[L])
-
-    def macro_f1(self, true_labels: torch.tensor, L: int = 0) -> float:
-        """
-        Args:
-            pred_labels: torch.Tensor [n_nodes]
-            L: int, optional (default=0)
-        Returns:
-            macro_f1: float 
-        """
-        return Metrics.macro_f1(true_labels[L], self.coms[L])    
+        from metrics import Metrics
+        return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)    
         
     def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
         """
