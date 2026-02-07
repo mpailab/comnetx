@@ -128,9 +128,9 @@ def main(file_name, network_type):
             dgm1_new = wrcf_layer_dim1(community_graph)
             dgm_list[t] = [dgm0_new,dgm1_new]
 
-    with open("/home/egorov/comnetx/baselines/MFC-TopoReg/Data/"+file_name+'/results_raw.pkl', 'wb') as handle:
+    with open("/home/drobyshev/comnetx2/comnetx/baselines/MFC-TopoReg/Data/"+file_name+'/results_raw.pkl', 'wb') as handle:
         pickle.dump(results_raw, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open("/home/egorov/comnetx/baselines/MFC-TopoReg/Data/"+file_name+'/results_topo.pkl', 'wb') as handle:
+    with open("/home/drobyshev/comnetx2/comnetx/baselines/MFC-TopoReg/Data/"+file_name+'/results_topo.pkl', 'wb') as handle:
         pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":

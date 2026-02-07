@@ -11,7 +11,7 @@ label_num_dic = {"Cora": 10,"enron":7,"highschool":9,"DBLP":15, "DBLPdyn":14}
 COMPLETE_GRAPH = False
 def load_graphs(file_name,network_type):
     if file_name in graph_pkl:
-        return load_graphs_pkl('/home/egorov/comnetx/baselines/MFC-TopoReg/Data/'+file_name,network_type)
+        return load_graphs_pkl('/home/drobyshev/comnetx2/comnetx/baselines/MFC-TopoReg/Data/'+file_name,network_type)
     else:
         raise NameError
 
