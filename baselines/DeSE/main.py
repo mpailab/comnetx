@@ -108,10 +108,13 @@ def train(args):
     print(args)
 
     save_path = './output/%s.result' % args.dataset
-    f = open(save_path, 'a')
-    f.write(f"lr={args.lr}, embed_dim={args.embed_dim}, se_lamda={args.se_lamda}, lp_lamda={args.lp_lamda}, k={args.k}, dropout={args.dropout}, beta_f={args.beta_f}, epochs={args.epochs}, height={args.height}, num_clusters={args.num_clusters_layer}, verbose={args.verbose}, activation={args.activation}, seed={args.seed} \n")
-    f.write(f"--------Best NMI: {best_cluster_result['nmi']}, Best ARI: {best_cluster_result['ari']}, Best Cluster: {best_cluster} \n")
-    f.close()
+    #f = open(save_path, 'a')
+    save_path = f'./output/{args.dataset}.result'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with open(save_path, 'a') as f:
+        f.write(f"lr={args.lr}, embed_dim={args.embed_dim}, se_lamda={args.se_lamda}, lp_lamda={args.lp_lamda}, k={args.k}, dropout={args.dropout}, beta_f={args.beta_f}, epochs={args.epochs}, height={args.height}, num_clusters={args.num_clusters_layer}, verbose={args.verbose}, activation={args.activation}, seed={args.seed} \n")
+        f.write(f"--------Best NMI: {best_cluster_result['nmi']}, Best ARI: {best_cluster_result['ari']}, Best Cluster: {best_cluster} \n")
+        f.close()
     return best_cluster
 
 
@@ -164,7 +167,7 @@ def draw_network(dataset):
 
 if __name__ == "__main__":
     args = parse_args()
-    args.dataset = 'Cora'
+    args.dataset = 'Computers'
     args.save = False
     if args.dataset == 'Cora':
         args.epochs = 600
@@ -198,7 +201,7 @@ if __name__ == "__main__":
         args.embed_dim = 64  #64
         args.k = 1
         args.num_clusters_layer = [9]  #[9]
-        args.lp_lamda = 0  #5
+        args.lp_lamda = 5  #5
         args.se_lamda = 0.01  #0.01
         args.lr = 0.001 #0.001
         args.seed = 132  #132
