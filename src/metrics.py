@@ -1,8 +1,6 @@
 import torch
-import tensorflow as tf
-import time
 import numpy as np
-from sklearn.metrics import pairwise_distances, adjusted_rand_score, f1_score, normalized_mutual_info_score, balanced_accuracy_score
+from sklearn.metrics import adjusted_rand_score, f1_score, normalized_mutual_info_score, balanced_accuracy_score
 from torch_sparse import SparseTensor
 from scipy.optimize import linear_sum_assignment
 

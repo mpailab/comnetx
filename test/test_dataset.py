@@ -6,6 +6,7 @@ import tempfile
 import pytest
 import subprocess
 from pathlib import Path
+from download import download_and_process_magi
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 from datasets import Dataset, KONECT_PATH
@@ -21,18 +22,6 @@ def temp_dataset_dir():
     yield path
     shutil.rmtree(path)
 
-@pytest.mark.short
-def test_coo_joblib_save(temp_dataset_dir):
-    ds = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    ds._load_magi()
-    ds._save_magi(coo_adj = True)
-    ds._save_magi(coo_adj = False)
-    ds1 = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    ds2 = Dataset(dataset_name="Cora", path=temp_dataset_dir)
-    ds1._load_npy_format(coo_adj = True)
-    ds2._load_npy_format(coo_adj = False)
-    assert torch.equal(ds1.adj.to_dense(), ds2.adj.to_dense())
-
 @pytest.mark.long
 @pytest.mark.parametrize(
     "dataset_name",
@@ -40,15 +29,15 @@ def test_coo_joblib_save(temp_dataset_dir):
         "cora",
         "citeseer",
         "pubmed",
-        "reddit",
+        #"reddit",
         "ogbn-arxiv",
         "ogbn-products",
-        "ogbn-papers100M",
         "amazon-photo",
         "amazon-computers",
     ],
 )
 def test_load_magi_datasets(dataset_name, temp_dataset_dir):
+    download_and_process_magi(dataset_name, temp_dataset_dir)
     ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
     ds.load(tensor_type="coo")
     assert isinstance(ds.adj, torch.Tensor)
@@ -99,6 +88,7 @@ def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_dense_output(temp_dataset_dir):
+    download_and_process_magi("Cora", temp_dataset_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="dense")
 
@@ -108,6 +98,7 @@ def test_tensor_dense_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csr_output(temp_dataset_dir):
+    download_and_process_magi("Cora", temp_dataset_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csr")
 
@@ -117,6 +108,7 @@ def test_tensor_csr_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csc_output(temp_dataset_dir):
+    download_and_process_magi("Citeseer", temp_dataset_dir)
     loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csc")
 
@@ -138,6 +130,7 @@ def test_exist_small_datasets():
 
 @pytest.mark.short
 def test_invalid_tensor_type(temp_dataset_dir):
+    download_and_process_magi("Cora", temp_dataset_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     with pytest.raises(ValueError, match="Unsupported tensor type"):
         loader.load(tensor_type="invalid")

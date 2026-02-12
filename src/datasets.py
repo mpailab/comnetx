@@ -1,11 +1,6 @@
 import torch
-from torch_geometric.datasets import Planetoid, Reddit, Amazon
 
-from ogb.nodeproppred import PygNodePropPredDataset
-import tempfile
-import pandas as pd
 import numpy as np
-import scipy.sparse as sp
 import os.path
 from ogb.nodeproppred import PygNodePropPredDataset
 import pickle
@@ -15,6 +10,8 @@ import scipy.io as io
 import time
 import json
 import joblib
+import pickle
+
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -129,78 +126,39 @@ class Dataset:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
         return self.adj, self.features, self.label
 
-    def _load_magi(self):
-        name = self.name.lower()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if name in {"cora", "citeseer", "pubmed"}:
-                dataset = Planetoid(root=tmpdir, name=name.capitalize())
-                data = dataset[0]
-
-            elif name == "reddit":
-                dataset = Reddit(root=tmpdir)
-                data = dataset[0]
-
-            elif name.startswith("ogbn-"):
-                dataset = PygNodePropPredDataset(name=name, root=tmpdir)
-                split_idx = dataset.get_idx_split()
-                data = dataset[0]
-                data.y = data.y.view(-1)
-            elif name.startswith("amazon-"):
-                amazon_name = name.replace("amazon-", "").capitalize()
-                dataset = Amazon(root=tmpdir, name=amazon_name)
-                data = dataset[0]
-            else:
-                raise ValueError(f"Unknown MAGI-compatible dataset: {self.name}")
-
-        edge_index = data.edge_index
-        num_nodes = data.num_nodes if hasattr(data, "num_nodes") else data.x.size(0)
-        values = torch.ones(edge_index.size(1), dtype=torch.float32)
-        self.adj = torch.sparse_coo_tensor(edge_index, values, size=(num_nodes, num_nodes))
-
-        self.features = data.x
-        self.label = data.y
-
-    def _save_magi(self, coo_adj = False):
-        dname = self.name.lower()
-        save_dir = os.path.join(self.path, dname)
-        os.makedirs(save_dir, exist_ok=True)
-
-        np.save(os.path.join(save_dir, f'{dname}_feat.npy'), self.features.numpy())
-        np.save(os.path.join(save_dir, f'{dname}_label.npy'), self.label.numpy())
-
-        adj = self.adj.coalesce()
-
-        if coo_adj:
-            adj_data = {
-                'indices': adj.indices().numpy(),
-                'values': adj.values().numpy(),
-                'shape': adj.shape
-            }
-            joblib.dump(adj_data, os.path.join(save_dir, f'{dname}_coo_adj.joblib'))
-        else:
-            adj_dense = adj.to_dense().numpy()
-            np.save(os.path.join(save_dir, f'{dname}_adj.npy'), adj_dense)
-
-    def _load_npy_format(self, coo_adj = False):
+    def _load_npy_format(self, coo_adj=True):
         dname = self.name.lower()
         load_dir = os.path.join(self.path, dname)
 
-        features = np.load(os.path.join(load_dir, f"{dname}_feat.npy"))
-        labels = np.load(os.path.join(load_dir, f"{dname}_label.npy"))
-        self.features = torch.tensor(features, dtype=torch.float)
-        self.label = torch.tensor(labels, dtype=torch.long)
-
-        if coo_adj:
-            adj_data = joblib.load(os.path.join(load_dir, f"{dname}_coo_adj.joblib"))
-            self.adj = torch.sparse_coo_tensor(adj_data['indices'], adj_data['values'], size=adj_data['shape'])
-        else:
-            adj_data = np.load(os.path.join(load_dir, f"{dname}_adj.npy"), allow_pickle=True)
-            rows, cols = adj_data.nonzero()
+        feat_path = os.path.join(load_dir, f"{dname}_feat.npy")
+        label_path = os.path.join(load_dir, f"{dname}_label.npy")
+        
+        self.features = torch.tensor(np.load(feat_path), dtype=torch.float)
+        self.label = torch.tensor(np.load(label_path), dtype=torch.long)
+        coo_path = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
+        dense_path = os.path.join(load_dir, f"{dname}_adj.npy")
+        
+        if coo_adj and os.path.exists(coo_path):
+            adj_data = joblib.load(coo_path)
+            self.adj = torch.sparse_coo_tensor(
+                adj_data['indices'], 
+                adj_data['values'], 
+                size=adj_data['shape']
+            )
+        elif os.path.exists(dense_path):
+            adj_data = np.load(dense_path, allow_pickle=True)
+            rows, cols = np.nonzero(adj_data)
             values_np = adj_data[rows, cols]
-            indices_np = np.vstack((rows, cols))
-            indices = torch.from_numpy(indices_np).long()
+            
+            indices = torch.from_numpy(np.vstack((rows, cols))).long()
             values = torch.from_numpy(values_np).float()
             self.adj = torch.sparse_coo_tensor(indices, values, size=adj_data.shape)
+        else:
+            raise FileNotFoundError(
+                f"No adjacency file found for {dname} in {load_dir}. "
+                f"Expected: {coo_path} or {dense_path}"
+            )
+
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,

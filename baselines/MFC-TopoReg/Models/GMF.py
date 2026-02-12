@@ -31,7 +31,10 @@ class GAEMF(nn.Module):
         z = self.encode(_input) # do not normalize z in MFC
         A_pred = torch.sigmoid(torch.matmul(z, z.t()))
         if type(flag) != bool or flag is True:
-            pinv_weight = torch.linalg.pinv(self.cluster_centroid)  # compute pesudo inverse of W [ n * k ]
+            #new
+            pinv_weight = torch.pinverse(self.cluster_centroid, rcond=1e-8)
+            #previous
+            #pinv_weight = torch.linalg.pinv(self.cluster_centroid)  # compute pesudo inverse of W [ n * k ]
 
             indicator = self.normalize(torch.mm(z, pinv_weight))  # m * n --> m * k
             # indicator = F.softmax(torch.mm(z, pinv_weight), dim=1)  # m * n --> m * k
