@@ -45,7 +45,10 @@ class Dataset:
         with open(os.path.join(INFO, "konect.json")) as _:
             info = json.load(_)
         with open(os.path.join(INFO, "magi.json")) as _:
-                magi_info = json.load(_)
+            magi_info = json.load(_)
+        with open(os.path.join(INFO, "dsbm.json")) as _:
+            dsbm_info = json.load(_)
+        info.update(dsbm_info)
         
         dname = self.name.lower()
         if self.name in info:
