@@ -5,11 +5,12 @@ import shutil
 import tempfile
 import pytest
 import subprocess
+import json
 from pathlib import Path
 from download import download_and_process_magi
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset, INFO
 
 TEST_DIR = os.path.dirname(__file__)
 GRAPHS_DIR = "/auto/datasets/graphs/small"
@@ -38,8 +39,13 @@ def temp_dataset_dir():
 )
 def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     download_and_process_magi(dataset_name, temp_dataset_dir)
-    ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
+    paths = {"small": temp_dataset_dir}  # MAGI = small в твоём коде
+    paths_file = Path(temp_dataset_dir) / "temp_paths.json"
+    paths_file.write_text(json.dumps(paths))
+    
+    ds = Dataset(dataset_name, paths_config=str(paths_file))
     ds.load(tensor_type="coo")
+
     assert isinstance(ds.adj, torch.Tensor)
     assert ds.adj.is_sparse
     assert ds.adj.shape[0] == ds.adj.shape[1]
@@ -119,8 +125,9 @@ def test_tensor_csc_output(temp_dataset_dir):
 @pytest.mark.short
 def test_exist_small_datasets():
     datasets = ["Acm", "Bat", "Eat"]
+    paths_config = "/home/drobyshev/comnetx2/comnetx/datasets-info/paths.json"
     for dataset_name in datasets:
-        ds = Dataset(dataset_name=dataset_name, path=GRAPHS_DIR)
+        ds = Dataset(dataset_name, paths_config=paths_config)
         ds.load(tensor_type="csr")
         assert isinstance(ds.adj, torch.Tensor)
         assert ds.adj.layout == torch.sparse_csr

@@ -7,22 +7,51 @@ import time
 import json
 import joblib
 import pickle
+from pathlib import Path
 
-
-KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
-PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-INFO = os.path.join(PROJECT_DIR, "datasets-info")
+INFO = Path(__file__).parent / "datasets-info"
+PROJECT_DIR = Path(__file__).parent.resolve()
 
 class Dataset:
     """Dataset treatment"""
 
-    def __init__(self, dataset_name : str, path: str = "./datasets"):
+    def __init__(self, dataset_name : str, paths_config: str = "datasets-info/paths.json"):
         self.name = dataset_name
-        self.path = path # dir with datasets dirs
+        self.paths_config  = paths_config # dir with datasets dirs
+        self.dataset_format = self.detect_dataset_format()
+        self.dataset_root = Path(self.load_paths(paths_config)[self.dataset_format])
         self.adj = None # (l, n, n)-tensor or (n, n)-tensor
         self.is_directed = False
         self.features = None
         self.label = None
+
+    def load_paths(self, paths_config: str | Path):
+        """Loads paths.json."""
+        with open(paths_config, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def detect_dataset_format(self): 
+        konect_path = INFO / "konect.json"
+        if konect_path.exists():
+            with open(konect_path) as f:
+                if self.name in json.load(f):
+                    return "dynamic_konect"
+        
+        magi_path = INFO / "magi.json"
+        if magi_path.exists():
+            with open(magi_path) as f:
+                if self.name in json.load(f):
+                    return "magi"
+        
+        dname = self.name.lower()
+        if dname in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
+            return "small"
+        if dname.startswith("sbm") or dname.startswith("tsbm"):
+            return "sbm"
+        if dname.startswith("static") or dname.startswith("stream"):
+            return "dyn_sbm"
+        
+        raise ValueError(f"Dataset '{self.name}' not in konect.json/magi.json and no pattern match.")
 
     def load(self, tensor_type : str = "coo", batches_strategy = None) -> torch.Tensor:
         """
@@ -42,63 +71,78 @@ class Dataset:
         label - #TODO (to Drobyshev) add info for shape
         """    
 
-        with open(os.path.join(INFO, "konect.json")) as _:
-            info = json.load(_)
-        with open(os.path.join(INFO, "magi.json")) as _:
-                magi_info = json.load(_)
-        
         dname = self.name.lower()
-        if self.name in info:
-            self.is_directed = info[self.name]['d'] == 'directed'
-            if batches_strategy == None:
-                self._load_konect(batches_strategy = "1")
+        fmt = self.dataset_format
+
+        if fmt == "dynamic_konect":
+            konect_path = INFO / "konect.json"
+            with open(konect_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = (info[self.name]["d"] == "directed")
+
+        elif fmt == "magi":
+            magi_path = INFO / "magi.json"
+            with open(magi_path, "r", encoding="utf-8") as f:
+                magi_info = json.load(f)
+            self.is_directed = (magi_info[dname]["d"] == "directed")
+
+        elif fmt in {"small", "sbm", "dyn_sbm"}:
+            self.is_directed = False
+
+        else:
+            raise ValueError(f"Unknown dataset_format: {fmt}")
+
+        if fmt == "dynamic_konect":
+            bs = "1" if batches_strategy is None else str(batches_strategy)
+            self._load_konect(batches_strategy=bs)
+            if batches_strategy is None:
                 self.adj = self.adj[0]
-            else:
-                self._load_konect(batches_strategy = batches_strategy)
-        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
-            self._load_npy_format()
-            
-        elif dname in magi_info or dname in {"acm", "bat", "dblp", "eat", "uat"}:
-            if dname in magi_info:
-                self.is_directed = magi_info[dname]['d'] == 'directed'
-            
-            # ПРОВЕРЯЕМ ТОЛЬКО ЛОКАЛЬНЫЕ ФАЙЛЫ
-            load_dir = os.path.join(self.path, dname)
+
+        elif fmt == "magi":
+            load_dir = self.dataset_root / dname
             required_files = {
-                f"{dname}_feat.npy", 
-                f"{dname}_label.npy", 
-                f"{dname}_coo_adj.joblib"  # или f"{dname}_adj.npy"
+                f"{dname}_feat.npy",
+                f"{dname}_label.npy",
+                f"{dname}_coo_adj.joblib",
             }
-            
-            if not os.path.exists(load_dir) or not required_files.issubset(os.listdir(load_dir)):
+            if (not load_dir.exists()) or (not required_files.issubset(set(os.listdir(load_dir)))):
                 raise FileNotFoundError(
                     f"Dataset {dname} files not found in {load_dir}. "
                     f"Required: {required_files}. "
                     f"Run `python download.py {dname}` first."
                 )
-            
             self._load_npy_format(coo_adj=True)
 
-        elif dname.startswith("static") or dname.startswith("stream"):
-            parts = self.name.split("_")
+        elif fmt == "small":
+            self._load_npy_format(coo_adj=True)
 
+        elif fmt == "dyn_sbm":
+            parts = self.name.split("_")
             if dname.startswith("static"):
-                dataset_type = "static"
-                num_snapshots = 5
+                dataset_type, num_snapshots = "static", 5
             elif dname.startswith("stream"):
-                dataset_type = "stream"
-                num_snapshots = 10
-            snap = int(parts[1]) 
+                dataset_type, num_snapshots = "stream", 10
+            else:
+                raise ValueError(f"Bad dyn_sbm name: {self.name}")
+
+            snap = int(parts[1])
             num_nodes = int(parts[2])
             mu = float(parts[3])
             beta = float(parts[4])
-            self._load_prgpt_dataset(dataset_type=dataset_type, num_nodes=num_nodes, 
-                                     mu=mu, beta=beta, snap=snap, num_snapshots=num_snapshots)
-        elif dname.startswith("sbm") or dname.startswith("tsbm"):
+            self._load_prgpt_dataset(
+                dataset_type=dataset_type,
+                num_nodes=num_nodes,
+                mu=mu,
+                beta=beta,
+                snap=snap,
+                num_snapshots=num_snapshots,
+            )
+
+        elif fmt == "sbm":
             self._load_sbm()
 
         else:
-            raise ValueError(f"Unsupported dataset: {self.name}")
+            raise ValueError(f"Unsupported dataset format: {fmt}")
 
         if tensor_type == "dense":
             self.adj = self.adj.to_dense()
@@ -114,7 +158,7 @@ class Dataset:
 
     def _load_npy_format(self, coo_adj=True):
         dname = self.name.lower()
-        load_dir = os.path.join(self.path, dname)
+        load_dir = os.path.join(self.dataset_root, dname)
 
         feat_path = os.path.join(load_dir, f"{dname}_feat.npy")
         label_path = os.path.join(load_dir, f"{dname}_label.npy")
@@ -152,7 +196,7 @@ class Dataset:
                        beta=3.0,
                        snap=1,
                        num_snapshots=5):
-        base_path = self.path
+        base_path = self.dataset_root
         if dataset_type == 'static':
             edges_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
             gnd_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd_list.pickle')
@@ -204,7 +248,7 @@ class Dataset:
         ----------
         data_type : static / temporal
         """
-        base_path = self.path
+        base_path = self.dataset_root
         file_path = os.path.join(base_path, self.name + ".pt")
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"SBM dataset file not found: {file_path}")
@@ -301,10 +345,10 @@ class Dataset:
             adj_sparse = adj_sparse.coalesce()
             adjs.append(adj_sparse)
 
-    # stack into (T, n, n)
+        # stack into (T, n, n)
         adj_3d = torch.stack(adjs, dim=0)
 
-    # labels -> tensor (T, n)
+        # labels -> tensor (T, n)
         labels = torch.stack([
         torch.from_numpy(l).long().to(device) if isinstance(l, np.ndarray) else l.clone().detach().long().to(device)
         for l in labels_list
@@ -329,13 +373,13 @@ class Dataset:
         # Определение нужного файла
         batches_strategy = str(batches_strategy)
         if batches_strategy == "real":
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.sort")
+            filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.sort")
         elif ":" in batches_strategy:  # p:n стратегия
             p_str, n_str = batches_strategy.split(":")
             p, n = int(p_str), int(n_str)
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{p+1}_batches")
+            filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.{p+1}_batches")
         else:  # N стратегия
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_strategy}_batches")
+            filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.{batches_strategy}_batches")
 
         # Чтение файла
         with open(filepath) as _:
@@ -439,9 +483,9 @@ def save_small_datasets_in_konect_format():
     os.makedirs(dir_output, exist_ok = True)
     for dname in os.listdir(dir_small_datasets):
         print(dname)
-        ds = Dataset(dname, path = dir_small_datasets)
+        ds = Dataset(dname)
         ds.load()
-        ds._save_konect(dir_output)
+        ds._save_konect(path = dir_output)
         print("ok")
 
 
