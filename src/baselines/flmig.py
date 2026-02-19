@@ -11,6 +11,7 @@ for p in (SRC_PATH, FLMIG_root):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import tempfile
 import torch
 import networkx as nx
 from pathlib import Path
@@ -150,46 +151,60 @@ def flmig_adopted(
             ),
             size=A.size(),
         ).to_dense()
+        adj_dense.fill_diagonal_(0.0)
     else:
         adj_dense = (adj > 0).to(torch.float32)
         adj_dense.fill_diagonal_(0.0)
 
-    path = tensor_to_graph_txt(
-        adj_dense,
-        str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"),
-    )
+         
+    # path = tensor_to_graph_txt(
+    #     adj_dense,
+    #     str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"),
+    # )
 
-    t1 = time.time()
-    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
+    with tempfile.NamedTemporaryFile(suffix=".txt") as tmp:
+        
+        tensor_to_graph_txt(adj_dense, tmp.name)
+        path = tmp.name
+        # print(f"Временный граф лежит здесь: {tmp.name}")
 
-    best_community = None
-    best_mod = -np.inf
+        t1 = time.time()
+        timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
-    Q_list = []
-    Time_list = []
-    Community_list = []
+        best_community = None
+        best_mod = -np.inf
 
-    for nb_run in range(max_rb):
-        print(f"rb {nb_run}")
+        Q_list = []
+        Time_list = []
+        Community_list = []
+
+        # print("ALARM ================")
+
+        for nb_run in range(max_rb):
+            # print(f"rb {nb_run}, max_rb {max_rb}")
+            communities = Fast_local_Move_IG(Number_iter, Beta, path)
+            mod, community, tim = communities.Run_FMLIG()
+
+            # print("community =", community)
+
+            Q_list.append(mod)
+            Time_list.append(tim)
+            Community_list.append(community)
+
+            if mod > best_mod:
+                best_mod = mod
+                best_community = community
+
         communities = Fast_local_Move_IG(Number_iter, Beta, path)
-        mod, community, tim = communities.Run_FMLIG()
 
-        Q_list.append(mod)
-        Time_list.append(tim)
-        Community_list.append(community)
+        # print("communities =", communities)
 
-        if mod > best_mod:
-            best_mod = mod
-            best_community = community
+        Q_avg = communities.avg(Q_list)
+        Q_max = communities.max(Q_list)
+        Q_std = communities.stdev(Q_list)
+        time_run = communities.avg(Time_list)
 
-    communities = Fast_local_Move_IG(Number_iter, Beta, path)
-
-    Q_avg = communities.avg(Q_list)
-    Q_max = communities.max(Q_list)
-    Q_std = communities.stdev(Q_list)
-    time_run = communities.avg(Time_list)
-
-    os.remove(path)
+    # os.remove(path)
 
     if return_labels:
         N = adj.size(0)
