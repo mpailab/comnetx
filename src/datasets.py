@@ -12,6 +12,8 @@ import json
 import joblib
 import pickle
 
+import torch_geometric
+
 
 KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -52,6 +54,10 @@ class Dataset:
                 magi_info = json.load(_)
         with open(os.path.join(INFO, "s2cag.json")) as _:
             s2cag_info = json.load(_)
+        with open(os.path.join(INFO, "attr_graphs.json")) as _:
+            attr_graphs_info = json.load(_)
+        with open(os.path.join(INFO, "ogb_graphs.json")) as _:
+            ogb_graphs_info = json.load(_)
         
         dname = self.name.lower()
         if self.name in info:
@@ -73,6 +79,110 @@ class Dataset:
             self._load_npy_format()
             self.adj = self.adj.unsqueeze(0)
             # print(self.adj)
+
+        elif dname in attr_graphs_info:
+            self.is_directed = attr_graphs_info[dname]['d'] == 'directed'
+            
+            # Куда сохранять
+            path = f"/auto/datasets/graphs/comnetx/torch_geom_datasets/data/{dname}"
+            if dname == "flickr": #ok
+                path = f"/auto/datasets/graphs/comnetx/torch_geom_datasets/data/Flickr"
+                dataset = torch_geometric.datasets.Flickr(root=path)
+                print("alarm")
+            elif dname == "wikics": #ok
+                dataset = torch_geometric.datasets.WikiCS(root=path)
+            elif dname == "nell": #ok
+                dataset = torch_geometric.datasets.NELL(root=path)
+            elif dname == "reddit2": #ok
+                dataset = torch_geometric.datasets.Reddit2(root=path)
+            elif dname == "yelp": #bad communities shape torch.Size([716847, 100]), required (1, 716847)
+                dataset = torch_geometric.datasets.Yelp(root=path)
+            elif dname == "coauthorcs": #ok
+                dataset = torch_geometric.datasets.Coauthor(root=path, name="CS")
+            elif dname == "coauthorphysics": #ok
+                dataset = torch_geometric.datasets.Coauthor(root=path, name="Physics")
+            elif dname == "wiki": #ok
+                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="Wiki")
+            elif dname == "pubmed": #ok
+                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="PubMed")
+            elif dname == "blogcatalog": #ok
+                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="BlogCatalog")
+            elif dname == "ppi": #bad communities shape torch.Size([56944, 121]), required (1, 56944)
+                                    #Killed
+                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="PPI")
+            elif dname == "facebook": #bad communities shape torch.Size([4039, 193]), required (1, 4039)
+                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="Facebook")   
+
+            self.features = dataset.x  
+            self.label = dataset.y
+
+            num_nodes = len(dataset.y)
+            indices = dataset.edge_index
+            num_edges = indices.shape[1]
+            values = torch.ones(num_edges, dtype=torch.float32) # Веса ребер = 1.0
+
+            # print(indices.shape)
+
+            adj_data = {
+                'indices': indices,
+                'values': values,
+                'shape': (num_nodes, num_nodes)
+            }
+            # print(adj_data['shape'])
+            # print("label=", self.label)
+
+            # 3. Ваша конструкция (теперь она сработает)
+            self.adj = torch.sparse_coo_tensor(
+                            adj_data['indices'], 
+                            adj_data['values'], 
+                            size=adj_data['shape']
+                        ).coalesce()
+
+            self.adj = self.adj.unsqueeze(0)
+
+        elif dname in ogb_graphs_info:
+            self.is_directed = ogb_graphs_info[dname]['d'] == 'directed'
+            
+            if dname in ["ogbn-products", "ogbn-arxiv", "ogbn-papers100M"]:
+                from ogb.nodeproppred import NodePropPredDataset
+                dataset = NodePropPredDataset(name=dname, root="/auto/datasets/graphs/comnetx/ogb/")
+                graph, labels = dataset[0]
+            
+                self.label = torch.from_numpy(labels).to(torch.long).squeeze()
+            else:
+                from ogb.linkproppred import LinkPropPredDataset
+                dataset = LinkPropPredDataset(name=dname, root="/auto/datasets/graphs/comnetx/ogb/")
+                graph = dataset[0]
+                self.label = None
+
+            if graph['node_feat'] is not None:
+                self.features = torch.from_numpy(graph['node_feat']).float()
+            else:
+                print(f"Warning: {dname} has no node features. Using ones.")
+                self.features = None
+
+            indices = torch.from_numpy(graph['edge_index']).long()
+            num_nodes = graph['num_nodes']
+            num_edges = indices.shape[1]
+
+            values = torch.ones(num_edges, dtype=torch.float32)
+
+            adj_data = {
+                'indices': indices,
+                'values': values,
+                'shape': (num_nodes, num_nodes)
+            }
+
+            print(f"Loaded {dname}: Nodes={num_nodes}, Edges={num_edges}")
+            print("Adj shape:", adj_data['shape'])
+
+            self.adj = torch.sparse_coo_tensor(
+                adj_data['indices'], 
+                adj_data['values'], 
+                size=adj_data['shape']
+            ).coalesce() 
+            
+            self.adj = self.adj.unsqueeze(0)
 
         elif dname in magi_info:
             self.is_directed = magi_info[dname]['d'] == 'directed'

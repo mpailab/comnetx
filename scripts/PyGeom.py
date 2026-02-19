@@ -1,9 +1,9 @@
-from torch_geometric.datasets import GDELTLite
+from torch_geometric.datasets import Flickr
 import torch
 # Инициализируем класс
 # root — это папка, куда скачаются данные
-dataset = GDELTLite(root='/auto/datasets/graphs/comnetx/torch_geom_datasets/data/GDELTLite')
+dataset = Flickr(root='/auto/datasets/graphs/comnetx/torch_geom_datasets/data/Flickr')
 
 print(dataset.x)
-print(dataset.edge_index)
+print(type(dataset.edge_index))
 print(dataset.y)
