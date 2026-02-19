@@ -151,6 +151,7 @@ def flmig_adopted(
             ),
             size=A.size(),
         ).to_dense()
+        adj_dense.fill_diagonal_(0.0)
     else:
         adj_dense = (adj > 0).to(torch.float32)
         adj_dense.fill_diagonal_(0.0)

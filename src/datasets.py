@@ -117,7 +117,10 @@ class Dataset:
                 dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="Facebook")   
 
             self.features = dataset.x  
-            self.label = dataset.y
+            if dataset.y.dim() == 1:
+                self.label = dataset.y
+            else:
+                self.label = None
 
             num_nodes = len(dataset.y)
             indices = dataset.edge_index
