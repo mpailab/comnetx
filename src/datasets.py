@@ -51,7 +51,10 @@ class Dataset:
         with open(os.path.join(INFO, "konect.json")) as _:
             info = json.load(_)
         with open(os.path.join(INFO, "magi.json")) as _:
-                magi_info = json.load(_)
+            magi_info = json.load(_)
+        with open(os.path.join(INFO, "dsbm.json")) as _:
+            dsbm_info = json.load(_)
+        info.update(dsbm_info)
         with open(os.path.join(INFO, "s2cag.json")) as _:
             s2cag_info = json.load(_)
         with open(os.path.join(INFO, "attr_graphs.json")) as _:
@@ -464,10 +467,14 @@ class Dataset:
         # Чтение файла
         with open(filepath) as _:
             first_string = _.readline()
-            num_nodes = int(first_string.split()[0])
-            max_index = num_nodes - 1
+            #num_nodes = int(first_string.split()[0])
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        min_ind = min(i.min(), j.min())
+        max_ind = max(i.max(), j.max())
+        i -= min_ind
+        j -= min_ind
+        num_nodes = max_ind - min_ind + 1
 
         def make_adj(i_arr, j_arr, w_arr):
             idx = np.vstack((i_arr, j_arr))

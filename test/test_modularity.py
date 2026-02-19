@@ -29,7 +29,7 @@ def test_modularity():
     
     print("Dataset (is_directed) : Modularity (True modularity)")
     for dataset in datasets:
-        results = dynamic_launch(dataset, 1, "leidenalg", mode = "naive", verbose = 0)
+        results = dynamic_launch(dataset, "1", "leidenalg", mode = "naive", verbose = 0)
         mod = results[-1]['modularity']
         true_mod = true_mod_db[dataset]
         is_directed = info[dataset]["d"]
@@ -42,4 +42,4 @@ def test_modularity_memory():
     datasets = ['wiki_talk_sr', 'sx-mathoverflow', 'wiki_talk_sv', 'wiki_talk_vi', 'facebook-wosn-links', 'facebook-wosn-wall', 'sx-askubuntu', 'wiki_talk_ja', 'mit', 'lkml-reply']
     for dataset in datasets:
         print(dataset)
-        results = dynamic_launch(dataset, 1, "leidenalg", mode = "raw", verbose = 0)   
+        results = dynamic_launch(dataset, "1", "leidenalg", mode = "raw", verbose = 0)   
