@@ -55,6 +55,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
             affected_nodes_mask = opt.neighborhood(opt.adj, affected_nodes_mask, step = smart_neighborhood_step)
             opt.run(affected_nodes_mask)
         elif mode == "naive" or mode == "raw":
+            #opt.adj = opt.safe_clamp_sparse(opt.adj) #For non-negative weights in leidenalg
             labels = opt.coms if mode == "naive" else None
             coms = opt.local_algorithm(opt.adj, opt.features, labels = labels)
             opt._set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
@@ -71,12 +72,6 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 print(f"Algorithm time: {algorithm_time:.2}")
             else:
                 print(f"Time: {total_time - conversion_time:.2}")
-        
-        # acc = opt.accuracy(labels)
-        # nmi = opt.nmi(labels)
-        # ari = opt.ari(labels)
-        # f1 = opt.macro_f1(labels)
-        # print("nmi =", nmi, "ari =", ari, "acc =", acc, "f1 =", f1)
 
         results.append({'modularity' : mod, 'time': total_time - conversion_time})
 

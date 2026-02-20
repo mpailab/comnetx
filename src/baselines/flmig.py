@@ -11,6 +11,7 @@ for p in (SRC_PATH, FLMIG_root):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import tempfile
 import torch
 import networkx as nx
 from pathlib import Path
@@ -57,7 +58,7 @@ def de_main(path, Number_iter, Beta, max_rb):
     nb_run = 0
 
     while nb_run < max_rb :
-        # print("rb",nb_run)
+        print("rb",nb_run)
         communities = Fast_local_Move_IG( Number_iter, Beta, path)
         mod,community,tim = communities.Run_FMLIG() 
         #print(community)
@@ -115,11 +116,12 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 #     os.remove(path)
 
+
 def flmig_adopted(
     adj: torch.Tensor,
-    Number_iter: int = 20,
+    Number_iter: int = 100,
     Beta: float = 0.5,
-    max_rb: int = 50,
+    max_rb: int = 10,
     return_labels: bool = False,
     timing_info: dict | None = None,
 ):
@@ -154,48 +156,55 @@ def flmig_adopted(
         adj_dense = (adj > 0).to(torch.float32)
         adj_dense.fill_diagonal_(0.0)
 
-    path = tensor_to_graph_txt(
-        adj_dense,
-        str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"),
-    )
+         
+    # path = tensor_to_graph_txt(
+    #     adj_dense,
+    #     str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"),
+    # )
 
-    t1 = time.time()
-    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
+    with tempfile.NamedTemporaryFile(suffix=".txt") as tmp:
+        
+        tensor_to_graph_txt(adj_dense, tmp.name)
+        path = tmp.name
+        # print(f"Временный граф лежит здесь: {tmp.name}")
 
-    best_community = None
-    best_mod = -np.inf
+        t1 = time.time()
+        timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
-    Q_list = []
-    Time_list = []
-    Community_list = []
+        best_community = None
+        best_mod = -np.inf
 
-    # print("ALARM ================")
+        Q_list = []
+        Time_list = []
+        Community_list = []
 
-    for nb_run in range(max_rb):
-        # print(f"rb {nb_run}, max_rb {max_rb}")
+        # print("ALARM ================")
+
+        for nb_run in range(max_rb):
+            # print(f"rb {nb_run}, max_rb {max_rb}")
+            communities = Fast_local_Move_IG(Number_iter, Beta, path)
+            mod, community, tim = communities.Run_FMLIG()
+
+            # print("community =", community)
+
+            Q_list.append(mod)
+            Time_list.append(tim)
+            Community_list.append(community)
+
+            if mod > best_mod:
+                best_mod = mod
+                best_community = community
+
         communities = Fast_local_Move_IG(Number_iter, Beta, path)
-        mod, community, tim = communities.Run_FMLIG()
 
-        # print("community =", community)
+        # print("communities =", communities)
 
-        Q_list.append(mod)
-        Time_list.append(tim)
-        Community_list.append(community)
+        Q_avg = communities.avg(Q_list)
+        Q_max = communities.max(Q_list)
+        Q_std = communities.stdev(Q_list)
+        time_run = communities.avg(Time_list)
 
-        if mod > best_mod:
-            best_mod = mod
-            best_community = community
-
-    communities = Fast_local_Move_IG(Number_iter, Beta, path)
-
-    # print("communities =", communities)
-
-    Q_avg = communities.avg(Q_list)
-    Q_max = communities.max(Q_list)
-    Q_std = communities.stdev(Q_list)
-    time_run = communities.avg(Time_list)
-
-    os.remove(path)
+    # os.remove(path)
 
     if return_labels:
         N = adj.size(0)
@@ -218,11 +227,29 @@ if __name__ == "__main__":
     from datasets import Dataset
 
     ap = argparse.ArgumentParser()
-    ...
+    ap.add_argument("--adj", type=str, required=True,
+                    help="Root directory with datasets (used by Dataset)")
+    ap.add_argument("--dataset-name", type=str, required=True,
+                    help="Dataset key (name) for Dataset")
+    ap.add_argument("--Number_iter", type=int, default=100)
+    ap.add_argument("--Beta", type=float, default=0.5)
+    ap.add_argument("--max_rb", type=int, default=10)
+    ap.add_argument("--out", type=str, default=None)
     args = ap.parse_args()
 
     ds = Dataset(args.dataset_name, path=args.adj)
     adj, features, labels = ds.load(tensor_type="coo")
+
+    if adj.is_sparse:
+        A = adj.coalesce()
+        adj = torch.sparse_coo_tensor(A.indices(),
+                                        torch.where(A.values() > 0,
+                                                    torch.ones_like(A.values()),
+                                                    torch.zeros_like(A.values())),
+                                        size=A.size()).to_dense()
+    else:
+        adj = (adj > 0).to(torch.float32)
+        adj.fill_diagonal_(0.0)
 
     labels = flmig_adopted(
         adj=adj,                      # sparse или dense, внутри всё приведётся
