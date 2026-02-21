@@ -1,0 +1,854 @@
+{
+  "dsbm-4096-16-42": {
+    "n": 10000000,
+    "m": 79928091,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-16-42": {
+    "n": 10000000,
+    "m": 79931358,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-16-42": {
+    "n": 10000000,
+    "m": 79928800,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-16-42": {
+    "n": 10000000,
+    "m": 74750243,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-16-42": {
+    "n": 10000000,
+    "m": 79936232,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-16-42": {
+    "n": 10000000,
+    "m": 79927962,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-16-42": {
+    "n": 10000000,
+    "m": 79927217,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-16-42": {
+    "n": 10000000,
+    "m": 79927537,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-16-42": {
+    "n": 10000000,
+    "m": 79927085,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-16-45": {
+    "n": 10000000,
+    "m": 79922895,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-16-45": {
+    "n": 10000000,
+    "m": 79922094,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-16-45": {
+    "n": 10000000,
+    "m": 79922856,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-16-45": {
+    "n": 10000000,
+    "m": 79925172,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-16-45": {
+    "n": 10000000,
+    "m": 79934412,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-16-45": {
+    "n": 10000000,
+    "m": 79922232,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-16-45": {
+    "n": 10000000,
+    "m": 74747673,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-16-45": {
+    "n": 10000000,
+    "m": 79928799,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-16-45": {
+    "n": 10000000,
+    "m": 79923612,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-16-46": {
+    "n": 10000000,
+    "m": 79927198,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-16-46": {
+    "n": 10000000,
+    "m": 79931289,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-16-46": {
+    "n": 10000000,
+    "m": 79927869,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-16-46": {
+    "n": 10000000,
+    "m": 79926846,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-16-46": {
+    "n": 10000000,
+    "m": 79927688,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-16-46": {
+    "n": 10000000,
+    "m": 74748511,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-16-46": {
+    "n": 10000000,
+    "m": 79929267,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-16-46": {
+    "n": 10000000,
+    "m": 79927519,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-16-46": {
+    "n": 10000000,
+    "m": 79934945,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-16-43": {
+    "n": 10000000,
+    "m": 79933661,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-16-43": {
+    "n": 10000000,
+    "m": 79934126,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-16-43": {
+    "n": 10000000,
+    "m": 79934223,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-16-43": {
+    "n": 10000000,
+    "m": 74747130,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-16-43": {
+    "n": 10000000,
+    "m": 79935227,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-16-43": {
+    "n": 10000000,
+    "m": 79934016,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-16-43": {
+    "n": 10000000,
+    "m": 79936934,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-16-43": {
+    "n": 10000000,
+    "m": 79942394,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-16-43": {
+    "n": 10000000,
+    "m": 79933612,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-32-43": {
+    "n": 10000000,
+    "m": 160053800,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-32-43": {
+    "n": 10000000,
+    "m": 160053204,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-32-43": {
+    "n": 10000000,
+    "m": 153740477,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-32-43": {
+    "n": 10000000,
+    "m": 160053673,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-32-43": {
+    "n": 10000000,
+    "m": 160051928,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-32-43": {
+    "n": 10000000,
+    "m": 160052922,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-32-43": {
+    "n": 10000000,
+    "m": 160053479,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-32-43": {
+    "n": 10000000,
+    "m": 160052677,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-8-45": {
+    "n": 10000000,
+    "m": 39604550,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-8-45": {
+    "n": 10000000,
+    "m": 39599395,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-8-8-45": {
+    "n": 10000000,
+    "m": 35507917,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-8-45": {
+    "n": 10000000,
+    "m": 39600593,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-8-45": {
+    "n": 10000000,
+    "m": 39607258,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-8-45": {
+    "n": 10000000,
+    "m": 39600724,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-8-45": {
+    "n": 10000000,
+    "m": 39601797,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-8-45": {
+    "n": 10000000,
+    "m": 39599969,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-8-45": {
+    "n": 10000000,
+    "m": 39599791,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-8-45": {
+    "n": 10000000,
+    "m": 39599900,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-32-46": {
+    "n": 10000000,
+    "m": 160046070,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-32-46": {
+    "n": 10000000,
+    "m": 160044610,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-32-46": {
+    "n": 10000000,
+    "m": 153736418,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-32-46": {
+    "n": 10000000,
+    "m": 160046585,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-32-46": {
+    "n": 10000000,
+    "m": 160045373,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-32-46": {
+    "n": 10000000,
+    "m": 160045375,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-32-46": {
+    "n": 10000000,
+    "m": 160044271,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-32-46": {
+    "n": 10000000,
+    "m": 160044885,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-8-8-44": {
+    "n": 10000000,
+    "m": 35510005,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-8-44": {
+    "n": 10000000,
+    "m": 39608504,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-8-44": {
+    "n": 10000000,
+    "m": 39614558,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-8-44": {
+    "n": 10000000,
+    "m": 39610746,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-8-44": {
+    "n": 10000000,
+    "m": 39609592,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-8-44": {
+    "n": 10000000,
+    "m": 39613850,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-8-44": {
+    "n": 10000000,
+    "m": 39607423,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-8-44": {
+    "n": 10000000,
+    "m": 39608228,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-8-44": {
+    "n": 10000000,
+    "m": 39607723,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-8-44": {
+    "n": 10000000,
+    "m": 39607463,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-8-42": {
+    "n": 10000000,
+    "m": 39600335,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-8-42": {
+    "n": 10000000,
+    "m": 39600325,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-8-42": {
+    "n": 10000000,
+    "m": 39601171,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-8-42": {
+    "n": 10000000,
+    "m": 39602264,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-8-42": {
+    "n": 10000000,
+    "m": 39599271,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-8-8-42": {
+    "n": 10000000,
+    "m": 35511073,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-8-42": {
+    "n": 10000000,
+    "m": 39607909,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-8-42": {
+    "n": 10000000,
+    "m": 39611134,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-8-42": {
+    "n": 10000000,
+    "m": 39601605,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-8-42": {
+    "n": 10000000,
+    "m": 39603002,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-8-46": {
+    "n": 10000000,
+    "m": 39600226,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-8-46": {
+    "n": 10000000,
+    "m": 39604347,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-8-46": {
+    "n": 10000000,
+    "m": 39601114,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-8-46": {
+    "n": 10000000,
+    "m": 39600421,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-8-46": {
+    "n": 10000000,
+    "m": 39599245,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-8-46": {
+    "n": 10000000,
+    "m": 39599013,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-8-8-46": {
+    "n": 10000000,
+    "m": 35507764,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-8-46": {
+    "n": 10000000,
+    "m": 39598624,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-8-46": {
+    "n": 10000000,
+    "m": 39598300,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-8-46": {
+    "n": 10000000,
+    "m": 39607943,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-64-42": {
+    "n": 10000000,
+    "m": 320054076,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-64-42": {
+    "n": 10000000,
+    "m": 320027766,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-64-42": {
+    "n": 10000000,
+    "m": 312144759,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-64-42": {
+    "n": 10000000,
+    "m": 320034190,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-64-42": {
+    "n": 10000000,
+    "m": 320023978,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-64-42": {
+    "n": 10000000,
+    "m": 320047577,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-64-42": {
+    "n": 10000000,
+    "m": 320051003,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-32-42": {
+    "n": 10000000,
+    "m": 160045203,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-32-42": {
+    "n": 10000000,
+    "m": 153739910,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-32-42": {
+    "n": 10000000,
+    "m": 160045676,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-32-42": {
+    "n": 10000000,
+    "m": 160044961,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-32-42": {
+    "n": 10000000,
+    "m": 160044487,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-32-42": {
+    "n": 10000000,
+    "m": 160044125,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-32-42": {
+    "n": 10000000,
+    "m": 160044246,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-32-42": {
+    "n": 10000000,
+    "m": 160045498,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-16-44": {
+    "n": 10000000,
+    "m": 79937771,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-16-44": {
+    "n": 10000000,
+    "m": 74751369,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-16-44": {
+    "n": 10000000,
+    "m": 79937777,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-16-44": {
+    "n": 10000000,
+    "m": 79938483,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-16-44": {
+    "n": 10000000,
+    "m": 79938020,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-16-44": {
+    "n": 10000000,
+    "m": 79947476,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-16-44": {
+    "n": 10000000,
+    "m": 79941695,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-16-44": {
+    "n": 10000000,
+    "m": 79937060,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-16-44": {
+    "n": 10000000,
+    "m": 79938833,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-32-44": {
+    "n": 10000000,
+    "m": 160062378,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-32-44": {
+    "n": 10000000,
+    "m": 160060265,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-32-44": {
+    "n": 10000000,
+    "m": 160062490,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-32-44": {
+    "n": 10000000,
+    "m": 160060831,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-32-44": {
+    "n": 10000000,
+    "m": 160062517,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-32-44": {
+    "n": 10000000,
+    "m": 160061511,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-32-44": {
+    "n": 10000000,
+    "m": 153741348,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-32-44": {
+    "n": 10000000,
+    "m": 160061461,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-32-45": {
+    "n": 10000000,
+    "m": 160040984,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-32-45": {
+    "n": 10000000,
+    "m": 160042749,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-32-45": {
+    "n": 10000000,
+    "m": 160041577,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-32-45": {
+    "n": 10000000,
+    "m": 160041528,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-32-45": {
+    "n": 10000000,
+    "m": 153740562,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-32-45": {
+    "n": 10000000,
+    "m": 160041782,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-32-45": {
+    "n": 10000000,
+    "m": 160041014,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-32-45": {
+    "n": 10000000,
+    "m": 160042253,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-64-8-43": {
+    "n": 10000000,
+    "m": 39605881,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-2048-8-43": {
+    "n": 10000000,
+    "m": 39606135,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-512-8-43": {
+    "n": 10000000,
+    "m": 39606185,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-1024-8-43": {
+    "n": 10000000,
+    "m": 39606163,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-16-8-43": {
+    "n": 10000000,
+    "m": 39611184,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-32-8-43": {
+    "n": 10000000,
+    "m": 39609780,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-8-8-43": {
+    "n": 10000000,
+    "m": 35508142,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-4096-8-43": {
+    "n": 10000000,
+    "m": 39605944,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-128-8-43": {
+    "n": 10000000,
+    "m": 39606090,
+    "d": "undirected",
+    "w": "with_deletions"
+  },
+  "dsbm-256-8-43": {
+    "n": 10000000,
+    "m": 39606092,
+    "d": "undirected",
+    "w": "with_deletions"
+  }
+}
