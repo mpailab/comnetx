@@ -93,7 +93,7 @@ class Dataset:
                 dataset = torch_geometric.datasets.Flickr(root=path)
                 print("alarm")
             elif dname == "wikics": #ok
-                dataset = torch_geometric.datasets.WikiCS(root=path)
+                dataset = torch_geometric.datasets.WikiCS(root=path, is_undirected=True)
             elif dname == "nell": #ok
                 dataset = torch_geometric.datasets.NELL(root=path)
             elif dname == "reddit2": #ok
@@ -125,7 +125,7 @@ class Dataset:
             num_nodes = len(dataset.y)
             indices = dataset.edge_index
             num_edges = indices.shape[1]
-            values = torch.ones(num_edges, dtype=torch.float32) # Веса ребер = 1.0
+            values = torch.ones(num_edges, dtype=torch.float32)
 
             # print(indices.shape)
 
@@ -137,12 +137,13 @@ class Dataset:
             # print(adj_data['shape'])
             # print("label=", self.label)
 
-            # 3. Ваша конструкция (теперь она сработает)
             self.adj = torch.sparse_coo_tensor(
                             adj_data['indices'], 
                             adj_data['values'], 
                             size=adj_data['shape']
                         ).coalesce()
+
+            print(f"self.adj = {type(self.adj)}")
 
             self.adj = self.adj.unsqueeze(0)
 

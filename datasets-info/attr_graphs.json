@@ -8,43 +8,13 @@
     "wikics": {
         "n": 11701,
         "m": 216123,
-        "d": "directed",
-        "w": "unweighted"
-    },
-    "wiki": {
-        "n": 2405,
-        "m": 17981,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "pubmed": {
-        "n": 19717,
-        "m": 44338,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "blogcatalog": {
-        "n": 5196,
-        "m": 343486,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "ppi": {
-        "n": 56944,
-        "m": 1612348,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "facebook": {
-        "n": 4039,
-        "m": 88234,
         "d": "undirected",
         "w": "unweighted"
     },
     "nell": {
         "n": 65755,
         "m": 266144,
-        "d": "directed",
+        "d": "undirected",
         "w": "unweighted"
     },
     "coauthorcs": {
@@ -69,6 +39,36 @@
         "n": 716847,
         "m": 6977410,
         "d": "undirected",
+        "w": "unweighted"
+    },
+    "wiki": {
+        "n": 2405,
+        "m": 17981,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "pubmed": {
+        "n": 19717,
+        "m": 44338,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "blogcatalog": {
+        "n": 5196,
+        "m": 343486,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "ppi": {
+        "n": 56944,
+        "m": 1612348,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "facebook": {
+        "n": 4039,
+        "m": 88234,
+        "d": "directed",
         "w": "unweighted"
     }
 }
