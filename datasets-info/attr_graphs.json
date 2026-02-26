@@ -7,20 +7,50 @@
     },
     "wikics": {
         "n": 11701,
-        "m": 216123,
-        "d": "directed",
+        "m": 431726,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "nell": {
+        "n": 65755,
+        "m": 251550,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "coauthorcs": {
+        "n": 18333,
+        "m": 163788,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "coauthorphysics": {
+        "n": 34493,
+        "m": 495924,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "reddit2": {
+        "n": 232965,
+        "m": 23213838,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "yelp": {
+        "n": 716847,
+        "m": 13954819,
+        "d": "undirected",
         "w": "unweighted"
     },
     "wiki": {
         "n": 2405,
         "m": 17981,
-        "d": "undirected",
+        "d": "directed",
         "w": "unweighted"
     },
     "pubmed": {
         "n": 19717,
         "m": 44338,
-        "d": "undirected",
+        "d": "directed",
         "w": "unweighted"
     },
     "blogcatalog": {
@@ -38,37 +68,7 @@
     "facebook": {
         "n": 4039,
         "m": 88234,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "nell": {
-        "n": 65755,
-        "m": 266144,
         "d": "directed",
-        "w": "unweighted"
-    },
-    "coauthorcs": {
-        "n": 18333,
-        "m": 81894,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "coauthorphysics": {
-        "n": 34493,
-        "m": 247962,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "reddit2": {
-        "n": 232965,
-        "m": 11606919,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "yelp": {
-        "n": 716847,
-        "m": 6977410,
-        "d": "undirected",
         "w": "unweighted"
     }
 }
