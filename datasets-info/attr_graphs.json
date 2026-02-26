@@ -7,37 +7,37 @@
     },
     "wikics": {
         "n": 11701,
-        "m": 216123,
+        "m": 431726,
         "d": "undirected",
         "w": "unweighted"
     },
     "nell": {
         "n": 65755,
-        "m": 266144,
+        "m": 251550,
         "d": "undirected",
         "w": "unweighted"
     },
     "coauthorcs": {
         "n": 18333,
-        "m": 81894,
+        "m": 163788,
         "d": "undirected",
         "w": "unweighted"
     },
     "coauthorphysics": {
         "n": 34493,
-        "m": 247962,
+        "m": 495924,
         "d": "undirected",
         "w": "unweighted"
     },
     "reddit2": {
         "n": 232965,
-        "m": 11606919,
+        "m": 23213838,
         "d": "undirected",
         "w": "unweighted"
     },
     "yelp": {
         "n": 716847,
-        "m": 6977410,
+        "m": 13954819,
         "d": "undirected",
         "w": "unweighted"
     },
