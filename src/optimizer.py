@@ -266,7 +266,7 @@ class Optimizer:
 
 
         # Reset adjacency matrix to the nodes of affected communities
-        adj = sparse.reset_matrix(self.adj, torch.nonzero(ext_mask[0], as_tuple=True)[0])
+        adj = sparse.reset_matrix(self.adj, torch.nonzero(ext_mask[0], as_tuple=True)[0]).to(self.adj.device)
 
 
         for l in range(self.subcoms_depth):
@@ -291,7 +291,7 @@ class Optimizer:
 
 
             # Apply local algorithm for aggregated graph
-            coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(coms.device)
+            coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(self.adj.device)
 
 
             # Restoring the community of the original graph
@@ -303,5 +303,5 @@ class Optimizer:
 
             # Cut off adjacency matrix
             cut_idx = torch.stack((new_coms, ext_nodes))
-            cut_ptn = sparse.tensor(cut_idx, self.size, adj.dtype)
-            adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
+            cut_ptn = sparse.tensor(cut_idx, self.size, adj.dtype).to(self.adj.device)
+            adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn).to(self.adj.device)

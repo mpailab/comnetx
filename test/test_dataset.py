@@ -37,12 +37,25 @@ def temp_dataset_dir():
         "amazon-computers",
     ],
 )
-def test_load_magi_datasets(dataset_name, temp_dataset_dir):
+def test_load_magi_datasets(dataset_name, temp_dataset_dir, monkeypatch):
     download_and_process_magi(dataset_name, temp_dataset_dir)
-    paths = {"small": temp_dataset_dir}  # MAGI = small в твоём коде
-    paths_file = Path(temp_dataset_dir) / "temp_paths.json"
+    
+    temp_info_dir = Path(temp_dataset_dir) / "datasets-info"
+    temp_info_dir.mkdir(exist_ok=True)
+
+    if dataset_name.lower() not in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
+        magi_path = temp_info_dir / "magi.json"
+        magi_path.write_text(json.dumps({dataset_name.lower(): {"d": "undirected"}}))
+    
+    if dataset_name.lower() not in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
+        paths = {"magi": str(temp_dataset_dir)}
+    else:
+        paths = {"small": str(temp_dataset_dir)}
+    paths_file = temp_info_dir / "temp_paths.json"
     paths_file.write_text(json.dumps(paths))
     
+    monkeypatch.setattr("datasets.INFO", temp_info_dir)
+
     ds = Dataset(dataset_name, paths_config=str(paths_file))
     ds.load(tensor_type="coo")
 
@@ -61,9 +74,18 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     "999:10",     # p:n стратегия
 ])
 @pytest.mark.short
-def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy):
+def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy, monkeypatch):
     """Тестирует различные стратегии батчинга."""
-    ds = Dataset(dataset_name="wiki_talk_cy", path=KONECT_PATH)
+
+    real_info_dir = Path(__file__).parent.parent / "datasets-info" 
+    paths_file = real_info_dir / "paths.json"
+    
+    def mock_info():
+        return real_info_dir
+    
+    monkeypatch.setattr("datasets.INFO", mock_info())
+    
+    ds = Dataset("wiki_talk_cy", paths_config=str(paths_file))
     ds.load(batches_strategy=batches_strategy)
     adj = ds.adj
     
@@ -84,8 +106,15 @@ def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy
         assert adj.shape[0] == int(batches_strategy)  # N батчей
 
 @pytest.mark.short
-def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="wiki_talk_ht", path=KONECT_PATH)
+def test_load_wiki_talk_ht_dataset(temp_dataset_dir, monkeypatch):
+    real_info_dir = Path(__file__).parent.parent / "datasets-info" 
+    paths_file = real_info_dir / "paths.json"
+    
+    def mock_info():
+        return real_info_dir
+    
+    monkeypatch.setattr("datasets.INFO", mock_info())
+    loader = Dataset(dataset_name="wiki_talk_ht", paths_config=str(paths_file))
     tensor, features, label = loader.load(tensor_type="coo")
 
     assert isinstance(tensor, torch.Tensor)
@@ -94,7 +123,15 @@ def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_dense_output(temp_dataset_dir):
-    download_and_process_magi("Cora", temp_dataset_dir)
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="dense")
 
@@ -103,9 +140,17 @@ def test_tensor_dense_output(temp_dataset_dir):
     assert tensor.shape[0] == tensor.shape[1]
 
 @pytest.mark.short
-def test_tensor_csr_output(temp_dataset_dir):
-    download_and_process_magi("Cora", temp_dataset_dir)
-    loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+def test_tensor_csr_output(temp_dataset_dir, monkeypatch):
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
+    loader = Dataset(dataset_name="Cora", paths_config=str(paths_file))
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -114,7 +159,15 @@ def test_tensor_csr_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csc_output(temp_dataset_dir):
-    download_and_process_magi("Citeseer", temp_dataset_dir)
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
     loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csc")
 
