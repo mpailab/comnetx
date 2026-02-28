@@ -2,6 +2,10 @@ import torch
 
 import numpy as np
 import os.path
+from ogb.nodeproppred import PygNodePropPredDataset
+import pickle
+import os
+import scipy.io as io
 
 import time
 import json
@@ -384,10 +388,14 @@ class Dataset:
         # Чтение файла
         with open(filepath) as _:
             first_string = _.readline()
-            num_nodes = int(first_string.split()[0])
-            max_index = num_nodes - 1
+            #num_nodes = int(first_string.split()[0])
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        min_ind = min(i.min(), j.min())
+        max_ind = max(i.max(), j.max())
+        i -= min_ind
+        j -= min_ind
+        num_nodes = max_ind - min_ind + 1
 
         def make_adj(i_arr, j_arr, w_arr):
             idx = np.vstack((i_arr, j_arr))

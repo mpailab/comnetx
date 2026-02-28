@@ -1,6 +1,7 @@
 import torch
 import json
 import os
+import time
 
 from datasets import KONECT_PATH, INFO, Dataset
 from optimizer import Optimizer
@@ -72,11 +73,6 @@ def dynamic_launch(dataset_name : str, batches_strategy,
             else:
                 print(f"Time: {total_time - conversion_time:.2}")
 
-        # acc = opt.accuracy(labels)
-        # nmi = opt.nmi(labels)
-        # ari = opt.ari(labels)
-        # f1 = opt.macro_f1(labels)
-        # print("nmi =", nmi, "ari =", ari, "acc =", acc, "f1 =", f1)
         results.append({'modularity' : mod, 'time': total_time - conversion_time})
 
     total_time = sum(map(lambda x: x["time"], results))
