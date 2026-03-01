@@ -61,7 +61,7 @@ class Dataset:
             attr_graphs_info = json.load(_)
         with open(os.path.join(INFO, "ogb_graphs.json")) as _:
             ogb_graphs_info = json.load(_)
-        
+        print("alarm")
         dname = self.name.lower()
         if self.name in info:
             self.is_directed = info[self.name]['d'] == 'directed'
@@ -91,7 +91,7 @@ class Dataset:
             if dname == "flickr": #ok
                 path = f"/auto/datasets/graphs/comnetx/torch_geom_datasets/data/Flickr"
                 dataset = torch_geometric.datasets.Flickr(root=path)
-                print("alarm")
+                # print("alarm")
             elif dname == "wikics": #ok
                 dataset = torch_geometric.datasets.WikiCS(root=path, is_undirected=True)
             elif dname == "nell": #ok
@@ -143,8 +143,7 @@ class Dataset:
                             size=adj_data['shape']
                         ).coalesce()
 
-            print(f"self.adj = {type(self.adj)}")
-
+            # print(f"self.adj = {type(self.adj)}")
             self.adj = self.adj.unsqueeze(0)
 
         elif dname in ogb_graphs_info:

@@ -43,9 +43,9 @@
     },
     "wiki": {
         "n": 2405,
-        "m": 17981,
+        "m": 16523,
         "d": "directed",
-        "w": "unweighted"
+        "w": "weighted"
     },
     "pubmed": {
         "n": 19717,

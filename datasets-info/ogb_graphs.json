@@ -11,12 +11,6 @@
         "d": "directed",
         "w": "unweighted"
     },
-    "ogbn-papers100M": {
-        "n": 111059956,
-        "m": 1615685872,
-        "d": "directed",
-        "w": "unweighted"
-    },
     "ogbl-ppa": {
         "n": 576289,
         "m": 30326273,
