@@ -5,5 +5,6 @@
   "dyn_sbm": "/auto/datasets/graphs/dyn_sbm/",
   "sbm": "/auto/datasets/graphs/sbm/",
   "small": "/auto/datasets/graphs/small/",
-  "small_konect": "/auto/datasets/graphs/small_konect/"
+  "small_konect": "/auto/datasets/graphs/small_konect/",
+  "attr_graphs": "/auto/datasets/graphs/attr_graphs"
 }

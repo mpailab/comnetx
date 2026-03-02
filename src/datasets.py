@@ -13,7 +13,7 @@ import joblib
 import pickle
 from pathlib import Path
 
-INFO = Path(__file__).parent / "datasets-info"
+INFO = Path(__file__).parent.parent / "datasets-info"
 PROJECT_DIR = Path(__file__).parent.resolve()
 
 class Dataset:
@@ -46,6 +46,12 @@ class Dataset:
             with open(magi_path) as f:
                 if self.name in json.load(f):
                     return "magi"
+
+        attr_path = INFO / "attr_graphs.json"
+        if attr_path.exists():
+            with open(attr_path) as f:
+                if self.name.lower() in json.load(f):
+                    return "attr_graphs"
         
         dname = self.name.lower()
         if dname in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
@@ -92,6 +98,12 @@ class Dataset:
 
         elif fmt in {"small", "sbm", "dyn_sbm"}:
             self.is_directed = False
+        
+        elif fmt == "attr_graphs":
+            attr_path = INFO / "attr_graphs.json"
+            with open(attr_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = (info[dname]["d"] == "directed")
 
         else:
             raise ValueError(f"Unknown dataset_format: {fmt}")
@@ -119,6 +131,9 @@ class Dataset:
 
         elif fmt == "small":
             self._load_npy_format(coo_adj=True)
+
+        elif fmt == "attr_graphs":
+            self._load_attr_graph()
 
         elif fmt == "dyn_sbm":
             parts = self.name.split("_")
@@ -193,6 +208,24 @@ class Dataset:
                 f"Expected: {coo_path} or {dense_path}"
             )
 
+    def _load_attr_graph(self):  # ← ПОЛНАЯ НОВАЯ ФУНКЦИЯ
+        """Загрузка attributed graphs (flickr, wikics...) из npy/joblib."""
+        dname = self.name.lower()
+        load_dir = os.path.join(self.dataset_root, dname)
+        
+        feat_file = os.path.join(load_dir, f"{dname}_feat.npy")
+        label_file = os.path.join(load_dir, f"{dname}_label.npy")
+        adj_file = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
+        
+        if not all(os.path.exists(f) for f in [feat_file, label_file, adj_file]):
+            raise FileNotFoundError(f"Файлы attr_graph отсутствуют в {load_dir}. Запустите: download.py {dname}")
+        
+        self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
+        self.label = torch.tensor(np.load(label_file), dtype=torch.long)
+        adj_data = joblib.load(adj_file)
+        self.adj = torch.sparse_coo_tensor(
+            adj_data['indices'], adj_data['values'], size=adj_data['shape']
+        )
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,

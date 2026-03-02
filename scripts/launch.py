@@ -20,8 +20,9 @@ conf_name = os.path.basename(conf_file).rsplit(".", maxsplit=1)[0]
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
-from datasets import INFO, KONECT_PATH
+from datasets import INFO
 
+KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
 # input
 MACHINE_DEFAULT = subprocess.check_output("hostname", shell=True, text=True)[:-1]
 MACHINE = conf.get("MACHINE", MACHINE_DEFAULT)
