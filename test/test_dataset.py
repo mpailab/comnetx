@@ -6,6 +6,8 @@ import tempfile
 import pytest
 import subprocess
 import json
+import numpy as np
+import joblib
 from pathlib import Path
 from download import download_and_process_magi
 
@@ -317,6 +319,53 @@ def test_load_sbm_static_dataset():
     assert labels.shape[0] == n, "Labels must be of shape [n]"
     assert features is None
 
+@pytest.mark.short
+def test_download_attr_graph(temp_dataset_dir, monkeypatch):
+    """Тест скачивания attributed graph (wiki) через download_attr_graph."""
+    from download import download_attr_graph  # Импорт из download.py
+    
+    dataset_name = "wiki"  # Маленький: 2405 nodes
+    download_attr_graph(dataset_name, temp_dataset_dir)
+    
+    # Проверяем файлы
+    dname = dataset_name.lower()
+    load_dir = Path(temp_dataset_dir) / dname
+    required = [f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"]
+    
+    assert load_dir.exists(), f"Директория {load_dir} не создана"
+    assert all((load_dir / f).exists() for f in required), f"Файлы {required} отсутствуют"
+    
+    # Размеры из attr_graphs.json
+    feat_shape = np.load(load_dir / f"{dname}_feat.npy").shape
+    label_shape = np.load(load_dir / f"{dname}_label.npy").shape
+    adj_data = joblib.load(load_dir / f"{dname}_coo_adj.joblib")
+    
+    assert feat_shape[0] == 2405, "Неправильное число узлов (features)"
+    assert label_shape[0] == 2405, "Неправильное число узлов (labels)"
+    assert adj_data['shape'] == (2405, 2405), "Неправильная форма adj"
+    assert adj_data['indices'].shape[1] == 16523, "Неправильное число ребер (неориентированный граф)"
+
+@pytest.mark.parametrize("dataset_name", ["wiki", "facebook", "blogcatalog"])
+@pytest.mark.short
+def test_download_attr_graphs(dataset_name, temp_dataset_dir):
+    """Тест всех маленьких attr_graphs."""
+    from download import download_attr_graph
+    
+    download_attr_graph(dataset_name, temp_dataset_dir)
+    
+    dname = dataset_name.lower()
+    load_dir = Path(temp_dataset_dir) / dname
+    
+    # Все файлы созданы
+    feat = np.load(load_dir / f"{dname}_feat.npy")
+    labels = np.load(load_dir / f"{dname}_label.npy")
+    adj_data = joblib.load(load_dir / f"{dname}_coo_adj.joblib")
+    
+    assert feat.shape[0] == labels.shape[0] == adj_data['shape'][0]
+    assert adj_data['indices'].shape[0] == 2  # COO format
+    
+    print(f"{dataset_name}: {feat.shape[0]} nodes, {adj_data['indices'].shape[1]} edges")
+
 @pytest.mark.debug
 def test_load_sbm_temporal_dataset():
     path = SBM_GRAPHS_DIR
@@ -346,3 +395,37 @@ def test_load_sbm_temporal_dataset():
     assert adj.is_coalesced(), "Temporal adjacency must be coalesced"
 
     assert features is None
+
+@pytest.mark.short
+@pytest.mark.short
+def test_local_wiki_attr_graph_full_pipeline():
+    """ЛОКАЛЬНЫЙ тест wiki с вашим paths.json."""
+    
+    info_dir = Path(__file__).parent.parent / "datasets-info"
+    paths_data = json.loads((info_dir / "paths.json").read_text())
+    graphs_dir = Path(paths_data["attr_graphs"])
+    
+    print(f"✓ graphs_dir = {graphs_dir}")
+    
+    dataset_name = "wiki"
+    
+    # Скачиваем
+    from download import download_attr_graph
+    download_attr_graph(dataset_name, str(graphs_dir))
+    
+    load_dir = graphs_dir / dataset_name.lower()
+    
+    # Файлы
+    feat_file = load_dir / "wiki_feat.npy"
+    assert feat_file.exists()
+    
+    # Dataset (теперь работает!)
+    ds = Dataset(dataset_name, str(info_dir / "paths.json"))
+    adj, feat, lbl = ds.load("coo")
+    
+    assert ds.dataset_format == "attr_graphs"  # ← если исправили detect!
+    assert str(ds.dataset_root) == str(graphs_dir)
+    assert ds.is_directed is True
+    
+    print(f"✅ wiki: {adj.shape[0]}n/{adj._nnz()}e → {ds.dataset_root}")
+
