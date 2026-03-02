@@ -322,20 +322,18 @@ def test_load_sbm_static_dataset():
 @pytest.mark.short
 def test_download_attr_graph(temp_dataset_dir, monkeypatch):
     """Тест скачивания attributed graph (wiki) через download_attr_graph."""
-    from download import download_attr_graph  # Импорт из download.py
+    from download import download_attr_graph
     
-    dataset_name = "wiki"  # Маленький: 2405 nodes
+    dataset_name = "wiki"
     download_attr_graph(dataset_name, temp_dataset_dir)
-    
-    # Проверяем файлы
+
     dname = dataset_name.lower()
     load_dir = Path(temp_dataset_dir) / dname
     required = [f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"]
     
     assert load_dir.exists(), f"Директория {load_dir} не создана"
     assert all((load_dir / f).exists() for f in required), f"Файлы {required} отсутствуют"
-    
-    # Размеры из attr_graphs.json
+
     feat_shape = np.load(load_dir / f"{dname}_feat.npy").shape
     label_shape = np.load(load_dir / f"{dname}_label.npy").shape
     adj_data = joblib.load(load_dir / f"{dname}_coo_adj.joblib")
@@ -356,13 +354,12 @@ def test_download_attr_graphs(dataset_name, temp_dataset_dir):
     dname = dataset_name.lower()
     load_dir = Path(temp_dataset_dir) / dname
     
-    # Все файлы созданы
     feat = np.load(load_dir / f"{dname}_feat.npy")
     labels = np.load(load_dir / f"{dname}_label.npy")
     adj_data = joblib.load(load_dir / f"{dname}_coo_adj.joblib")
     
     assert feat.shape[0] == labels.shape[0] == adj_data['shape'][0]
-    assert adj_data['indices'].shape[0] == 2  # COO format
+    assert adj_data['indices'].shape[0] == 2
     
     print(f"{dataset_name}: {feat.shape[0]} nodes, {adj_data['indices'].shape[1]} edges")
 
@@ -408,22 +405,19 @@ def test_local_wiki_attr_graph_full_pipeline():
     print(f"✓ graphs_dir = {graphs_dir}")
     
     dataset_name = "wiki"
-    
-    # Скачиваем
+
     from download import download_attr_graph
     download_attr_graph(dataset_name, str(graphs_dir))
     
     load_dir = graphs_dir / dataset_name.lower()
     
-    # Файлы
     feat_file = load_dir / "wiki_feat.npy"
     assert feat_file.exists()
     
-    # Dataset (теперь работает!)
     ds = Dataset(dataset_name, str(info_dir / "paths.json"))
     adj, feat, lbl = ds.load("coo")
     
-    assert ds.dataset_format == "attr_graphs"  # ← если исправили detect!
+    assert ds.dataset_format == "attr_graphs"
     assert str(ds.dataset_root) == str(graphs_dir)
     assert ds.is_directed is True
     
@@ -481,7 +475,7 @@ def test_load_existing_cora_dynamic_konect():
     finally:
         if konect_backup.exists():
             shutil.move(konect_backup, konect_path)
-        print("\n✅ cora dynamic_konect: все стратегии OK!")
+        print("\ncora dynamic_konect: все стратегии OK!")
 
 def collect_dynamic_attr_datasets():
     """Сбор ДИНАМИЧЕСКИХ датасетов из /auto/datasets/graphs/comnetx/dynamic_attr_datasets/."""
@@ -497,8 +491,8 @@ def collect_dynamic_attr_datasets():
     missing = expected - found
     
     if missing:
-        print(f"⚠️ Отсутствуют датасеты: {missing} — тест пропущен")  # ← print вместо skip
-        return []  # ← пустой список: 0 тестов вместо skip модуля
+        print(f"Отсутствуют датасеты: {missing} — тест пропущен")
+        return []
     
     print(f"✓ Найдено {len(datasets)} динамических датасетов: {datasets}")
     return datasets
@@ -517,7 +511,7 @@ def test_dynamic_attr_dataset(dataset_name):
 
     dyn_root = Path("/auto/datasets/graphs/comnetx/dynamic_attr_datasets")
     
-    print(f"🔄 dyn_attr:{dataset_name} ← {dyn_root / dataset_name}")
+    print(f"dyn_attr:{dataset_name} ← {dyn_root / dataset_name}")
 
     ds = Dataset(dataset_name, str(info_dir / "paths.json"))
     adj, features, labels = ds.load("coo")
@@ -541,7 +535,7 @@ def test_dynamic_attr_dataset(dataset_name):
     feat_info = features.shape if features is not None else "None"
     label_info = labels.shape if labels is not None else "None"
     
-    print(f"  ✅ B={n_batches:4}, N={n_nodes:7}, E={total_edges:10,} "
+    print(f"B={n_batches:4}, N={n_nodes:7}, E={total_edges:10,} "
           f"dir={ds.is_directed}, feat={feat_info}, label={label_info}")
 
     assert n_batches >= 1 and n_nodes > 10 and total_edges > 0, \

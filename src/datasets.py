@@ -117,7 +117,7 @@ class Dataset:
             with open(dyn_attr_path, "r", encoding="utf-8") as f:
                 info = json.load(f)
             self.is_directed = info[self.name.lower()]["d"] == "directed"
-            
+
         else:
             raise ValueError(f"Unknown dataset_format: {fmt}")
 
@@ -225,7 +225,7 @@ class Dataset:
                 f"Expected: {coo_path} or {dense_path}"
             )
 
-    def _load_attr_graph(self):  # ← ПОЛНАЯ НОВАЯ ФУНКЦИЯ
+    def _load_attr_graph(self):
         """Загрузка attributed graphs (flickr, wikics...) из npy/joblib."""
         dname = self.name.lower()
         load_dir = os.path.join(self.dataset_root, dname)
@@ -286,8 +286,7 @@ class Dataset:
         
         self.adj = torch.stack(adjs)
         self.is_directed = is_directed
-        
-        # Features/labels
+
         if feat_path:
             feat_data = np.load(feat_path, allow_pickle=True)
             self.features = torch.from_numpy(feat_data.get("features", None)) if "features" in feat_data else None
