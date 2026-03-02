@@ -77,7 +77,6 @@ def download_and_process_magi(dataset_name: str, save_path: str):
 
 def download_attr_graph(name: str, save_path: str = DATASETS_PATH):
     dname = name.lower()
-    # root для сырых PyG-данных (куда PyG сам скачает)
     root = os.path.join("/auto/datasets/graphs/comnetx/torch_geom_datasets/data", dname)
     if dname == "flickr":
         dataset = torch_geometric.datasets.Flickr(root=root)
