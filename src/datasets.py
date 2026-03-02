@@ -52,6 +52,13 @@ class Dataset:
             with open(attr_path) as f:
                 if self.name.lower() in json.load(f):
                     return "attr_graphs"
+
+        dyn_attr_path = INFO / "dyn_attr_graphs.json"
+        if dyn_attr_path.exists():
+            with open(dyn_attr_path) as f:
+                datasets = json.load(f)
+            if self.name.lower() in datasets:
+                return "dyn_attr_graphs"
         
         dname = self.name.lower()
         if dname in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
@@ -104,15 +111,22 @@ class Dataset:
             with open(attr_path, "r", encoding="utf-8") as f:
                 info = json.load(f)
             self.is_directed = (info[dname]["d"] == "directed")
-
+        
+        elif fmt == "dyn_attr_graphs":
+            dyn_attr_path = INFO / "dyn_attr_graphs.json"
+            with open(dyn_attr_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = info[self.name.lower()]["d"] == "directed"
+            
         else:
             raise ValueError(f"Unknown dataset_format: {fmt}")
 
         if fmt == "dynamic_konect":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_konect(batches_strategy=bs)
-            if batches_strategy is None:
+            if int(bs) == 1:
                 self.adj = self.adj[0]
+
 
         elif fmt == "magi":
             load_dir = self.dataset_root / dname
@@ -134,6 +148,9 @@ class Dataset:
 
         elif fmt == "attr_graphs":
             self._load_attr_graph()
+
+        elif fmt == "dyn_attr_graphs":
+            self._load_dynamic_attr_graph()
 
         elif fmt == "dyn_sbm":
             parts = self.name.split("_")
@@ -226,6 +243,56 @@ class Dataset:
         self.adj = torch.sparse_coo_tensor(
             adj_data['indices'], adj_data['values'], size=adj_data['shape']
         )
+
+    def _load_dynamic_attr_graph(self):
+        """Загрузка dynamic attr graphs из .npz файлов."""
+        dname = self.name.lower()
+        dataset_path = os.path.join(self.dataset_root, dname)
+        
+        dynamic_files = [f for f in os.listdir(dataset_path) if f.startswith("dynamic_") and f.endswith(".npz")]
+        feat_files = [f for f in os.listdir(dataset_path) if f.startswith("feat_") and f.endswith(".npz")]
+        
+        if not dynamic_files:
+            raise FileNotFoundError(f"Dynamic файлы не найдены в {dataset_path}")
+        
+        dyn_path = os.path.join(dataset_path, dynamic_files[0])
+        feat_path = os.path.join(dataset_path, feat_files[0]) if feat_files else None
+        
+        print(f"Loading dynamic: {dyn_path}")
+        
+        dyn = np.load(dyn_path, allow_pickle=True)
+        indices = torch.from_numpy(dyn["indices"]).long()
+        values = torch.from_numpy(dyn["values"]).float()
+        batch_indices = torch.from_numpy(dyn["batch_indices"]).long()
+        
+        num_batches = int(dyn["num_batches"][0])
+        num_nodes = int(dyn["num_nodes"][0])
+        is_directed = bool(dyn.get("is_directed", [False])[0])
+        
+        adjs = []
+        for b in range(num_batches):
+            mask = batch_indices == b
+            if mask.sum() > 0:
+                idx_b = indices[:, mask]
+                val_b = values[mask]
+            else:
+                idx_b = torch.empty((2, 0), dtype=torch.long)
+                val_b = torch.empty(0, dtype=torch.float)
+            
+            adj_b = torch.sparse_coo_tensor(idx_b, val_b, (num_nodes, num_nodes)).coalesce()
+            if not is_directed:
+                adj_b = (adj_b + adj_b.transpose(0, 1)).coalesce()
+            adjs.append(adj_b)
+        
+        self.adj = torch.stack(adjs)
+        self.is_directed = is_directed
+        
+        # Features/labels
+        if feat_path:
+            feat_data = np.load(feat_path, allow_pickle=True)
+            self.features = torch.from_numpy(feat_data.get("features", None)) if "features" in feat_data else None
+            self.label = torch.from_numpy(feat_data.get("labels", None)) if "labels" in feat_data else None
+
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,
