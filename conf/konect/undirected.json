@@ -5,13 +5,13 @@
   "DATASETS": "konect_by_nodes",
   "BATCHES": [100],
   
-  "BASELINES": ["magi", "prgpt:infomap", "prgpt:locale", "leidenalg", "dmon", "networkit",
-                "mfc", "flmig", "dese", "s2cag"],
+  "BASELINES": ["leidenalg", "ldleiden", "dfleiden", "networkit", "flmig", "prgpt:infomap", "prgpt:locale"],
+
   "MODES": ["smart", "naive"],
   
   "SMART_VERSION": "v1",
   "SMART_PARAMS_GRID": {
-    "smart_subcoms_depth": [5],
+    "smart_subcoms_depth": [3],
     "smart_neighborhood_step": [1]
   }
 }
