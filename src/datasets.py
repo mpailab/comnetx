@@ -268,8 +268,6 @@ class Dataset:
         dyn = np.load(dyn_path, allow_pickle=True)
         i, j = dyn["indices"]
         w, t = dyn["values"], dyn["batch_indices"]
-        num_batches = int(dyn["num_batches"][0])
-        num_nodes = int(dyn["num_nodes"][0])
         self.is_directed = bool(dyn.get("is_directed", [False])[0])
         self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
 

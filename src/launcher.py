@@ -32,7 +32,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                             subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
                             method = underlying_static_method,
                             verbose = verbose)
-            if ":" in batches_strategy:
+            if ":" in str(batches_strategy):
                 #TODO сделать загрузку посчитанного разбиения первого батча для стратегий "9:N", "99:N", "999:N"
                 # Сейчас считаем разбиение "на ходу" самым быстрым алгоритмом
                 opt.method = "ldleiden"

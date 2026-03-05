@@ -1,9 +1,8 @@
 {
-  "MACHINE": "test-machine",
   "VERBOSE": 1,
   
   "DATASETS": "konect_by_nodes",
-  "BATCHES": [100],
+  "BATCHES": ["999:100", "100"],
   
   "BASELINES": ["leidenalg", "ldleiden"],
 

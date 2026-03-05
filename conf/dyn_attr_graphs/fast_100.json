@@ -5,7 +5,7 @@
   "DATASETS": ["dyn_wiki", "dyn_blogcatalog", "dyn_wikics", "dyn_coauthorcs", "dyn_pubmed",
                "dyn_coauthorphysics", "dyn_nell", "dyn_flickr", "dyn_ogbn-arxiv", "dyn_reddit2",
                "dyn_ogbn-products"],
-  "BATCHES": ["999:10", "10"],
+  "BATCHES": ["999:100", "100"],
   
   "BASELINES": ["leidenalg", "networkit", "dfleiden", "ldleiden"],
   "MODES": ["naive", "smart"],
