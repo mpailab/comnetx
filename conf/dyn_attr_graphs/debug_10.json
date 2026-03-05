@@ -7,7 +7,7 @@
                "dyn_ogbn-products"],
   "BATCHES": ["999:10", "10"],
   
-  "BASELINES": ["mfc", "prgpt:infomap", "prgpt:locale"],
+  "BASELINES": ["mfc", "prgpt:infomap", "prgpt:locale", "networkit"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",

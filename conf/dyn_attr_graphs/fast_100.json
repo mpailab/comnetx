@@ -7,7 +7,7 @@
                "dyn_ogbn-products"],
   "BATCHES": ["999:100", "100"],
   
-  "BASELINES": ["leidenalg", "networkit", "dfleiden", "ldleiden"],
+  "BASELINES": ["leidenalg", "dfleiden", "ldleiden"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",
