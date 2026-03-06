@@ -17,7 +17,7 @@ sys.path.append(os.path.join(PROJECT_PATH, "src"))
 sys.path.append(os.path.join(PROJECT_PATH, "baselines"))
 sys.path.append(os.path.join(PROJECT_PATH, "baselines", "PRGPT"))
 
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 from PRGPT.modules.X1 import MDL_X1, get_edge_ind_est
 from PRGPT.PRGPT_static import get_sp_GCN_sup, get_sp_adj, get_rand_proj_mat, rand_seed_gbl, get_red_feat
 from PRGPT.PRGPT_static import get_init_res, InfoMap_rfn, locale_rfn, clus_reorder

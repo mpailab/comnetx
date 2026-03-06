@@ -5,11 +5,14 @@ import shutil
 import tempfile
 import pytest
 import subprocess
+import json
+import numpy as np
+import joblib
 from pathlib import Path
 from download import download_and_process_magi
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset, INFO
 
 TEST_DIR = os.path.dirname(__file__)
 GRAPHS_DIR = "/auto/datasets/graphs/small"
@@ -36,10 +39,28 @@ def temp_dataset_dir():
         "amazon-computers",
     ],
 )
-def test_load_magi_datasets(dataset_name, temp_dataset_dir):
+def test_load_magi_datasets(dataset_name, temp_dataset_dir, monkeypatch):
     download_and_process_magi(dataset_name, temp_dataset_dir)
-    ds = Dataset(dataset_name=dataset_name, path=temp_dataset_dir)
+    
+    temp_info_dir = Path(temp_dataset_dir) / "datasets-info"
+    temp_info_dir.mkdir(exist_ok=True)
+
+    if dataset_name.lower() not in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
+        magi_path = temp_info_dir / "magi.json"
+        magi_path.write_text(json.dumps({dataset_name.lower(): {"d": "undirected"}}))
+    
+    if dataset_name.lower() not in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
+        paths = {"magi": str(temp_dataset_dir)}
+    else:
+        paths = {"small": str(temp_dataset_dir)}
+    paths_file = temp_info_dir / "temp_paths.json"
+    paths_file.write_text(json.dumps(paths))
+    
+    monkeypatch.setattr("datasets.INFO", temp_info_dir)
+
+    ds = Dataset(dataset_name, paths_config=str(paths_file))
     ds.load(tensor_type="coo")
+
     assert isinstance(ds.adj, torch.Tensor)
     assert ds.adj.is_sparse
     assert ds.adj.shape[0] == ds.adj.shape[1]
@@ -55,9 +76,18 @@ def test_load_magi_datasets(dataset_name, temp_dataset_dir):
     "999:10",     # p:n стратегия
 ])
 @pytest.mark.short
-def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy):
+def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy, monkeypatch):
     """Тестирует различные стратегии батчинга."""
-    ds = Dataset(dataset_name="wiki_talk_cy", path=KONECT_PATH)
+
+    real_info_dir = Path(__file__).parent.parent / "datasets-info" 
+    paths_file = real_info_dir / "paths.json"
+    
+    def mock_info():
+        return real_info_dir
+    
+    monkeypatch.setattr("datasets.INFO", mock_info())
+    
+    ds = Dataset("wiki_talk_cy", paths_config=str(paths_file))
     ds.load(batches_strategy=batches_strategy)
     adj = ds.adj
     
@@ -78,8 +108,15 @@ def test_load_wiki_talk_cy_dataset_strategies(temp_dataset_dir, batches_strategy
         assert adj.shape[0] == int(batches_strategy)  # N батчей
 
 @pytest.mark.short
-def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="wiki_talk_ht", path=KONECT_PATH)
+def test_load_wiki_talk_ht_dataset(temp_dataset_dir, monkeypatch):
+    real_info_dir = Path(__file__).parent.parent / "datasets-info" 
+    paths_file = real_info_dir / "paths.json"
+    
+    def mock_info():
+        return real_info_dir
+    
+    monkeypatch.setattr("datasets.INFO", mock_info())
+    loader = Dataset(dataset_name="wiki_talk_ht", paths_config=str(paths_file))
     tensor, features, label = loader.load(tensor_type="coo")
 
     assert isinstance(tensor, torch.Tensor)
@@ -88,7 +125,15 @@ def test_load_wiki_talk_ht_dataset(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_dense_output(temp_dataset_dir):
-    download_and_process_magi("Cora", temp_dataset_dir)
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
     loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="dense")
 
@@ -97,9 +142,17 @@ def test_tensor_dense_output(temp_dataset_dir):
     assert tensor.shape[0] == tensor.shape[1]
 
 @pytest.mark.short
-def test_tensor_csr_output(temp_dataset_dir):
-    download_and_process_magi("Cora", temp_dataset_dir)
-    loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+def test_tensor_csr_output(temp_dataset_dir, monkeypatch):
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
+    loader = Dataset(dataset_name="Cora", paths_config=str(paths_file))
     tensor, features, label = loader.load(tensor_type="csr")
 
     assert isinstance(tensor, torch.Tensor)
@@ -108,7 +161,15 @@ def test_tensor_csr_output(temp_dataset_dir):
 
 @pytest.mark.short
 def test_tensor_csc_output(temp_dataset_dir):
-    download_and_process_magi("Citeseer", temp_dataset_dir)
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
     loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
     tensor, features, label = loader.load(tensor_type="csc")
 
@@ -119,8 +180,9 @@ def test_tensor_csc_output(temp_dataset_dir):
 @pytest.mark.short
 def test_exist_small_datasets():
     datasets = ["Acm", "Bat", "Eat"]
+    paths_config = "/home/drobyshev/comnetx2/comnetx/datasets-info/paths.json"
     for dataset_name in datasets:
-        ds = Dataset(dataset_name=dataset_name, path=GRAPHS_DIR)
+        ds = Dataset(dataset_name, paths_config=paths_config)
         ds.load(tensor_type="csr")
         assert isinstance(ds.adj, torch.Tensor)
         assert ds.adj.layout == torch.sparse_csr
@@ -257,6 +319,50 @@ def test_load_sbm_static_dataset():
     assert labels.shape[0] == n, "Labels must be of shape [n]"
     assert features is None
 
+@pytest.mark.short
+def test_download_attr_graph(temp_dataset_dir, monkeypatch):
+    """Тест скачивания attributed graph (wiki) через download_attr_graph."""
+    from download import download_attr_graph
+    
+    dataset_name = "wiki"
+    download_attr_graph(dataset_name, temp_dataset_dir)
+
+    dname = dataset_name.lower()
+    load_dir = Path(temp_dataset_dir) / dname
+    required = [f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"]
+    
+    assert load_dir.exists(), f"Директория {load_dir} не создана"
+    assert all((load_dir / f).exists() for f in required), f"Файлы {required} отсутствуют"
+
+    feat_shape = np.load(load_dir / f"{dname}_feat.npy").shape
+    label_shape = np.load(load_dir / f"{dname}_label.npy").shape
+    adj_data = joblib.load(load_dir / f"{dname}_coo_adj.joblib")
+    
+    assert feat_shape[0] == 2405, "Неправильное число узлов (features)"
+    assert label_shape[0] == 2405, "Неправильное число узлов (labels)"
+    assert adj_data['shape'] == (2405, 2405), "Неправильная форма adj"
+    assert adj_data['indices'].shape[1] == 16523, "Неправильное число ребер (неориентированный граф)"
+
+@pytest.mark.parametrize("dataset_name", ["wiki", "facebook", "blogcatalog"])
+@pytest.mark.short
+def test_download_attr_graphs(dataset_name, temp_dataset_dir):
+    """Тест всех маленьких attr_graphs."""
+    from download import download_attr_graph
+    
+    download_attr_graph(dataset_name, temp_dataset_dir)
+    
+    dname = dataset_name.lower()
+    load_dir = Path(temp_dataset_dir) / dname
+    
+    feat = np.load(load_dir / f"{dname}_feat.npy")
+    labels = np.load(load_dir / f"{dname}_label.npy")
+    adj_data = joblib.load(load_dir / f"{dname}_coo_adj.joblib")
+    
+    assert feat.shape[0] == labels.shape[0] == adj_data['shape'][0]
+    assert adj_data['indices'].shape[0] == 2
+    
+    print(f"{dataset_name}: {feat.shape[0]} nodes, {adj_data['indices'].shape[1]} edges")
+
 @pytest.mark.debug
 def test_load_sbm_temporal_dataset():
     path = SBM_GRAPHS_DIR
@@ -286,3 +392,151 @@ def test_load_sbm_temporal_dataset():
     assert adj.is_coalesced(), "Temporal adjacency must be coalesced"
 
     assert features is None
+
+@pytest.mark.short
+@pytest.mark.short
+def test_local_wiki_attr_graph_full_pipeline():
+    """ЛОКАЛЬНЫЙ тест wiki с вашим paths.json."""
+    
+    info_dir = Path(__file__).parent.parent / "datasets-info"
+    paths_data = json.loads((info_dir / "paths.json").read_text())
+    graphs_dir = Path(paths_data["attr_graphs"])
+    
+    print(f"✓ graphs_dir = {graphs_dir}")
+    
+    dataset_name = "wiki"
+
+    from download import download_attr_graph
+    download_attr_graph(dataset_name, str(graphs_dir))
+    
+    load_dir = graphs_dir / dataset_name.lower()
+    
+    feat_file = load_dir / "wiki_feat.npy"
+    assert feat_file.exists()
+    
+    ds = Dataset(dataset_name, str(info_dir / "paths.json"))
+    adj, feat, lbl = ds.load("coo")
+    
+    assert ds.dataset_format == "attr_graphs"
+    assert str(ds.dataset_root) == str(graphs_dir)
+    assert ds.is_directed is True
+    
+    print(f"✅ wiki: {adj.shape[0]}n/{adj._nnz()}e → {ds.dataset_root}")
+
+@pytest.mark.short
+def test_load_existing_cora_dynamic_konect():
+    """Тест cora dynamic out.cora.*_batches (small → konect формат)."""
+    
+    info_dir = Path(__file__).parent.parent / "datasets-info"
+    paths_data = json.loads((info_dir / "paths.json").read_text())
+    cora_dir = Path("/auto/datasets/graphs/dyn_atr_datasets/cora")
+    
+    dataset_name = "cora"
+    strategies = ["1", "10", "100", "1000"]
+    
+    print(f"✓ Testing {dataset_name} в {cora_dir}")
+    
+    for bs in strategies:
+        batch_file = cora_dir / f"out.{dataset_name}.{bs}_batches"
+        assert batch_file.exists(), f"{batch_file} отсутствует — запустите save_small_datasets_in_konect_format()"
+    
+    konect_path = info_dir / "konect.json"
+    konect_backup = info_dir / "konect.json.backup"
+    konect_data = json.loads(konect_path.read_text())
+
+    shutil.copy2(konect_path, konect_backup)
+    konect_data["cora"] = {"d": "undirected", "n": 2708, "m": 5429, "w": "unweighted"}
+    konect_path.write_text(json.dumps(konect_data, indent=2))
+    
+    paths_data["dynamic_konect"] = str(cora_dir.parent)
+    (info_dir / "paths.json").write_text(json.dumps(paths_data, indent=2))
+    
+    try:
+        for bs in strategies:
+            print(f"  → {bs}_batches")
+            
+            ds = Dataset(dataset_name, str(info_dir / "paths.json"))
+            adj, feat, lbl = ds.load("coo", batches_strategy=bs)
+            
+            assert ds.dataset_format == "dynamic_konect"
+            assert ds.is_directed is False
+            
+            if bs == "1":
+                assert adj.dim() == 2 and adj.shape == (2708, 2708)
+                assert adj._nnz() == 10556
+            else:
+                assert adj.dim() == 3
+                assert adj.shape[0] == int(bs)
+                assert adj.shape[1:] == (2708, 2708)
+            
+            assert adj.is_sparse and adj.is_coalesced()
+            print(f"     ✓ L={adj.shape[0] if adj.dim()==3 else 1}, E={adj._nnz()}")
+    
+    finally:
+        if konect_backup.exists():
+            shutil.move(konect_backup, konect_path)
+        print("\ncora dynamic_konect: все стратегии OK!")
+
+def collect_dynamic_attr_datasets():
+    """Сбор ДИНАМИЧЕСКИХ датасетов из /auto/datasets/graphs/comnetx/dynamic_attr_datasets/."""
+    dyn_attr_root = Path("/auto/datasets/graphs/comnetx/dynamic_attr_datasets")
+    
+    datasets = [d.name for d in dyn_attr_root.iterdir() 
+                if d.is_dir() and not d.name.startswith('.')]
+    
+    expected = {'dyn_blogcatalog', 'dyn_coauthorcs', 'dyn_coauthorphysics', 'dyn_flickr', 
+                'dyn_nell', 'dyn_ogbn-arxiv', 'dyn_ogbn-products', 'dyn_pubmed', 'dyn_reddit2', 'dyn_wiki', 'dyn_wikics'}
+    
+    found = set(datasets)
+    missing = expected - found
+    
+    if missing:
+        print(f"Отсутствуют датасеты: {missing} — тест пропущен")
+        return []
+    
+    print(f"✓ Найдено {len(datasets)} динамических датасетов: {datasets}")
+    return datasets
+
+def collect_small_dynamic_attr_datasets():
+    small_datasets = ["dyn_wiki", "dyn_pubmed", "dyn_coauthorcs"]  # n < 20k, быстро
+    return small_datasets
+
+@pytest.mark.parametrize("dataset_name", collect_small_dynamic_attr_datasets(), ids=lambda name: f"dyn_attr:{name}")
+@pytest.mark.long
+def test_dynamic_attr_dataset(dataset_name):
+    """Тест динамических датасетов из dynamic_attr_datasets/."""
+
+    info_dir = Path(__file__).parent.parent / "datasets-info"
+    paths_data = json.loads((info_dir / "paths.json").read_text())
+
+    dyn_root = Path("/auto/datasets/graphs/comnetx/dynamic_attr_datasets")
+    
+    print(f"dyn_attr:{dataset_name} ← {dyn_root / dataset_name}")
+
+    ds = Dataset(dataset_name, str(info_dir / "paths.json"))
+    adj, features, labels = ds.load("coo")
+
+    assert adj.dim() == 3, f"{dataset_name}: ожидали 3D [batches,N,N]"
+    assert adj.shape[1] == adj.shape[2], "Не квадратная матрица"
+    assert adj.is_sparse and adj.is_coalesced()
+    
+    n_batches, n_nodes = adj.shape[:2]
+    total_edges = sum(batch._nnz() for batch in adj)
+
+    if not ds.is_directed:
+        for b in range(min(3, n_batches)):
+            batch_adj = adj[b]
+            assert torch.allclose(
+                batch_adj.to_dense(), 
+                batch_adj.to_dense().T,
+                atol=1e-6
+            ), f"{dataset_name}[{b}]: не симметричен"
+
+    feat_info = features.shape if features is not None else "None"
+    label_info = labels.shape if labels is not None else "None"
+    
+    print(f"B={n_batches:4}, N={n_nodes:7}, E={total_edges:10,} "
+          f"dir={ds.is_directed}, feat={feat_info}, label={label_info}")
+
+    assert n_batches >= 1 and n_nodes > 10 and total_edges > 0, \
+        f"{dataset_name}: слишком маленький/пустой"

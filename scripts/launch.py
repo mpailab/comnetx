@@ -20,8 +20,9 @@ conf_name = os.path.basename(conf_file).rsplit(".", maxsplit=1)[0]
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
-from datasets import INFO, KONECT_PATH
+from datasets import INFO
 
+KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
 # input
 MACHINE_DEFAULT = subprocess.check_output("hostname", shell=True, text=True)[:-1]
 MACHINE = conf.get("MACHINE", MACHINE_DEFAULT)
@@ -36,9 +37,13 @@ with open(os.path.join(INFO, "konect.json")) as _:
 konect_datasets = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
 datasets_by_edges = sorted(konect_datasets, key = lambda x: info[x]["m"])
 datasets_by_nodes = sorted(konect_datasets, key = lambda x: info[x]["n"])
+undirected_datasets_by_nodes = list(filter(lambda dataset: info[dataset]["d"] == "undirected", datasets_by_nodes))
+undirected_datasets_by_edges = list(filter(lambda dataset: info[dataset]["d"] == "undirected", datasets_by_edges))
 datasets_dict = {
     "konect_by_edges" : datasets_by_edges,
-    "konect_by_nodes" : datasets_by_nodes
+    "konect_by_nodes" : datasets_by_nodes,
+    "undirected_datasets_by_nodes" : undirected_datasets_by_nodes,
+    "undirected_datasets_by_edges" : undirected_datasets_by_edges
 }
 if type(conf["DATASETS"]) == str:
   DATASETS = datasets_dict[conf["DATASETS"]]
@@ -74,13 +79,13 @@ def init(db, baseline, dataset):
         db[baseline][dataset][MACHINE] = {}
     return db
 
-#DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
-DATE_SUFFIX = "now"
+DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
+#DATE_SUFFIX = "now"
 def save(db, errors):
     os.makedirs(os.path.join(PROJECT_PATH, "results"), exist_ok = True)
-    with open(os.path.join(PROJECT_PATH, "results", f"measurements_{DATE_SUFFIX}.json"), 'w') as _:
+    with open(os.path.join(PROJECT_PATH, "results", f"measurements_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
         json.dump(db, _, indent=4)
-    with open(os.path.join(PROJECT_PATH, "results", f"errors_{DATE_SUFFIX}.json"), 'w') as _:
+    with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
         #print(errors)
         json.dump(errors, _, indent=4)
 

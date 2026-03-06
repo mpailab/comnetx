@@ -1,0 +1,19 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  
+  "DATASETS": ["dyn_wiki", "dyn_blogcatalog", "dyn_wikics", "dyn_coauthorcs", "dyn_pubmed",
+               "dyn_coauthorphysics", "dyn_nell", "dyn_flickr", "dyn_ogbn-arxiv", "dyn_reddit2",
+               "dyn_ogbn-products"],
+  "BATCHES": ["100", "999:100"],
+  
+  "BASELINES": ["leidenalg", "networkit", "dfleiden", "ldleiden", "magi", "dmon",
+                "mfc", "flmig", "dese", "s2cag", "prgpt:infomap", "prgpt:locale"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1]
+  }
+}

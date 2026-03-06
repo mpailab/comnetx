@@ -11,24 +11,64 @@ import time
 import json
 import joblib
 import pickle
+from pathlib import Path
 
-import torch_geometric
-
-
-KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets/"
-PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-INFO = os.path.join(PROJECT_DIR, "datasets-info")
+INFO = Path(__file__).parent.parent / "datasets-info"
+PROJECT_DIR = Path(__file__).parent.resolve()
 
 class Dataset:
     """Dataset treatment"""
 
-    def __init__(self, dataset_name : str, path: str = "./datasets"):
+    def __init__(self, dataset_name : str, paths_config: str = "datasets-info/paths.json"):
         self.name = dataset_name
-        self.path = path # dir with datasets dirs
+        self.paths_config  = paths_config # dir with datasets dirs
+        self.dataset_format = self.detect_dataset_format()
+        self.dataset_root = Path(self.load_paths(paths_config)[self.dataset_format])
         self.adj = None # (l, n, n)-tensor or (n, n)-tensor
         self.is_directed = False
         self.features = None
         self.label = None
+
+    def load_paths(self, paths_config: str | Path):
+        """Loads paths.json."""
+        with open(paths_config, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def detect_dataset_format(self): 
+        konect_path = INFO / "konect.json"
+        if konect_path.exists():
+            with open(konect_path) as f:
+                if self.name in json.load(f):
+                    return "dynamic_konect"
+        
+        magi_path = INFO / "magi.json"
+        if magi_path.exists():
+            with open(magi_path) as f:
+                if self.name in json.load(f):
+                    return "magi"
+
+        attr_path = INFO / "attr_graphs.json"
+        if attr_path.exists():
+            with open(attr_path) as f:
+                if self.name.lower() in json.load(f):
+                    return "attr_graphs"
+
+        dyn_attr_path = INFO / "dyn_attr_graphs.json"
+        if dyn_attr_path.exists():
+            with open(dyn_attr_path) as f:
+                datasets = json.load(f)
+            if self.name.lower() in datasets:
+                return "dyn_attr_graphs"
+        
+        dname = self.name.lower()
+        if dname in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
+            return "small"
+        if dname.startswith("sbm") or dname.startswith("tsbm"):
+            return "sbm"
+        if dname.startswith("static") or dname.startswith("stream"):
+            return "dyn_sbm"
+        
+        raise ValueError(f"Dataset '{self.name}' not in konect.json/magi.json and no pattern match.")
 
     def load(self, tensor_type : str = "coo", batches_strategy = None) -> torch.Tensor:
         """
@@ -48,187 +88,100 @@ class Dataset:
         label - #TODO (to Drobyshev) add info for shape
         """    
 
-        with open(os.path.join(INFO, "konect.json")) as _:
-            info = json.load(_)
-        with open(os.path.join(INFO, "magi.json")) as _:
-            magi_info = json.load(_)
-        with open(os.path.join(INFO, "dsbm.json")) as _:
-            dsbm_info = json.load(_)
-        info.update(dsbm_info)
-        with open(os.path.join(INFO, "s2cag.json")) as _:
-            s2cag_info = json.load(_)
-        with open(os.path.join(INFO, "attr_graphs.json")) as _:
-            attr_graphs_info = json.load(_)
-        with open(os.path.join(INFO, "ogb_graphs.json")) as _:
-            ogb_graphs_info = json.load(_)
-        print("alarm")
         dname = self.name.lower()
-        if self.name in info:
-            self.is_directed = info[self.name]['d'] == 'directed'
-            if batches_strategy == None:
-                self._load_konect(batches_strategy = "1")
+        fmt = self.dataset_format
+
+        if fmt == "dynamic_konect":
+            konect_path = INFO / "konect.json"
+            with open(konect_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = (info[self.name]["d"] == "directed")
+
+        elif fmt == "magi":
+            magi_path = INFO / "magi.json"
+            with open(magi_path, "r", encoding="utf-8") as f:
+                magi_info = json.load(f)
+            self.is_directed = (magi_info[dname]["d"] == "directed")
+
+        elif fmt in {"small", "sbm", "dyn_sbm"}:
+            self.is_directed = False
+        
+        elif fmt == "attr_graphs":
+            attr_path = INFO / "attr_graphs.json"
+            with open(attr_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = (info[dname]["d"] == "directed")
+        
+        elif fmt == "dyn_attr_graphs":
+            dyn_attr_path = INFO / "dyn_attr_graphs.json"
+            with open(dyn_attr_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = info[self.name.lower()]["d"] == "directed"
+
+        else:
+            raise ValueError(f"Unknown dataset_format: {fmt}")
+
+        if fmt == "dynamic_konect":
+            bs = "1" if batches_strategy is None else str(batches_strategy)
+            self._load_konect(batches_strategy=bs)
+            if str(bs) == "1":
                 self.adj = self.adj[0]
-            else:
-                self._load_konect(batches_strategy = batches_strategy)
-        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
-            self._load_npy_format()
-            
-        elif dname in s2cag_info:
-            self.is_directed = s2cag_info[dname]['d'] == 'directed'
-            for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_adj.npy"}:
-                if not os.path.isfile(os.path.join(self.path, dname, filename)):
-                    print(f"file not found: {filename}")
-                    print("path =", os.path.join(self.path, filename))
-            self._load_npy_format()
-            self.adj = self.adj.unsqueeze(0)
-            # print(self.adj)
 
-        elif dname in attr_graphs_info:
-            self.is_directed = attr_graphs_info[dname]['d'] == 'directed'
-            
-            # Куда сохранять
-            path = f"/auto/datasets/graphs/comnetx/torch_geom_datasets/data/{dname}"
-            if dname == "flickr": #ok
-                path = f"/auto/datasets/graphs/comnetx/torch_geom_datasets/data/Flickr"
-                dataset = torch_geometric.datasets.Flickr(root=path)
-                # print("alarm")
-            elif dname == "wikics": #ok
-                dataset = torch_geometric.datasets.WikiCS(root=path, is_undirected=True)
-            elif dname == "nell": #ok
-                dataset = torch_geometric.datasets.NELL(root=path)
-            elif dname == "reddit2": #ok
-                dataset = torch_geometric.datasets.Reddit2(root=path)
-            elif dname == "yelp": #bad communities shape torch.Size([716847, 100]), required (1, 716847)
-                dataset = torch_geometric.datasets.Yelp(root=path)
-            elif dname == "coauthorcs": #ok
-                dataset = torch_geometric.datasets.Coauthor(root=path, name="CS")
-            elif dname == "coauthorphysics": #ok
-                dataset = torch_geometric.datasets.Coauthor(root=path, name="Physics")
-            elif dname == "wiki": #ok
-                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="Wiki")
-            elif dname == "pubmed": #ok
-                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="PubMed")
-            elif dname == "blogcatalog": #ok
-                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="BlogCatalog")
-            elif dname == "ppi": #bad communities shape torch.Size([56944, 121]), required (1, 56944)
-                                    #Killed
-                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="PPI")
-            elif dname == "facebook": #bad communities shape torch.Size([4039, 193]), required (1, 4039)
-                dataset = torch_geometric.datasets.AttributedGraphDataset(root=path, name="Facebook")   
 
-            self.features = dataset.x  
-            if dataset.y.dim() == 1:
-                self.label = dataset.y
-            else:
-                self.label = None
-
-            num_nodes = len(dataset.y)
-            indices = dataset.edge_index
-            num_edges = indices.shape[1]
-            values = torch.ones(num_edges, dtype=torch.float32)
-
-            # print(indices.shape)
-
-            adj_data = {
-                'indices': indices,
-                'values': values,
-                'shape': (num_nodes, num_nodes)
+        elif fmt == "magi":
+            load_dir = self.dataset_root / dname
+            required_files = {
+                f"{dname}_feat.npy",
+                f"{dname}_label.npy",
+                f"{dname}_coo_adj.joblib",
             }
-            # print(adj_data['shape'])
-            # print("label=", self.label)
+            if (not load_dir.exists()) or (not required_files.issubset(set(os.listdir(load_dir)))):
+                raise FileNotFoundError(
+                    f"Dataset {dname} files not found in {load_dir}. "
+                    f"Required: {required_files}. "
+                    f"Run `python download.py {dname}` first."
+                )
+            self._load_npy_format(coo_adj=True)
 
-            self.adj = torch.sparse_coo_tensor(
-                            adj_data['indices'], 
-                            adj_data['values'], 
-                            size=adj_data['shape']
-                        ).coalesce()
+        elif fmt == "small":
+            self._load_npy_format(coo_adj=True)
 
-            # print(f"self.adj = {type(self.adj)}")
-            self.adj = self.adj.unsqueeze(0)
+        elif fmt == "attr_graphs":
+            self._load_attr_graph()
 
-        elif dname in ogb_graphs_info:
-            self.is_directed = ogb_graphs_info[dname]['d'] == 'directed'
-            
-            if dname in ["ogbn-products", "ogbn-arxiv", "ogbn-papers100M"]:
-                from ogb.nodeproppred import NodePropPredDataset
-                dataset = NodePropPredDataset(name=dname, root="/auto/datasets/graphs/comnetx/ogb/")
-                graph, labels = dataset[0]
-            
-                self.label = torch.from_numpy(labels).to(torch.long).squeeze()
-            else:
-                from ogb.linkproppred import LinkPropPredDataset
-                dataset = LinkPropPredDataset(name=dname, root="/auto/datasets/graphs/comnetx/ogb/")
-                graph = dataset[0]
-                self.label = None
+        elif fmt == "dyn_attr_graphs":
+            bs = "1" if batches_strategy is None else str(batches_strategy)
+            self._load_dynamic_attr_graph(batches_strategy=bs)
+            if str(bs) == "1":
+                self.adj = self.adj[0]
 
-            if graph['node_feat'] is not None:
-                self.features = torch.from_numpy(graph['node_feat']).float()
-            else:
-                print(f"Warning: {dname} has no node features. Using ones.")
-                self.features = None
-
-            indices = torch.from_numpy(graph['edge_index']).long()
-            num_nodes = graph['num_nodes']
-            num_edges = indices.shape[1]
-
-            values = torch.ones(num_edges, dtype=torch.float32)
-
-            adj_data = {
-                'indices': indices,
-                'values': values,
-                'shape': (num_nodes, num_nodes)
-            }
-
-            print(f"Loaded {dname}: Nodes={num_nodes}, Edges={num_edges}")
-            print("Adj shape:", adj_data['shape'])
-
-            self.adj = torch.sparse_coo_tensor(
-                adj_data['indices'], 
-                adj_data['values'], 
-                size=adj_data['shape']
-            ).coalesce() 
-            
-            self.adj = self.adj.unsqueeze(0)
-
-        elif dname in magi_info:
-            self.is_directed = magi_info[dname]['d'] == 'directed'
-            download_flag = False
-            for filename in {f"{dname}_feat.npy", f"{dname}_label.npy", f"{dname}_coo_adj.joblib"}:
-                if not os.path.isfile(os.path.join(self.path, dname, filename)):
-                    print(f"file not found: {filename}")
-                    print("Downloading files...")
-                    download_flag = True
-                    break
-            if download_flag:
-                self._load_magi()
-                self._save_magi(coo_adj = True)
-            else:
-                self._load_npy_format(coo_adj = True)
-
-            self.adj = self.adj.unsqueeze(0)
-            print("self.afj=", self.adj)
-        elif dname in {"acm", "bat", "dblp", "eat", "uat"}:
-            self._load_npy_format()
-        elif dname.startswith("static") or dname.startswith("stream"):
+        elif fmt == "dyn_sbm":
             parts = self.name.split("_")
-
             if dname.startswith("static"):
-                dataset_type = "static"
-                num_snapshots = 5
+                dataset_type, num_snapshots = "static", 5
             elif dname.startswith("stream"):
-                dataset_type = "stream"
-                num_snapshots = 10
-            snap = int(parts[1]) 
+                dataset_type, num_snapshots = "stream", 10
+            else:
+                raise ValueError(f"Bad dyn_sbm name: {self.name}")
+
+            snap = int(parts[1])
             num_nodes = int(parts[2])
             mu = float(parts[3])
             beta = float(parts[4])
-            self._load_prgpt_dataset(dataset_type=dataset_type, num_nodes=num_nodes, 
-                                     mu=mu, beta=beta, snap=snap, num_snapshots=num_snapshots)
-        elif dname.startswith("sbm") or dname.startswith("tsbm"):
+            self._load_prgpt_dataset(
+                dataset_type=dataset_type,
+                num_nodes=num_nodes,
+                mu=mu,
+                beta=beta,
+                snap=snap,
+                num_snapshots=num_snapshots,
+            )
+
+        elif fmt == "sbm":
             self._load_sbm()
 
         else:
-            raise ValueError(f"Unsupported dataset: {self.name}")
+            raise ValueError(f"Unsupported dataset format: {fmt}")
 
         if tensor_type == "dense":
             self.adj = self.adj.to_dense()
@@ -244,7 +197,7 @@ class Dataset:
 
     def _load_npy_format(self, coo_adj=True):
         dname = self.name.lower()
-        load_dir = os.path.join(self.path, dname)
+        load_dir = os.path.join(self.dataset_root, dname)
 
         feat_path = os.path.join(load_dir, f"{dname}_feat.npy")
         label_path = os.path.join(load_dir, f"{dname}_label.npy")
@@ -275,6 +228,54 @@ class Dataset:
                 f"Expected: {coo_path} or {dense_path}"
             )
 
+    def _load_attr_graph(self):
+        """Загрузка attributed graphs (flickr, wikics...) из npy/joblib."""
+        dname = self.name.lower()
+        load_dir = os.path.join(self.dataset_root, dname)
+        
+        feat_file = os.path.join(load_dir, f"{dname}_feat.npy")
+        label_file = os.path.join(load_dir, f"{dname}_label.npy")
+        adj_file = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
+        
+        if not all(os.path.exists(f) for f in [feat_file, label_file, adj_file]):
+            raise FileNotFoundError(f"Файлы attr_graph отсутствуют в {load_dir}. Запустите: download.py {dname}")
+        
+        self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
+        self.label = torch.tensor(np.load(label_file), dtype=torch.long)
+        adj_data = joblib.load(adj_file)
+        self.adj = torch.sparse_coo_tensor(
+            adj_data['indices'], adj_data['values'], size=adj_data['shape']
+        )
+
+    def _load_dynamic_attr_graph(self, batches_strategy):
+        """Загрузка dynamic attr graphs из .npz файлов."""
+        dname = self.name.lower()
+        dataset_path = os.path.join(self.dataset_root, dname)
+        
+        pure_name = self.name.split("dyn_")[-1]
+        if ":" in batches_strategy:  # p:n стратегия
+            p_str, n_str = batches_strategy.split(":")
+            p, n = int(p_str), int(n_str)
+            sufix = f"{pure_name}-{p+1}_batches.npz"
+        else:  # N стратегия
+            p, n = 0, int(batches_strategy)
+            sufix = f"{pure_name}-{n}_batches.npz"
+        dyn_path = os.path.join(dataset_path, f"dynamic_{sufix}")
+        feat_path = os.path.join(dataset_path, f"feat_{sufix}")
+        
+        print(f"Loading dynamic: {dyn_path}")
+        
+        dyn = np.load(dyn_path, allow_pickle=True)
+        i, j = dyn["indices"]
+        w, t = dyn["values"], dyn["batch_indices"]
+        self.is_directed = bool(dyn.get("is_directed", [False])[0])
+        self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+
+        if feat_path:
+            feat_data = np.load(feat_path, allow_pickle=True)
+            self.features = torch.from_numpy(feat_data.get("features", None)) if "features" in feat_data else None
+            self.label = torch.from_numpy(feat_data.get("labels", None)) if "labels" in feat_data else None
+
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,
@@ -282,7 +283,7 @@ class Dataset:
                        beta=3.0,
                        snap=1,
                        num_snapshots=5):
-        base_path = self.path
+        base_path = self.dataset_root
         if dataset_type == 'static':
             edges_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_edges_list.pickle')
             gnd_path = os.path.join(base_path, f'static_5_{num_nodes}_{mu:.1f}_{beta:.1f}_gnd_list.pickle')
@@ -334,7 +335,7 @@ class Dataset:
         ----------
         data_type : static / temporal
         """
-        base_path = self.path
+        base_path = self.dataset_root
         file_path = os.path.join(base_path, self.name + ".pt")
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"SBM dataset file not found: {file_path}")
@@ -431,10 +432,10 @@ class Dataset:
             adj_sparse = adj_sparse.coalesce()
             adjs.append(adj_sparse)
 
-    # stack into (T, n, n)
+        # stack into (T, n, n)
         adj_3d = torch.stack(adjs, dim=0)
 
-    # labels -> tensor (T, n)
+        # labels -> tensor (T, n)
         labels = torch.stack([
         torch.from_numpy(l).long().to(device) if isinstance(l, np.ndarray) else l.clone().detach().long().to(device)
         for l in labels_list
@@ -459,13 +460,14 @@ class Dataset:
         # Определение нужного файла
         batches_strategy = str(batches_strategy)
         if batches_strategy == "real":
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.sort")
+            filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.sort")
         elif ":" in batches_strategy:  # p:n стратегия
             p_str, n_str = batches_strategy.split(":")
             p, n = int(p_str), int(n_str)
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{p+1}_batches")
+            filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.{p+1}_batches")
         else:  # N стратегия
-            filepath = os.path.join(self.path, self.name, f"out.{self.name}.{batches_strategy}_batches")
+            p, n = 0, int(batches_strategy)
+            filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.{batches_strategy}_batches")
 
         # Чтение файла
         with open(filepath) as _:
@@ -473,6 +475,9 @@ class Dataset:
             #num_nodes = int(first_string.split()[0])
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+    
+    def get_dynamic_adj(self, i, j, w, t, p, n):
         min_ind = min(i.min(), j.min())
         max_ind = max(i.max(), j.max())
         i -= min_ind
@@ -484,7 +489,7 @@ class Dataset:
             adj = torch.sparse_coo_tensor(idx, w_arr, size=(num_nodes, num_nodes)).coalesce()
             return adj if self.is_directed else adj + torch.t(adj)
 
-        if ":" in batches_strategy:
+        if p != 0:
             mask = (t < p)
             adj = make_adj(i[mask], j[mask], w[mask]) # Объединяем первые p батчей в один
             adjs = [adj]
@@ -509,7 +514,7 @@ class Dataset:
             masks = [(t == tv) for tv in time_values]
             adjs = [make_adj(i[mask], j[mask], w[mask]) for mask in masks]
 
-        self.adj = torch.stack(adjs) # 3-dimensional tensor
+        return torch.stack(adjs) # 3-dimensional tensor
     
     def _save_konect(self, path = None, int_weights = True):
         main_adj = self.adj.to_sparse_coo().coalesce()
@@ -573,9 +578,9 @@ def save_small_datasets_in_konect_format():
     os.makedirs(dir_output, exist_ok = True)
     for dname in os.listdir(dir_small_datasets):
         print(dname)
-        ds = Dataset(dname, path = dir_small_datasets)
+        ds = Dataset(dname)
         ds.load()
-        ds._save_konect(dir_output)
+        ds._save_konect(path = dir_output)
         print("ok")
 
 

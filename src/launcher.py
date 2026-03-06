@@ -3,9 +3,11 @@ import json
 import os
 import time
 
-from datasets import KONECT_PATH, INFO, Dataset
+from datasets import INFO, Dataset
 from optimizer import Optimizer
 from our_utils import print_zone
+
+#KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
 
 def dynamic_launch(dataset_name : str, batches_strategy,
                     underlying_static_method : str,
@@ -13,7 +15,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                     smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
                     verbose : int = 1):
 
-    ds = Dataset(dataset_name, path = KONECT_PATH)
+    ds = Dataset(dataset_name)
     ds.load(batches_strategy = batches_strategy)
 
     with print_zone(verbose >= 1):
@@ -30,7 +32,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                             subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
                             method = underlying_static_method,
                             verbose = verbose)
-            if ":" in batches_strategy:
+            if ":" in str(batches_strategy):
                 #TODO сделать загрузку посчитанного разбиения первого батча для стратегий "9:N", "99:N", "999:N"
                 # Сейчас считаем разбиение "на ходу" самым быстрым алгоритмом
                 opt.method = "ldleiden"

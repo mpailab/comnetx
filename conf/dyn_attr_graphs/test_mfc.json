@@ -1,0 +1,16 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  
+  "DATASETS": ["dyn_wiki"],
+  "BATCHES": ["10", "999:10"],
+  
+  "BASELINES": ["mfc"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1]
+  }
+}
