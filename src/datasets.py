@@ -124,7 +124,11 @@ class Dataset:
         if fmt == "dynamic_konect":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_konect(batches_strategy=bs)
+<<<<<<< HEAD
             if ":" not in bs and bs != "real" and int(bs) == 1:
+=======
+            if str(bs) == "1":
+>>>>>>> origin/develop
                 self.adj = self.adj[0]
 
 
@@ -150,7 +154,10 @@ class Dataset:
             self._load_attr_graph()
 
         elif fmt == "dyn_attr_graphs":
-            self._load_dynamic_attr_graph()
+            bs = "1" if batches_strategy is None else str(batches_strategy)
+            self._load_dynamic_attr_graph(batches_strategy=bs)
+            if str(bs) == "1":
+                self.adj = self.adj[0]
 
         elif fmt == "dyn_sbm":
             parts = self.name.split("_")
@@ -244,48 +251,29 @@ class Dataset:
             adj_data['indices'], adj_data['values'], size=adj_data['shape']
         )
 
-    def _load_dynamic_attr_graph(self):
+    def _load_dynamic_attr_graph(self, batches_strategy):
         """Загрузка dynamic attr graphs из .npz файлов."""
         dname = self.name.lower()
         dataset_path = os.path.join(self.dataset_root, dname)
         
-        dynamic_files = [f for f in os.listdir(dataset_path) if f.startswith("dynamic_") and f.endswith(".npz")]
-        feat_files = [f for f in os.listdir(dataset_path) if f.startswith("feat_") and f.endswith(".npz")]
-        
-        if not dynamic_files:
-            raise FileNotFoundError(f"Dynamic файлы не найдены в {dataset_path}")
-        
-        dyn_path = os.path.join(dataset_path, dynamic_files[0])
-        feat_path = os.path.join(dataset_path, feat_files[0]) if feat_files else None
+        pure_name = self.name.split("dyn_")[-1]
+        if ":" in batches_strategy:  # p:n стратегия
+            p_str, n_str = batches_strategy.split(":")
+            p, n = int(p_str), int(n_str)
+            sufix = f"{pure_name}-{p+1}_batches.npz"
+        else:  # N стратегия
+            p, n = 0, int(batches_strategy)
+            sufix = f"{pure_name}-{n}_batches.npz"
+        dyn_path = os.path.join(dataset_path, f"dynamic_{sufix}")
+        feat_path = os.path.join(dataset_path, f"feat_{sufix}")
         
         print(f"Loading dynamic: {dyn_path}")
         
         dyn = np.load(dyn_path, allow_pickle=True)
-        indices = torch.from_numpy(dyn["indices"]).long()
-        values = torch.from_numpy(dyn["values"]).float()
-        batch_indices = torch.from_numpy(dyn["batch_indices"]).long()
-        
-        num_batches = int(dyn["num_batches"][0])
-        num_nodes = int(dyn["num_nodes"][0])
-        is_directed = bool(dyn.get("is_directed", [False])[0])
-        
-        adjs = []
-        for b in range(num_batches):
-            mask = batch_indices == b
-            if mask.sum() > 0:
-                idx_b = indices[:, mask]
-                val_b = values[mask]
-            else:
-                idx_b = torch.empty((2, 0), dtype=torch.long)
-                val_b = torch.empty(0, dtype=torch.float)
-            
-            adj_b = torch.sparse_coo_tensor(idx_b, val_b, (num_nodes, num_nodes)).coalesce()
-            if not is_directed:
-                adj_b = (adj_b + adj_b.transpose(0, 1)).coalesce()
-            adjs.append(adj_b)
-        
-        self.adj = torch.stack(adjs)
-        self.is_directed = is_directed
+        i, j = dyn["indices"]
+        w, t = dyn["values"], dyn["batch_indices"]
+        self.is_directed = bool(dyn.get("is_directed", [False])[0])
+        self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
 
         if feat_path:
             feat_data = np.load(feat_path, allow_pickle=True)
@@ -482,6 +470,7 @@ class Dataset:
             p, n = int(p_str), int(n_str)
             filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.{p+1}_batches")
         else:  # N стратегия
+            p, n = 0, int(batches_strategy)
             filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.{batches_strategy}_batches")
 
         # Чтение файла
@@ -490,6 +479,9 @@ class Dataset:
             #num_nodes = int(first_string.split()[0])
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+    
+    def get_dynamic_adj(self, i, j, w, t, p, n):
         min_ind = min(i.min(), j.min())
         max_ind = max(i.max(), j.max())
         i -= min_ind
@@ -501,7 +493,7 @@ class Dataset:
             adj = torch.sparse_coo_tensor(idx, w_arr, size=(num_nodes, num_nodes)).coalesce()
             return adj if self.is_directed else adj + torch.t(adj)
 
-        if ":" in batches_strategy:
+        if p != 0:
             mask = (t < p)
             adj = make_adj(i[mask], j[mask], w[mask]) # Объединяем первые p батчей в один
             adjs = [adj]
@@ -526,7 +518,7 @@ class Dataset:
             masks = [(t == tv) for tv in time_values]
             adjs = [make_adj(i[mask], j[mask], w[mask]) for mask in masks]
 
-        self.adj = torch.stack(adjs) # 3-dimensional tensor
+        return torch.stack(adjs) # 3-dimensional tensor
     
     def _save_konect(self, path = None, int_weights = True):
         main_adj = self.adj.to_sparse_coo().coalesce()
