@@ -124,7 +124,7 @@ class Dataset:
         if fmt == "dynamic_konect":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_konect(batches_strategy=bs)
-            if int(bs) == 1:
+            if ":" not in bs and bs != "real" and int(bs) == 1:
                 self.adj = self.adj[0]
 
 
