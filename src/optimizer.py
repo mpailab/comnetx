@@ -54,10 +54,54 @@ class Optimizer:
         self.method = method
         self.local_algorithm_fn = local_algorithm_fn
 
+        self._gpu_methods = {"magi", "s2cag", "prgpt:infomap", "prgpt:locale"}
+        self._gpu_device = torch.device("cuda") if torch.cuda.is_available() else None
+        self._adj_gpu = None
+        self._features_gpu = None
+        self._coms_gpu = None
 
         self.verbose = verbose
         self.conversion_time = 0.0
         self.last_timing_info = None
+
+    def _use_cuda_pipeline(self) -> bool:
+        return (
+            self._gpu_device is not None
+            and self.local_algorithm_fn is None
+            and self.method in self._gpu_methods
+        )
+
+    def _ensure_gpu_cache(self) -> None:
+        if not self._use_cuda_pipeline():
+            return
+        if self._adj_gpu is None:
+            self._adj_gpu = self.adj.to(self._gpu_device)
+        if self._features_gpu is None:
+            self._features_gpu = self.features.to(self._gpu_device)
+        if self._coms_gpu is None:
+            self._coms_gpu = self.coms.to(self._gpu_device)
+
+    def _local_algorithm_requires_features(self) -> bool:
+        if self.local_algorithm_fn is not None:
+            return True
+        if self.method in {"magi", "dmon", "dese"}:
+            return True
+        if self.method == "s2cag":
+            return not self.feat_gen
+        return False
+
+    def runtime_device(self) -> torch.device:
+        return self._gpu_device if self._use_cuda_pipeline() else self.adj.device
+
+    def runtime_adj(self) -> torch.Tensor:
+        if self._use_cuda_pipeline():
+            self._ensure_gpu_cache()
+            return self._adj_gpu
+        return self.adj
+
+    def to_runtime_device(self, tensor: torch.Tensor) -> torch.Tensor:
+        device = self.runtime_device()
+        return tensor if tensor.device == device else tensor.to(device)
     
     def _set_communities(self, communities, replace_subcoms_depth = False):
         n = self.nodes_num
@@ -88,6 +132,7 @@ class Optimizer:
                     print(f"Extending with zeros to {l} levels.")
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
+        self._coms_gpu = None
    
     def modularity(self,
             gamma: float = 1, L: int = 0, directed: bool = False) -> float:
@@ -115,12 +160,28 @@ class Optimizer:
 
         if self.size != batch.size():
             raise ValueError(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
-       
-        self.adj += batch.type(self.adj.dtype)
-        affected_nodes = batch.coalesce().indices().unique()
+
+        batch_cpu = batch if batch.device == self.adj.device else batch.to(self.adj.device)
+        batch_cpu = batch_cpu.coalesce()
+
+        self.adj += batch_cpu.type(self.adj.dtype)
+
+        use_cuda = self._use_cuda_pipeline()
+
+        if self._adj_gpu is not None:
+            if use_cuda:
+                batch_gpu = batch_cpu.to(device=self._gpu_device, dtype=self.adj.dtype)
+                self._adj_gpu = (self._adj_gpu + batch_gpu).coalesce()
+            else:
+                self._adj_gpu = None
+                self._coms_gpu = None
+
+        affected_nodes = batch_cpu.indices().unique()
         affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool)
         affected_nodes_mask[affected_nodes] = True
 
+        if use_cuda:
+            return affected_nodes_mask.to(self._gpu_device)
         return affected_nodes_mask
 
     @staticmethod
@@ -155,7 +216,7 @@ class Optimizer:
 
     def local_algorithm(self,
                         adj: torch.Tensor,
-                        features: torch.Tensor,
+                        features: Optional[torch.Tensor],
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
@@ -237,44 +298,53 @@ class Optimizer:
         nodes_mask : torch.Tensor
         """
 
+        use_cuda = self._use_cuda_pipeline()
+        needs_features = self._local_algorithm_requires_features()
 
-        # Find indices of affected nodes
-        nodes = torch.nonzero(nodes_mask, as_tuple=True)[0]
+        if use_cuda:
+            self._ensure_gpu_cache()
+            compute_device = self._gpu_device
+            coms_work = self._coms_gpu
+            adj_base = self._adj_gpu
+            features_work = self._features_gpu if needs_features else None
+        else:
+            compute_device = self.coms.device
+            coms_work = self.coms
+            adj_base = self.adj
+            features_work = self.features if needs_features else None
 
+        nodes_mask_work = nodes_mask if nodes_mask.device == compute_device else nodes_mask.to(compute_device)
 
+        # Find indices of affected nodes.
+        nodes = torch.nonzero(nodes_mask_work, as_tuple=True)[0]
         if nodes.numel() == 0:
             return
 
-
-        # Find mask of all nodes in the affected communities
-        # Per-level mask: only nodes in communities touched at each level
-        ext_mask = torch.zeros_like(self.coms, dtype=torch.bool)
+        # Per-level mask: only nodes in communities touched at each level.
+        ext_mask_work = torch.zeros_like(coms_work, dtype=torch.bool)
         for l in range(self.subcoms_depth):
-            # Use index_select (faster than boolean indexing)
-            touched = self.coms[l].index_select(0, nodes)
-            ext_mask[l] = torch.isin(self.coms[l], torch.unique(touched))
+            touched = coms_work[l].index_select(0, nodes)
+            ext_mask_work[l] = torch.isin(coms_work[l], torch.unique(touched))
 
+        # Set singleton communities for affected nodes at the last level.
+        coms_work[-1, nodes_mask_work] = nodes
 
-        # Set singleton communities for affected nodes at the last level
-        self.coms[-1, nodes_mask] = nodes
-
-
-        # Propagate remaining communities from the larger level to the smaller one
+        # Propagate remaining communities from the larger level to the smaller one.
         for l in range(self.subcoms_depth - 2, -1, -1):
-            level_ext_mask = ext_mask[l]
-            self.coms[l, level_ext_mask] = self.coms[l + 1, level_ext_mask]
+            level_ext_mask = ext_mask_work[l]
+            coms_work[l, level_ext_mask] = coms_work[l + 1, level_ext_mask]
 
-
-        # Reset adjacency matrix to the nodes of affected communities
-        adj = sparse.reset_matrix(self.adj, torch.nonzero(ext_mask[0], as_tuple=True)[0])
+        affected_nodes_lvl0 = torch.nonzero(ext_mask_work[0], as_tuple=True)[0]
+        adj_work = sparse.reset_matrix(adj_base, affected_nodes_lvl0)
 
 
         for l in range(self.subcoms_depth):
 
 
             # Get affected communites and all their nodes at the level l
-            coms = self.coms[l, ext_mask[l]]
-            ext_nodes = torch.nonzero(ext_mask[l], as_tuple=True)[0]
+            level_ext_mask = ext_mask_work[l]
+            coms = coms_work[l, level_ext_mask]
+            ext_nodes = torch.nonzero(level_ext_mask, as_tuple=True)[0]
 
 
             # Reindex communities
@@ -284,24 +354,35 @@ class Optimizer:
 
             # Aggregate adjacency and features matrices
             aggr_idx = torch.stack((inverse, ext_nodes))
-            aggr_ptn = sparse.tensor(aggr_idx, (n, self.nodes_num), adj.dtype)
-            aggr_adj = self.aggregate(adj, aggr_ptn)
-            aggr_features = torch.sparse.mm(aggr_ptn, self.features)
+            aggr_ptn = sparse.tensor(aggr_idx, (n, self.nodes_num), adj_work.dtype)
+            aggr_adj = self.aggregate(adj_work, aggr_ptn)
+            aggr_features = (
+                torch.sparse.mm(aggr_ptn, features_work)
+                if needs_features
+                else None
+            )
             del aggr_ptn
 
 
             # Apply local algorithm for aggregated graph
-            coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(coms.device)
+            coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(
+                device=compute_device,
+                dtype=torch.long,
+            )
 
 
             # Restoring the community of the original graph
             new_coms = old_idx[coms[inverse]]
             
             # Store new communities at the level l
-            self.coms[l, ext_mask[l]] = new_coms
+            coms_work[l, level_ext_mask] = new_coms
 
 
             # Cut off adjacency matrix
             cut_idx = torch.stack((new_coms, ext_nodes))
-            cut_ptn = sparse.tensor(cut_idx, self.size, adj.dtype)
-            adj = adj * torch.sparse.mm(cut_ptn.t(), cut_ptn)
+            cut_ptn = sparse.tensor(cut_idx, self.size, adj_work.dtype)
+            adj_work = adj_work * torch.sparse.mm(cut_ptn.t(), cut_ptn)
+
+        if use_cuda:
+            ext_mask_cpu = ext_mask_work.cpu()
+            self.coms[ext_mask_cpu] = coms_work[ext_mask_work].cpu()

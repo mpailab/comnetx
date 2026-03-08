@@ -52,7 +52,13 @@ def dynamic_launch(dataset_name : str, batches_strategy,
         conversion_time_s = opt.conversion_time
         time_s = time.time()
         if mode == "smart":
-            affected_nodes_mask = opt.neighborhood(opt.adj, affected_nodes_mask, step = smart_neighborhood_step)
+            runtime_adj = opt.runtime_adj()
+            affected_nodes_mask = opt.to_runtime_device(affected_nodes_mask)
+            affected_nodes_mask = opt.neighborhood(
+                runtime_adj,
+                affected_nodes_mask,
+                step = smart_neighborhood_step,
+            )
             opt.run(affected_nodes_mask)
         elif mode == "naive" or mode == "raw":
             #opt.adj = opt.safe_clamp_sparse(opt.adj) #For non-negative weights in leidenalg
