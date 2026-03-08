@@ -106,8 +106,9 @@ def load_graphs_from_tensors(adj_matrices,
 
         if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
             raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN")
+        print(f"t={t}, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
         if labels_t.dim() != 1 or labels_t.size(0) != adj_dense.size(0):
-            raise ValueError(f"Метки снапшота {t} должны быть длины N")
+            raise ValueError(f"Метки снапшота {t} должны быть длины N, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
 
         g = nx.from_numpy_array(adj_dense.cpu().numpy())
         labels_dict = {i: int(labels_t[i].item()) for i in range(len(labels_t))}
@@ -269,6 +270,7 @@ def mfc_adopted(
     labels_list = [init_labels]
 
     t0 = time.time()
+    
     main(
         network_type=network_type,
         adj_matrix=adj_matrices,

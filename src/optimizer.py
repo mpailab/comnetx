@@ -188,6 +188,8 @@ class Optimizer:
                 return networkit_partition(adj, timing_info = timing_info)
             elif self.method == "mfc":
                 from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
+                if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
+                    labels = labels.squeeze(0)
                 return mfc_adopted(
                     adj=adj,
                     labels=labels,
