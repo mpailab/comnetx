@@ -194,42 +194,41 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
-        adj_work = adj
-        features_work = features
-        labels_work = labels
 
         with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:
-                res = self.local_algorithm_fn(adj_work, features_work, limited, labels_work)
+                res = self.local_algorithm_fn(adj, features, limited, labels)
             elif self.method == "magi":
                 from baselines.magi_model import magi
-                res = magi(adj_work, features_work, labels_work, timing_info = timing_info)
+                res = magi(adj, features, labels, timing_info = timing_info)
             elif self.method == "prgpt:infomap":
                 from baselines.rough_PRGPT import rough_prgpt
-                res = rough_prgpt(adj_work, refine="infomap", timing_info = timing_info)
+                res = rough_prgpt(adj, refine="infomap", timing_info = timing_info)
             elif self.method == "prgpt:locale":
                 from baselines.rough_PRGPT import rough_prgpt
-                res = rough_prgpt(adj_work, refine="locale", timing_info = timing_info)
+                res = rough_prgpt(adj, refine="locale", timing_info = timing_info)
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
-                res = leidenalg_partition(adj_work, timing_info = timing_info)
+                res = leidenalg_partition(adj, timing_info = timing_info)
             elif self.method == "ldleiden":
                 from baselines.ldleiden import ldleiden_partition
-                res = ldleiden_partition(adj_work, timing_info = timing_info)
+                res = ldleiden_partition(adj, timing_info = timing_info)
             elif self.method == "dfleiden":
                 from baselines.dfleiden import dfleiden_partition
-                res = dfleiden_partition(adj_work, timing_info = timing_info)
+                res = dfleiden_partition(adj, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
-                res = adapted_dmon(adj_work, features_work, labels_work, timing_info = timing_info)
+                res = adapted_dmon(adj, features, labels, timing_info = timing_info)
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
-                res = networkit_partition(adj_work, timing_info = timing_info)
+                res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "mfc":
-                from baselines.mfc import mfc_adopted
-                res = mfc_adopted(
-                    adj=adj_work,
-                    labels=labels_work,
+                from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
+                if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
+                    labels = labels.squeeze(0)
+                return mfc_adopted(
+                    adj=adj,
+                    labels=labels,
                     network_type="MFC",
                     return_labels=True,
                     timing_info=timing_info,
@@ -237,7 +236,7 @@ class Optimizer:
             elif self.method == "flmig":
                 from baselines.flmig import flmig_adopted
                 flmig_labels = flmig_adopted(
-                    adj=adj_work,
+                    adj=adj,
                     return_labels=True,
                     timing_info=timing_info,
                 )
@@ -248,12 +247,12 @@ class Optimizer:
                 if self.feat_gen:
                     raise ValueError("dese cann`t work without real features")
                 else:
-                    res = dese(adj_work, features_work, labels_work, timing_info=timing_info)
+                    res = dese(adj, features, labels, timing_info=timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
                 if self.feat_gen:
-                    features_work = None
-                res = s2cag(adj_work, features_work, labels_work, timing_info = timing_info)
+                    features = None
+                res = s2cag(adj, features, labels, timing_info = timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info.get('conversion_time', 0.0)
@@ -303,9 +302,9 @@ class Optimizer:
             level_ext_mask = ext_mask_work[l]
             coms_work[l, level_ext_mask] = coms_work[l + 1, level_ext_mask]
 
+        # Reset adjacency matrix to the nodes of affected communities
         affected_nodes_lvl0 = torch.nonzero(ext_mask_work[0], as_tuple=True)[0]
         adj_work = sparse.reset_matrix(adj_base, affected_nodes_lvl0)
-
 
         for l in range(self.subcoms_depth):
             # Get affected communites and all their nodes at the level l

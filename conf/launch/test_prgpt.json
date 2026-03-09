@@ -1,0 +1,16 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  
+  "DATASETS": ["wiki_talk_ht"],
+  "BATCHES": ["999:100"],
+  
+  "BASELINES": ["prgpt:infomap"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [1],
+    "smart_neighborhood_step": [0]
+  }
+}
