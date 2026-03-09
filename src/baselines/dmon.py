@@ -173,6 +173,12 @@ def adapted_dmon(adj: torch.Tensor,
         args = Args()
 
   time_s = time.time()
+  if adj.device.type == "cuda":
+    adj = adj.cpu()
+  if ftrs.device.type == "cuda":
+    ftrs = ftrs.cpu()
+  if lbls is not None and lbls.device.type == "cuda":
+    lbls = lbls.cpu()
   graph, features = torch_to_tf_sparse_tensor(adj), torch_to_tf_sparse_tensor(ftrs)
   adjacency = torch_to_scipy_csr(adj)
   if lbls != None:

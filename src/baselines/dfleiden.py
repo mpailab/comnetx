@@ -15,14 +15,22 @@ def dfleiden_partition(
     options=None,
     timing_info=None,
 ) -> torch.Tensor:
+    conversion_time = 0.0
+    if adj.device.type == "cuda":
+        time_s = time.time()
+        adj = adj.cpu()
+        time_e = time.time()
+        conversion_time += time_e - time_s
+
     time_s = time.time()
     if options is not None:
         options = AlgorithmOptions(**options)
     algo = DFLeiden(nodes_num=adj.size(0), directed=directed, options=options)
     algo.update(adj)
     time_e = time.time()
+    conversion_time += time_e - time_s
     if timing_info is not None:
-        timing_info["conversion_time"] = time_e - time_s
+        timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + conversion_time
 
     algo.apply()
     return algo.partition().to(torch.long)

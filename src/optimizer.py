@@ -1,7 +1,6 @@
 # External imports
 import torch
-import numpy as np
-from typing import Union, Optional, Callable
+from typing import Optional, Callable
 
 
 # Internal imports
@@ -10,7 +9,7 @@ from our_utils import print_zone
 
 
 # Type aliases
-LocalAlgorithmFn = Callable[[torch.Tensor, torch.Tensor, bool, Optional[torch.Tensor]], \
+LocalAlgorithmFn = Callable[[torch.Tensor, Optional[torch.Tensor], bool, Optional[torch.Tensor]], \
                             torch.Tensor]
 
 
@@ -23,7 +22,8 @@ class Optimizer:
                  subcoms_depth: int = 1,
                  method: str = "prgpt:infomap",
                  local_algorithm_fn: Optional[LocalAlgorithmFn] = None,
-                 verbose : int = 0):
+                 verbose : int = 0,
+                 use_gpu: bool = False):
         """
 
 
@@ -38,48 +38,29 @@ class Optimizer:
         self.size = adj_matrix.size()
         self.nodes_num = adj_matrix.size()[0]
         self.subcoms_depth = subcoms_depth
-       
-       
-        self.adj = adj_matrix.float() # FIXME add any type support
 
+        # If GPU mode is requested and CUDA is available, keep all optimizer state on CUDA.
+        if use_gpu and torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = adj_matrix.device
+
+        self.adj = adj_matrix.float().to(self.device)
 
         if features is None:
-            self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype)
+            self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype, device=self.device)
             self.feat_gen = True
         else:
-            self.features = features.float() # FIXME add any type support
+            self.features = features.float().to(self.device)
             self.feat_gen = False
-       
-        self._set_communities(communities)
+
+        self.set_communities(communities)
         self.method = method
         self.local_algorithm_fn = local_algorithm_fn
-
-        self._gpu_methods = {"magi", "s2cag", "prgpt:infomap", "prgpt:locale"}
-        self._gpu_device = torch.device("cuda") if torch.cuda.is_available() else None
-        self._adj_gpu = None
-        self._features_gpu = None
-        self._coms_gpu = None
 
         self.verbose = verbose
         self.conversion_time = 0.0
         self.last_timing_info = None
-
-    def _use_cuda_pipeline(self) -> bool:
-        return (
-            self._gpu_device is not None
-            and self.local_algorithm_fn is None
-            and self.method in self._gpu_methods
-        )
-
-    def _ensure_gpu_cache(self) -> None:
-        if not self._use_cuda_pipeline():
-            return
-        if self._adj_gpu is None:
-            self._adj_gpu = self.adj.to(self._gpu_device)
-        if self._features_gpu is None:
-            self._features_gpu = self.features.to(self._gpu_device)
-        if self._coms_gpu is None:
-            self._coms_gpu = self.coms.to(self._gpu_device)
 
     def _local_algorithm_requires_features(self) -> bool:
         if self.local_algorithm_fn is not None:
@@ -91,31 +72,28 @@ class Optimizer:
         return False
 
     def runtime_device(self) -> torch.device:
-        return self._gpu_device if self._use_cuda_pipeline() else self.adj.device
+        return self.device
 
     def runtime_adj(self) -> torch.Tensor:
-        if self._use_cuda_pipeline():
-            self._ensure_gpu_cache()
-            return self._adj_gpu
         return self.adj
 
-    def to_runtime_device(self, tensor: torch.Tensor) -> torch.Tensor:
-        device = self.runtime_device()
-        return tensor if tensor.device == device else tensor.to(device)
+    def runtime_features(self) -> torch.Tensor:
+        return self.features
     
-    def _set_communities(self, communities, replace_subcoms_depth = False):
+    def set_communities(self, communities: Optional[torch.Tensor], replace_subcoms_depth: bool = False):
         n = self.nodes_num
         l = self.subcoms_depth
         if communities is None:
-            self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
+            self.coms = torch.arange(0, n, dtype=torch.long, device=self.device).repeat(l).reshape((l, n))
         else:
+            communities = communities.to(self.device)
             if communities.dim() == 1:
                 print(f"Warning: 1D communities converted to 2D with depth 1")
                 communities = communities.unsqueeze(0)
             if communities.size(1) != n:
                 print(f"Warning: bad communities shape {communities.shape}, required ({l}, {n})")
                 print(f"Use default communities with shape ({l}, {n})")
-                self.coms = torch.arange(0, n, dtype=torch.long).repeat(l).reshape((l, n))
+                self.coms = torch.arange(0, n, dtype=torch.long, device=self.device).repeat(l).reshape((l, n))
             else:
                 current_depth = communities.size(0)
                 if replace_subcoms_depth:
@@ -130,9 +108,8 @@ class Optimizer:
                 else:
                     print(f"Warning: communities depth {current_depth} < subcoms_depth {l}.")
                     print(f"Extending with zeros to {l} levels.")
-                    zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype)
+                    zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype, device=self.device)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
-        self._coms_gpu = None
    
     def modularity(self,
             gamma: float = 1, L: int = 0, directed: bool = False) -> float:
@@ -144,9 +121,9 @@ class Optimizer:
             modularity: float
         """
         from metrics import Metrics
-        return Metrics.modularity(self.adj, self.coms[L].float(), gamma, directed = directed)    
+        return Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
         
-    def update_adj(self, batch: torch.Tensor) -> torch.Tensor:
+    def update_adj(self, batch: torch.Tensor, return_mask: bool = True) -> Optional[torch.Tensor]:
         """
         Change the graph based on the current batch of updates.
 
@@ -161,27 +138,24 @@ class Optimizer:
         if self.size != batch.size():
             raise ValueError(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
 
-        batch_cpu = batch if batch.device == self.adj.device else batch.to(self.adj.device)
-        batch_cpu = batch_cpu.coalesce()
+        batch_dev = batch if batch.device == self.device else batch.to(self.device)
+        if batch_dev.is_sparse and not batch_dev.is_coalesced():
+            batch_dev = batch_dev.coalesce()
 
-        self.adj += batch_cpu.type(self.adj.dtype)
+        self.adj += batch_dev.type(self.adj.dtype)
 
-        use_cuda = self._use_cuda_pipeline()
+        if not return_mask:
+            return None
 
-        if self._adj_gpu is not None:
-            if use_cuda:
-                batch_gpu = batch_cpu.to(device=self._gpu_device, dtype=self.adj.dtype)
-                self._adj_gpu = (self._adj_gpu + batch_gpu).coalesce()
-            else:
-                self._adj_gpu = None
-                self._coms_gpu = None
-
-        affected_nodes = batch_cpu.indices().unique()
-        affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool)
+        if batch_dev.is_sparse:
+            affected_nodes = batch_dev.indices().unique()
+        else:
+            # For dense updates, track both row and column endpoints as affected nodes.
+            nz_rows, nz_cols = torch.nonzero(batch_dev, as_tuple=True)
+            affected_nodes = torch.cat((nz_rows, nz_cols), dim=0).unique()
+        affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool, device=self.device)
         affected_nodes_mask[affected_nodes] = True
 
-        if use_cuda:
-            return affected_nodes_mask.to(self._gpu_device)
         return affected_nodes_mask
 
     @staticmethod
@@ -220,67 +194,69 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
+        adj_work = adj
+        features_work = features
+        labels_work = labels
+
         with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:
-                res = self.local_algorithm_fn(adj, features, limited, labels)
+                res = self.local_algorithm_fn(adj_work, features_work, limited, labels_work)
             elif self.method == "magi":
                 from baselines.magi_model import magi
-                res = magi(adj, features, labels, timing_info = timing_info)
+                res = magi(adj_work, features_work, labels_work, timing_info = timing_info)
             elif self.method == "prgpt:infomap":
                 from baselines.rough_PRGPT import rough_prgpt
-                res = rough_prgpt(adj, refine="infomap", timing_info = timing_info)
+                res = rough_prgpt(adj_work, refine="infomap", timing_info = timing_info)
             elif self.method == "prgpt:locale":
                 from baselines.rough_PRGPT import rough_prgpt
-                res = rough_prgpt(adj, refine="locale", timing_info = timing_info)
+                res = rough_prgpt(adj_work, refine="locale", timing_info = timing_info)
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
-                res = leidenalg_partition(adj, timing_info = timing_info)
+                res = leidenalg_partition(adj_work, timing_info = timing_info)
             elif self.method == "ldleiden":
                 from baselines.ldleiden import ldleiden_partition
-                res = ldleiden_partition(adj, timing_info = timing_info)
+                res = ldleiden_partition(adj_work, timing_info = timing_info)
             elif self.method == "dfleiden":
                 from baselines.dfleiden import dfleiden_partition
-                res = dfleiden_partition(adj, timing_info = timing_info)
+                res = dfleiden_partition(adj_work, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
-                res = adapted_dmon(adj, features, labels, timing_info = timing_info)
+                res = adapted_dmon(adj_work, features_work, labels_work, timing_info = timing_info)
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
-                return networkit_partition(adj, timing_info = timing_info)
+                res = networkit_partition(adj_work, timing_info = timing_info)
             elif self.method == "mfc":
-                from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
-                return mfc_adopted(
-                    adj=adj,
-                    labels=labels,
+                from baselines.mfc import mfc_adopted
+                res = mfc_adopted(
+                    adj=adj_work,
+                    labels=labels_work,
                     network_type="MFC",
                     return_labels=True,
                     timing_info=timing_info,
                 )
             elif self.method == "flmig":
                 from baselines.flmig import flmig_adopted
-                labels = flmig_adopted(
-                    adj=adj,
+                flmig_labels = flmig_adopted(
+                    adj=adj_work,
                     return_labels=True,
                     timing_info=timing_info,
                 )
-                uniq, remap = torch.unique(labels, sorted=True, return_inverse=True)
-                return remap.to(torch.long)
+                _, remap = torch.unique(flmig_labels, sorted=True, return_inverse=True)
+                res = remap.to(torch.long)
             elif self.method == "dese":
                 from baselines.dese import dese
                 if self.feat_gen:
                     raise ValueError("dese cann`t work without real features")
                 else:
-                    res = dese(adj, features, labels, timing_info=timing_info)
+                    res = dese(adj_work, features_work, labels_work, timing_info=timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
-                # print("features =", features.shape)
                 if self.feat_gen:
-                    features = None
-                res = s2cag(adj, features, labels, timing_info = timing_info)
-                # print("Alarm1")
+                    features_work = None
+                res = s2cag(adj_work, features_work, labels_work, timing_info = timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")
-        self.conversion_time += timing_info['conversion_time']
+        self.conversion_time += timing_info.get('conversion_time', 0.0)
         self.last_timing_info = timing_info
         return res
 
@@ -298,20 +274,13 @@ class Optimizer:
         nodes_mask : torch.Tensor
         """
 
-        use_cuda = self._use_cuda_pipeline()
+        compute_device = self.device
         needs_features = self._local_algorithm_requires_features()
 
-        if use_cuda:
-            self._ensure_gpu_cache()
-            compute_device = self._gpu_device
-            coms_work = self._coms_gpu
-            adj_base = self._adj_gpu
-            features_work = self._features_gpu if needs_features else None
-        else:
-            compute_device = self.coms.device
-            coms_work = self.coms
-            adj_base = self.adj
-            features_work = self.features if needs_features else None
+        # Aliases to tensors stored in Optimizer; in-place writes update self.coms directly.
+        coms_work = self.coms
+        adj_base = self.adj
+        features_work = self.features if needs_features else None
 
         nodes_mask_work = nodes_mask if nodes_mask.device == compute_device else nodes_mask.to(compute_device)
 
@@ -339,18 +308,16 @@ class Optimizer:
 
 
         for l in range(self.subcoms_depth):
-
-
             # Get affected communites and all their nodes at the level l
             level_ext_mask = ext_mask_work[l]
             coms = coms_work[l, level_ext_mask]
             ext_nodes = torch.nonzero(level_ext_mask, as_tuple=True)[0]
 
-
             # Reindex communities
             old_idx, inverse = torch.unique(coms, sorted=True, return_inverse=True)
             n = old_idx.size(0)
-
+            if n == 0:
+                continue
 
             # Aggregate adjacency and features matrices
             aggr_idx = torch.stack((inverse, ext_nodes))
@@ -363,13 +330,11 @@ class Optimizer:
             )
             del aggr_ptn
 
-
             # Apply local algorithm for aggregated graph
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(
                 device=compute_device,
                 dtype=torch.long,
             )
-
 
             # Restoring the community of the original graph
             new_coms = old_idx[coms[inverse]]
@@ -382,7 +347,3 @@ class Optimizer:
             cut_idx = torch.stack((new_coms, ext_nodes))
             cut_ptn = sparse.tensor(cut_idx, self.size, adj_work.dtype)
             adj_work = adj_work * torch.sparse.mm(cut_ptn.t(), cut_ptn)
-
-        if use_cuda:
-            ext_mask_cpu = ext_mask_work.cpu()
-            self.coms[ext_mask_cpu] = coms_work[ext_mask_work].cpu()

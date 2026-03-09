@@ -11,16 +11,21 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                     underlying_static_method : str,
                     mode : str = "smart",
                     smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
-                    verbose : int = 1):
+                    verbose : int = 1,
+                    use_gpu: bool = False):
 
     ds = Dataset(dataset_name, path = KONECT_PATH)
     ds.load(batches_strategy = batches_strategy)
+    smart_mode = (mode == "smart")
+    naive_mode = (mode == "naive")
+    raw_mode = (mode == "raw")
 
     with print_zone(verbose >= 1):
         print("-----------------------------------------------")
         print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
-        sufix = f"L:{smart_subcoms_depth}-r:{smart_neighborhood_step}" if mode == "smart" else mode
-        print(f"Baseline: {underlying_static_method}-{sufix}")
+        sufix = f"L:{smart_subcoms_depth}-r:{smart_neighborhood_step}" if smart_mode else mode
+        gpu_sfx = "gpu" if use_gpu else "cpu"
+        print(f"Baseline: {underlying_static_method}-{sufix}-{gpu_sfx}")
     results = []
     for i, batch in enumerate(torch.unbind(ds.adj)):
         with print_zone(verbose >= 2):
@@ -29,7 +34,8 @@ def dynamic_launch(dataset_name : str, batches_strategy,
             opt = Optimizer(batch, ds.features, ds.label,
                             subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
                             method = underlying_static_method,
-                            verbose = verbose)
+                            verbose = verbose,
+                            use_gpu = use_gpu)
             if ":" in batches_strategy:
                 #TODO сделать загрузку посчитанного разбиения первого батча для стратегий "9:N", "99:N", "999:N"
                 # Сейчас считаем разбиение "на ходу" самым быстрым алгоритмом
@@ -38,33 +44,39 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 l = opt.subcoms_depth
                 coms = opt.local_algorithm(opt.adj, opt.features)
                 coms = coms.repeat(l).reshape((l, n)) # Пропагируем сообщества вверх на все уровни
-                #FIXME перенести функционал выше в функцию _set_communities
-                opt._set_communities(communities = coms)
+                #FIXME перенести функционал выше в функцию set_communities
+                opt.set_communities(communities = coms)
                 opt.method = underlying_static_method
                 continue
-            else:
-                active_nodes = batch.coalesce().indices().unique()
-                affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool)
+            elif smart_mode:
+                if batch.is_sparse:
+                    batch_idx = batch.indices() if batch.is_coalesced() else batch.coalesce().indices()
+                    active_nodes = batch_idx.unique()
+                else:
+                    nz_idx = torch.nonzero(batch, as_tuple=False)
+                    active_nodes = nz_idx.unique()
+                mask_device = opt.runtime_device()
+                active_nodes = active_nodes.to(mask_device)
+                affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool, device=mask_device)
                 affected_nodes_mask[active_nodes] = True
         else:
-            affected_nodes_mask = opt.update_adj(batch)
+            affected_nodes_mask = opt.update_adj(batch, return_mask = smart_mode)
         
         conversion_time_s = opt.conversion_time
         time_s = time.time()
-        if mode == "smart":
+        if smart_mode:
             runtime_adj = opt.runtime_adj()
-            affected_nodes_mask = opt.to_runtime_device(affected_nodes_mask)
             affected_nodes_mask = opt.neighborhood(
                 runtime_adj,
                 affected_nodes_mask,
                 step = smart_neighborhood_step,
             )
             opt.run(affected_nodes_mask)
-        elif mode == "naive" or mode == "raw":
+        elif naive_mode or raw_mode:
             #opt.adj = opt.safe_clamp_sparse(opt.adj) #For non-negative weights in leidenalg
-            labels = opt.coms if mode == "naive" else None
-            coms = opt.local_algorithm(opt.adj, opt.features, labels = labels)
-            opt._set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
+            labels = opt.coms if naive_mode else None
+            coms = opt.local_algorithm(opt.runtime_adj(), opt.runtime_features(), labels = labels)
+            opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
         time_e = time.time()
         conversion_time_e = opt.conversion_time
 
