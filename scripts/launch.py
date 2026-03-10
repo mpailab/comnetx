@@ -22,7 +22,6 @@ sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
 from datasets import INFO
 
-KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
 # input
 MACHINE_DEFAULT = subprocess.check_output("hostname", shell=True, text=True)[:-1]
 MACHINE = conf.get("MACHINE", MACHINE_DEFAULT)
@@ -58,6 +57,7 @@ BATCHES = conf["BATCHES"] # [1, 10, 100, "real", "10:100"]
 METHODS = conf["BASELINES"] # ["prgpt:locale", "prgpt:infomap", "leidenalg", "networkit", "magi", "dmon"]
 MODES = conf["MODES"] # ["smart", "naive", "raw"]
 SMART_VERSION = conf["SMART_VERSION"]
+USE_GPU = conf.get("USE_GPU", False)
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:
@@ -85,9 +85,9 @@ def save(db, errors):
     os.makedirs(os.path.join(PROJECT_PATH, "results"), exist_ok = True)
     with open(os.path.join(PROJECT_PATH, "results", f"measurements_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
         json.dump(db, _, indent=4)
-    with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
-        #print(errors)
-        json.dump(errors, _, indent=4)
+    if errors:
+        with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
+            json.dump(errors, _, indent=4)
 
 def get_algname(method, mode, smart_params=None):
     if mode == "smart":
@@ -130,7 +130,8 @@ def measure():
                                 mode=mode,
                                 smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
                                 smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
-                                verbose=VERBOSE
+                                verbose=VERBOSE,
+                                use_gpu=USE_GPU
                             )
                         except Exception as e:
                             if CATCH_ERRORS:  # ловим ошибки только если флаг True

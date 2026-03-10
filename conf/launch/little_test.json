@@ -5,8 +5,10 @@
   "DATASETS": ["wiki_talk_ht"],
   "BATCHES": ["999:100"],
   
-  "BASELINES": ["prgpt:infomap", "prgpt:locale", "flmig", "leidenalg", "networkit"],
+  "BASELINES": ["s2cag", "prgpt:infomap", "prgpt:locale", "magi", "leidenalg", "dmon", "networkit",
+                "mfc", "flmig", "dese"],
   "MODES": ["naive", "smart"],
+  "USE_GPU": true,
   
   "SMART_VERSION": "v1",
   "SMART_PARAMS_GRID": {
