@@ -7,8 +7,6 @@ from datasets import INFO, Dataset
 from optimizer import Optimizer
 from our_utils import print_zone
 
-#KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
-
 def dynamic_launch(dataset_name : str, batches_strategy,
                     underlying_static_method : str,
                     mode : str = "smart",
