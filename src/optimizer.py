@@ -61,6 +61,7 @@ class Optimizer:
         self.verbose = verbose
         self.conversion_time = 0.0
         self.last_timing_info = None
+        self.local_algorithm_calls = 0
 
     def _local_algorithm_requires_features(self) -> bool:
         if self.local_algorithm_fn is not None:
@@ -194,6 +195,7 @@ class Optimizer:
                         limited: bool = False,
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
+        self.local_algorithm_calls += 1
 
         with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:

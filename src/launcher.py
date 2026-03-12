@@ -47,6 +47,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 #FIXME перенести функционал выше в функцию set_communities
                 opt.set_communities(communities = coms)
                 opt.method = underlying_static_method
+                opt.local_algorithm_calls = 0
                 continue
             elif smart_mode:
                 if batch.is_sparse:
@@ -62,8 +63,9 @@ def dynamic_launch(dataset_name : str, batches_strategy,
         else:
             affected_nodes_mask = opt.update_adj(batch, return_mask = smart_mode)
         
-        conversion_time_s = opt.conversion_time
         time_s = time.time()
+        conversion_time_s = opt.conversion_time
+        calls_s = opt.local_algorithm_calls
         if smart_mode:
             runtime_adj = opt.runtime_adj()
             affected_nodes_mask = opt.neighborhood(
@@ -79,27 +81,27 @@ def dynamic_launch(dataset_name : str, batches_strategy,
             opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
         time_e = time.time()
         conversion_time_e = opt.conversion_time
+        calls_e = opt.local_algorithm_calls
 
-        total_time = time_e - time_s
+        total_batch_time = time_e - time_s
         conversion_time = conversion_time_e - conversion_time_s
+        measured_time = total_batch_time - conversion_time
         mod = opt.modularity(directed = ds.is_directed)
         with print_zone(verbose >= 2):
-            print(f"Modularity: {mod:.2}")
+            print(f"Modularity: {mod:.2g}")
+            print(f"Baseline calls: {calls_e - calls_s}")
             if underlying_static_method == "ldleiden" and mode in {"naive", "raw"}:
                 algorithm_time = opt.last_timing_info["algorithm_time"]
-                print(f"Algorithm time: {algorithm_time:.2}")
+                print(f"Algorithm time: {algorithm_time:.2f}")
             else:
-                print(f"Time: {total_time - conversion_time:.2}")
+                print(f"Time: {measured_time:.2f}")
+        results.append({'modularity' : mod, 'time': measured_time})
 
-        results.append({'modularity' : mod, 'time': total_time - conversion_time})
-
-    total_time = sum(map(lambda x: x["time"], results))
+    total_measured_time = sum(map(lambda x: x["time"], results))
     with print_zone(verbose == 1):
-        print(f"Final modularity: {mod:.2}")
-        print(f"Total time: {total_time:.2}")
-        print("-----------------------------------------------")
-    with print_zone(verbose >= 2):
-        print("-")
-        print(f"Total time: {total_time:.2}")
+        print(f"Final modularity: {mod:.2g}")
+    with print_zone(verbose >= 1):
+        print(f"Total baseline calls: {opt.local_algorithm_calls}")
+        print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")
     return results
