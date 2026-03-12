@@ -3,9 +3,8 @@ from typing import Any
 
 
 def tensor(indices : torch.Tensor, size : torch.types._size, dtype : torch.dtype):
-    return torch.sparse_coo_tensor(indices, 
-                                   torch.ones(indices.size()[1], dtype=dtype),
-                                   size).coalesce()
+    values = torch.ones(indices.size()[1], dtype=dtype, device=indices.device)
+    return torch.sparse_coo_tensor(indices, values, size, device=indices.device).coalesce()
 
 
 def mm(indices1 : torch.Tensor, indices2 : torch.Tensor, size : torch.Size):
@@ -22,10 +21,15 @@ def ext_range(tensor : torch.Tensor, size : int):
 
 def reset_matrix(tensor : torch.Tensor, 
                  indices : torch.Tensor) -> torch.Tensor:
-    mask = torch.isin(tensor.coalesce().indices(), indices).all(0)
-    return torch.sparse_coo_tensor(tensor.coalesce().indices()[:, mask], 
-                                   tensor.coalesce().values()[mask],
-                                   tensor.size()).coalesce()
+    coalesced = tensor.coalesce()
+    coalesced_idx = coalesced.indices()
+    mask = torch.isin(coalesced_idx, indices).all(0)
+    return torch.sparse_coo_tensor(
+        coalesced_idx[:, mask],
+        coalesced.values()[mask],
+        tensor.size(),
+        device=tensor.device,
+    ).coalesce()
 
 
 def reset(tensor : torch.Tensor, 

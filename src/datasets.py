@@ -124,7 +124,7 @@ class Dataset:
         if fmt == "dynamic_konect":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_konect(batches_strategy=bs)
-            if str(bs) == "1":
+            if ":" not in bs and bs != "real" and int(bs) == 1:
                 self.adj = self.adj[0]
 
 
@@ -262,8 +262,6 @@ class Dataset:
             sufix = f"{pure_name}-{n}_batches.npz"
         dyn_path = os.path.join(dataset_path, f"dynamic_{sufix}")
         feat_path = os.path.join(dataset_path, f"feat_{sufix}")
-        
-        print(f"Loading dynamic: {dyn_path}")
         
         dyn = np.load(dyn_path, allow_pickle=True)
         i, j = dyn["indices"]
