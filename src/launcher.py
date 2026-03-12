@@ -31,8 +31,9 @@ def dynamic_launch(dataset_name : str, batches_strategy,
         with print_zone(verbose >= 2):
             print("Batch", i)
         if i == 0:
-            opt = Optimizer(batch, ds.features, ds.label,
-                            subcoms_depth = smart_subcoms_depth if mode == "smart" else 1,
+            subcoms_depth = smart_subcoms_depth if mode == "smart" else 1
+            opt = Optimizer(batch, ds.features,
+                            subcoms_depth = subcoms_depth,
                             method = underlying_static_method,
                             verbose = verbose,
                             use_gpu = use_gpu)
@@ -42,10 +43,11 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 opt.method = "ldleiden"
                 n = opt.nodes_num
                 l = opt.subcoms_depth
+
                 coms = opt.local_algorithm(opt.adj, opt.features)
                 coms = coms.repeat(l).reshape((l, n)) # Пропагируем сообщества вверх на все уровни
-                #FIXME перенести функционал выше в функцию set_communities
                 opt.set_communities(communities = coms)
+
                 opt.method = underlying_static_method
                 opt.local_algorithm_calls = 0
                 continue

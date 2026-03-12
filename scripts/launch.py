@@ -57,7 +57,7 @@ BATCHES = conf["BATCHES"] # [1, 10, 100, "real", "10:100"]
 METHODS = conf["BASELINES"] # ["prgpt:locale", "prgpt:infomap", "leidenalg", "networkit", "magi", "dmon"]
 MODES = conf["MODES"] # ["smart", "naive", "raw"]
 SMART_VERSION = conf["SMART_VERSION"]
-USE_GPU = conf.get("USE_GPU", False)
+USE_GPU = conf.get("USE_GPU", True)
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:

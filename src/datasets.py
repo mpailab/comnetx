@@ -263,8 +263,6 @@ class Dataset:
         dyn_path = os.path.join(dataset_path, f"dynamic_{sufix}")
         feat_path = os.path.join(dataset_path, f"feat_{sufix}")
         
-        print(f"Loading dynamic: {dyn_path}")
-        
         dyn = np.load(dyn_path, allow_pickle=True)
         i, j = dyn["indices"]
         w, t = dyn["values"], dyn["batch_indices"]
