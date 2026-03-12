@@ -89,13 +89,14 @@ def save(db, errors):
         with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
             json.dump(errors, _, indent=4)
 
-def get_algname(method, mode, smart_params=None):
+def get_algname(method, mode, use_gpu, smart_params=None):
     if mode == "smart":
         #algname = f"{method}-{SMART_VERSION}"
         algname = f"{method}"
         if smart_params:
+            gpu_sfx = "gpu" if use_gpu else "cpu"
             params_string = "-".join([f"{ABBR[k]}:{v}" for k, v in smart_params.items()])
-            algname = f"{algname}-{params_string}"
+            algname = f"{algname}-{params_string}-{gpu_sfx}"
         return algname
     else:
         return f"{method}-{mode}"
@@ -119,7 +120,7 @@ def measure():
                         else:
                             smart_params_dict = SMART_PAR_DEFAULT
                         
-                        algname = get_algname(method, mode, smart_params_dict)
+                        algname = get_algname(method, mode, USE_GPU, smart_params_dict)
                         db = init(db, algname, dataset)
                         
                         try:

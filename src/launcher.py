@@ -23,9 +23,9 @@ def dynamic_launch(dataset_name : str, batches_strategy,
     with print_zone(verbose >= 1):
         print("-----------------------------------------------")
         print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
-        sufix = f"L:{smart_subcoms_depth}-r:{smart_neighborhood_step}" if smart_mode else mode
         gpu_sfx = "gpu" if use_gpu else "cpu"
-        print(f"Baseline: {underlying_static_method}-{sufix}-{gpu_sfx}")
+        sufix = f"L:{smart_subcoms_depth}-r:{smart_neighborhood_step}-{gpu_sfx}" if smart_mode else mode
+        print(f"Baseline: {underlying_static_method}-{sufix}")
     results = []
     for i, batch in enumerate(torch.unbind(ds.adj)):
         with print_zone(verbose >= 2):
