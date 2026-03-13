@@ -20,7 +20,7 @@ conf_name = os.path.basename(conf_file).rsplit(".", maxsplit=1)[0]
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
-from datasets import INFO, KONECT_PATH
+from datasets import INFO
 
 # input
 MACHINE_DEFAULT = subprocess.check_output("hostname", shell=True, text=True)[:-1]
@@ -36,9 +36,13 @@ with open(os.path.join(INFO, "konect.json")) as _:
 konect_datasets = list(filter(lambda dataset: info[dataset]["w"] in ["weighted", "unweighted"], list(info.keys())))
 datasets_by_edges = sorted(konect_datasets, key = lambda x: info[x]["m"])
 datasets_by_nodes = sorted(konect_datasets, key = lambda x: info[x]["n"])
+undirected_datasets_by_nodes = list(filter(lambda dataset: info[dataset]["d"] == "undirected", datasets_by_nodes))
+undirected_datasets_by_edges = list(filter(lambda dataset: info[dataset]["d"] == "undirected", datasets_by_edges))
 datasets_dict = {
     "konect_by_edges" : datasets_by_edges,
-    "konect_by_nodes" : datasets_by_nodes
+    "konect_by_nodes" : datasets_by_nodes,
+    "undirected_datasets_by_nodes" : undirected_datasets_by_nodes,
+    "undirected_datasets_by_edges" : undirected_datasets_by_edges
 }
 if type(conf["DATASETS"]) == str:
   DATASETS = datasets_dict[conf["DATASETS"]]
@@ -53,6 +57,7 @@ BATCHES = conf["BATCHES"] # [1, 10, 100, "real", "10:100"]
 METHODS = conf["BASELINES"] # ["prgpt:locale", "prgpt:infomap", "leidenalg", "networkit", "magi", "dmon"]
 MODES = conf["MODES"] # ["smart", "naive", "raw"]
 SMART_VERSION = conf["SMART_VERSION"]
+USE_GPU = conf.get("USE_GPU", True)
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:
@@ -74,23 +79,24 @@ def init(db, baseline, dataset):
         db[baseline][dataset][MACHINE] = {}
     return db
 
-#DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
-DATE_SUFFIX = "now"
+DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
+#DATE_SUFFIX = "now"
 def save(db, errors):
     os.makedirs(os.path.join(PROJECT_PATH, "results"), exist_ok = True)
-    with open(os.path.join(PROJECT_PATH, "results", f"measurements_{DATE_SUFFIX}.json"), 'w') as _:
+    with open(os.path.join(PROJECT_PATH, "results", f"measurements_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
         json.dump(db, _, indent=4)
-    with open(os.path.join(PROJECT_PATH, "results", f"errors_{DATE_SUFFIX}.json"), 'w') as _:
-        #print(errors)
-        json.dump(errors, _, indent=4)
+    if errors:
+        with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
+            json.dump(errors, _, indent=4)
 
-def get_algname(method, mode, smart_params=None):
+def get_algname(method, mode, use_gpu, smart_params=None):
     if mode == "smart":
         #algname = f"{method}-{SMART_VERSION}"
         algname = f"{method}"
         if smart_params:
+            gpu_sfx = "gpu" if use_gpu else "cpu"
             params_string = "-".join([f"{ABBR[k]}:{v}" for k, v in smart_params.items()])
-            algname = f"{algname}-{params_string}"
+            algname = f"{algname}-{params_string}-{gpu_sfx}"
         return algname
     else:
         return f"{method}-{mode}"
@@ -114,7 +120,7 @@ def measure():
                         else:
                             smart_params_dict = SMART_PAR_DEFAULT
                         
-                        algname = get_algname(method, mode, smart_params_dict)
+                        algname = get_algname(method, mode, USE_GPU, smart_params_dict)
                         db = init(db, algname, dataset)
                         
                         try:
@@ -125,7 +131,8 @@ def measure():
                                 mode=mode,
                                 smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
                                 smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
-                                verbose=VERBOSE
+                                verbose=VERBOSE,
+                                use_gpu=USE_GPU
                             )
                         except Exception as e:
                             if CATCH_ERRORS:  # ловим ошибки только если флаг True
