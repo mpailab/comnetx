@@ -60,6 +60,13 @@ class Dataset:
             if self.name.lower() in datasets:
                 return "dyn_attr_graphs"
         
+        tgc_path = INFO / "tgc_graphs.json"
+        if tgc_path.exists():
+            with open(tgc_path) as f:
+                datasets = json.load(f)
+            if self.name.lower() in datasets:
+                return "tgc_graphs"
+        
         dname = self.name.lower()
         if dname in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
             return "small"
@@ -118,6 +125,12 @@ class Dataset:
                 info = json.load(f)
             self.is_directed = info[self.name.lower()]["d"] == "directed"
 
+        elif fmt == "tgc_graphs":
+            tgc_path = INFO / "tgc_graphs.json"
+            with open(tgc_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            self.is_directed = info[self.name.lower()]["d"] == "directed"
+
         else:
             raise ValueError(f"Unknown dataset_format: {fmt}")
 
@@ -152,6 +165,12 @@ class Dataset:
         elif fmt == "dyn_attr_graphs":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_dynamic_attr_graph(batches_strategy=bs)
+            if str(bs) == "1":
+                self.adj = self.adj[0]
+        
+        elif fmt == "tgc_graphs":
+            bs = "1" if batches_strategy is None else str(batches_strategy)
+            self._load_tgc_graphs(batches_strategy=bs)
             if str(bs) == "1":
                 self.adj = self.adj[0]
 
@@ -274,6 +293,54 @@ class Dataset:
             self.features = torch.from_numpy(feat_data.get("features", None)) if "features" in feat_data else None
             self.label = torch.from_numpy(feat_data.get("labels", None)) if "labels" in feat_data else None
 
+    def _load_tgc_graphs(self, batches_strategy):
+        """Загрузка temporal graph clustering (TGC) датасетов из npy/joblib."""
+        dname = self.name.lower()
+        load_dir = os.path.join(self.dataset_root, dname)
+        
+        if ":" in batches_strategy:  # p:n стратегия
+            p_str, n_str = batches_strategy.split(":")
+            p, n = int(p_str), int(n_str)
+            adj_file = os.path.join(load_dir, f"{dname}_coo_adj-{p+1}_batches.joblib")
+        else:  # N стратегия
+            p, n = 0, int(batches_strategy)
+            adj_file = os.path.join(load_dir, f"{dname}_coo_adj-{n}_batches.joblib")
+
+        feat_file = os.path.join(load_dir, f"{dname}_feat.npy")
+        label_file = os.path.join(load_dir, f"{dname}_label.npy")
+        
+        # # old (14.03.26)
+        # adj_file = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
+        
+        if not all(os.path.exists(f) for f in [feat_file, label_file, adj_file]):
+            raise FileNotFoundError(f"Для стратегии {batches_strategy} файлы TGC отсутствуют в {load_dir}. Запустите загрузку для датасета {dname}")
+        
+        self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
+        self.label = torch.tensor(np.load(label_file), dtype=torch.long)
+        
+        adj_data = joblib.load(adj_file)
+        
+        indices = torch.tensor(adj_data['indices'], dtype=torch.long)
+        
+        # # old (14.03.26)
+        # values = torch.tensor(adj_data['values'], dtype=torch.float32)
+        # self.adj = torch.sparse_coo_tensor(
+        #     indices=indices, 
+        #     values=values, 
+        #     size=adj_data['shape']
+        # ).coalesce()
+        
+        t = indices[0]
+        i = indices[1] 
+        j = indices[2] 
+        w = adj_data['values']
+
+        self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+
+        # Автоматическая разметка ориентированности согласно статье
+        # Неориентированные: brain, dblp. Остальные (цитирования) - ориентированные.
+        undirected_datasets = {"brain", "dblp"}
+        self.is_directed = dname not in undirected_datasets
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,

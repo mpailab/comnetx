@@ -1,56 +1,20 @@
+import os
 import torch
-from torch_geometric.data import Data
-import matplotlib.pyplot as plt
 import numpy as np
-
-def analyze_graph_dynamics(dataset):
-    # Извлекаем метки времени из edge_attr
-    # В нашем случае это тензор размерности [E, 1]
-    timestamps = dataset.edge_attr.flatten().numpy()
-    
-    print(f"--- Анализ временной динамики ---")
-    print(f"Минимальное время (t_min): {timestamps.min()}")
-    print(f"Максимальное время (t_max): {timestamps.max()}")
-    print(f"Общая длительность: {timestamps.max() - timestamps.min()}")
-    
-    # 1. Визуализация интенсивности событий
-    plt.figure(figsize=(12, 5))
-    
-    plt.subplot(1, 2, 1)
-    plt.hist(timestamps, bins=50, color='skyblue', edgecolor='black')
-    plt.title('Распределение ребер во времени')
-    plt.xlabel('Timestamp (Время)')
-    plt.ylabel('Количество новых связей (событий)')
-    plt.grid(axis='y', alpha=0.3)
-
-    # 2. Накопительный график (как растет граф)
-    plt.subplot(1, 2, 2)
-    sorted_times = np.sort(timestamps)
-    cumulative_edges = np.arange(len(sorted_times))
-    plt.plot(sorted_times, cumulative_edges, color='salmon', linewidth=2)
-    plt.title('Накопительный рост графа')
-    plt.xlabel('Timestamp')
-    plt.ylabel('Общее число ребер')
-    plt.grid(alpha=0.3)
-
-    plt.tight_layout()
-    plt.show()
+import joblib
+from torch_geometric.data import Data
 
 def load_tgc_dataset(nodes_path, edges_path, labels_path):
-    # 1. Загрузка признаков (Features)
     features_list = []
     with open(nodes_path, 'r') as f:
         lines = f.readlines()
         
-        # Проверяем, является ли первая строка заголовком (N d)
         first_line = lines[0].strip().split()
         if len(first_line) == 2 and '.' not in first_line[0]:
-            # Это заголовок (например: "100 128")
             num_nodes = int(first_line[0])
             dim = int(first_line[1])
             data_start_idx = 1
         else:
-            # Заголовка нет, данные начинаются сразу
             data_start_idx = 0
             dim = len(first_line) if len(first_line) > 2 else len(lines[1].strip().split())
             num_nodes = len(lines) - data_start_idx
@@ -61,7 +25,6 @@ def load_tgc_dataset(nodes_path, edges_path, labels_path):
             parts = line.strip().split()
             if not parts or i >= num_nodes: continue
             
-            # Если в строке dim+1 элементов, значит первый - это ID
             if len(parts) == dim + 1:
                 node_id = int(float(parts[0]))
                 vector = [float(v) for v in parts[1:]]
@@ -74,17 +37,18 @@ def load_tgc_dataset(nodes_path, edges_path, labels_path):
 
     print(f"Загружено узлов: {x.shape[0]}, размерность признаков: {x.shape[1]}")
 
-    # 2. Загрузка меток (Labels)
     y = torch.zeros(x.shape[0], dtype=torch.long)
-    with open(labels_path, 'r') as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) < 2: continue
-            node_id, label = int(float(parts[0])), int(float(parts[1]))
-            if node_id < x.shape[0]:
-                y[node_id] = label
+    if os.path.exists(labels_path):
+        with open(labels_path, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) < 2: continue
+                node_id, label = int(float(parts[0])), int(float(parts[1]))
+                if node_id < x.shape[0]:
+                    y[node_id] = label
+    else:
+        print(f"Файл меток {labels_path} не найден. Используются нули.")
 
-    # 3. Загрузка ребер (Edges)
     edges, timestamps = [], []
     with open(edges_path, 'r') as f:
         for line in f:
@@ -100,13 +64,68 @@ def load_tgc_dataset(nodes_path, edges_path, labels_path):
     data = Data(x=x, edge_index=edge_index, edge_attr=edge_time, y=y)
     return data
 
-# Пути для вашего сервера
-DATA_DIR = '/auto/datasets/graphs/comnetx/4TGC/data'
-dataset = load_tgc_dataset(
-    nodes_path= DATA_DIR + '/arXivAI/feature.txt', 
-    edges_path= DATA_DIR + '/arXivAI/arxivAI.txt', 
-    labels_path= DATA_DIR + '/arXivAI/node2label.txt'
-)
-print(f"Итоговый объект: {dataset}")
+def download_tgc(name: str, data_dir: str, save_path: str, num_batches: int = 100):
+    dname = name.lower()
+    
+    nodes_path = os.path.join(data_dir, name, 'feature.txt')
+    edges_path = os.path.join(data_dir, name, f'{name}.txt')
+    labels_path = os.path.join(data_dir, name, 'node2label.txt')
 
-analyze_graph_dynamics(dataset)
+    dataset = load_tgc_dataset(nodes_path, edges_path, labels_path)
+    
+    features = dataset.x
+    labels = dataset.y
+    num_nodes = labels.size(0)
+
+    save_dir = os.path.join(save_path, dname)
+    os.makedirs(save_dir, exist_ok=True)
+
+    if features is not None:
+        feat_path = os.path.join(save_dir, f"{dname}_feat.npy")
+        np.save(feat_path, features.detach().cpu().numpy())
+        print(f"Фичи сохранены: {feat_path}")
+
+    label_path = os.path.join(save_dir, f"{dname}_label.npy")
+    if labels is not None and labels.dim() == 1:
+        np.save(label_path, labels.detach().cpu().numpy())
+    else:
+        np.save(label_path, np.full((num_nodes,), -1, dtype=np.int64))
+    print(f"Метки сохранены: {label_path}")
+
+    timestamps = dataset.edge_attr.flatten()
+    sorted_indices = torch.argsort(timestamps)
+    sorted_u = dataset.edge_index[0, sorted_indices]
+    sorted_v = dataset.edge_index[1, sorted_indices]
+
+    num_edges = dataset.edge_index.shape[1]
+    batch_indices = torch.arange(num_edges) * num_batches // num_edges
+
+    indices = torch.stack([batch_indices, sorted_u, sorted_v], dim=0)
+    values = torch.ones(num_edges, dtype=torch.float32)
+    size = (num_batches, num_nodes, num_nodes)
+    sparse_adj_3d = torch.sparse_coo_tensor(indices, values, size=size).coalesce()
+    
+    adj_data = {
+        "indices": sparse_adj_3d.indices().cpu().numpy(),
+        "values": sparse_adj_3d.values().cpu().numpy(),
+        "shape": sparse_adj_3d.shape,
+    }
+    
+    adj_path = os.path.join(save_dir, f"{dname}_coo_adj-{num_batches}_batches.joblib")
+    joblib.dump(adj_data, adj_path)
+    print(f"Временной граф сохранен: {adj_path}")
+    print(f"--- Обработка {name} успешно завершена! ---\n")
+
+    return sparse_adj_3d, features, labels
+
+if __name__ == "__main__":
+    # arxivai  arxivcs  arxivlarge  arxivmath  arxivphy  brain  dblp-tgc  patent
+    DATASET_NAME = "brain" 
+    RAW_DATA_DIR = "/auto/datasets/graphs/comnetx/4TGC/data/" 
+    PROCESSED_DATA_DIR = "/auto/datasets/graphs/comnetx/4TGC/data_npy" 
+    for num_batches in [1,10,100,1000]:
+        sparse_adj_3d, features, labels = download_tgc(DATASET_NAME, RAW_DATA_DIR, PROCESSED_DATA_DIR, num_batches)
+
+    # print(f"sparse_adj_3d = {sparse_adj_3d}")
+    # print(f"features = {features}")
+    # print(f"labels = {labels}")
