@@ -137,8 +137,8 @@ class Dataset:
         if fmt == "dynamic_konect":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_konect(batches_strategy=bs)
-            if ":" not in bs and bs != "real" and int(bs) == 1:
-                self.adj = self.adj[0]
+            # if ":" not in bs and bs != "real" and int(bs) == 1:
+                # self.adj = self.adj[0]
 
 
         elif fmt == "magi":
@@ -165,14 +165,12 @@ class Dataset:
         elif fmt == "dyn_attr_graphs":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_dynamic_attr_graph(batches_strategy=bs)
-            if str(bs) == "1":
-                self.adj = self.adj[0]
+            # if str(bs) == "1":
+            #     self.adj = self.adj[0]
         
         elif fmt == "tgc_graphs":
             bs = "1" if batches_strategy is None else str(batches_strategy)
             self._load_tgc_graphs(batches_strategy=bs)
-            if str(bs) == "1":
-                self.adj = self.adj[0]
 
         elif fmt == "dyn_sbm":
             parts = self.name.split("_")
@@ -313,7 +311,7 @@ class Dataset:
         # adj_file = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
         
         if not all(os.path.exists(f) for f in [feat_file, label_file, adj_file]):
-            raise FileNotFoundError(f"Для стратегии {batches_strategy} файлы TGC отсутствуют в {load_dir}. Запустите загрузку для датасета {dname}")
+            raise FileNotFoundError(f"Для стратегии {batches_strategy} файлы TGC отсутствуют в {load_dir}. Запустите bash: python src/download.py {dname}")
         
         self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
         self.label = torch.tensor(np.load(label_file), dtype=torch.long)
