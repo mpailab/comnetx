@@ -54,14 +54,17 @@ class Optimizer:
             self.features = features.float().to(self.device)
             self.feat_gen = False
 
-        self.set_communities(communities)
-        self.method = method
-        self.local_algorithm_fn = local_algorithm_fn
-
         self.verbose = verbose
         self.conversion_time = 0.0
         self.last_timing_info = None
         self.local_algorithm_calls = 0
+        self.cuda_mem_log = self.verbose >= 4 and self.device.type == "cuda" and torch.cuda.is_available()
+        self._log_cuda_memory("init:after-adj-features")
+
+        self.set_communities(communities)
+        self._log_cuda_memory("init:after-communities")
+        self.method = method
+        self.local_algorithm_fn = local_algorithm_fn
 
     def _local_algorithm_requires_features(self) -> bool:
         if self.local_algorithm_fn is not None:
@@ -71,6 +74,33 @@ class Optimizer:
         if self.method == "s2cag":
             return not self.feat_gen
         return False
+
+    def _log_cuda_memory(self, stage: str) -> None:
+        if not self.cuda_mem_log:
+            return
+        allocated_mb = torch.cuda.memory_allocated(self.device) / (1024 * 1024)
+        reserved_mb = torch.cuda.memory_reserved(self.device) / (1024 * 1024)
+        peak_mb = torch.cuda.max_memory_allocated(self.device) / (1024 * 1024)
+        print(
+            f"[cuda-mem] {stage:<22} "
+            f"allocated={allocated_mb:9.2f} MB "
+            f"reserved={reserved_mb:9.2f} MB "
+            f"peak={peak_mb:9.2f} MB"
+        )
+
+    @staticmethod
+    def _log_cuda_memory_static(stage: str, device: torch.device, enabled: bool) -> None:
+        if not enabled:
+            return
+        allocated_mb = torch.cuda.memory_allocated(device) / (1024 * 1024)
+        reserved_mb = torch.cuda.memory_reserved(device) / (1024 * 1024)
+        peak_mb = torch.cuda.max_memory_allocated(device) / (1024 * 1024)
+        print(
+            f"[cuda-mem] {stage:<22} "
+            f"allocated={allocated_mb:9.2f} MB "
+            f"reserved={reserved_mb:9.2f} MB "
+            f"peak={peak_mb:9.2f} MB"
+        )
 
     def runtime_device(self) -> torch.device:
         return self.device
@@ -82,6 +112,7 @@ class Optimizer:
         return self.features
     
     def set_communities(self, communities: Optional[torch.Tensor], replace_subcoms_depth: bool = False):
+        self._log_cuda_memory("set_communities:start")
         n = self.nodes_num
         l = self.subcoms_depth
         if communities is None:
@@ -111,6 +142,7 @@ class Optimizer:
                     print(f"Extending with zeros to {l} levels.")
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype, device=self.device)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
+        self._log_cuda_memory("set_communities:end")
    
     def modularity(self,
             gamma: float = 1, L: int = 0, directed: bool = False) -> float:
@@ -139,13 +171,17 @@ class Optimizer:
         if self.size != batch.size():
             raise ValueError(f"Unsuitable batch size: {batch.size()}. {self.size} is required.")
 
+        self._log_cuda_memory("update_adj:start")
         batch_dev = batch if batch.device == self.device else batch.to(self.device)
         if batch_dev.is_sparse and not batch_dev.is_coalesced():
             batch_dev = batch_dev.coalesce()
+        self._log_cuda_memory("update_adj:prepared")
 
         self.adj += batch_dev.type(self.adj.dtype)
+        self._log_cuda_memory("update_adj:after-add")
 
         if not return_mask:
+            self._log_cuda_memory("update_adj:end-no-mask")
             return None
 
         if batch_dev.is_sparse:
@@ -156,6 +192,7 @@ class Optimizer:
             affected_nodes = torch.cat((nz_rows, nz_cols), dim=0).unique()
         affected_nodes_mask = torch.zeros(self.nodes_num, dtype=torch.bool, device=self.device)
         affected_nodes_mask[affected_nodes] = True
+        self._log_cuda_memory("update_adj:end")
 
         return affected_nodes_mask
 
@@ -163,10 +200,14 @@ class Optimizer:
     def neighborhood(adj: torch.Tensor,
                     nodes_mask: torch.Tensor,
                     step: int = 1,
-                    is_symmetric=False) -> torch.Tensor:
+                    is_symmetric=False,
+                    log_cuda: bool = False) -> torch.Tensor:
+        cuda_log = log_cuda and adj.device.type == "cuda" and torch.cuda.is_available()
+        Optimizer._log_cuda_memory_static("neighborhood:start", adj.device, cuda_log)
 
         visited = nodes_mask.clone()
         if (step <= 0) or visited.all() or not visited.any():
+            Optimizer._log_cuda_memory_static("neighborhood:end-short", adj.device, cuda_log)
             return visited
 
         A = adj.coalesce()
@@ -176,9 +217,10 @@ class Optimizer:
             A_sym = (A + AT).coalesce()
         else:
             A_sym = A
+        Optimizer._log_cuda_memory_static("neighborhood:prepared", adj.device, cuda_log)
 
         frontier = visited.clone()
-        for _ in range(step):
+        for i in range(step):
             if not frontier.any() or visited.all():
                 break
             y = torch.sparse.mm(A_sym, frontier.to(dtype=A_sym.dtype).unsqueeze(1)).squeeze(1)
@@ -186,7 +228,9 @@ class Optimizer:
             new_frontier = new_nodes & (~visited)
             visited = visited | new_nodes
             frontier = new_frontier
+            Optimizer._log_cuda_memory_static(f"neighborhood:step-{i}", adj.device, cuda_log)
 
+        Optimizer._log_cuda_memory_static("neighborhood:end", adj.device, cuda_log)
         return visited
 
     def local_algorithm(self,
@@ -196,6 +240,7 @@ class Optimizer:
                         labels: Optional[torch.Tensor] = None) -> torch.Tensor:
         timing_info = {'conversion_time' : 0.0}
         self.local_algorithm_calls += 1
+        self._log_cuda_memory(f"local:start:{self.method}")
 
         with print_zone(self.verbose >= 3):
             if self.local_algorithm_fn is not None:
@@ -228,13 +273,15 @@ class Optimizer:
                 from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
                 if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
                     labels = labels.squeeze(0)
-                return mfc_adopted(
+                res = mfc_adopted(
                     adj=adj,
                     labels=labels,
                     network_type="MFC",
                     return_labels=True,
                     timing_info=timing_info,
                 )
+                self._log_cuda_memory("local:end:mfc")
+                return res
             elif self.method == "flmig":
                 from baselines.flmig import flmig_adopted
                 flmig_labels = flmig_adopted(
@@ -259,11 +306,18 @@ class Optimizer:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info.get('conversion_time', 0.0)
         self.last_timing_info = timing_info
+        self._log_cuda_memory(f"local:end:{self.method}")
         return res
 
     @staticmethod
-    def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:
-        return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
+    def aggregate(adj: torch.Tensor, pattern: torch.Tensor, log_cuda: bool = False) -> torch.Tensor:
+        cuda_log = log_cuda and adj.device.type == "cuda" and torch.cuda.is_available()
+        Optimizer._log_cuda_memory_static("aggregate:start", adj.device, cuda_log)
+        aggr_mid = torch.sparse.mm(adj, pattern.t())
+        Optimizer._log_cuda_memory_static("aggregate:after-inner", adj.device, cuda_log)
+        aggr_out = torch.sparse.mm(pattern, aggr_mid)
+        Optimizer._log_cuda_memory_static("aggregate:end", adj.device, cuda_log)
+        return aggr_out
        
     def run(self, nodes_mask: torch.Tensor) -> None:
         """
@@ -277,6 +331,9 @@ class Optimizer:
 
         compute_device = self.device
         needs_features = self._local_algorithm_requires_features()
+        if self.cuda_mem_log:
+            torch.cuda.reset_peak_memory_stats(compute_device)
+            self._log_cuda_memory("run:start")
 
         # Aliases to tensors stored in Optimizer; in-place writes update self.coms directly.
         coms_work = self.coms
@@ -288,13 +345,16 @@ class Optimizer:
         # Find indices of affected nodes.
         nodes = torch.nonzero(nodes_mask_work, as_tuple=True)[0]
         if nodes.numel() == 0:
+            self._log_cuda_memory("run:end-empty")
             return
 
         # Per-level mask: only nodes in communities touched at each level.
         ext_mask_work = torch.zeros_like(coms_work, dtype=torch.bool)
         for l in range(self.subcoms_depth):
             touched = coms_work[l].index_select(0, nodes)
-            ext_mask_work[l] = torch.isin(coms_work[l], torch.unique(touched))
+            touched_unique = torch.unique(touched)
+            ext_mask_work[l] = torch.isin(coms_work[l], touched_unique)
+        self._log_cuda_memory("run:after-ext-mask")
 
         # Set singleton communities for affected nodes at the last level.
         coms_work[-1, nodes_mask_work] = nodes
@@ -307,8 +367,10 @@ class Optimizer:
         # Reset adjacency matrix to the nodes of affected communities
         affected_nodes_lvl0 = torch.nonzero(ext_mask_work[0], as_tuple=True)[0]
         adj_work = sparse.reset_matrix(adj_base, affected_nodes_lvl0)
+        self._log_cuda_memory("run:after-reset")
 
         for l in range(self.subcoms_depth):
+            self._log_cuda_memory(f"lvl{l}:start")
             # Get affected communites and all their nodes at the level l
             level_ext_mask = ext_mask_work[l]
             coms = coms_work[l, level_ext_mask]
@@ -323,19 +385,21 @@ class Optimizer:
             # Aggregate adjacency and features matrices
             aggr_idx = torch.stack((inverse, ext_nodes))
             aggr_ptn = sparse.tensor(aggr_idx, (n, self.nodes_num), adj_work.dtype)
-            aggr_adj = self.aggregate(adj_work, aggr_ptn)
+            aggr_adj = self.aggregate(adj_work, aggr_ptn, log_cuda=self.cuda_mem_log)
             aggr_features = (
                 torch.sparse.mm(aggr_ptn, features_work)
                 if needs_features
                 else None
             )
             del aggr_ptn
+            self._log_cuda_memory(f"lvl{l}:after-aggregate")
 
             # Apply local algorithm for aggregated graph
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(
                 device=compute_device,
                 dtype=torch.long,
             )
+            self._log_cuda_memory(f"lvl{l}:after-local")
 
             # Restoring the community of the original graph
             new_coms = old_idx[coms[inverse]]
@@ -347,4 +411,8 @@ class Optimizer:
             # Cut off adjacency matrix
             cut_idx = torch.stack((new_coms, ext_nodes))
             cut_ptn = sparse.tensor(cut_idx, self.size, adj_work.dtype)
-            adj_work = adj_work * torch.sparse.mm(cut_ptn.t(), cut_ptn)
+            cut_mask = torch.sparse.mm(cut_ptn.t(), cut_ptn)
+            adj_work = adj_work * cut_mask
+            self._log_cuda_memory(f"lvl{l}:after-cut")
+
+        self._log_cuda_memory("run:end")

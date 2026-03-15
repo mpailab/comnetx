@@ -127,6 +127,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 runtime_adj,
                 affected_nodes_mask,
                 step = smart_neighborhood_step,
+                log_cuda = opt.cuda_mem_log,
             )
             opt.run(affected_nodes_mask)
         elif naive_mode or raw_mode:
