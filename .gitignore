@@ -196,3 +196,4 @@ baselines/GraphChallenge/
 results/*.json
 test/graphs/small_konect/
 test/*.json
+results/mfc/*.pkl
