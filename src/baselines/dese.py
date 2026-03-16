@@ -143,6 +143,13 @@ def dese(adj,
          num_clusters=None,
          metrics_mod=None):
     time_s = time()
+    if adj.device.type == "cuda":
+        adj = adj.cpu()
+    if features is not None and features.device.type == "cuda":
+        features = features.cpu()
+    if labels is not None and labels.device.type == "cuda":
+        labels = labels.cpu()
+
     if labels is None:
         num_nodes = adj.size(0)
         labels = torch.arange(num_nodes)

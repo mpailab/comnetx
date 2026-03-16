@@ -18,12 +18,20 @@ def sparse_tensor_to_networkit(sparse_tensor, directed=False):
     return graph
 
 def networkit_partition(adj: torch.Tensor, algorithm="leiden", timing_info=None):
+    conversion_time = 0.0
+    if adj.device.type == "cuda":
+        time_s = time.time()
+        adj = adj.cpu()
+        time_e = time.time()
+        conversion_time += time_e - time_s
+
     time_s = time.time()
     graph = sparse_tensor_to_networkit(adj)
     time_e = time.time()
+    conversion_time += time_e - time_s
     
     if timing_info is not None:
-        timing_info['conversion_time'] = time_e - time_s
+        timing_info['conversion_time'] = timing_info.get('conversion_time', 0.0) + conversion_time
 
     if algorithm == "leiden":
         detector = nk.community.ParallelLeiden(graph)

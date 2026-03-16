@@ -14,11 +14,19 @@ def sparse_tensor_to_igraph(sparse_tensor, directed=True):
     return graph
 
 def leidenalg_partition(adj : torch.Tensor, timing_info=None):
+    conversion_time = 0.0
+    if adj.device.type == "cuda":
+        time_s = time.time()
+        adj = adj.cpu()
+        time_e = time.time()
+        conversion_time += time_e - time_s
+
     time_s = time.time()
     G = sparse_tensor_to_igraph(adj.to_sparse())
     time_e = time.time()
+    conversion_time += time_e - time_s
     if timing_info is not None:
-        timing_info['conversion_time'] = time_e - time_s
+        timing_info['conversion_time'] = timing_info.get('conversion_time', 0.0) + conversion_time
 
 
     part = la.find_partition(G, la.ModularityVertexPartition, weights='weight', seed=True, n_iterations=2)

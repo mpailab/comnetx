@@ -119,9 +119,9 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 def flmig_adopted(
     adj: torch.Tensor,
-    Number_iter: int = 100,
+    Number_iter: int = 20,
     Beta: float = 0.5,
-    max_rb: int = 10,
+    max_rb: int = 50,
     return_labels: bool = False,
     timing_info: dict | None = None,
 ):
@@ -136,6 +136,12 @@ def flmig_adopted(
     """
     if timing_info is None:
         timing_info = {}
+
+    t0 = time.time()
+    if adj.device.type == "cuda":
+        adj = adj.cpu()
+    t1 = time.time()
+    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
     # --- приведение к dense и бинаризация + запись во временный файл ---
     t0 = time.time()
@@ -261,4 +267,3 @@ if __name__ == "__main__":
 
     if args.out is not None:
         torch.save(labels, args.out)
-

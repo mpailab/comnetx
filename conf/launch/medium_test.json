@@ -1,11 +1,14 @@
 {
   "VERBOSE": 1,
+  "CATCH_ERRORS": false,
   
   "DATASETS": ["facebook-wosn-links"],
-  "BATCHES": ["999:100"],
+  "BATCHES": ["999:10"],
   
-  "BASELINES": ["prgpt:infomap", "prgpt:locale", "leidenalg", "networkit"],
+  "BASELINES": ["ldleiden", "leidenalg", "prgpt:infomap", "prgpt:locale", "magi", "dmon", "networkit",
+  "mfc", "flmig", "s2cag", "dese"],
   "MODES": ["naive", "smart"],
+  "USE_GPU": true,
   
   "SMART_VERSION": "v1",
   "SMART_PARAMS_GRID": {

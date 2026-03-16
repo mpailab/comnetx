@@ -258,6 +258,14 @@ def mfc_adopted(
         timing_info = {}
 
     t0 = time.time()
+    if adj.device.type == "cuda":
+        adj = adj.cpu()
+    if labels is not None and labels.device.type == "cuda":
+        labels = labels.cpu()
+    t1 = time.time()
+    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
+
+    t0 = time.time()
     adj_bin = _binarize_adj(adj)
     if labels is None:
         init_labels = _degree_bins_labels(adj_bin)
