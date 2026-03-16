@@ -523,6 +523,7 @@ class Dataset:
         # Определение нужного файла
         batches_strategy = str(batches_strategy)
         if batches_strategy == "real":
+            p, n = 0, 0
             filepath = os.path.join(self.dataset_root, self.name, f"out.{self.name}.sort")
         elif ":" in batches_strategy:  # p:n стратегия
             p_str, n_str = batches_strategy.split(":")

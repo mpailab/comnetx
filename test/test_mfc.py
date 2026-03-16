@@ -9,7 +9,7 @@ from conftest import collect_datasets
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 from baselines.mfc import mfc_adopted, PROJECT_PATH
 
 SMALL_ROOT = Path("/auto/datasets/graphs/small")

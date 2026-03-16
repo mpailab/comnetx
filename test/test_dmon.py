@@ -16,7 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
 from baselines.dmon import adapted_dmon
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 
 
 def get_all_datasets():
@@ -62,11 +62,12 @@ def load_konect_info():
 def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
     info = load_konect_info()
+    KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
     datasets = {}
     for name in info.keys():
         path = os.path.join(KONECT_PATH, name)
         if os.path.exists(path):
-            datasets[name] = Dataset(name, KONECT_PATH)
+            datasets[name] = Dataset(name)
     return datasets
 
 KONECT_DATASETS = get_all_konect_datasets()
@@ -78,7 +79,7 @@ KONECT_DATASETS = get_all_konect_datasets()
     ids=list(KONECT_DATASETS.keys())
 )
 def test_dmon_konect_dataset(name):
-    dataset = Dataset(name, path=KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     num_nodes = adj.size(0)
@@ -126,7 +127,7 @@ def test_dmon_konect_dataset(name):
 
 
 def test_dmon_single_konect_dataset():
-    dataset = Dataset("youtube-u-growth", KONECT_PATH)
+    dataset = Dataset("youtube-u-growth")
     adj, features, labels = dataset.load(tensor_type="coo")
     adj = adj.coalesce()
     num_nodes = adj.size(0)

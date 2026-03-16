@@ -15,7 +15,7 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 test_root = os.path.join(PROJECT_PATH, "test")
 
 from baselines.dese import dese
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 from optimizer import Optimizer
 
 def test_dese_synthetic_dataset():
@@ -207,11 +207,12 @@ def load_konect_info():
 def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
     info = load_konect_info()
+    KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
     datasets = {}
     for name in info.keys():
         path = os.path.join(KONECT_PATH, name)
         if os.path.exists(path):
-            datasets[name] = Dataset(name, KONECT_PATH)
+            datasets[name] = Dataset(name)
     return datasets
 
 KONECT_DATASETS = get_all_konect_datasets()
@@ -223,7 +224,7 @@ KONECT_DATASETS = get_all_konect_datasets()
     ids=list(KONECT_DATASETS.keys())
 )
 def test_dese_konect_dataset(name):
-    dataset = Dataset(name, path=KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     num_nodes = adj.size(0)
@@ -268,7 +269,7 @@ def test_dese_konect_dataset(name):
 
 def test_dese_single_konect_dataset():
     name = "ca-cit-HepTh"
-    dataset = Dataset(name, path=KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     num_nodes = adj.size(0)
