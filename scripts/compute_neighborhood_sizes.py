@@ -8,11 +8,11 @@ from datetime import datetime
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
-from datasets import Dataset, KONECT_PATH, INFO
+from datasets import Dataset, INFO
 from optimizer import Optimizer
 import torch
 
-def compute_neighborhood_sizes(dataset_name, path_to_dir, batches_strategy, max_step=5, skip_first_batch=True):
+def compute_neighborhood_sizes(dataset_name, batches_strategy, max_step=5, skip_first_batch=True):
     """
     Вычисляет размеры окрестностей для каждого батча датасета
     
@@ -25,7 +25,7 @@ def compute_neighborhood_sizes(dataset_name, path_to_dir, batches_strategy, max_
         Список размеров окрестностей для каждого батча
     """
     # Загружаем датасет с указанной стратегией батчинга
-    ds = Dataset(dataset_name, path=path_to_dir)
+    ds = Dataset(dataset_name)
     ds.load(batches_strategy=batches_strategy)
     
     batches = torch.unbind(ds.adj)
@@ -64,7 +64,7 @@ def compute_neighborhood_sizes(dataset_name, path_to_dir, batches_strategy, max_
 
 def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None, 
          p_values=None, n_values=None, max_step=5, output_file=None,
-         konect_path=None, info_path=None):
+         info_path=None):
     """
     Основная функция
     
@@ -83,17 +83,12 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
         p_values = [9, 99, 999]
     if n_values is None:
         n_values = [10, 100, 1000]
-    if konect_path is None:
-        konect_path = KONECT_PATH
     if info_path is None:
         info_path = os.path.join(INFO, "konect.json")
     
     # Проверяем существование путей
     if not os.path.exists(info_path):
         print(f"Ошибка: файл с информацией о датасетах не найден: {info_path}")
-        sys.exit(1)
-    if not os.path.exists(konect_path):
-        print(f"Ошибка: директория с датасетами не найдена: {konect_path}")
         sys.exit(1)
     
     # Проверяем корректность ограничений
@@ -105,20 +100,20 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
         print("Ошибка: max_edges должен быть больше или равен min_edges")
         sys.exit(1)
     
-    # Загружаем информацию о датасетах konect
+    # Загружаем информацию о датасетах
     with open(info_path) as f:
-        konect_info = json.load(f)
+        info = json.load(f)
     
     # Фильтруем датасеты как в launch.py
-    konect_datasets = list(filter(
-        lambda dataset: konect_info[dataset]["w"] in ["weighted", "unweighted", "with_deletions"],
-        list(konect_info.keys())
+    datasets = list(filter(
+        lambda dataset: info[dataset]["w"] in ["weighted", "unweighted", "with_deletions"],
+        list(info.keys())
     ))
     
     # Применяем фильтры по размеру
     filtered_datasets = []
-    for dataset_name in konect_datasets:
-        dataset_info = konect_info[dataset_name]
+    for dataset_name in datasets:
+        dataset_info = info[dataset_name]
         n_nodes = dataset_info["n"]
         n_edges = dataset_info["m"]
         
@@ -135,7 +130,7 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
         filtered_datasets.append(dataset_name)
     
     # Сортируем по числу вершин
-    datasets_by_nodes = sorted(filtered_datasets, key=lambda x: konect_info[x]["n"])
+    datasets_by_nodes = sorted(filtered_datasets, key=lambda x: info[x]["n"])
     
     if not datasets_by_nodes:
         print("Нет датасетов, удовлетворяющих заданным ограничениям")
@@ -143,7 +138,7 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
 
     # Определяем путь для сохранения файла
     if output_file is None:
-        results_dir = os.path.join(PROJECT_PATH, "results")
+        results_dir = os.path.join(PROJECT_PATH, "results", "neighborhood")
         os.makedirs(results_dir, exist_ok=True)
         output_file = os.path.join(results_dir, "neighborhood_analysis.json")
     else:
@@ -177,7 +172,7 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
     
     # Перебираем все комбинации
     for dataset_name in datasets_by_nodes:
-        dataset_info = konect_info[dataset_name]
+        dataset_info = info[dataset_name]
         n_nodes = dataset_info["n"]
         n_edges = dataset_info["m"]
         
@@ -196,9 +191,9 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
                 try:
                     neighborhood_sizes = compute_neighborhood_sizes(
                         dataset_name,
-                        konect_path, 
                         strategy, 
-                        max_step
+                        max_step,
+                        skip_first_batch = (p != 0)
                     )
                     
                     dataset_results[strategy] = neighborhood_sizes
@@ -250,7 +245,7 @@ def main(max_nodes=None, min_nodes=None, max_edges=None, min_edges=None,
 
 if __name__ == "__main__":
     description = """
-    Скрипт для анализа размеров окрестностей в динамических графах KONECT.
+    Скрипт для анализа размеров окрестностей в динамических графах
     
     Вычисляет размеры окрестностей для различных стратегий батчинга "p:n",
     где p определяет процент ребер в первом батче, а n - количество остальных батчей.
@@ -279,12 +274,12 @@ if __name__ == "__main__":
     
     5. Указать путь для сохранения результатов и пути к данным:
        python compute_neighborhood_sizes.py --output-file /путь/к/результатам/мой_анализ.json
-       python compute_neighborhood_sizes.py --konect-path /путь/к/konect/ --info-path /путь/к/konect.json
+       python compute_neighborhood_sizes.py --info-path /путь/к/konect.json
     
     6. Комбинированный пример:
-       python compute_neighborhood_sizes.py --min-nodes 500 --max-nodes 5000 --p-values 0 9 99 --n-values 10 100 1000 --max-step 5 --konect-path /data/konect/ --info-path /data/konect/konect.json --output-file ./custom_results.json
+       python compute_neighborhood_sizes.py --min-nodes 500 --max-nodes 5000 --p-values 0 9 99 --n-values 10 100 1000 --max-step 5 --info-path /data/konect/konect.json --output-file ./custom_results.json
 
-    Результаты по умолчанию сохраняются в директории results/neighborhood_analysis.json
+    Результаты по умолчанию сохраняются в директории results/neighborhood/neighborhood_analysis.json
     """
 
     parser = argparse.ArgumentParser(
@@ -317,13 +312,11 @@ if __name__ == "__main__":
     
     # Параметр пути для сохранения
     parser.add_argument('--output-file', type=str, default=None,
-                       help='Путь для сохранения JSON файла с результатами (по умолчанию: results/neighborhood_analysis.json)')
+                       help='Путь для сохранения JSON файла с результатами (по умолчанию: results/neighborhood/neighborhood_analysis.json)')
     
     # Параметры путей к данным
-    parser.add_argument('--konect-path', type=str, default=None,
-                       help='Путь к директории с датасетами KONECT (по умолчанию: значение из конфига)')
     parser.add_argument('--info-path', type=str, default=None,
-                       help='Путь к файлу konect.json с информацией о датасетах (по умолчанию: значение из конфига)')
+                       help='Путь к файлу с информацией о датасетах (по умолчанию: datasets-info/konect.json)')
     
     args = parser.parse_args()
 
@@ -341,6 +334,5 @@ if __name__ == "__main__":
         n_values=args.n_values,
         max_step=args.max_step,
         output_file=args.output_file,
-        konect_path=args.konect_path,
         info_path=args.info_path
     )
