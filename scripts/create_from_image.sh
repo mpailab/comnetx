@@ -5,19 +5,21 @@ DOCKER=docker
 IMAGE="diaduskaau/comnetx:latest"
 REUSE=0
 SHM_SIZE="2g"
+GPUS="all"
 
 function usage {
     echo "usage: $0 [-rmh] -n NAME [-m SHM_SIZE]"
     echo "  -n   Container's name"
     echo "  -r   Remove container with the same name if it exists"
     echo "  -m   Shared memory size for container (default: 2g)"
+    echo "  -g   GPUs to use (default: all, example: 0,1,2 или 7)"
     echo "  -h   Display help"
     exit 1
 }
 
 [ $# -eq 0 ] && usage
 
-PARSED_ARGUMENTS=$(getopt -n $0 -o n:m:rh -- "$@")
+PARSED_ARGUMENTS=$(getopt -n $0 -o n:m:rhg: -- "$@")
 VALID_ARGUMENTS=$?
 if [ "$VALID_ARGUMENTS" != "0" ]; then
     usage
@@ -45,6 +47,10 @@ do
             ;;
         -h)
             usage
+            ;;
+        -g)
+            GPUS="$2"
+            shift 2
             ;;
         --) 
             shift
@@ -78,10 +84,9 @@ if [ $REUSE -eq 1 ]; then
 fi 
 
 printf "  create $NAME as "
-$DOCKER create --gpus all -it --shm-size=$SHM_SIZE \
+$DOCKER create --gpus "device=$GPUS" -it --shm-size=$SHM_SIZE \
     -e TERM=xterm-256color \
     --entrypoint /bin/bash \
-    -v /auto/datasets/graphs:/auto/datasets/graphs \
     -w / \
     -v /home/$USER:/home/$USER \
     -v /home/$USER/.bashrc:/root/.bashrc --name $NAME -h $NAME $IMAGE
