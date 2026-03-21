@@ -7,6 +7,5 @@
   "small": "/auto/datasets/graphs/small/",
   "small_konect": "/auto/datasets/graphs/small_konect/",
   "attr_graphs": "/auto/datasets/graphs/attr_graphs",
-  "dyn_attr_graphs": "/auto/datasets/graphs/comnetx/dynamic_attr_datasets",
-  "tgc_graphs": "/auto/datasets/graphs/comnetx/4TGC/data_npy/"
+  "dyn_attr_graphs": "/auto/datasets/graphs/comnetx/dynamic_attr_datasets"
 }

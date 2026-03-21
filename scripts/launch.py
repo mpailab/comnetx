@@ -1,5 +1,4 @@
 import json
-import subprocess
 import sys
 import os
 from datetime import datetime
@@ -23,12 +22,23 @@ from launcher import dynamic_launch
 from datasets import INFO, Dataset
 
 # input
-MACHINE_DEFAULT = subprocess.check_output("hostname", shell=True, text=True)[:-1]
-MACHINE = conf.get("MACHINE", MACHINE_DEFAULT)
+MACHINE_DEFAULT = os.getenv('HOSTNAME')
+MACHINE_PARENT = os.getenv('PARENT_HOSTNAME') # задать в bash : export PARENT_HOSTNAME=<parent_hostname>
+MACHINE = MACHINE_PARENT if MACHINE_PARENT is not None else MACHINE_DEFAULT
 
 # output
 VERBOSE = conf.get("VERBOSE", 1) # 0, 1, 2, 3
 CATCH_ERRORS = conf.get("CATCH_ERRORS", True)
+
+#paths to datasets
+paths_config_default = "datasets-info/paths/default.json"
+paths_config_host = f"datasets-info/paths/{MACHINE}.json"
+if os.path.exists(paths_config_host):
+    paths_config = paths_config_host
+else:
+    print(f"Warning! {paths_config_host} does not exist.")
+    print(f"         {paths_config_default} will be used instead.")
+    paths_config = paths_config_default
 
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
@@ -79,8 +89,10 @@ def init(db, baseline, dataset):
         db[baseline][dataset][MACHINE] = {}
     return db
 
-DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
-#DATE_SUFFIX = "now"
+if conf.get("USE_TIMESTAMP_SUFFIX", True):
+    DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
+else:
+    DATE_SUFFIX = "now"
 def save(db, errors):
     os.makedirs(os.path.join(PROJECT_PATH, "results"), exist_ok = True)
     with open(os.path.join(PROJECT_PATH, "results", f"measurements_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
@@ -106,7 +118,7 @@ def measure():
     errors = []
     for dataset in DATASETS:
         for batches_strategy in BATCHES:
-            ds = Dataset(dataset)
+            ds = Dataset(dataset, paths_config)
             ds.load(batches_strategy = batches_strategy)
             for method in METHODS:
                 for mode in MODES:
