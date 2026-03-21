@@ -318,6 +318,36 @@ class Optimizer:
         aggr_out = torch.sparse.mm(pattern, aggr_mid)
         Optimizer._log_cuda_memory_static("aggregate:end", adj.device, cuda_log)
         return aggr_out
+
+    @staticmethod
+    def cut_by_partition(
+        adj: torch.Tensor,
+        node_mask: torch.Tensor,
+        node_labels: torch.Tensor,
+        inplace: bool = True,
+    ) -> torch.Tensor:
+        """
+        Cut edges that violate partition constraints.
+
+        If inplace=True (default), zeroes disallowed entries in-place.
+        If inplace=False, rebuilds sparse tensor keeping only allowed edges.
+        """
+        indices = adj.indices()
+        row, col = indices
+
+        keep = node_mask[row] & node_mask[col]
+        keep = keep & (node_labels[row] == node_labels[col])
+
+        if inplace:
+            adj.values().masked_fill_(~keep, 0)
+            return adj
+
+        return torch.sparse_coo_tensor(
+            indices[:, keep],
+            adj.values()[keep],
+            adj.size(),
+            device=adj.device,
+        ).coalesce()
        
     def run(self, nodes_mask: torch.Tensor) -> None:
         """
@@ -401,18 +431,12 @@ class Optimizer:
             )
             self._log_cuda_memory(f"lvl{l}:after-local")
 
-            # Restoring the community of the original graph
-            new_coms = old_idx[coms[inverse]]
-            
-            # Store new communities at the level l
-            coms_work[l, level_ext_mask] = new_coms
-
+            # Restoring the community of the original graph and 
+            # store new communities at the level l
+            coms_work[l, level_ext_mask] = old_idx[coms[inverse]]
 
             # Cut off adjacency matrix
-            cut_idx = torch.stack((new_coms, ext_nodes))
-            cut_ptn = sparse.tensor(cut_idx, self.size, adj_work.dtype)
-            cut_mask = torch.sparse.mm(cut_ptn.t(), cut_ptn)
-            adj_work = adj_work * cut_mask
+            adj_work = self.cut_by_partition(adj_work, level_ext_mask, coms_work[l])
             self._log_cuda_memory(f"lvl{l}:after-cut")
 
         self._log_cuda_memory("run:end")
