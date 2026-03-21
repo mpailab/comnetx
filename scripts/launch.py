@@ -20,7 +20,7 @@ conf_name = os.path.basename(conf_file).rsplit(".", maxsplit=1)[0]
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 from launcher import dynamic_launch
-from datasets import INFO
+from datasets import INFO, Dataset
 
 # input
 MACHINE_DEFAULT = subprocess.check_output("hostname", shell=True, text=True)[:-1]
@@ -106,6 +106,8 @@ def measure():
     errors = []
     for dataset in DATASETS:
         for batches_strategy in BATCHES:
+            ds = Dataset(dataset)
+            ds.load(batches_strategy = batches_strategy)
             for method in METHODS:
                 for mode in MODES:
                     if mode == "smart" and SMART_PARAMS_GRID:
@@ -125,7 +127,7 @@ def measure():
                         
                         try:
                             results = dynamic_launch(
-                                dataset, 
+                                ds,
                                 batches_strategy,
                                 method, 
                                 mode=mode,

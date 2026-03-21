@@ -3,7 +3,6 @@ import json
 import os
 import time
 
-from datasets import INFO, Dataset
 from optimizer import Optimizer
 from our_utils import print_zone
 
@@ -15,15 +14,14 @@ ALG_CLASS = {
     "dfleiden": DFLeiden
 }
 
-def dynamic_launch(dataset_name : str, batches_strategy,
+def dynamic_launch(ds, batches_strategy,
                     underlying_static_method : str,
                     mode : str = "smart",
                     smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
                     verbose : int = 1,
                     use_gpu: bool = False):
 
-    ds = Dataset(dataset_name)
-    ds.load(batches_strategy = batches_strategy)
+    dataset_name = ds.name
     smart_mode = (mode == "smart")
     naive_mode = (mode == "naive")
     raw_mode = (mode == "raw")
