@@ -1,5 +1,5 @@
 {
-  "dynamic_konect": "/home/dev/datasets/konect",
+  "konect": "/home/dev/datasets/konect",
   "magi": "/auto/datasets/graphs/small/",
   "dyn_atr": "/auto/datasets/graphs/dyn_atr_datasets/",
   "dyn_sbm": "/auto/datasets/graphs/dyn_sbm/",
