@@ -141,7 +141,7 @@ def build_dmon(input_features,
 def adapted_dmon(adj: torch.Tensor,
         ftrs : torch.Tensor,
         lbls : torch.Tensor | None = None,
-        args=None,
+        epochs: int = None,
         timing_info=None,
         **kwargs):
   """
@@ -158,23 +158,22 @@ def adapted_dmon(adj: torch.Tensor,
     lbls: torch.Tensor or None, optional
         Ground-truth node labels.
         Default: None 
-    args: 
-        Hyperparameters for DMON training. If None, default parameters are used.
   """
-  if args is None:
-        class Args:
-            _architecture = [64]
-            _collapse_regularization = 1
-            _dropout_rate = 0.5 #min - 0, max - 1
-            _n_clusters = 16 #min - 0
-            _n_epochs = 1000 #min - 0
-            _learning_rate = 0.001 #min - 0
-        args = Args()
+  if epochs is None:
+     epochs = 200
+
+  class Args:
+    _architecture = [64]
+    _collapse_regularization = 1
+    _dropout_rate = 0 #min - 0, max - 1
+    _n_clusters = 16 #min - 0
+    _n_epochs = epochs #min - 0
+    _learning_rate = 0.001 #min - 0
+  args = Args()
+
   num_nodes = adj.shape[0]
   args._n_clusters = min(args._n_clusters, num_nodes)
-  # if ftrs is not None and torch.is_tensor(ftrs):
-  #       if ftrs.abs().sum() == 0:
-  #           ftrs = torch.eye(num_nodes, dtype=torch.float32)
+
   time_s = time.time()
   if adj.device.type == "cuda":
     adj = adj.cpu()

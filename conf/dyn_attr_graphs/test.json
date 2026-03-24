@@ -1,11 +1,12 @@
 {
   "VERBOSE": 1,
   "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
   
   "DATASETS": ["dyn_wiki"],
-  "BATCHES": ["10", "999:10"],
+  "BATCHES": ["999:10"],
   
-  "BASELINES": ["mfc"],
+  "BASELINES": ["ldleiden"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",

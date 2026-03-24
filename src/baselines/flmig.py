@@ -119,9 +119,9 @@ def generate_symmetric_adj_matrix(n_nodes=100, edge_prob=0.05, seed=None):
 
 def flmig_adopted(
     adj: torch.Tensor,
-    Number_iter: int = 100,
+    Number_iter = None,
     Beta: float = 0.5,
-    max_rb: int = 10,
+    max_rb: int = 50,
     return_labels: bool = False,
     timing_info: dict | None = None,
 ):
@@ -134,6 +134,8 @@ def flmig_adopted(
         return_labels: если True — вернуть метки кластеров, иначе метрики
         timing_info: dict | None — сюда накапливаем conversion_time.
     """
+    if Number_iter is None:
+        Number_iter = 20
     if timing_info is None:
         timing_info = {}
 
@@ -161,12 +163,6 @@ def flmig_adopted(
     else:
         adj_dense = (adj > 0).to(torch.float32)
         adj_dense.fill_diagonal_(0.0)
-
-         
-    # path = tensor_to_graph_txt(
-    #     adj_dense,
-    #     str(Path(PROJECT_PATH) / "src" / "baselines" / "graph.txt"),
-    # )
 
     with tempfile.NamedTemporaryFile(suffix=".txt") as tmp:
         

@@ -144,10 +144,16 @@ def s2cag(adj_torch: torch.Tensor,
           features_torch: torch.Tensor | None = None, 
           labels: torch.Tensor | None = None,
           timing_info=None,
-          dataset = 'dataset', T = 10, n_runs = 5, 
+          dataset = 'dataset',
+          T = None, n_runs = None, 
           alpha= 1.0, fdim = 0, method = 'sub', 
           gamma = 1.0, tau = 7,
           metrics_mod=None):
+    if T is None:
+        T = 10
+    if n_runs is None:
+        n_runs = 5
+
     time_s = time()
     if labels is None:
         num_nodes = adj_torch.size(0)

@@ -33,9 +33,8 @@ def magi(adj : torch.Tensor,
          labels : torch.Tensor | None = None, 
          n_clusters: int | None = None, 
          device=None, 
-         args=None,
-         timing_info=None,
-         **kwargs):
+         n_epochs=None,
+         timing_info=None):
 
     """
     MAGI method
@@ -60,39 +59,31 @@ def magi(adj : torch.Tensor,
         Device for computing: 'cuda', 'cpu'
         Default: None 
 
-    args: 
-        Hyperparameters for MAGI training. If None, default parameters are used.
-
     Returns
     -------
     torch.Tensor
         Predicted cluster assignments for all nodes, shape [N].
     """
 
-    if args is None:
-        class Args:
-            batchsize = 2048
-            max_duration = 60
-            kmeans_device = 'cpu'
-            kmeans_batch = -1
-            hidden_channels = '1024,256'
-            size = '10,10'
-            wt = 20
-            wl = 5
-            tau = 0.5
-            ns = 0.5
-            lr = 0.05
-            epochs = 100
-            projection = ""
-            wd = 0
-            dropout = 0
-        args = Args()
-
-    for key, value in kwargs.items():
-        if hasattr(args, key):
-            setattr(args, key, value)
-        else:
-            raise ValueError(f"Unknown argument {key}")
+    if n_epochs is None:
+        n_epochs = 100
+    class Args:
+        batchsize = 2048
+        max_duration = 60
+        kmeans_device = 'cpu'
+        kmeans_batch = -1
+        hidden_channels = '1024,256'
+        size = '10,10'
+        wt = 20
+        wl = 5
+        tau = 0.5
+        ns = 0.5
+        lr = 0.05
+        epochs = n_epochs
+        projection = ""
+        wd = 0
+        dropout = 0
+    args = Args()
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
