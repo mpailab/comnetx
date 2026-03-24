@@ -139,9 +139,11 @@ def dese(adj,
          labels: torch.Tensor | None = None, 
          args=None,
          timing_info=None, 
-         n_epochs=100,
+         n_epochs=None,
          num_clusters=None,
          metrics_mod=None):
+    if n_epochs is None:
+        n_epochs = 1
     time_s = time()
     if adj.device.type == "cuda":
         adj = adj.cpu()

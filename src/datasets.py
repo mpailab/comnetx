@@ -19,7 +19,7 @@ PROJECT_DIR = Path(__file__).parent.resolve()
 class Dataset:
     """Dataset treatment"""
 
-    def __init__(self, dataset_name : str, paths_config: str = "datasets-info/paths.json"):
+    def __init__(self, dataset_name : str, paths_config: str = "datasets-info/paths/default.json"):
         self.name = dataset_name
         self.paths_config  = paths_config # dir with datasets dirs
         self.dataset_format = self.detect_dataset_format()
