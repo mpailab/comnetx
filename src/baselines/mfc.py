@@ -71,6 +71,16 @@ def _to_dense(adj_t: torch.Tensor) -> torch.Tensor:
         return adj_t.to_dense()
     return adj_t
 
+def size_correct(adj_list):
+    adj_3d = adj_list[0] 
+
+    adj_list_correct = list(torch.unbind(adj_3d, dim=0))
+
+    N = adj_3d.size(1) 
+    T = adj_3d.size(0) 
+
+    label_snapshots_correct = [torch.zeros(N, dtype=torch.long) for _ in range(T)]
+    return adj_list_correct, label_snapshots_correct
 
 def load_graphs_from_tensors(adj_matrices,
                              labels_list,
@@ -101,11 +111,25 @@ def load_graphs_from_tensors(adj_matrices,
 
     graph_snapshots = []
     labels_dicts = []
+
+    print(f"adj_list = {adj_list}")
+
+    for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
+        print("alarm")
+
+    adj_list, label_snapshots = size_correct(adj_list)
+
+    print(f"label_snapshots = {label_snapshots}")
+    print(f"labels_list = {labels_list}")
+    
+
     for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
         adj_dense = _to_dense(adj_t)
 
+        print(f"adj_t = {adj_t}")
+
         if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
-            raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN")
+            raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN, adj_dense = {adj_dense}")
         print(f"t={t}, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
         if labels_t.dim() != 1 or labels_t.size(0) != adj_dense.size(0):
             raise ValueError(f"Метки снапшота {t} должны быть длины N, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
@@ -130,6 +154,8 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
     if file_name == "from_tensor":
         if adj_matrix is None or labels is None:
             raise ValueError("Для 'from_tensor' нужно передать adj_matrix и labels.")
+
+        print(f"adj_matrix = {adj_matrix}")    
         return load_graphs_from_tensors(
             adj_matrices=adj_matrix,
             labels_list=labels,
@@ -186,7 +212,7 @@ def main(network_type, adj_matrix, labels):
         adj,features,labels = snapshot_list[t]
         
         if len(snapshot_list)!=1:
-            # print('several snapshot')
+            print('several snapshot')
             if t == 0:
                 gt_dgm = [None, dgm_list[t+1]]
             elif t == len(snapshot_list)-1: 
@@ -194,7 +220,7 @@ def main(network_type, adj_matrix, labels):
             else:
                 gt_dgm = [dgm_list[t-1],dgm_list[t+1]]
         else:
-            # print('one snapshot')
+            print('one snapshot')
             gt_dgm = [None, dgm_list[t]]
 
         retrain_with_topo(
@@ -279,6 +305,8 @@ def mfc_adopted(
 
     t0 = time.time()
     
+    print(f"adj_matrices = {adj_matrices}")
+
     main(
         network_type=network_type,
         adj_matrix=adj_matrices,
@@ -308,8 +336,8 @@ def mfc_adopted(
         # Очищаем результаты (опционально, чтобы не засорять диск)
         # (out_dir / "results_raw.pkl").unlink(missing_ok=True)
         # (out_dir / "results_topo.pkl").unlink(missing_ok=True)
-        assert labels.shape[0] == adj_matrices[0].shape[0], \
-            f"Labels size mismatch: {labels.shape[0]} vs {adj_matrices[0].shape[0]}"
+        assert labels.shape[0] == adj_matrices[0].shape[1], \
+            f"Labels size mismatch: {labels.shape} vs {adj_matrices[0].shape}"
 
         return labels
 

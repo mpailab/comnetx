@@ -47,8 +47,25 @@ def dynamic_launch(dataset_name : str, batches_strategy,
         else:
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
 
+    if underlying_static_method == "mfc":
+        print("It's mfc")
+
+        print(f"torch.unbind(ds.adj) = {torch.unbind(ds.adj)}")
+
+        opt = Optimizer(ds.adj, ds.features,
+                            method = underlying_static_method,
+                            verbose = verbose,
+                            use_gpu = use_gpu)
+
+        labels = opt.coms
+        coms = opt.local_algorithm(opt.runtime_adj(), opt.runtime_features(), labels = labels)
+        opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
+        mod = opt.modularity(directed = ds.is_directed)
+    
     # Основной цикл по батчам
     for i, batch in enumerate(torch.unbind(ds.adj)):
+        # print(f"batch = {batch}")
+        """
         with print_zone(verbose >= 2):
             print("Batch", i)
 
@@ -142,6 +159,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
         conversion_time = conversion_time_e - conversion_time_s
         measured_time = total_batch_time - conversion_time
         mod = opt.modularity(directed = ds.is_directed)
+        """
 
         with print_zone(verbose >= 2):
             print(f"Modularity: {mod:.2g}")
@@ -153,6 +171,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 print(f"Time: {measured_time:.2f}")
 
         results.append({'modularity': mod, 'time': measured_time})
+        break
 
     # --- Итоговый вывод ---
     total_measured_time = sum(map(lambda x: x["time"], results))
