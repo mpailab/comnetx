@@ -1,4 +1,22 @@
 {
+    "brain": {
+        "n": 5000,
+        "m": 1955488,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "patent": {
+        "n": 12214,
+        "m": 41916,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "dblp-tgc": {
+        "n": 28085,
+        "m": 236894,
+        "d": "undirected",
+        "w": "unweighted"
+    },
     "arxivai": {
         "n": 69854,
         "m": 699206,
@@ -8,12 +26,6 @@
     "arxivcs": {
         "n": 169343,
         "m": 1166243,
-        "d": "directed",
-        "w": "unweighted"
-    },
-    "arxivlarge": {
-        "n": 1324064,
-        "m": 13701428,
         "d": "directed",
         "w": "unweighted"
     },
@@ -29,21 +41,9 @@
         "d": "directed",
         "w": "unweighted"
     },
-    "brain": {
-        "n": 5000,
-        "m": 1955488,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "dblp-tgc": {
-        "n": 28085,
-        "m": 236894,
-        "d": "undirected",
-        "w": "unweighted"
-    },
-    "patent": {
-        "n": 12214,
-        "m": 41916,
+    "arxivlarge": {
+        "n": 1324064,
+        "m": 13701428,
         "d": "directed",
         "w": "unweighted"
     }
