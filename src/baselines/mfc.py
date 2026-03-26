@@ -253,7 +253,7 @@ def mfc_adopted(
     network_type: str = "MFC",
     return_labels: bool = False,
     timing_info: dict | None = None,
-    pure_mfc: bool = True,
+    pure_mfc: bool = False,
 ):
     """
     Запуск MFC-TopoReg на одном графе.

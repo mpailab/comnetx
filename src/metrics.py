@@ -27,15 +27,12 @@ class Metrics:
             modularity: float 
         """
 
-        # print(f"adjacency = {adjacency}, adjacency.shape = {adjacency.shape}")
-
         if adjacency.ndim == 3:
             adjacency = adjacency[0]
         # print(f"adjacency = {adjacency}, adjacency.shape = {adjacency.shape}")
 
         adjacency = adjacency.coalesce()
         device = adjacency.device
-        # print(f"adjacency.indices() = {adjacency.indices().shape }")
         row, col = adjacency.indices()
         weight = adjacency.values()  
         assignments = assignments.to(device=device, dtype=torch.long)

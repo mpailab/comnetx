@@ -40,9 +40,14 @@ def dynamic_launch(ds, batches_strategy,
         else:
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
 
+    if underlying_static_method == "pure_mfc" or mfc_mode:
+        if underlying_static_method != "pure_mfc" or not mfc_mode:
+            raise ValueError(f"mfc_mode work only with baselines = pure_mfc")
+
+        if is_special_strategy:    
+            raise ValueError(f"mfc_mode with pure_mfc work only with strategy like 1,10,100,1000")
+    
     if mfc_mode:       
-        if underlying_static_method != "mfc":
-            raise ValueError(f"mfc_mode work only with underlying_static_method = mfc")
         # print("It's mfc")
 
         # print(f"ds.adj.shape = {ds.adj.shape}")
