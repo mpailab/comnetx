@@ -27,6 +27,10 @@ class Metrics:
             modularity: float 
         """
 
+        if adjacency.ndim == 3:
+            adjacency = adjacency[0]
+        # print(f"adjacency = {adjacency}, adjacency.shape = {adjacency.shape}")
+
         adjacency = adjacency.coalesce()
         device = adjacency.device
         row, col = adjacency.indices()

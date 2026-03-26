@@ -27,6 +27,7 @@ def dynamic_launch(ds, batches_strategy,
     naive_mode = (mode == "naive")
     raw_mode = (mode == "raw")
     dynamic_mode = (mode == "dynamic")
+    mfc_mode = (mode == "mfc_mode")
 
     results = []
     is_special_strategy = ":" in str(batches_strategy)
@@ -39,8 +40,64 @@ def dynamic_launch(ds, batches_strategy,
         else:
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
 
+    if underlying_static_method == "pure_mfc" or mfc_mode:
+        if underlying_static_method != "pure_mfc" or not mfc_mode:
+            raise ValueError(f"mfc_mode work only with baselines = pure_mfc")
+
+        if is_special_strategy:    
+            raise ValueError(f"mfc_mode with pure_mfc work only with strategy like 1,10,100,1000")
+    
+    if mfc_mode:       
+        # print("It's mfc")
+
+        # print(f"ds.adj.shape = {ds.adj.shape}")
+        # print(f"ds.label = {ds.label[:200]}")
+        opt = Optimizer(ds.adj, ds.features, ds.label,
+                subcoms_depth = smart_subcoms_depth if smart_mode else 1,
+                method=underlying_static_method,
+                baseline_iter=baseline_iter,
+                verbose=verbose,
+                use_gpu=use_gpu)
+
+        # # opt.nodes_num = ds.adj.size()[1]
+        # # labels = ds.label
+        # print(f"opt.coms = {opt.coms}")
+
+        time_s = time.time()
+        conversion_time_s = opt.conversion_time
+        calls_s = opt.local_algorithm_calls
+
+        coms = opt.local_algorithm(opt.runtime_adj(), opt.runtime_features(), labels = ds.label)
+        # print(f"coms.unsqueeze(0) = {coms.unsqueeze(0)}")
+        # print(f"coms.unsqueeze(0).shape = {coms.unsqueeze(0).shape}")
+        opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
+
+        time_e = time.time()
+        conversion_time_e = opt.conversion_time
+        calls_e = opt.local_algorithm_calls
+
+        total_batch_time = time_e - time_s
+        conversion_time = conversion_time_e - conversion_time_s
+        measured_time = total_batch_time - conversion_time
+        mod = opt.modularity(directed = ds.is_directed)
+
+        with print_zone(verbose >= 2):
+            print(f"Modularity: {mod:.2g}")
+            print(f"Baseline calls: {calls_e - calls_s}")
+            if underlying_static_method == "ldleiden" and mode in {"naive", "raw"}:
+                algorithm_time = opt.last_timing_info["algorithm_time"]
+                print(f"Algorithm time: {algorithm_time:.2f}")
+            else:
+                print(f"Time: {measured_time:.2f}")
+
+        results.append({'modularity': mod, 'time': measured_time})
+
     # Основной цикл по батчам
     for i, batch in enumerate(torch.unbind(ds.adj)):
+        if mfc_mode:
+            break
+        # print(f"batch = {batch}")
+        
         with print_zone(verbose >= 2):
             print("  Batch", i)
 
