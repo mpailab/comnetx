@@ -3,9 +3,9 @@
   "CATCH_ERRORS": false,
   
   "DATASETS": ["dyn_wiki"],
-  "BATCHES": ["10", "999:10"],
+  "BATCHES": ["999:10"],
   
-  "BASELINES": ["mfc"],
+  "BASELINES": ["dfleiden", "prgpt:infomap", "prgpt:locale"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",

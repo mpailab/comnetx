@@ -57,6 +57,9 @@ def dynamic_launch(dataset_name : str, batches_strategy,
             temp_algo = LDLeiden(batch, directed=ds.is_directed)
             temp_algo.apply()  # выполняем разбиение
             initial_partition = temp_algo.partition()
+            mod = temp_algo.modularity()
+            with print_zone(verbose >= 1):
+                print(f"Initial modularity: {mod:.2g}")
 
             algo = algo_class(batch,
                               directed=ds.is_directed,
@@ -69,12 +72,10 @@ def dynamic_launch(dataset_name : str, batches_strategy,
 
         # --- Если режим динамический, обрабатываем батч через algo ---
         if dynamic_mode:
-            time_s = time.time()
             algo.update(batch)
             elapsed_ms = algo.apply()
             measured_time = elapsed_ms / 1000.0  # переводим в секунды
             mod = algo.modularity()
-            time_e = time.time()  # для единообразия, но фактическое время уже в measured_time
 
             with print_zone(verbose >= 2):
                 print(f"Modularity: {mod:.2g}")
@@ -93,7 +94,6 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                             verbose = verbose,
                             use_gpu = use_gpu)
             if is_special_strategy:
-                # Обработка ":" для не-dynamic режимов (как в оригинале)
                 opt.method = "ldleiden"
                 n = opt.nodes_num
                 l = opt.subcoms_depth
@@ -102,6 +102,9 @@ def dynamic_launch(dataset_name : str, batches_strategy,
                 opt.set_communities(communities = coms)
                 opt.method = underlying_static_method
                 opt.local_algorithm_calls = 0
+                mod = opt.modularity(directed = ds.is_directed)
+                with print_zone(verbose >= 1):
+                    print(f"Initial modularity: {mod:.2g}")
                 continue
             elif smart_mode:
                 if batch.is_sparse:
