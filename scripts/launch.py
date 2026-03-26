@@ -35,25 +35,14 @@ MACHINE = MACHINE_PARENT if MACHINE_PARENT is not None else MACHINE_DEFAULT
 VERBOSE = conf.get("VERBOSE", 1) # 0, 1, 2, 3
 CATCH_ERRORS = conf.get("CATCH_ERRORS", True)
 
-# --- Определение paths_config ---
-def get_default_paths_config():
-    paths_config_host = f"datasets-info/paths/{MACHINE}.json"
-    paths_config_default = "datasets-info/paths/default.json"
-    if os.path.exists(paths_config_host):
-        return paths_config_host
-    else:
-        print(f"Warning! {paths_config_host} does not exist.")
-        print(f"         {paths_config_default} will be used instead.")
-        return paths_config_default
-
 if args.paths_config:
     paths_config = os.path.abspath(args.paths_config)
     if not os.path.exists(paths_config):
         print(f"Warning! Provided paths config file does not exist: {paths_config}")
         print("Will fallback to default auto-detection.")
-        paths_config = get_default_paths_config()
+        paths_config = None
 else:
-    paths_config = get_default_paths_config()
+    paths_config = None
 
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:

@@ -15,15 +15,28 @@ from pathlib import Path
 INFO = Path(__file__).parent.parent / "datasets-info" / "nodes-sorted"
 PROJECT_DIR = Path(__file__).parent.resolve()
 
+def paths_config_auto_detect():
+    machine_default = os.getenv('HOSTNAME')
+    machine_parent = os.getenv('PARENT_HOSTNAME') # задать в bash : export PARENT_HOSTNAME=<parent_hostname>
+    machine = machine_parent if machine_parent is not None else machine_default
+    paths_config_host = f"datasets-info/paths/{machine}.json"
+    paths_config_default = "datasets-info/paths/default.json"
+    if os.path.exists(paths_config_host):
+        return paths_config_host
+    else:
+        print(f"Warning! {paths_config_host} does not exist.")
+        print(f"         {paths_config_default} will be used instead.")
+        return paths_config_default
+
 class Dataset:
     """Dataset treatment"""
     FILE_BASED_FORMATS = ["konect", "magi", "attr_graphs", "dyn_attr_graphs", "tgc", "ogb"]
 
-    def __init__(self, dataset_name : str, paths_config: str = "datasets-info/paths/default.json"):
+    def __init__(self, dataset_name : str, paths_config = None):
         self.name = dataset_name
-        self.paths_config  = paths_config # dir with datasets dirs
+        self.paths_config  = paths_config_auto_detect() if paths_config is None else paths_config
         self.dataset_format = self.detect_dataset_format()
-        self.dataset_root = Path(self.load_paths(paths_config)[self.dataset_format])
+        self.dataset_root = Path(self.load_paths(self.paths_config)[self.dataset_format])
         self.adj = None # (l, n, n)-tensor or (n, n)-tensor
         self.is_directed = False
         self.features = None
