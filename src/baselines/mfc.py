@@ -71,17 +71,6 @@ def _to_dense(adj_t: torch.Tensor) -> torch.Tensor:
         return adj_t.to_dense()
     return adj_t
 
-def size_correct(adj_list):
-    adj_3d = adj_list[0] 
-
-    adj_list_correct = list(torch.unbind(adj_3d, dim=0))
-
-    N = adj_3d.size(1) 
-    T = adj_3d.size(0) 
-
-    label_snapshots_correct = [torch.zeros(N, dtype=torch.long) for _ in range(T)]
-    return adj_list_correct, label_snapshots_correct
-
 def load_graphs_from_tensors(adj_matrices,
                              labels_list,
                              network_type: str,
@@ -99,6 +88,8 @@ def load_graphs_from_tensors(adj_matrices,
     else:
         raise ValueError("adj_matrices should be list of 2-dim tensor")
 
+    print(f"labels_list = {labels_list}")
+
     if isinstance(labels_list, torch.Tensor) and labels_list.dim() == 2:
         label_snapshots = [labels_list[t] for t in range(labels_list.size(0))]
     elif isinstance(labels_list, list):
@@ -106,33 +97,33 @@ def load_graphs_from_tensors(adj_matrices,
     else:
         raise ValueError("labels_list should be list of tensor")
 
+    print(f"label_snapshots = {label_snapshots}")
+
+
     if len(label_snapshots) == 1 and len(adj_list) > 1:
         label_snapshots = label_snapshots * len(adj_list)
 
     graph_snapshots = []
     labels_dicts = []
 
-    print(f"adj_list = {adj_list}")
+    # print(f"adj_list = {adj_list}") #my
 
-    for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
-        print("alarm")
+    # adj_list, label_snapshots = size_correct(adj_list)
 
-    adj_list, label_snapshots = size_correct(adj_list)
-
-    print(f"label_snapshots = {label_snapshots}")
-    print(f"labels_list = {labels_list}")
+    print(f"label_snapshots = {label_snapshots}") #my
+    print(f"labels_list = {labels_list}") #my
     
 
     for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
         adj_dense = _to_dense(adj_t)
 
-        print(f"adj_t = {adj_t}")
+        # print(f"adj_t = {adj_t}") #my
 
         if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
             raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN, adj_dense = {adj_dense}")
-        print(f"t={t}, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
+        # print(f"t={t}, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t}")
         if labels_t.dim() != 1 or labels_t.size(0) != adj_dense.size(0):
-            raise ValueError(f"Метки снапшота {t} должны быть длины N, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
+            raise ValueError(f"Метки снапшота {t} должны быть длины N, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t}")
 
         g = nx.from_numpy_array(adj_dense.cpu().numpy())
         labels_dict = {i: int(labels_t[i].item()) for i in range(len(labels_t))}
@@ -155,7 +146,7 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
         if adj_matrix is None or labels is None:
             raise ValueError("Для 'from_tensor' нужно передать adj_matrix и labels.")
 
-        print(f"adj_matrix = {adj_matrix}")    
+        # print(f"adj_matrix = {adj_matrix}")  #my  
         return load_graphs_from_tensors(
             adj_matrices=adj_matrix,
             labels_list=labels,
@@ -167,11 +158,11 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
 
 def main(network_type, adj_matrix, labels):
     model_init = InitModel(device = "cuda")
+    # print(f"adj_matrix in main = {adj_matrix}")
     snapshot_list, n_cluster = load_graphs("from_tensor", 
                                            network_type=network_type, 
                                            adj_matrix=adj_matrix, 
                                            labels=labels)
-    print(len(snapshot_list))
     args = Args(n_cluster, "from_tensor", network_type) # fix 20 cluster or assume known n_cluster
     model_list = []
     dgm_list = []
@@ -262,6 +253,7 @@ def mfc_adopted(
     network_type: str = "MFC",
     return_labels: bool = False,
     timing_info: dict | None = None,
+    pure_mfc: bool = True,
 ):
     """
     Запуск MFC-TopoReg на одном графе.
@@ -300,12 +292,17 @@ def mfc_adopted(
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
-    adj_matrices = [adj_bin]
+    if pure_mfc:
+        adj_matrices = adj_bin
+        init_labels = _degree_bins_labels(adj_bin[0])
+    else:
+        adj_matrices = [adj_bin]
+        
     labels_list = [init_labels]
 
     t0 = time.time()
     
-    print(f"adj_matrices = {adj_matrices}")
+    # print(f"adj_matrices = {adj_matrices}") #my
 
     main(
         network_type=network_type,

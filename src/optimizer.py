@@ -36,7 +36,10 @@ class Optimizer:
         """
        
         self.size = adj_matrix.size()
-        self.nodes_num = adj_matrix.size()[0]
+        if adj_matrix.ndim == 2:
+            self.nodes_num = adj_matrix.size()[1]
+        else:
+            self.nodes_num = adj_matrix.size()[-2]
         self.subcoms_depth = subcoms_depth
 
         # If GPU mode is requested and CUDA is available, keep all optimizer state on CUDA.
@@ -225,7 +228,8 @@ class Optimizer:
                 if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
                     labels = labels.squeeze(0)
 
-                print(f"adj = {adj}")
+                # print(f"adj = {adj}") # my
+                # print(f"labels = {labels}")
 
                 return mfc_adopted(
                     adj=adj,
