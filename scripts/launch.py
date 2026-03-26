@@ -1,18 +1,22 @@
 import json
 import sys
 import os
+import argparse
 from datetime import datetime
 from itertools import product
 
-if len(sys.argv[1:]) != 1:
-  print("Usage: launch.py <config_file>")
-  sys.exit(1)
-conf_file = os.path.abspath(sys.argv[1])
+# --- Парсинг аргументов командной строки ---
+parser = argparse.ArgumentParser(description='Launch experiments with config file.')
+parser.add_argument('config_file', help='Path to the main configuration JSON file')
+parser.add_argument('--paths-config', '-p', help='Custom path to datasets paths configuration file (overrides auto-detection)')
+args = parser.parse_args()
+
+conf_file = os.path.abspath(args.config_file)
 if not os.path.exists(conf_file):
-  print("Don't exists the file:", conf_file)
-  sys.exit(1)
+    print(f"Don't exists the file: {conf_file}")
+    sys.exit(1)
 with open(conf_file) as _:
-  conf = json.load(_)
+    conf = json.load(_)
 conf_name = os.path.basename(conf_file).rsplit(".", maxsplit=1)[0]
 
 # inner imports
@@ -31,15 +35,25 @@ MACHINE = MACHINE_PARENT if MACHINE_PARENT is not None else MACHINE_DEFAULT
 VERBOSE = conf.get("VERBOSE", 1) # 0, 1, 2, 3
 CATCH_ERRORS = conf.get("CATCH_ERRORS", True)
 
-#paths to datasets
-paths_config_default = "datasets-info/paths/default.json"
-paths_config_host = f"datasets-info/paths/{MACHINE}.json"
-if os.path.exists(paths_config_host):
-    paths_config = paths_config_host
+# --- Определение paths_config ---
+def get_default_paths_config():
+    paths_config_host = f"datasets-info/paths/{MACHINE}.json"
+    paths_config_default = "datasets-info/paths/default.json"
+    if os.path.exists(paths_config_host):
+        return paths_config_host
+    else:
+        print(f"Warning! {paths_config_host} does not exist.")
+        print(f"         {paths_config_default} will be used instead.")
+        return paths_config_default
+
+if args.paths_config:
+    paths_config = os.path.abspath(args.paths_config)
+    if not os.path.exists(paths_config):
+        print(f"Warning! Provided paths config file does not exist: {paths_config}")
+        print("Will fallback to default auto-detection.")
+        paths_config = get_default_paths_config()
 else:
-    print(f"Warning! {paths_config_host} does not exist.")
-    print(f"         {paths_config_default} will be used instead.")
-    paths_config = paths_config_default
+    paths_config = get_default_paths_config()
 
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
