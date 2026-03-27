@@ -36,10 +36,7 @@ class Optimizer:
         """
        
         self.size = adj_matrix.size()
-        if method == "pure_mfc":
-            self.nodes_num = adj_matrix.size()[-2]
-        else:
-            self.nodes_num = adj_matrix.size()[1]            
+        self.nodes_num = adj_matrix.size()[0]            
         self.subcoms_depth = subcoms_depth
 
         # If GPU mode is requested and CUDA is available, keep all optimizer state on CUDA.
@@ -234,23 +231,6 @@ class Optimizer:
                     network_type="MFC",
                     return_labels=True,
                     timing_info=timing_info,
-                )
-            
-            elif self.method == "pure_mfc":
-                from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
-                if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
-                    labels = labels.squeeze(0)
-
-                # print(f"adj = {adj}") # my
-                # print(f"labels = {labels}")
-
-                return mfc_adopted(
-                    adj=adj,
-                    labels=labels,
-                    network_type="MFC",
-                    return_labels=True,
-                    timing_info=timing_info,
-                    pure_mfc=True,
                 )
 
             elif self.method == "flmig":
