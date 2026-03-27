@@ -14,15 +14,15 @@ LocalAlgorithmFn = Callable[[torch.Tensor, Optional[torch.Tensor], bool, Optiona
 
 
 class Optimizer:
-   
+
     def __init__(self,
                  adj_matrix: torch.Tensor,
                  features: Optional[torch.Tensor] = None,
                  communities: Optional[torch.Tensor] = None,
                  subcoms_depth: int = 1,
-                 method: str = "prgpt:infomap",
-                 local_algorithm_fn: Optional[LocalAlgorithmFn] = None,
-                 verbose : int = 0,
+                 method: str = "leidenalg",
+                 baseline_iter: int = None,
+                 verbose: int = 0,
                  use_gpu: bool = False):
         """
 
@@ -56,7 +56,7 @@ class Optimizer:
 
         self.set_communities(communities)
         self.method = method
-        self.local_algorithm_fn = local_algorithm_fn
+        self.baseline_iter = baseline_iter
 
         self.verbose = verbose
         self.conversion_time = 0.0
@@ -64,8 +64,6 @@ class Optimizer:
         self.local_algorithm_calls = 0
 
     def _local_algorithm_requires_features(self) -> bool:
-        if self.local_algorithm_fn is not None:
-            return True
         if self.method in {"magi", "dmon", "dese"}:
             return True
         if self.method == "s2cag":
@@ -198,11 +196,9 @@ class Optimizer:
         self.local_algorithm_calls += 1
 
         with print_zone(self.verbose >= 3):
-            if self.local_algorithm_fn is not None:
-                res = self.local_algorithm_fn(adj, features, limited, labels)
-            elif self.method == "magi":
+            if self.method == "magi":
                 from baselines.magi_model import magi
-                res = magi(adj, features, labels, timing_info = timing_info)
+                res = magi(adj, features, labels, n_epochs=self.baseline_iter, timing_info=timing_info)
             elif self.method == "prgpt:infomap":
                 from baselines.rough_PRGPT import rough_prgpt
                 res = rough_prgpt(adj, refine="infomap", timing_info = timing_info)
@@ -220,7 +216,7 @@ class Optimizer:
                 res = dfleiden_partition(adj, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
-                res = adapted_dmon(adj, features, labels, timing_info = timing_info)
+                res = adapted_dmon(adj, features, labels, epochs=self.baseline_iter, timing_info=timing_info)
             elif self.method == "networkit":
                 from baselines.network import networkit_partition
                 res = networkit_partition(adj, timing_info = timing_info)
@@ -239,6 +235,7 @@ class Optimizer:
                 from baselines.flmig import flmig_adopted
                 flmig_labels = flmig_adopted(
                     adj=adj,
+                    Number_iter=self.baseline_iter,
                     return_labels=True,
                     timing_info=timing_info,
                 )
@@ -249,12 +246,12 @@ class Optimizer:
                 if self.feat_gen:
                     raise ValueError("dese cann`t work without real features")
                 else:
-                    res = dese(adj, features, labels, timing_info=timing_info)
+                    res = dese(adj, features, labels, n_epochs=self.baseline_iter, timing_info=timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
                 if self.feat_gen:
                     features = None
-                res = s2cag(adj, features, labels, timing_info = timing_info)
+                res = s2cag(adj, features, labels, T=self.baseline_iter, timing_info=timing_info)
             else:
                 raise ValueError("Unsupported baseline method name")
         self.conversion_time += timing_info.get('conversion_time', 0.0)
@@ -264,6 +261,36 @@ class Optimizer:
     @staticmethod
     def aggregate(adj: torch.Tensor, pattern: torch.Tensor) -> torch.Tensor:
         return torch.sparse.mm(pattern, torch.sparse.mm(adj, pattern.t()))
+
+    @staticmethod
+    def cut_by_partition(
+        adj: torch.Tensor,
+        node_mask: torch.Tensor,
+        node_labels: torch.Tensor,
+        inplace: bool = True,
+    ) -> torch.Tensor:
+        """
+        Cut edges that violate partition constraints.
+
+        If inplace=True (default), zeroes disallowed entries in-place.
+        If inplace=False, rebuilds sparse tensor keeping only allowed edges.
+        """
+        indices = adj.indices()
+        row, col = indices
+
+        keep = node_mask[row] & node_mask[col]
+        keep = keep & (node_labels[row] == node_labels[col])
+
+        if inplace:
+            adj.values().masked_fill_(~keep, 0)
+            return adj
+
+        return torch.sparse_coo_tensor(
+            indices[:, keep],
+            adj.values()[keep],
+            adj.size(),
+            device=adj.device,
+        ).coalesce()
        
     def run(self, nodes_mask: torch.Tensor) -> None:
         """
@@ -339,12 +366,10 @@ class Optimizer:
 
             # Restoring the community of the original graph
             new_coms = old_idx[coms[inverse]]
-            
-            # Store new communities at the level l
-            coms_work[l, level_ext_mask] = new_coms
 
+            # Restoring the community of the original graph and 
+            # store new communities at the level l
+            coms_work[l, level_ext_mask] = old_idx[coms[inverse]]
 
             # Cut off adjacency matrix
-            cut_idx = torch.stack((new_coms, ext_nodes))
-            cut_ptn = sparse.tensor(cut_idx, self.size, adj_work.dtype)
-            adj_work = adj_work * torch.sparse.mm(cut_ptn.t(), cut_ptn)
+            adj_work = self.cut_by_partition(adj_work, level_ext_mask, coms_work[l])

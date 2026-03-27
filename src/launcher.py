@@ -3,7 +3,6 @@ import json
 import os
 import time
 
-from datasets import INFO, Dataset
 from optimizer import Optimizer
 from our_utils import print_zone
 
@@ -15,26 +14,19 @@ ALG_CLASS = {
     "dfleiden": DFLeiden
 }
 
-def dynamic_launch(dataset_name : str, batches_strategy,
-                    underlying_static_method : str,
-                    mode : str = "smart",
-                    smart_subcoms_depth : int = 5, smart_neighborhood_step : int = 1,
-                    verbose : int = 1,
+def dynamic_launch(ds, batches_strategy,
+                    underlying_static_method: str,
+                    baseline_iter: int = None,
+                    mode: str = "smart",
+                    smart_subcoms_depth: int = 5, smart_neighborhood_step: int = 1,
+                    verbose: int = 1,
                     use_gpu: bool = False):
 
-    ds = Dataset(dataset_name)
-    ds.load(batches_strategy = batches_strategy)
+    dataset_name = ds.name
     smart_mode = (mode == "smart")
     naive_mode = (mode == "naive")
     raw_mode = (mode == "raw")
     dynamic_mode = (mode == "dynamic")
-
-    with print_zone(verbose >= 1):
-        print("-----------------------------------------------")
-        print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
-        gpu_sfx = "gpu" if use_gpu else "cpu"
-        sufix = f"L:{smart_subcoms_depth}-r:{smart_neighborhood_step}-{gpu_sfx}" if smart_mode else mode
-        print(f"Baseline: {underlying_static_method}-{sufix}")
 
     results = []
     is_special_strategy = ":" in str(batches_strategy)
@@ -50,7 +42,7 @@ def dynamic_launch(dataset_name : str, batches_strategy,
     # Основной цикл по батчам
     for i, batch in enumerate(torch.unbind(ds.adj)):
         with print_zone(verbose >= 2):
-            print("Batch", i)
+            print("  Batch", i)
 
         # --- Обработка специальной стратегии (":") для динамического режима ---
         if dynamic_mode and is_special_strategy and i == 0:
@@ -87,12 +79,12 @@ def dynamic_launch(dataset_name : str, batches_strategy,
 
         # --- Исходный код для остальных режимов (smart, naive, raw) ---
         if i == 0:
-            subcoms_depth = smart_subcoms_depth if mode == "smart" else 1
             opt = Optimizer(batch, ds.features,
-                            subcoms_depth = subcoms_depth,
-                            method = underlying_static_method,
-                            verbose = verbose,
-                            use_gpu = use_gpu)
+                            subcoms_depth = smart_subcoms_depth if smart_mode else 1,
+                            method=underlying_static_method,
+                            baseline_iter=baseline_iter,
+                            verbose=verbose,
+                            use_gpu=use_gpu)
             if is_special_strategy:
                 opt.method = "ldleiden"
                 n = opt.nodes_num
