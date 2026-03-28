@@ -8,5 +8,5 @@
   "small_konect": "/auto/datasets/graphs/small_konect/",
   "attr_graphs": "/auto/datasets/graphs/attr_graphs",
   "dyn_attr_graphs": "/home/dev/datasets/row_attr",
-  "tgc": "/home/dev/datasets/tgc/data_npy/"
+  "tgc": "/home/dev/datasets/tgc"
 }
