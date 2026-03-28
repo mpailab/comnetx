@@ -1,0 +1,44 @@
+{
+    "dyn_acm": {
+        "n": 3025,
+        "m": 13128,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_bat": {
+        "n": 131,
+        "m": 1074,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_citeseer": {
+        "n": 3327,
+        "m": 4552,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_cora": {
+        "n": 2708,
+        "m": 5278,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_dblp": {
+        "n": 4057,
+        "m": 3528,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_eat": {
+        "n": 399,
+        "m": 5995,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_uat": {
+        "n": 1190,
+        "m": 13599,
+        "d": "undirected",
+        "w": "unweighted"
+    }
+}

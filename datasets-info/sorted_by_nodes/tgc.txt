@@ -1,0 +1,8 @@
+brain      5000    1955488  undirected unweighted
+patent     12214   41916    directed   unweighted
+dblp-tgc   28085   236894   undirected unweighted
+arxivai    69854   699206   directed   unweighted
+arxivcs    169343  1166243  directed   unweighted
+arxivmath  270013  799745   directed   unweighted
+arxivphy   837212  11733619 directed   unweighted
+arxivlarge 1324064 13701428 directed   unweighted

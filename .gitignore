@@ -196,3 +196,5 @@ baselines/GraphChallenge/
 results/*.json
 test/graphs/small_konect/
 test/*.json
+
+neighborhood_analysis

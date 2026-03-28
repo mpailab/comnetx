@@ -1,0 +1,13 @@
+bat              131     1003     undirected unweighted
+eat              399     5993     undirected unweighted
+uat              1190    13599    undirected unweighted
+cora             2708    5278     undirected unweighted
+acm              3025    13128    undirected unweighted
+citeseer         3327    4552     undirected unweighted
+dblp             4057    3528     undirected unweighted
+amazon-photo     7650    119081   undirected unweighted
+amazon-computers 13752   245861   undirected unweighted
+pubmed           19717   44324    undirected unweighted
+ogbn-arxiv       169343  1166243  directed   unweighted
+reddit           232965  57307946 undirected unweighted
+ogbn-products    2449029 61859012 undirected unweighted

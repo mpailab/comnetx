@@ -12,7 +12,7 @@ import joblib
 import pickle
 from pathlib import Path
 
-INFO = Path(__file__).parent.parent / "datasets-info" / "nodes-sorted"
+INFO = Path(__file__).parent.parent / "datasets-info" / "json"
 PROJECT_DIR = Path(__file__).parent.resolve()
 
 def paths_config_auto_detect():
@@ -521,36 +521,3 @@ class Dataset:
         else:
             for line in lines:
                 print(line)
-
-def list_konect_datasets():
-    with open(os.path.join(INFO, "konect.json")) as _:
-        info = json.load(_)
-    datasets = list(info.keys())
-    max_name_len = max(map(len, datasets))
-    max_n_strlen = max(map(lambda x: len(str(info[x]["n"])), datasets))
-    max_m_strlen = max(map(lambda x: len(str(info[x]["m"])), datasets))
-    max_w_strlen = max(map(lambda x: len(str(info[x]["w"])), datasets))
-    max_d_strlen = max(map(lambda x: len(str(info[x]["d"])), datasets))
-    datasets.sort(key = lambda x: info[x]["m"])
-    for dataset in datasets:
-        pstring = f"{dataset:<{max_name_len}}"
-        pstring += f" {info[dataset]['n']:<{max_n_strlen}}"
-        pstring += f" {info[dataset]['m']:<{max_m_strlen}}"
-        pstring += f" {info[dataset]['d']:<{max_d_strlen}}"
-        pstring += f" {info[dataset]['w']:<{max_w_strlen}}"
-        print(pstring, sep="\t")
-
-def save_small_datasets_in_konect_format():
-    dir_small_datasets = "/auto/datasets/graphs/small"
-    dir_output = "/auto/datasets/graphs/small_konect"
-    os.makedirs(dir_output, exist_ok = True)
-    for dname in os.listdir(dir_small_datasets):
-        print(dname)
-        ds = Dataset(dname)
-        ds.load()
-        ds._save_konect(path = dir_output)
-        print("ok")
-
-
-if __name__ == "__main__":
-    list_konect_datasets()
