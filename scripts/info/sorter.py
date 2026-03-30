@@ -22,9 +22,10 @@ def get_sorted_table(info, sorting_key):
     return res
 
 def sort_jsons(source_dir, sorting_key, output_dir, formats):
-    for fmt in formats:
-        path = source_dir / f"{fmt}.json"
-        with open(path) as _:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for file_path in source_dir.glob("*.json"):
+        fmt = file_path.stem
+        with open(file_path) as _:
             info = json.load(_)
         
         # json-files

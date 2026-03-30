@@ -1,4 +1,11 @@
+dyn_bat             131     1074     undirected unweighted
+dyn_eat             399     5995     undirected unweighted
+dyn_uat             1190    13599    undirected unweighted
 dyn_wiki            2405    17981    directed   unweighted
+dyn_cora            2708    5278     undirected unweighted
+dyn_acm             3025    13128    undirected unweighted
+dyn_citeseer        3327    4552     undirected unweighted
+dyn_dblp            4057    3528     undirected unweighted
 dyn_blogcatalog     5196    343486   undirected unweighted
 dyn_wikics          11701   431726   undirected unweighted
 dyn_coauthorcs      18333   163788   undirected unweighted
