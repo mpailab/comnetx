@@ -1,7 +1,7 @@
 {
   "dynamic": {
     "konect": "/home/dev/datasets/konect",
-    "dyn_attr_graphs": "/home/dev/datasets/row_attr",
+    "dyn_attr": "/home/dev/datasets/row_attr",
     "tgc": "/home/dev/datasets/tgc"
   },
   "static": {

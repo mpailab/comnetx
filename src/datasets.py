@@ -118,7 +118,7 @@ class Dataset:
             batches_strategy = "1" if batches_strategy is None else str(batches_strategy)
             if fmt == "konect":
                 self._load_konect(batches_strategy=batches_strategy)
-            elif fmt == "dyn_attr_graphs":
+            elif fmt == "dyn_attr":
                 self._load_dynamic_attr_graph(batches_strategy=batches_strategy)
             elif fmt == "tgc":
                 self._load_tgc_graphs(batches_strategy=batches_strategy)
@@ -136,9 +136,7 @@ class Dataset:
         if self.root_section == "static":
             if fmt == "magi":
                 self._load_npy_format(coo_adj=True)
-            elif fmt == "small":
-                self._load_npy_format(coo_adj=True)
-            elif fmt == "attr_graphs":
+            elif fmt == "attr":
                 self._load_attr_graph()
             elif fmt == "sbm":
                 self._load_sbm()
