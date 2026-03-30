@@ -20,7 +20,7 @@ def paths_config_auto_detect():
     machine_parent = os.getenv('PARENT_HOSTNAME') # задать в bash : export PARENT_HOSTNAME=<parent_hostname>
     machine = machine_parent if machine_parent is not None else machine_default
     paths_config_host = f"datasets-info/paths/{machine}.json"
-    paths_config_default = "datasets-info/paths/default.json"
+    paths_config_default = "datasets-info/paths/astra.json"
     if os.path.exists(paths_config_host):
         return paths_config_host
     else:
@@ -30,32 +30,47 @@ def paths_config_auto_detect():
 
 class Dataset:
     """Dataset treatment"""
-    FILE_BASED_FORMATS = ["konect", "magi", "attr_graphs", "dyn_attr_graphs", "tgc", "ogb"]
 
-    def __init__(self, dataset_name : str, paths_config = None):
+    def __init__(self, dataset_name : str, paths_config = None, is_dynamic : bool = True):
         self.name = dataset_name
-        self.paths_config  = paths_config_auto_detect() if paths_config is None else paths_config
+        self.is_dynamic = is_dynamic
+        
+        if paths_config is None:
+            paths_config  = paths_config_auto_detect()
+        with open(paths_config, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
         self.dataset_format = self.detect_dataset_format()
-        self.dataset_root = Path(self.load_paths(self.paths_config)[self.dataset_format])
-        self.adj = None # (l, n, n)-tensor or (n, n)-tensor
+        self.root_section = self.get_root_section(config)
+        self.dataset_root = Path(config[self.root_section][self.dataset_format])
+
+        self.adj = None # (l, n, n)-tensor (dynamic) or (n, n)-tensor (static)
         self.is_directed = False
         self.features = None
         self.label = None
 
-    def load_paths(self, paths_config: str | Path):
-        """Loads paths.json."""
-        with open(paths_config, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def detect_dataset_format(self): 
-        for fmt in self.FILE_BASED_FORMATS:
-            path = INFO / f"{fmt}.json"
-            if path.exists():
-                with open(path) as f:
-                    if self.name.lower() in json.load(f):
-                        return fmt
+    def get_root_section(self, config):
+        dynamic = config.get("dynamic", {})
+        static = config.get("static", {})
+        if self.dataset_format in dynamic:
+            return "dynamic"
+        elif not self.is_dynamic and self.dataset_format in static:
+            return "static"
+        else:
+            raise KeyError(
+                f"Dataset format '{self.dataset_format}' not found in appropriate section. "
+                f"is_dynamic={self.is_dynamic}, "
+                f"dynamic keys={list(dynamic.keys())}, "
+                f"static keys={list(static.keys())}"
+            )
         
+    def detect_dataset_format(self):
         dname = self.name.lower()
+        for file_path in INFO.glob("*.json"):
+            fmt = file_path.stem
+            with open(file_path) as f:
+                if dname in json.load(f):
+                    return fmt
         if dname in {"acm", "bat", "citeseer", "cora", "dblp", "eat", "uat"}:
             return "small"
         if dname.startswith("sbm") or dname.startswith("tsbm"):
@@ -85,11 +100,13 @@ class Dataset:
 
         dname = self.name.lower()
         fmt = self.dataset_format
-        bs = "1" if batches_strategy is None else str(batches_strategy)
 
-        if fmt in self.FILE_BASED_FORMATS:
-            path = INFO / f"{fmt}.json"
-            with open(path, "r", encoding="utf-8") as f:
+        if not self.is_dynamic and batches_strategy is not None:
+            print(f"batches_strategy={batches_strategy} is ignored for static dataset '{self.name}'")
+
+        info_path = INFO / f"{fmt}.json"
+        if info_path.exists():
+            with open(info_path, "r", encoding="utf-8") as f:
                 info = json.load(f)
             self.is_directed = (info[dname]["d"] == "directed")
         elif fmt in {"small", "sbm", "dyn_sbm"}:
@@ -97,35 +114,47 @@ class Dataset:
         else:
             raise ValueError(f"Unknown dataset_format: {fmt}")
 
-        if fmt == "konect":
-            self._load_konect(batches_strategy=bs)
-        elif fmt == "magi":
-            self._load_npy_format(coo_adj=True)
-        elif fmt == "ogb":
-            #FIXME
-            raise ValueError(f"Unsupported dataset format: {fmt}")
-        elif fmt == "small":
-            self._load_npy_format(coo_adj=True)
-        elif fmt == "attr_graphs":
-            self._load_attr_graph()
-        elif fmt == "dyn_attr_graphs":
-            self._load_dynamic_attr_graph(batches_strategy=bs) 
-        elif fmt == "tgc":
-            self._load_tgc_graphs(batches_strategy=bs)
-        elif fmt == "dyn_sbm":
-            parts = self.name.split("_")
-            if dname.startswith("static"):
-                dataset_type, num_snapshots = "static", 5
-            elif dname.startswith("stream"):
-                dataset_type, num_snapshots = "stream", 10
+        if self.root_section == "dynamic":
+            batches_strategy = "1" if batches_strategy is None else str(batches_strategy)
+            if fmt == "konect":
+                self._load_konect(batches_strategy=batches_strategy)
+            elif fmt == "dyn_attr_graphs":
+                self._load_dynamic_attr_graph(batches_strategy=batches_strategy)
+            elif fmt == "tgc":
+                self._load_tgc_graphs(batches_strategy=batches_strategy)
+            elif fmt == "dyn_sbm":
+                parts = self.name.split("_")
+                if dname.startswith("static"):
+                    dataset_type, num_snapshots = "static", 5
+                elif dname.startswith("stream"):
+                    dataset_type, num_snapshots = "stream", 10
+                else:
+                    raise ValueError(f"Bad dyn_sbm name: {self.name}")
+                snap, num_nodes, mu, beta = int(parts[1]), int(parts[2]), float(parts[3]), float(parts[4])
+                self._load_prgpt_dataset(dataset_type, num_nodes, mu, beta, snap, num_snapshots)
+
+        if self.root_section == "static":
+            if fmt == "magi":
+                self._load_npy_format(coo_adj=True)
+            elif fmt == "small":
+                self._load_npy_format(coo_adj=True)
+            elif fmt == "attr_graphs":
+                self._load_attr_graph()
+            elif fmt == "sbm":
+                self._load_sbm()
+            elif fmt == "ogb":
+                raise ValueError(f"Unsupported dataset format: {fmt}")  # FIXME
             else:
-                raise ValueError(f"Bad dyn_sbm name: {self.name}")
-            snap, num_nodes, mu, beta = int(parts[1]), int(parts[2]), float(parts[3]), float(parts[4])
-            self._load_prgpt_dataset(dataset_type, num_nodes, mu, beta, snap, num_snapshots)
-        elif fmt == "sbm":
-            self._load_sbm()
-        else:
-            raise ValueError(f"Unsupported dataset format: {fmt}")
+                raise ValueError(f"Unsupported dataset format: {fmt}")
+        
+        # Статический датасет, хранящийся в динамической папке: берём первый срез
+        if not self.is_dynamic and self.root_section == "dynamic" and self.adj.dim() == 3:
+            if self.adj.shape[0] > 1:
+                raise ValueError(
+                    f"Static dataset '{self.name}' is stored as dynamic with {self.adj.shape[0]} snapshots. "
+                    f"Expected exactly 1 snapshot, but found {self.adj.shape[0]}. "
+                )
+            self.adj = self.adj[0]
 
         if tensor_type == "dense":
             self.adj = self.adj.to_dense()
