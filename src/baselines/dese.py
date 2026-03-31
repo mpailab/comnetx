@@ -174,11 +174,11 @@ def dese(adj,
             gpu = 0
             decay_rate = None
             num_clusters_layer = [num_clusters]
-            layer_str = '[3]'
+            layer_str = '[100]'
             embed_dim = features_dim
             se_lamda = 0.01
             lp_lamda = 1
-            verbose = 10
+            verbose = 5
             activation = 'relu'
             k = 2
             dropout = 0.1

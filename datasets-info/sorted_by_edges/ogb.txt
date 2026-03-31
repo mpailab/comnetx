@@ -1,0 +1,6 @@
+ogbn-arxiv     169343  1166243  directed   unweighted
+ogbl-collab    235868  1285465  undirected weighted  
+ogbl-vessel    3538495 5345897  undirected unweighted
+ogbl-ppa       576289  30326273 undirected unweighted
+ogbl-citation2 2927963 30561187 directed   unweighted
+ogbn-products  2449029 61859140 undirected unweighted

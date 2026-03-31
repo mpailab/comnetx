@@ -36,7 +36,7 @@ class Optimizer:
         """
        
         self.size = adj_matrix.size()
-        self.nodes_num = adj_matrix.size()[0]
+        self.nodes_num = adj_matrix.size()[0]            
         self.subcoms_depth = subcoms_depth
 
         # If GPU mode is requested and CUDA is available, keep all optimizer state on CUDA.
@@ -224,6 +224,7 @@ class Optimizer:
                 from baselines.mfc import mfc_adopted, _binarize_adj, _degree_bins_labels
                 if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
                     labels = labels.squeeze(0)
+
                 return mfc_adopted(
                     adj=adj,
                     labels=labels,
@@ -231,6 +232,7 @@ class Optimizer:
                     return_labels=True,
                     timing_info=timing_info,
                 )
+
             elif self.method == "flmig":
                 from baselines.flmig import flmig_adopted
                 flmig_labels = flmig_adopted(
