@@ -1,0 +1,12 @@
+wiki            2405   16523    directed   weighted  
+pubmed          19717  44338    directed   unweighted
+facebook        4039   88234    directed   unweighted
+coauthorcs      18333  163788   undirected unweighted
+nell            65755  251550   undirected unweighted
+blogcatalog     5196   343486   undirected unweighted
+wikics          11701  431726   undirected unweighted
+coauthorphysics 34493  495924   undirected unweighted
+flickr          89250  899756   undirected unweighted
+ppi             56944  1612348  undirected unweighted
+yelp            716847 13954819 undirected unweighted
+reddit2         232965 23213838 undirected unweighted
