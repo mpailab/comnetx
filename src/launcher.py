@@ -27,23 +27,20 @@ def dynamic_launch(ds, batches_strategy,
     naive_mode = (mode == "naive")
     raw_mode = (mode == "raw")
     dynamic_mode = (mode == "dynamic")
-    mfc_mode = (underlying_static_method == "pure_mfc")
 
     results = []
     is_special_strategy = ":" in str(batches_strategy)
 
     # Для динамического режима подготовим переменные вне цикла
-    if dynamic_mode:
+    if dynamic_mode and not (underlying_static_method=="mfc"):
         # Проверка поддерживаемого алгоритма
         if underlying_static_method in ALG_CLASS:
             algo_class = ALG_CLASS[underlying_static_method]
         else:
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
     
-    if mfc_mode:       
+    if dynamic_mode and underlying_static_method == "mfc":       
         # print("It's mfc")
-        if is_special_strategy:    
-            raise ValueError(f"mfc_mode with pure_mfc work only with strategy like 1,10,100,1000")
 
         # print(f"ds.adj.shape = {ds.adj.shape}")
         # print(f"ds.label = {ds.label[:200]}")
@@ -176,7 +173,18 @@ def dynamic_launch(ds, batches_strategy,
             total_batch_time = time_e - time_s
             conversion_time = conversion_time_e - conversion_time_s
             measured_time = total_batch_time - conversion_time
+
+            mod_time_s = time.time()
             mod = opt.modularity(directed = ds.is_directed)
+            mod_time_e = time.time()
+            mod_time = mod_time_e - mod_time_s
+
+            mod_time_s = time.time()
+            slow_mod = opt.modularity_slow(directed = ds.is_directed)
+            mod_time_e = time.time()
+            slow_mod_time = mod_time_e - mod_time_s
+            print(f"torch.unique(opt.coms).shape = {torch.unique(opt.coms).shape}")
+            print(f"mod_time = {mod_time}, slow_mod_time = {slow_mod_time}, delt = {abs(slow_mod - mod):.6f}")
 
             with print_zone(verbose >= 2):
                 print(f"Modularity: {mod:.2g}")
@@ -195,7 +203,7 @@ def dynamic_launch(ds, batches_strategy,
         final_mod = results[-1]['modularity'] if results else 0
         print(f"Final modularity: {final_mod:.2g}")
     with print_zone(verbose >= 1):
-        if not dynamic_mode and not mfc_mode:
+        if not dynamic_mode:
             print(f"Total baseline calls: {opt.local_algorithm_calls}")
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")

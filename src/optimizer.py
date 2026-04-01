@@ -110,6 +110,22 @@ class Optimizer:
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype, device=self.device)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
    
+    def modularity_slow(self,
+            gamma: float = 1, L: int = 0, directed: bool = False) -> float:
+        """
+        Args:
+            gamma: float, optional (default=1)
+            L: int, optional (default=0)
+        Returns:
+            modularity: float
+        """
+        from metrics import Metrics
+        # slow = Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed)
+        # fast = Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
+        # if abs(slow - fast) > 1e-4:
+        #     raise ValueError(f"modularity_slow - modularity = {slow - fast}")
+        return Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed) 
+   
     def modularity(self,
             gamma: float = 1, L: int = 0, directed: bool = False) -> float:
         """
@@ -120,7 +136,11 @@ class Optimizer:
             modularity: float
         """
         from metrics import Metrics
-        return Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
+        # slow = Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed)
+        # fast = Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
+        # if abs(slow - fast) > 1e-4:
+        #     raise ValueError(f"modularity_slow - modularity = {slow - fast}")
+        return Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed) 
         
     def update_adj(self, batch: torch.Tensor, return_mask: bool = True) -> Optional[torch.Tensor]:
         """

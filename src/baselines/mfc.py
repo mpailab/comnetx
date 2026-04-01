@@ -88,7 +88,7 @@ def load_graphs_from_tensors(adj_matrices,
     else:
         raise ValueError("adj_matrices should be list of 2-dim tensor")
 
-    print(f"labels_list = {labels_list}")
+    # print(f"labels_list = {labels_list}")
 
     if isinstance(labels_list, torch.Tensor) and labels_list.dim() == 2:
         label_snapshots = [labels_list[t] for t in range(labels_list.size(0))]
@@ -97,7 +97,7 @@ def load_graphs_from_tensors(adj_matrices,
     else:
         raise ValueError("labels_list should be list of tensor")
 
-    print(f"label_snapshots = {label_snapshots}")
+    # print(f"label_snapshots = {label_snapshots}")
 
 
     if len(label_snapshots) == 1 and len(adj_list) > 1:
@@ -110,14 +110,14 @@ def load_graphs_from_tensors(adj_matrices,
 
     # adj_list, label_snapshots = size_correct(adj_list)
 
-    print(f"label_snapshots = {label_snapshots}") #my
-    print(f"labels_list = {labels_list}") #my
+    # print(f"label_snapshots = {label_snapshots}") #my
+    # print(f"labels_list = {labels_list}") #my
     
 
     for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
         adj_dense = _to_dense(adj_t)
 
-        # print(f"adj_t = {adj_t}") #my
+        print(f"adj_t = {adj_t}") #my
 
         if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
             raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN, adj_dense = {adj_dense}")
@@ -203,7 +203,7 @@ def main(network_type, adj_matrix, labels):
         adj,features,labels = snapshot_list[t]
         
         if len(snapshot_list)!=1:
-            print('several snapshot')
+            # print('several snapshot')
             if t == 0:
                 gt_dgm = [None, dgm_list[t+1]]
             elif t == len(snapshot_list)-1: 
@@ -211,7 +211,7 @@ def main(network_type, adj_matrix, labels):
             else:
                 gt_dgm = [dgm_list[t-1],dgm_list[t+1]]
         else:
-            print('one snapshot')
+            # print('one snapshot')
             gt_dgm = [None, dgm_list[t]]
 
         retrain_with_topo(
