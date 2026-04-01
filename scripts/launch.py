@@ -74,7 +74,7 @@ SMART_VERSION = conf["SMART_VERSION"]
 USE_GPU = conf.get("USE_GPU", True)
 
 # baseline iterations
-SUPPORTED_ITER_METHODS = {"magi", "dmon", "dese", "flmig", "s2cag"}
+SUPPORTED_ITER_METHODS = {"magi", "dmon", "dese", "flmig", "s2cag", "mfc"}
 BASELINE_ITER_VALS = conf.get("BASELINE_ITERATIONS", [None])
 if isinstance(BASELINE_ITER_VALS, (int, float)):
     BASELINE_ITER_VALS = [BASELINE_ITER_VALS]

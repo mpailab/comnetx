@@ -120,10 +120,6 @@ class Optimizer:
             modularity: float
         """
         from metrics import Metrics
-        # slow = Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed)
-        # fast = Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
-        # if abs(slow - fast) > 1e-4:
-        #     raise ValueError(f"modularity_slow - modularity = {slow - fast}")
         return Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed) 
    
     def modularity(self,
@@ -136,10 +132,6 @@ class Optimizer:
             modularity: float
         """
         from metrics import Metrics
-        # slow = Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed)
-        # fast = Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
-        # if abs(slow - fast) > 1e-4:
-        #     raise ValueError(f"modularity_slow - modularity = {slow - fast}")
         return Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed) 
         
     def update_adj(self, batch: torch.Tensor, return_mask: bool = True) -> Optional[torch.Tensor]:
@@ -251,6 +243,7 @@ class Optimizer:
                     network_type="MFC",
                     return_labels=True,
                     timing_info=timing_info,
+                    num_epoch=self.baseline_iter,
                 )
 
             elif self.method == "flmig":

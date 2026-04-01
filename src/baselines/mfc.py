@@ -156,14 +156,18 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
     else:
         raise NameError
 
-def main(network_type, adj_matrix, labels):
-    model_init = InitModel(device = "cuda")
-    # print(f"adj_matrix in main = {adj_matrix}")
-    snapshot_list, n_cluster = load_graphs("from_tensor", 
-                                           network_type=network_type, 
-                                           adj_matrix=adj_matrix, 
-                                           labels=labels)
+def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
+    model_init = InitModel(device="cuda")
+    snapshot_list, n_cluster = load_graphs(
+        "from_tensor",
+        network_type=network_type,
+        adj_matrix=adj_matrix,
+        labels=labels,
+    )
     args = Args(n_cluster, "from_tensor", network_type) # fix 20 cluster or assume known n_cluster
+    args.num_epoch = num_epoch
+    args.start_mf = start_mf
+
     model_list = []
     dgm_list = []
     wrcf_layer_dim0 = WrcfLayer(dim=0, card=args.card)
@@ -253,6 +257,7 @@ def mfc_adopted(
     network_type: str = "MFC",
     return_labels: bool = False,
     timing_info: dict | None = None,
+    num_epoch = None,
     pure_mfc: bool = False,
 ):
     """
@@ -271,6 +276,11 @@ def mfc_adopted(
     timing_info : dict or None
         Словарь, куда накапливается conversion_time.
     """
+
+    if num_epoch is None:
+        num_epoch = 10
+
+    start_mf = num_epoch // 2
 
     if timing_info is None:
         timing_info = {}
@@ -308,6 +318,8 @@ def mfc_adopted(
         network_type=network_type,
         adj_matrix=adj_matrices,
         labels=labels_list,
+        num_epoch=num_epoch,
+        start_mf=start_mf,
     )
     t1 = time.time()
     timing_info["conversion_time"] += (t1 - t0)

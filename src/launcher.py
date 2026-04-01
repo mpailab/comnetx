@@ -58,6 +58,7 @@ def dynamic_launch(ds, batches_strategy,
                         labels=ds.label,
                         network_type="MFC",
                         return_labels=True,
+                        num_epoch=baseline_iter,
                         pure_mfc=True,
                     )
             # print(f"coms.unsqueeze(0) = {coms.unsqueeze(0)}")
@@ -174,17 +175,15 @@ def dynamic_launch(ds, batches_strategy,
             conversion_time = conversion_time_e - conversion_time_s
             measured_time = total_batch_time - conversion_time
 
-            mod_time_s = time.time()
+            # mod_time_s = time.time()
             mod = opt.modularity(directed = ds.is_directed)
-            mod_time_e = time.time()
-            mod_time = mod_time_e - mod_time_s
-
-            mod_time_s = time.time()
-            slow_mod = opt.modularity_slow(directed = ds.is_directed)
-            mod_time_e = time.time()
-            slow_mod_time = mod_time_e - mod_time_s
-            print(f"torch.unique(opt.coms).shape = {torch.unique(opt.coms).shape}")
-            print(f"mod_time = {mod_time}, slow_mod_time = {slow_mod_time}, delt = {abs(slow_mod - mod):.6f}")
+            # mod_time_e = time.time()
+            # mod_time = mod_time_e - mod_time_s
+            # mod_time_s = time.time()
+            # slow_mod = opt.modularity_slow(directed = ds.is_directed)
+            # mod_time_e = time.time()
+            # slow_mod_time = mod_time_e - mod_time_s
+            # print(f"mod_time = {mod_time}, slow_mod_time = {slow_mod_time}, delt = {abs(slow_mod - mod):.6f}, unique coms shape = {torch.unique(opt.coms).shape[0]}")
 
             with print_zone(verbose >= 2):
                 print(f"Modularity: {mod:.2g}")
