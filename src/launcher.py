@@ -27,46 +27,48 @@ def dynamic_launch(ds, batches_strategy,
     naive_mode = (mode == "naive")
     raw_mode = (mode == "raw")
     dynamic_mode = (mode == "dynamic")
-    mfc_mode = (underlying_static_method == "pure_mfc")
 
     results = []
     is_special_strategy = ":" in str(batches_strategy)
 
     # Для динамического режима подготовим переменные вне цикла
-    if dynamic_mode:
+    if dynamic_mode and not (underlying_static_method=="mfc"):
         # Проверка поддерживаемого алгоритма
         if underlying_static_method in ALG_CLASS:
             algo_class = ALG_CLASS[underlying_static_method]
         else:
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
     
-    if mfc_mode:       
-        # print("It's mfc")
-        if is_special_strategy:    
-            raise ValueError(f"mfc_mode with pure_mfc work only with strategy like 1,10,100,1000")
+    if dynamic_mode and underlying_static_method == "mfc":       
 
-        # print(f"ds.adj.shape = {ds.adj.shape}")
-        # print(f"ds.label = {ds.label[:200]}")
+        from baselines.mfc import mfc_adopted
+        from metrics import Metrics
+        
+        time_s = time.time()
+        labels = ds.label
+        if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
+            labels = labels.squeeze(0)
+        initial_partition = None
+        if is_special_strategy:
+            first_snapshot = ds.adj[0]
+            temp_algo = LDLeiden(first_snapshot, directed=ds.is_directed)
+            temp_algo.apply()
+            initial_partition = temp_algo.partition()
+            init_mod = temp_algo.modularity()
+            with print_zone(verbose >= 1):
+                print(f"Initial modularity: {init_mod:.2g}")
+        
         with print_zone(verbose >= 2):
-            # print(f"opt.coms = {opt.coms}")
-            from baselines.mfc import mfc_adopted
-            from metrics import Metrics
-            
-            time_s = time.time()
-            labels = ds.label
-            if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
-                labels = labels.squeeze(0)
             coms = mfc_adopted(
                         adj=ds.adj,
-                        labels=ds.label,
+                        labels=labels,
                         network_type="MFC",
                         return_labels=True,
+                        num_epoch=baseline_iter,
                         pure_mfc=True,
+                        initial_partition=initial_partition,
                     )
-            # print(f"coms.unsqueeze(0) = {coms.unsqueeze(0)}")
-            # print(f"coms.unsqueeze(0).shape = {coms.unsqueeze(0).shape}")
-            # opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
-
+            
             time_e = time.time()
             measured_time = time_e - time_s
             mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
@@ -177,7 +179,7 @@ def dynamic_launch(ds, batches_strategy,
             conversion_time = conversion_time_e - conversion_time_s
             measured_time = total_batch_time - conversion_time
             mod = opt.modularity(directed = ds.is_directed)
-
+            
             with print_zone(verbose >= 2):
                 print(f"Modularity: {mod:.2g}")
                 print(f"Baseline calls: {calls_e - calls_s}")
@@ -195,7 +197,7 @@ def dynamic_launch(ds, batches_strategy,
         final_mod = results[-1]['modularity'] if results else 0
         print(f"Final modularity: {final_mod:.2g}")
     with print_zone(verbose >= 1):
-        if not dynamic_mode and not mfc_mode:
+        if not dynamic_mode:
             print(f"Total baseline calls: {opt.local_algorithm_calls}")
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")

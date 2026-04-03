@@ -110,6 +110,18 @@ class Optimizer:
                     zeros_to_add = torch.zeros((l - current_depth, n), dtype=communities.dtype, device=self.device)
                     self.coms = torch.cat([communities, zeros_to_add], dim=0)
    
+    def modularity_slow(self,
+            gamma: float = 1, L: int = 0, directed: bool = False) -> float:
+        """
+        Args:
+            gamma: float, optional (default=1)
+            L: int, optional (default=0)
+        Returns:
+            modularity: float
+        """
+        from metrics import Metrics
+        return Metrics.modularity_slow(self.adj, self.coms[L], gamma, directed = directed) 
+   
     def modularity(self,
             gamma: float = 1, L: int = 0, directed: bool = False) -> float:
         """
@@ -120,7 +132,7 @@ class Optimizer:
             modularity: float
         """
         from metrics import Metrics
-        return Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed)
+        return Metrics.modularity(self.adj, self.coms[L], gamma, directed = directed) 
         
     def update_adj(self, batch: torch.Tensor, return_mask: bool = True) -> Optional[torch.Tensor]:
         """
@@ -231,6 +243,7 @@ class Optimizer:
                     network_type="MFC",
                     return_labels=True,
                     timing_info=timing_info,
+                    num_epoch=self.baseline_iter,
                 )
 
             elif self.method == "flmig":
