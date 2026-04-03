@@ -5,6 +5,12 @@ import pickle
 import numpy as np
 import time
 from pathlib import Path
+import warnings
+
+# for warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['AUTOGRAPH_VERBOSITY'] = '0'
+warnings.filterwarnings("ignore")
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC_PATH = os.path.join(PROJECT_PATH, "src")
@@ -71,6 +77,25 @@ def _to_dense(adj_t: torch.Tensor) -> torch.Tensor:
         return adj_t.to_dense()
     return adj_t
 
+
+def _normalize_initial_partition(initial_partition: torch.Tensor, nodes_num: int) -> torch.Tensor:
+    if initial_partition.dim() == 2 and initial_partition.size(0) == 1:
+        initial_partition = initial_partition.squeeze(0)
+
+    if initial_partition.dim() != 1:
+        raise ValueError(
+            "initial_partition must be a 1D tensor with shape [N] or [1, N], "
+            f"got {tuple(initial_partition.shape)}"
+        )
+
+    if initial_partition.size(0) != nodes_num:
+        raise ValueError(
+            f"initial_partition size mismatch: expected {nodes_num}, got {initial_partition.size(0)}"
+        )
+
+    return initial_partition.to(torch.long)
+
+
 def load_graphs_from_tensors(adj_matrices,
                              labels_list,
                              network_type: str,
@@ -117,7 +142,7 @@ def load_graphs_from_tensors(adj_matrices,
     for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
         adj_dense = _to_dense(adj_t)
 
-        print(f"adj_t = {adj_t}") #my
+        # print(f"adj_t = {adj_t}") #my
 
         if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
             raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN, adj_dense = {adj_dense}")
@@ -259,6 +284,7 @@ def mfc_adopted(
     timing_info: dict | None = None,
     num_epoch = None,
     pure_mfc: bool = False,
+    initial_partition: torch.Tensor | None = None,
 ):
     """
     Запуск MFC-TopoReg на одном графе.
@@ -290,6 +316,8 @@ def mfc_adopted(
         adj = adj.cpu()
     if labels is not None and labels.device.type == "cuda":
         labels = labels.cpu()
+    if initial_partition is not None and initial_partition.device.type == "cuda":
+        initial_partition = initial_partition.cpu()
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
@@ -304,7 +332,11 @@ def mfc_adopted(
 
     if pure_mfc:
         adj_matrices = adj_bin
-        init_labels = _degree_bins_labels(adj_bin[0])
+        first_snapshot = adj_bin[0]
+        if initial_partition is not None:
+            init_labels = _normalize_initial_partition(initial_partition, first_snapshot.size(0))
+        else:
+            init_labels = _degree_bins_labels(first_snapshot)
     else:
         adj_matrices = [adj_bin]
         

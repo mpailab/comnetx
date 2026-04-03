@@ -44,22 +44,34 @@ def dynamic_launch(ds, batches_strategy,
 
         # print(f"ds.adj.shape = {ds.adj.shape}")
         # print(f"ds.label = {ds.label[:200]}")
+        
+        # print(f"opt.coms = {opt.coms}")
+        from baselines.mfc import mfc_adopted
+        from metrics import Metrics
+        
+        time_s = time.time()
+        labels = ds.label
+        if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
+            labels = labels.squeeze(0)
+        initial_partition = None
+        if is_special_strategy:
+            first_snapshot = ds.adj[0]
+            temp_algo = LDLeiden(first_snapshot, directed=ds.is_directed)
+            temp_algo.apply()
+            initial_partition = temp_algo.partition()
+            init_mod = temp_algo.modularity()
+            with print_zone(verbose >= 1):
+                print(f"Initial modularity: {init_mod:.2g}")
+        
         with print_zone(verbose >= 2):
-            # print(f"opt.coms = {opt.coms}")
-            from baselines.mfc import mfc_adopted
-            from metrics import Metrics
-            
-            time_s = time.time()
-            labels = ds.label
-            if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
-                labels = labels.squeeze(0)
             coms = mfc_adopted(
                         adj=ds.adj,
-                        labels=ds.label,
+                        labels=labels,
                         network_type="MFC",
                         return_labels=True,
                         num_epoch=baseline_iter,
                         pure_mfc=True,
+                        initial_partition=initial_partition,
                     )
             # print(f"coms.unsqueeze(0) = {coms.unsqueeze(0)}")
             # print(f"coms.unsqueeze(0).shape = {coms.unsqueeze(0).shape}")
