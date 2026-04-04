@@ -41,6 +41,7 @@ class Dataset:
         self.is_directed = False
         self.features = None
         self.label = None
+        self.features_kind = None
 
     def load_paths(self, paths_config: str | Path):
         """Loads paths.json."""
@@ -65,7 +66,59 @@ class Dataset:
         
         raise ValueError(f"Dataset '{self.name}' not in json config files and no pattern match.")
 
-    def load(self, tensor_type : str = "coo", batches_strategy = None) -> torch.Tensor:
+    def _infer_num_nodes(self) -> int:
+        if self.features is not None:
+            return int(self.features.shape[0])
+
+        if self.label is not None:
+            # static labels: [n], temporal labels: [T, n]
+            return int(self.label.shape[-1] if self.label.ndim > 1 else self.label.shape[0])
+
+        if self.adj is not None:
+            # static adj: [n, n], dynamic adj: [T, n, n]
+            return int(self.adj.shape[-1])
+
+        raise ValueError("Cannot infer num_nodes: adj, label and features are all None.")
+
+    def _squeeze_single_batch_adj(self):
+        if self.adj is None:
+            return
+
+        if self.adj.ndim == 3 and self.adj.shape[0] == 1:
+            idx = self.adj.indices()
+            vals = self.adj.values()
+
+            new_indices = idx[1:]
+            new_size = self.adj.shape[1:]
+
+            self.adj = torch.sparse_coo_tensor(
+                new_indices,
+                vals,
+                size=new_size,
+                dtype=vals.dtype,
+                device=vals.device,
+            ).coalesce()
+
+
+    def _make_one_hot_features(self, num_nodes: int | None = None) -> torch.Tensor:
+        n = self._infer_num_nodes() if num_nodes is None else int(num_nodes)
+        idx = torch.arange(n, dtype=torch.long)
+        indices = torch.stack([idx, idx], dim=0)
+        values = torch.ones(n, dtype=torch.float32)
+        self.features_kind = "identity"
+        return torch.sparse_coo_tensor(indices, values, size=(n, n)).coalesce()
+
+
+    def _ensure_features(self):
+        if self.features is None:
+            self.features = self._make_one_hot_features()
+
+    def load(
+    self,
+    tensor_type: str = "coo",
+    batches_strategy=None,
+    add_one_hot_features: bool = True
+    ) -> torch.Tensor:
         """
         Load dataset
 
@@ -137,6 +190,13 @@ class Dataset:
             self.adj = self.adj.to_sparse_csc()
         else:
             raise ValueError(f"Unsupported tensor type for torch.sparse: {tensor_type}")
+
+        if self.adj is not None and self.adj.layout == torch.sparse_coo:
+            self._squeeze_single_batch_adj()
+
+        if add_one_hot_features:
+            self._ensure_features()
+
         return self.adj, self.features, self.label
 
     def _load_npy_format(self, coo_adj=True):
@@ -146,7 +206,10 @@ class Dataset:
         feat_path = os.path.join(load_dir, f"{dname}_feat.npy")
         label_path = os.path.join(load_dir, f"{dname}_label.npy")
         
-        self.features = torch.tensor(np.load(feat_path), dtype=torch.float)
+        self.features = None
+        if os.path.exists(feat_path):
+            self.features = torch.tensor(np.load(feat_path), dtype=torch.float)
+
         self.label = torch.tensor(np.load(label_path), dtype=torch.long)
         coo_path = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
         dense_path = os.path.join(load_dir, f"{dname}_adj.npy")
@@ -181,10 +244,16 @@ class Dataset:
         label_file = os.path.join(load_dir, f"{dname}_label.npy")
         adj_file = os.path.join(load_dir, f"{dname}_coo_adj.joblib")
         
-        if not all(os.path.exists(f) for f in [feat_file, label_file, adj_file]):
-            raise FileNotFoundError(f"Файлы attr_graph отсутствуют в {load_dir}. Запустите: download.py {dname}")
-        
-        self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
+        if not all(os.path.exists(f) for f in [label_file, adj_file]):
+            raise FileNotFoundError(
+                f"Файлы attr_graph отсутствуют в {load_dir}. "
+                f"Нужны как минимум label и adjacency. Запустите: download.py {dname}"
+            )
+
+        self.features = None
+        if os.path.exists(feat_file):
+            self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
+
         self.label = torch.tensor(np.load(label_file), dtype=torch.long)
         adj_data = joblib.load(adj_file)
         self.adj = torch.sparse_coo_tensor(
@@ -234,10 +303,15 @@ class Dataset:
         feat_file = os.path.join(load_dir, f"{dname}_feat.npy")
         label_file = os.path.join(load_dir, f"{dname}_label.npy")
         
-        if not all(os.path.exists(f) for f in [feat_file, label_file, adj_file]):
-            raise FileNotFoundError(f"Для стратегии {batches_strategy} файлы TGC отсутствуют в {load_dir}. Запустите bash: python src/download.py {dname}")
-        
-        self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
+        if not all(os.path.exists(f) for f in [label_file, adj_file]):
+            raise FileNotFoundError(
+                f"Для стратегии {batches_strategy} файлы TGC отсутствуют в {load_dir}. "
+                f"Нужны как минимум label и adjacency. Запустите: python src/download.py {dname}"
+            )
+
+        features_np = build_features_or_one_hot(features, num_nodes, dname)
+        np.save(os.path.join(save_dir, f"{dname}_feat.npy"), features_np)
+
         self.label = torch.tensor(np.load(label_file), dtype=torch.long)
         
         adj_data = joblib.load(adj_file)

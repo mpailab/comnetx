@@ -16,14 +16,16 @@ LocalAlgorithmFn = Callable[[torch.Tensor, Optional[torch.Tensor], bool, Optiona
 class Optimizer:
 
     def __init__(self,
-                 adj_matrix: torch.Tensor,
-                 features: Optional[torch.Tensor] = None,
-                 communities: Optional[torch.Tensor] = None,
-                 subcoms_depth: int = 1,
-                 method: str = "leidenalg",
-                 baseline_iter: int = None,
-                 verbose: int = 0,
-                 use_gpu: bool = False):
+             adj_matrix: torch.Tensor,
+             features: Optional[torch.Tensor] = None,
+             communities: Optional[torch.Tensor] = None,
+             subcoms_depth: int = 1,
+             method: str = "leidenalg",
+             baseline_iter: int = None,
+             verbose: int = 0,
+             use_gpu: bool = False):
+
+    
         """
 
 
@@ -39,7 +41,6 @@ class Optimizer:
         self.nodes_num = adj_matrix.size()[0]
         self.subcoms_depth = subcoms_depth
 
-        # If GPU mode is requested and CUDA is available, keep all optimizer state on CUDA.
         if use_gpu and torch.cuda.is_available():
             self.device = torch.device("cuda")
         else:
@@ -49,10 +50,12 @@ class Optimizer:
 
         if features is None:
             self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype, device=self.device)
-            self.feat_gen = True
+            self.synthetic_features = True
+            self.has_real_features = False
         else:
             self.features = features.float().to(self.device)
-            self.feat_gen = False
+            self.synthetic_features = self._is_sparse_identity(self.features)
+            self.has_real_features = not self.synthetic_features
 
         self.set_communities(communities)
         self.method = method
@@ -63,11 +66,54 @@ class Optimizer:
         self.last_timing_info = None
         self.local_algorithm_calls = 0
 
+    @staticmethod
+    def _is_sparse_identity(features: torch.Tensor) -> bool:
+        if not isinstance(features, torch.Tensor):
+            return False
+        if features.layout != torch.sparse_coo:
+            return False
+
+        feat = features.coalesce()
+        if feat.dim() != 2:
+            return False
+
+        n, m = feat.shape
+        if n != m or feat._nnz() != n:
+            return False
+
+        row, col = feat.indices()
+        vals = feat.values()
+
+        if not torch.equal(row, col):
+            return False
+        if not torch.all(vals == 1):
+            return False
+        if not torch.equal(torch.sort(row).values, torch.arange(n, device=row.device)):
+            return False
+
+        return True
+
+    def _aggregate_features(self, pattern: torch.Tensor, features: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        if features is None:
+            return None
+
+        if isinstance(features, torch.Tensor) and features.layout == torch.sparse_coo:
+            features = features.coalesce()
+
+            if self._is_sparse_identity(features):
+                return pattern.coalesce()
+
+            return torch.sparse.mm(pattern, features)
+
+        return torch.sparse.mm(pattern, features)
+
     def _local_algorithm_requires_features(self) -> bool:
-        if self.method in {"magi", "dmon", "dese"}:
+        if self.method in {"magi", "dmon"}:
             return True
+        if self.method == "dese":
+            return self.has_real_features
         if self.method == "s2cag":
-            return not self.feat_gen
+            return self.has_real_features
         return False
 
     def runtime_device(self) -> torch.device:
@@ -243,13 +289,12 @@ class Optimizer:
                 res = remap.to(torch.long)
             elif self.method == "dese":
                 from baselines.dese import dese
-                if self.feat_gen:
-                    raise ValueError("dese cann`t work without real features")
-                else:
-                    res = dese(adj, features, labels, n_epochs=self.baseline_iter, timing_info=timing_info)
+                if not self.has_real_features:
+                    raise ValueError("dese can't work without real features")
+                res = dese(adj, features, labels, n_epochs=self.baseline_iter, timing_info=timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
-                if self.feat_gen:
+                if not self.has_real_features:
                     features = None
                 res = s2cag(adj, features, labels, T=self.baseline_iter, timing_info=timing_info)
             else:
@@ -352,7 +397,7 @@ class Optimizer:
             aggr_ptn = sparse.tensor(aggr_idx, (n, self.nodes_num), adj_work.dtype)
             aggr_adj = self.aggregate(adj_work, aggr_ptn)
             aggr_features = (
-                torch.sparse.mm(aggr_ptn, features_work)
+                self._aggregate_features(aggr_ptn, features_work)
                 if needs_features
                 else None
             )

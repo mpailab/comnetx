@@ -40,7 +40,14 @@ def dynamic_launch(ds, batches_strategy,
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
 
     # Основной цикл по батчам
-    for i, batch in enumerate(torch.unbind(ds.adj)):
+    if ds.adj.ndim == 2:
+        batches_iter = [ds.adj]
+    elif ds.adj.ndim == 3:
+        batches_iter = torch.unbind(ds.adj)
+    else:
+        raise ValueError(f"Unsupported ds.adj ndim: {ds.adj.ndim}")
+
+    for i, batch in enumerate(batches_iter):
         with print_zone(verbose >= 2):
             print("  Batch", i)
 
