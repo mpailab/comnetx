@@ -1,0 +1,8 @@
+citeseer_s2      3327   4732    undirected unweighted
+wiki_s2          2405   14001   undirected unweighted
+acm_s2           3025   16153   undirected unweighted
+corafull_s2      19793  63421   undirected unweighted
+pubmed_s2        19717  64041   undirected unweighted
+amazon_photos_s2 7487   119043  undirected unweighted
+arxiv_s2         169343 1327142 undirected unweighted
+dblp_s2          4057   2502276 undirected unweighted

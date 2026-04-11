@@ -16,7 +16,7 @@ class Metrics:
     def __init__(self):
         pass
 
-    def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
+    def modularity_slow(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
         """
         Args:
             adjacency: torch.sparse.Tensor [n_nodes, n_nodes]
@@ -54,6 +54,55 @@ class Metrics:
             modularity += (actual_weight - gamma * expected_weight)
         modularity /=  m
 
+        return modularity.item()
+
+    def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
+        """
+        Args:
+            adjacency: torch.sparse.Tensor [n_nodes, n_nodes]
+            assignments: torch.Tensor [n_nodes]
+            gamma: float, optional (default = 1.0)
+            directed: bool, optional (default = False)
+        Returns:
+            modularity: float
+        """
+
+        adjacency = adjacency.coalesce()
+        device = adjacency.device
+        row, col = adjacency.indices()
+        weight = adjacency.values()
+        assignments = assignments.to(device=device, dtype=torch.long)
+
+        if weight.numel() == 0:
+            return 0.0
+
+        # Keep the same (directed) formulation as in the previous implementation.
+        # `directed` is left in the signature for API compatibility.
+        n_nodes = adjacency.size(0)
+        d_out = torch.zeros(n_nodes, device=device, dtype=weight.dtype)
+        d_in = torch.zeros(n_nodes, device=device, dtype=weight.dtype)
+        d_out.scatter_add_(0, row, weight)
+        d_in.scatter_add_(0, col, weight)
+
+        m = torch.sum(weight)
+        if m == 0:
+            return 0.0
+
+        communities, inverse = torch.unique(assignments, return_inverse=True)
+        n_communities = communities.numel()
+
+        same_community = inverse[row] == inverse[col]
+        actual_weight = torch.zeros(n_communities, device=device, dtype=weight.dtype)
+        if torch.any(same_community):
+            actual_weight.scatter_add_(0, inverse[row][same_community], weight[same_community])
+
+        out_per_community = torch.zeros(n_communities, device=device, dtype=weight.dtype)
+        in_per_community = torch.zeros(n_communities, device=device, dtype=weight.dtype)
+        out_per_community.scatter_add_(0, inverse, d_out)
+        in_per_community.scatter_add_(0, inverse, d_in)
+
+        expected_weight = (out_per_community * in_per_community) / m
+        modularity = (actual_weight - gamma * expected_weight).sum() / m
         return modularity.item()
 
     def purity_score(true_labels, pred_labels):

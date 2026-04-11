@@ -18,9 +18,11 @@ def dynamic_launch(ds, batches_strategy,
                     underlying_static_method: str,
                     baseline_iter: int = None,
                     mode: str = "smart",
-                    smart_subcoms_depth: int = 5, smart_neighborhood_step: int = 1,
+                    smart_subcoms_depth: int = 5,
+                    smart_neighborhood_step: int = 1,
                     verbose: int = 1,
-                    use_gpu: bool = False):
+                    use_gpu: bool = False,
+                    aggregation_mode: str = "sum"):
 
     dataset_name = ds.name
     smart_mode = (mode == "smart")
@@ -32,12 +34,14 @@ def dynamic_launch(ds, batches_strategy,
     is_special_strategy = ":" in str(batches_strategy)
 
     # Для динамического режима подготовим переменные вне цикла
-    if dynamic_mode:
+    if dynamic_mode and not (underlying_static_method=="mfc"):
         # Проверка поддерживаемого алгоритма
         if underlying_static_method in ALG_CLASS:
             algo_class = ALG_CLASS[underlying_static_method]
         else:
             raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
+    
+    if dynamic_mode and underlying_static_method == "mfc":       
 
     # Основной цикл по батчам
     if ds.adj.ndim == 2:
@@ -56,105 +60,160 @@ def dynamic_launch(ds, batches_strategy,
             temp_algo = LDLeiden(batch, directed=ds.is_directed)
             temp_algo.apply()  # выполняем разбиение
             initial_partition = temp_algo.partition()
-            mod = temp_algo.modularity()
+            init_mod = temp_algo.modularity()
             with print_zone(verbose >= 1):
-                print(f"Initial modularity: {mod:.2g}")
-
-            algo = algo_class(batch,
-                              directed=ds.is_directed,
-                              partition=initial_partition)
-            algo.apply() #FIXME По идеи тут apply() не нужен, но без него далее - Segmentation fault (core dumped)
-            continue
-        elif dynamic_mode and not is_special_strategy and i == 0:
-            # Обычный случай: создаём алгоритм без начального разбиения
-            algo = algo_class(batch, directed=ds.is_directed, partition=None)
-
-        # --- Если режим динамический, обрабатываем батч через algo ---
-        if dynamic_mode:
-            algo.update(batch)
-            elapsed_ms = algo.apply()
-            measured_time = elapsed_ms / 1000.0  # переводим в секунды
-            mod = algo.modularity()
-
-            with print_zone(verbose >= 2):
-                print(f"Modularity: {mod:.2g}")
-                print(f"Time: {measured_time:.2f}")
-
-            results.append({'modularity': mod, 'time': measured_time})
-            # Переходим к следующему батчу
-            continue
-
-        # --- Исходный код для остальных режимов (smart, naive, raw) ---
-        if i == 0:
-            opt = Optimizer(batch, ds.features,
-                            subcoms_depth = smart_subcoms_depth if smart_mode else 1,
-                            method=underlying_static_method,
-                            baseline_iter=baseline_iter,
-                            verbose=verbose,
-                            use_gpu=use_gpu)
-            if is_special_strategy:
-                opt.method = "ldleiden"
-                n = opt.nodes_num
-                l = opt.subcoms_depth
-                coms = opt.local_algorithm(opt.adj, opt.features)
-                coms = coms.repeat(l).reshape((l, n))
-                opt.set_communities(communities = coms)
-                opt.method = underlying_static_method
-                opt.local_algorithm_calls = 0
-                mod = opt.modularity(directed = ds.is_directed)
-                with print_zone(verbose >= 1):
-                    print(f"Initial modularity: {mod:.2g}")
-                continue
-            elif smart_mode:
-                if batch.is_sparse:
-                    batch_idx = batch.indices() if batch.is_coalesced() else batch.coalesce().indices()
-                    active_nodes = batch_idx.unique()
-                else:
-                    nz_idx = torch.nonzero(batch, as_tuple=False)
-                    active_nodes = nz_idx.unique()
-                mask_device = opt.runtime_device()
-                active_nodes = active_nodes.to(mask_device)
-                affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool, device=mask_device)
-                affected_nodes_mask[active_nodes] = True
-        else:
-            affected_nodes_mask = opt.update_adj(batch, return_mask = smart_mode)
-
-        time_s = time.time()
-        conversion_time_s = opt.conversion_time
-        calls_s = opt.local_algorithm_calls
-
-        if smart_mode:
-            runtime_adj = opt.runtime_adj()
-            affected_nodes_mask = opt.neighborhood(
-                runtime_adj,
-                affected_nodes_mask,
-                step = smart_neighborhood_step,
-            )
-            opt.run(affected_nodes_mask)
-        elif naive_mode or raw_mode:
-            labels = opt.coms if naive_mode else None
-            coms = opt.local_algorithm(opt.runtime_adj(), opt.runtime_features(), labels = labels)
-            opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
-
-        time_e = time.time()
-        conversion_time_e = opt.conversion_time
-        calls_e = opt.local_algorithm_calls
-
-        total_batch_time = time_e - time_s
-        conversion_time = conversion_time_e - conversion_time_s
-        measured_time = total_batch_time - conversion_time
-        mod = opt.modularity(directed = ds.is_directed)
-
+                print(f"Initial modularity: {init_mod:.2g}")
+        
         with print_zone(verbose >= 2):
+            coms = mfc_adopted(
+                        adj=ds.adj,
+                        labels=labels,
+                        network_type="MFC",
+                        return_labels=True,
+                        num_epoch=baseline_iter,
+                        pure_mfc=True,
+                        initial_partition=initial_partition,
+                    )
+            
+            time_e = time.time()
+            measured_time = time_e - time_s
+            mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
+
             print(f"Modularity: {mod:.2g}")
-            print(f"Baseline calls: {calls_e - calls_s}")
-            if underlying_static_method == "ldleiden" and mode in {"naive", "raw"}:
-                algorithm_time = opt.last_timing_info["algorithm_time"]
-                print(f"Algorithm time: {algorithm_time:.2f}")
-            else:
-                print(f"Time: {measured_time:.2f}")
+            print(f"Baseline calls: {1}")
+            print(f"Time: {measured_time:.2f}")
 
         results.append({'modularity': mod, 'time': measured_time})
+
+    else:
+    # Основной цикл по батчам
+        for i, batch in enumerate(torch.unbind(ds.adj)):
+            
+            with print_zone(verbose >= 2):
+                print("  Batch", i)
+
+            # --- Обработка специальной стратегии (":") для динамического режима ---
+            if dynamic_mode and is_special_strategy and i == 0:
+                temp_algo = LDLeiden(batch, directed=ds.is_directed)
+                temp_algo.apply()  # выполняем разбиение
+                initial_partition = temp_algo.partition()
+                mod = temp_algo.modularity()
+                with print_zone(verbose >= 1):
+                    print(f"Initial modularity: {mod:.2g}")
+
+                algo = algo_class(batch,
+                                directed=ds.is_directed,
+                                partition=initial_partition)
+                # FIXME тут apply() не нужен, но без него ниже падает с
+                # segmentation fault.
+                algo.apply()
+                continue
+            elif dynamic_mode and not is_special_strategy and i == 0:
+                # Обычный случай: создаём алгоритм без начального разбиения
+                algo = algo_class(batch, directed=ds.is_directed, partition=None)
+
+            # --- Если режим динамический, обрабатываем батч через algo ---
+            if dynamic_mode:
+                algo.update(batch)
+                elapsed_ms = algo.apply()
+                measured_time = elapsed_ms / 1000.0  # переводим в секунды
+                mod = algo.modularity()
+
+                with print_zone(verbose >= 2):
+                    print(f"Modularity: {mod:.2g}")
+                    print(f"Time: {measured_time:.2f}")
+
+                results.append({'modularity': mod, 'time': measured_time})
+                # Переходим к следующему батчу
+                continue
+
+            # --- Исходный код для остальных режимов (smart, naive, raw) ---
+            if i == 0:
+                opt = Optimizer(batch, ds.features,
+                                subcoms_depth = smart_subcoms_depth if smart_mode else 1,
+                                method=underlying_static_method,
+                                baseline_iter=baseline_iter,
+                                verbose=verbose,
+                                use_gpu=use_gpu,
+                                aggregation_mode=aggregation_mode)
+                if is_special_strategy:
+                    opt.method = "ldleiden"
+                    n = opt.nodes_num
+                    l = opt.subcoms_depth
+                    coms = opt.local_algorithm(opt.adj, opt.features)
+                    coms = coms.repeat(l).reshape((l, n))
+                    opt.set_communities(communities = coms)
+                    opt.method = underlying_static_method
+                    opt.local_algorithm_calls = 0
+                    mod = opt.modularity(directed = ds.is_directed)
+                    with print_zone(verbose >= 1):
+                        print(f"Initial modularity: {mod:.2g}")
+                    continue
+                elif smart_mode:
+                    if batch.is_sparse:
+                        batch_idx = (
+                            batch.indices()
+                            if batch.is_coalesced()
+                            else batch.coalesce().indices()
+                        )
+                        active_nodes = batch_idx.unique()
+                    else:
+                        nz_idx = torch.nonzero(batch, as_tuple=False)
+                        active_nodes = nz_idx.unique()
+                    mask_device = opt.runtime_device()
+                    active_nodes = active_nodes.to(mask_device)
+                    affected_nodes_mask = torch.zeros(
+                        opt.nodes_num,
+                        dtype=torch.bool,
+                        device=mask_device,
+                    )
+                    affected_nodes_mask[active_nodes] = True
+            else:
+                affected_nodes_mask = opt.update_adj(batch, return_mask = smart_mode)
+
+            time_s = time.time()
+            conversion_time_s = opt.conversion_time
+            calls_s = opt.local_algorithm_calls
+
+            if smart_mode:
+                runtime_adj = opt.runtime_adj()
+                affected_nodes_mask = opt.neighborhood(
+                    runtime_adj,
+                    affected_nodes_mask,
+                    step = smart_neighborhood_step,
+                )
+                opt.run(affected_nodes_mask)
+            elif naive_mode or raw_mode:
+                labels = opt.coms if naive_mode else None
+                coms = opt.local_algorithm(
+                    opt.runtime_adj(),
+                    opt.runtime_features(),
+                    labels=labels,
+                )
+                opt.set_communities(
+                    communities=coms.unsqueeze(0),
+                    replace_subcoms_depth=True,
+                )
+
+            time_e = time.time()
+            conversion_time_e = opt.conversion_time
+            calls_e = opt.local_algorithm_calls
+
+            total_batch_time = time_e - time_s
+            conversion_time = conversion_time_e - conversion_time_s
+            measured_time = total_batch_time - conversion_time
+            mod = opt.modularity(directed = ds.is_directed)
+            
+            with print_zone(verbose >= 2):
+                print(f"Modularity: {mod:.2g}")
+                print(f"Baseline calls: {calls_e - calls_s}")
+                if underlying_static_method == "ldleiden" and mode in {"naive", "raw"}:
+                    algorithm_time = opt.last_timing_info["algorithm_time"]
+                    print(f"Algorithm time: {algorithm_time:.2f}")
+                else:
+                    print(f"Time: {measured_time:.2f}")
+
+            results.append({'modularity': mod, 'time': measured_time})
 
     # --- Итоговый вывод ---
     total_measured_time = sum(map(lambda x: x["time"], results))

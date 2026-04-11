@@ -5,6 +5,12 @@ import pickle
 import numpy as np
 import time
 from pathlib import Path
+import warnings
+
+# for warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['AUTOGRAPH_VERBOSITY'] = '0'
+warnings.filterwarnings("ignore")
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC_PATH = os.path.join(PROJECT_PATH, "src")
@@ -72,6 +78,24 @@ def _to_dense(adj_t: torch.Tensor) -> torch.Tensor:
     return adj_t
 
 
+def _normalize_initial_partition(initial_partition: torch.Tensor, nodes_num: int) -> torch.Tensor:
+    if initial_partition.dim() == 2 and initial_partition.size(0) == 1:
+        initial_partition = initial_partition.squeeze(0)
+
+    if initial_partition.dim() != 1:
+        raise ValueError(
+            "initial_partition must be a 1D tensor with shape [N] or [1, N], "
+            f"got {tuple(initial_partition.shape)}"
+        )
+
+    if initial_partition.size(0) != nodes_num:
+        raise ValueError(
+            f"initial_partition size mismatch: expected {nodes_num}, got {initial_partition.size(0)}"
+        )
+
+    return initial_partition.to(torch.long)
+
+
 def load_graphs_from_tensors(adj_matrices,
                              labels_list,
                              network_type: str,
@@ -89,6 +113,8 @@ def load_graphs_from_tensors(adj_matrices,
     else:
         raise ValueError("adj_matrices should be list of 2-dim tensor")
 
+    # print(f"labels_list = {labels_list}")
+
     if isinstance(labels_list, torch.Tensor) and labels_list.dim() == 2:
         label_snapshots = [labels_list[t] for t in range(labels_list.size(0))]
     elif isinstance(labels_list, list):
@@ -96,19 +122,33 @@ def load_graphs_from_tensors(adj_matrices,
     else:
         raise ValueError("labels_list should be list of tensor")
 
+    # print(f"label_snapshots = {label_snapshots}")
+
+
     if len(label_snapshots) == 1 and len(adj_list) > 1:
         label_snapshots = label_snapshots * len(adj_list)
 
     graph_snapshots = []
     labels_dicts = []
+
+    # print(f"adj_list = {adj_list}") #my
+
+    # adj_list, label_snapshots = size_correct(adj_list)
+
+    # print(f"label_snapshots = {label_snapshots}") #my
+    # print(f"labels_list = {labels_list}") #my
+    
+
     for t, (adj_t, labels_t) in enumerate(zip(adj_list, label_snapshots)):
         adj_dense = _to_dense(adj_t)
 
+        # print(f"adj_t = {adj_t}") #my
+
         if adj_dense.dim() != 2 or adj_dense.size(0) != adj_dense.size(1):
-            raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN")
-        print(f"t={t}, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
+            raise ValueError(f"Матрица снапшота {t} должна быть квадратной NxN, adj_dense = {adj_dense}")
+        # print(f"t={t}, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t}")
         if labels_t.dim() != 1 or labels_t.size(0) != adj_dense.size(0):
-            raise ValueError(f"Метки снапшота {t} должны быть длины N, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t.shape}")
+            raise ValueError(f"Метки снапшота {t} должны быть длины N, adj_dense.shape={adj_dense.shape}, labels_t.shape={labels_t}")
 
         g = nx.from_numpy_array(adj_dense.cpu().numpy())
         labels_dict = {i: int(labels_t[i].item()) for i in range(len(labels_t))}
@@ -130,6 +170,8 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
     if file_name == "from_tensor":
         if adj_matrix is None or labels is None:
             raise ValueError("Для 'from_tensor' нужно передать adj_matrix и labels.")
+
+        # print(f"adj_matrix = {adj_matrix}")  #my  
         return load_graphs_from_tensors(
             adj_matrices=adj_matrix,
             labels_list=labels,
@@ -139,14 +181,18 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
     else:
         raise NameError
 
-def main(network_type, adj_matrix, labels):
-    model_init = InitModel(device = "cuda")
-    snapshot_list, n_cluster = load_graphs("from_tensor", 
-                                           network_type=network_type, 
-                                           adj_matrix=adj_matrix, 
-                                           labels=labels)
-    print(len(snapshot_list))
+def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
+    model_init = InitModel(device="cuda")
+    snapshot_list, n_cluster = load_graphs(
+        "from_tensor",
+        network_type=network_type,
+        adj_matrix=adj_matrix,
+        labels=labels,
+    )
     args = Args(n_cluster, "from_tensor", network_type) # fix 20 cluster or assume known n_cluster
+    args.num_epoch = num_epoch
+    args.start_mf = start_mf
+
     model_list = []
     dgm_list = []
     wrcf_layer_dim0 = WrcfLayer(dim=0, card=args.card)
@@ -236,6 +282,9 @@ def mfc_adopted(
     network_type: str = "MFC",
     return_labels: bool = False,
     timing_info: dict | None = None,
+    num_epoch = None,
+    pure_mfc: bool = False,
+    initial_partition: torch.Tensor | None = None,
 ):
     """
     Запуск MFC-TopoReg на одном графе.
@@ -254,6 +303,11 @@ def mfc_adopted(
         Словарь, куда накапливается conversion_time.
     """
 
+    if num_epoch is None:
+        num_epoch = 10
+
+    start_mf = num_epoch // 2
+
     if timing_info is None:
         timing_info = {}
 
@@ -262,6 +316,8 @@ def mfc_adopted(
         adj = adj.cpu()
     if labels is not None and labels.device.type == "cuda":
         labels = labels.cpu()
+    if initial_partition is not None and initial_partition.device.type == "cuda":
+        initial_partition = initial_partition.cpu()
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
@@ -274,15 +330,28 @@ def mfc_adopted(
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
-    adj_matrices = [adj_bin]
+    if pure_mfc:
+        adj_matrices = adj_bin
+        first_snapshot = adj_bin[0]
+        if initial_partition is not None:
+            init_labels = _normalize_initial_partition(initial_partition, first_snapshot.size(0))
+        else:
+            init_labels = _degree_bins_labels(first_snapshot)
+    else:
+        adj_matrices = [adj_bin]
+        
     labels_list = [init_labels]
 
     t0 = time.time()
     
+    # print(f"adj_matrices = {adj_matrices}") #my
+
     main(
         network_type=network_type,
         adj_matrix=adj_matrices,
         labels=labels_list,
+        num_epoch=num_epoch,
+        start_mf=start_mf,
     )
     t1 = time.time()
     timing_info["conversion_time"] += (t1 - t0)
@@ -308,8 +377,8 @@ def mfc_adopted(
         # Очищаем результаты (опционально, чтобы не засорять диск)
         # (out_dir / "results_raw.pkl").unlink(missing_ok=True)
         # (out_dir / "results_topo.pkl").unlink(missing_ok=True)
-        assert labels.shape[0] == adj_matrices[0].shape[0], \
-            f"Labels size mismatch: {labels.shape[0]} vs {adj_matrices[0].shape[0]}"
+        assert labels.shape[0] == adj_matrices[0].shape[1], \
+            f"Labels size mismatch: {labels.shape} vs {adj_matrices[0].shape}"
 
         return labels
 

@@ -1,12 +1,14 @@
 {
-  "konect": "/auto/datasets/graphs/dynamic_konect_project_datasets/",
-  "magi": "/auto/datasets/graphs/small/",
-  "dyn_atr": "/auto/datasets/graphs/dyn_atr_datasets/",
-  "dyn_sbm": "/auto/datasets/graphs/dyn_sbm/",
-  "sbm": "/auto/datasets/graphs/sbm/",
-  "small": "/auto/datasets/graphs/small/",
-  "small_konect": "/auto/datasets/graphs/small_konect/",
-  "attr_graphs": "/auto/datasets/graphs/attr_graphs",
-  "dyn_attr_graphs": "/auto/datasets/graphs/comnetx/dynamic_attr_datasets",
-  "tgc": "/auto/datasets/graphs/comnetx/4TGC/data_npy/"
+  "dynamic": {
+    "konect": "/auto/datasets/graphs/dynamic_konect_project_datasets",
+    "dyn_attr": "/auto/datasets/graphs/comnetx/dynamic_attr_datasets",
+    "tgc": "/auto/datasets/graphs/comnetx/4TGC/data_npy"
+  },
+  "static": {
+    "magi": "/auto/datasets/graphs/small",
+    "dyn_sbm": "/auto/datasets/graphs/dyn_sbm",
+    "sbm": "/auto/datasets/graphs/sbm",
+    "small": "/auto/datasets/graphs/small",
+    "attr": "/auto/datasets/graphs/attr_graphs"
+  }
 }
