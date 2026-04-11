@@ -13,7 +13,11 @@ import sparse
 @pytest.mark.unit
 @pytest.mark.short
 def test_init_defaults():
-    A = torch.sparse_coo_tensor(torch.tensor([[0,1],[1,0]]), torch.ones(2), size=(2,2)).coalesce()
+    A = torch.sparse_coo_tensor(
+        torch.tensor([[0, 1], [1, 0]]),
+        torch.ones(2),
+        size=(2, 2),
+    ).coalesce()
     opt = Optimizer(A, subcoms_depth=3)
     assert opt.nodes_num == 2
     assert opt.size == torch.Size([2,2])
@@ -29,7 +33,11 @@ def test_init_defaults():
 @pytest.mark.unit
 @pytest.mark.short
 def test_init_with_inputs():
-    A = torch.sparse_coo_tensor(torch.tensor([[0,1],[1,0]]), torch.ones(2), size=(2,2)).coalesce()
+    A = torch.sparse_coo_tensor(
+        torch.tensor([[0, 1], [1, 0]]),
+        torch.ones(2),
+        size=(2, 2),
+    ).coalesce()
     X = torch.randn(2, 4)
     C = torch.tensor([[1,0]])
     opt = Optimizer(A, features=X, communities=C, subcoms_depth=1)
@@ -57,7 +65,10 @@ def test_update_adj_adds_and_returns_mask():
     upd = torch.tensor([[0,0,0],[0,0,1],[0,0,0]], dtype=torch.float32).to_sparse_coo()
     mask = opt.update_adj(upd)
     # A now has (0,1), (1,0), and (1,2)
-    assert torch.isclose(opt.adj.to_dense(), torch.tensor([[0,1,0],[1,0,1],[0,0,0]], dtype=torch.float32)).all()
+    assert torch.isclose(
+        opt.adj.to_dense(),
+        torch.tensor([[0, 1, 0], [1, 0, 1], [0, 0, 0]], dtype=torch.float32),
+    ).all()
     # Mask should include nodes 1 and 2
     assert mask.dtype == torch.bool
     assert torch.equal(mask, torch.tensor([False, True, True]))
@@ -107,7 +118,10 @@ def test_local_algorithm_unsupported():
 @pytest.mark.short
 # FIXME now aggregate don't work for 2 sparse matrix with int-like elements type
 # def test_aggregate_1():
-#     adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.int64).to_sparse()
+#     adj = torch.tensor(
+#         [[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]],
+#         dtype=torch.int64,
+#     ).to_sparse()
 #     coms = torch.tensor([[1, 1, 1, 0], [0, 0, 0, 1]]).type(adj.dtype).to_sparse()
 #     res = Optimizer.aggregate(adj, coms)
 #     true_res = torch.tensor([[9, 0], [1, 1]])
@@ -117,7 +131,10 @@ def test_local_algorithm_unsupported():
 @pytest.mark.unit
 @pytest.mark.short
 def test_aggregate_2():
-    adj = torch.tensor([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]], dtype = torch.float).to_sparse()
+    adj = torch.tensor(
+        [[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]],
+        dtype=torch.float,
+    ).to_sparse()
     coms = torch.tensor([[1, 1, 1, 0], [0, 0, 0, 1]]).type(adj.dtype).to_sparse()
     res = Optimizer.aggregate(adj, coms)
     true_res = torch.tensor([[9, 0], [1, 1]])
@@ -127,7 +144,10 @@ def test_aggregate_2():
 @pytest.mark.unit
 @pytest.mark.short
 def test_aggregate_simple():
-    adj = torch.tensor([[1,1,1,0],[1,1,1,0],[1,1,1,0],[0,1,0,1]], dtype=torch.float32).to_sparse_coo()
+    adj = torch.tensor(
+        [[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]],
+        dtype=torch.float32,
+    ).to_sparse_coo()
     # Group nodes 0,1,2 together and 3 alone
     pattern_idx = torch.tensor([[1,1,1,0],[0,0,0,1]])
     pattern = pattern_idx.to(dtype=adj.dtype).to_sparse()
@@ -139,12 +159,53 @@ def test_aggregate_simple():
 @pytest.mark.short
 def test_aggregate_via_sparse_helper():
     # Same as above but build pattern via sparse helper like in run()
-    adj = torch.tensor([[1,1,1,0],[1,1,1,0],[1,1,1,0],[0,1,0,1]], dtype=torch.float32).to_sparse_coo()
+    adj = torch.tensor(
+        [[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 1, 0, 1]],
+        dtype=torch.float32,
+    ).to_sparse_coo()
     # old_coms = [[new_id],[orig_node]] pairs
     old_coms = torch.tensor([[0,0,0,1],[0,1,2,3]])
     pattern = sparse.tensor(old_coms, (2,4), adj.dtype)
     res = Optimizer.aggregate(adj, pattern)
     assert torch.equal(res.to_dense(), torch.tensor([[9.,0.],[1.,1.]]))
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_aggregation_mode_sum_pattern_values():
+    adj = torch.zeros((4, 4), dtype=torch.float32).to_sparse_coo()
+    opt = Optimizer(adj, aggregation_mode="sum")
+    counts = torch.tensor([3, 1])
+    inverse = torch.tensor([0, 0, 0, 1])
+
+    values = opt._aggregation_pattern_values(counts, inverse, adj.dtype)
+
+    assert torch.equal(values, torch.ones(4, dtype=adj.dtype))
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_aggregation_mode_normalized_pattern_values():
+    adj = torch.zeros((4, 4), dtype=torch.float32).to_sparse_coo()
+    opt = Optimizer(adj, aggregation_mode="normalized")
+    counts = torch.tensor([3, 1])
+    inverse = torch.tensor([0, 0, 0, 1])
+
+    values = opt._aggregation_pattern_values(counts, inverse, adj.dtype)
+
+    assert torch.allclose(
+        values,
+        torch.tensor([1 / 3, 1 / 3, 1 / 3, 1], dtype=adj.dtype),
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_aggregation_mode_invalid():
+    adj = torch.zeros((2, 2), dtype=torch.float32).to_sparse_coo()
+
+    with pytest.raises(ValueError, match="Unsupported aggregation_mode"):
+        Optimizer(adj, aggregation_mode="avg")
 
 
 @pytest.mark.unit
@@ -220,8 +281,14 @@ def test_neighborhood_steps_directed():
     ], dtype=torch.float32).to_sparse_coo()
     start = torch.tensor([True, False, False, False])
     assert torch.equal(Optimizer.neighborhood(A, start, 0), start)
-    assert torch.equal(Optimizer.neighborhood(A, start, 1), torch.tensor([True, True, False, False]))
-    assert torch.equal(Optimizer.neighborhood(A, start, 2), torch.tensor([True, True, True, True]))
+    assert torch.equal(
+        Optimizer.neighborhood(A, start, 1),
+        torch.tensor([True, True, False, False]),
+    )
+    assert torch.equal(
+        Optimizer.neighborhood(A, start, 2),
+        torch.tensor([True, True, True, True]),
+    )
 
 
 @pytest.mark.unit
@@ -233,7 +300,14 @@ def test_run_updates_last_level_singletons_and_propagates():
     # Single level
     C = torch.tensor([[0,0,1,1]])
     X = torch.randn(4,3)
-    opt = Optimizer(A, features=X, communities=C.clone(), subcoms_depth=1, local_algorithm_fn=identity_la, method="custom")
+    opt = Optimizer(
+        A,
+        features=X,
+        communities=C.clone(),
+        subcoms_depth=1,
+        local_algorithm_fn=identity_la,
+        method="custom",
+    )
 
     nodes_mask = torch.tensor([False, True, False, False])
     opt.run(nodes_mask)

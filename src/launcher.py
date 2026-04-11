@@ -18,9 +18,11 @@ def dynamic_launch(ds, batches_strategy,
                     underlying_static_method: str,
                     baseline_iter: int = None,
                     mode: str = "smart",
-                    smart_subcoms_depth: int = 5, smart_neighborhood_step: int = 1,
+                    smart_subcoms_depth: int = 5,
+                    smart_neighborhood_step: int = 1,
                     verbose: int = 1,
-                    use_gpu: bool = False):
+                    use_gpu: bool = False,
+                    aggregation_mode: str = "sum"):
 
     dataset_name = ds.name
     smart_mode = (mode == "smart")
@@ -98,7 +100,9 @@ def dynamic_launch(ds, batches_strategy,
                 algo = algo_class(batch,
                                 directed=ds.is_directed,
                                 partition=initial_partition)
-                algo.apply() #FIXME По идеи тут apply() не нужен, но без него далее - Segmentation fault (core dumped)
+                # FIXME тут apply() не нужен, но без него ниже падает с
+                # segmentation fault.
+                algo.apply()
                 continue
             elif dynamic_mode and not is_special_strategy and i == 0:
                 # Обычный случай: создаём алгоритм без начального разбиения
@@ -126,7 +130,8 @@ def dynamic_launch(ds, batches_strategy,
                                 method=underlying_static_method,
                                 baseline_iter=baseline_iter,
                                 verbose=verbose,
-                                use_gpu=use_gpu)
+                                use_gpu=use_gpu,
+                                aggregation_mode=aggregation_mode)
                 if is_special_strategy:
                     opt.method = "ldleiden"
                     n = opt.nodes_num
@@ -142,14 +147,22 @@ def dynamic_launch(ds, batches_strategy,
                     continue
                 elif smart_mode:
                     if batch.is_sparse:
-                        batch_idx = batch.indices() if batch.is_coalesced() else batch.coalesce().indices()
+                        batch_idx = (
+                            batch.indices()
+                            if batch.is_coalesced()
+                            else batch.coalesce().indices()
+                        )
                         active_nodes = batch_idx.unique()
                     else:
                         nz_idx = torch.nonzero(batch, as_tuple=False)
                         active_nodes = nz_idx.unique()
                     mask_device = opt.runtime_device()
                     active_nodes = active_nodes.to(mask_device)
-                    affected_nodes_mask = torch.zeros(opt.nodes_num, dtype=torch.bool, device=mask_device)
+                    affected_nodes_mask = torch.zeros(
+                        opt.nodes_num,
+                        dtype=torch.bool,
+                        device=mask_device,
+                    )
                     affected_nodes_mask[active_nodes] = True
             else:
                 affected_nodes_mask = opt.update_adj(batch, return_mask = smart_mode)
@@ -168,8 +181,15 @@ def dynamic_launch(ds, batches_strategy,
                 opt.run(affected_nodes_mask)
             elif naive_mode or raw_mode:
                 labels = opt.coms if naive_mode else None
-                coms = opt.local_algorithm(opt.runtime_adj(), opt.runtime_features(), labels = labels)
-                opt.set_communities(communities = coms.unsqueeze(0), replace_subcoms_depth = True)
+                coms = opt.local_algorithm(
+                    opt.runtime_adj(),
+                    opt.runtime_features(),
+                    labels=labels,
+                )
+                opt.set_communities(
+                    communities=coms.unsqueeze(0),
+                    replace_subcoms_depth=True,
+                )
 
             time_e = time.time()
             conversion_time_e = opt.conversion_time

@@ -2,9 +2,22 @@ import torch
 from typing import Any
 
 
-def tensor(indices : torch.Tensor, size : torch.types._size, dtype : torch.dtype):
-    values = torch.ones(indices.size()[1], dtype=dtype, device=indices.device)
-    return torch.sparse_coo_tensor(indices, values, size, device=indices.device).coalesce()
+def tensor(
+    indices: torch.Tensor,
+    size: torch.types._size,
+    dtype: torch.dtype,
+    values=None,
+):
+    if values is None:
+        values = torch.ones(indices.size()[1], dtype=dtype, device=indices.device)
+    else:
+        values = values.to(dtype=dtype, device=indices.device)
+    return torch.sparse_coo_tensor(
+        indices,
+        values,
+        size,
+        device=indices.device,
+    ).coalesce()
 
 
 def mm(indices1 : torch.Tensor, indices2 : torch.Tensor, size : torch.Size):
