@@ -202,7 +202,7 @@ def dynamic_launch(ds, batches_strategy,
             
             with print_zone(verbose >= 2):
                 print(f"Modularity: {mod:.2g}")
-                print(f"Baseline calls: {calls_e - calls_s}")
+                #print(f"Baseline calls: {calls_e - calls_s}")
                 if underlying_static_method == "ldleiden" and mode in {"naive", "raw"}:
                     algorithm_time = opt.last_timing_info["algorithm_time"]
                     print(f"Algorithm time: {algorithm_time:.2f}")
@@ -217,8 +217,8 @@ def dynamic_launch(ds, batches_strategy,
         final_mod = results[-1]['modularity'] if results else 0
         print(f"Final modularity: {final_mod:.2g}")
     with print_zone(verbose >= 1):
-        if not dynamic_mode:
-            print(f"Total baseline calls: {opt.local_algorithm_calls}")
+        #if not dynamic_mode:
+            #print(f"Total baseline calls: {opt.local_algorithm_calls}")
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")
 

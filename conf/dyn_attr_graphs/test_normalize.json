@@ -1,0 +1,18 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
+  
+  "DATASETS": ["dyn_wiki"],
+  "BATCHES": ["999:10"],
+  
+  "BASELINES": ["ldleiden"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["sum", "norm"]
+  }
+}
