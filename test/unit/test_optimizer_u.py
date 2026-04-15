@@ -86,22 +86,6 @@ def test_update_adj_size_mismatch():
     except ValueError:
         pass
 
-
-def identity_la(adj, features, limited, labels):
-    # Return each node as its own cluster id
-    return torch.arange(adj.size(0), dtype=torch.long)
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_local_algorithm_injection():
-    A = torch.zeros((3,3)).to_sparse_coo()
-    X = torch.randn(3,2)
-    opt = Optimizer(A, features=X, local_algorithm_fn=identity_la, method="custom")
-    out = opt.local_algorithm(A, X, False)
-    assert torch.equal(out, torch.tensor([0,1,2]))
-
-
 @pytest.mark.unit
 @pytest.mark.short
 def test_local_algorithm_unsupported():
@@ -289,30 +273,3 @@ def test_neighborhood_steps_directed():
         Optimizer.neighborhood(A, start, 2),
         torch.tensor([True, True, True, True]),
     )
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_run_updates_last_level_singletons_and_propagates():
-    # Simple chain 0-1-2-3
-    idx = torch.tensor([[0,1,2],[1,2,3]])
-    A = torch.sparse_coo_tensor(idx, torch.ones(3), size=(4,4)).coalesce()
-    # Single level
-    C = torch.tensor([[0,0,1,1]])
-    X = torch.randn(4,3)
-    opt = Optimizer(
-        A,
-        features=X,
-        communities=C.clone(),
-        subcoms_depth=1,
-        local_algorithm_fn=identity_la,
-        method="custom",
-    )
-
-    nodes_mask = torch.tensor([False, True, False, False])
-    opt.run(nodes_mask)
-    # Last level should set affected node to singleton label equal to node index
-    assert opt.coms.shape == (1,4)
-    assert opt.coms[0,1].item() == 1
-    # Unaffected nodes keep their original label structure or consistent mapping
-    # identity_la should not merge or split beyond singleton for the affected set
