@@ -114,6 +114,36 @@ class Dataset:
                 device=vals.device,
             ).coalesce()
 
+    def _apply_feature_mode(
+        self,
+        feature_mode: str = "dataset",
+        random_feat_dim: int = 64,
+        random_seed: int = 42,
+    ):
+        feature_mode = feature_mode.lower().strip()
+
+        if feature_mode == "dataset":
+            self.features_kind = "dataset" if self.features is not None else None
+            return
+
+        if feature_mode == "onehot":
+            self.features = self._make_synthetic_features(mode="identity")
+            self.features_kind = "identity"
+            return
+
+        if feature_mode == "random":
+            self.features = self._make_synthetic_features(
+                mode="random",
+                feat_dim=random_feat_dim,
+                seed=random_seed,
+            )
+            self.features_kind = "random"
+            return
+
+        raise ValueError(
+            f"Unsupported feature_mode: {feature_mode}. "
+            f"Expected one of: dataset, onehot, random"
+        )
 
     def _make_synthetic_features(
         self,
@@ -123,13 +153,17 @@ class Dataset:
         seed: int = 42,
     ) -> torch.Tensor:
         n = self._infer_num_nodes() if num_nodes is None else int(num_nodes)
-
+        """
         if mode == "identity":
             idx = torch.arange(n, dtype=torch.long)
             indices = torch.stack([idx, idx], dim=0)
             values = torch.ones(n, dtype=torch.float32)
             self.features_kind = "identity"
             return torch.sparse_coo_tensor(indices, values, size=(n, n)).coalesce()
+        """
+        if mode == "identity":
+            self.features_kind = "identity"
+            return torch.eye(n, dtype=torch.float32)
 
         if mode == "random":
             g = torch.Generator(device="cpu")
@@ -139,20 +173,13 @@ class Dataset:
 
         raise ValueError(f"Unsupported synthetic feature mode: {mode}")
 
-
-    def _ensure_features(self):
-        if self.features is None:
-            self.features = self._make_synthetic_features(
-                mode="random",
-                feat_dim=64,
-                seed=42,
-            )
-
     def load(
-    self,
-    tensor_type: str = "coo",
-    batches_strategy=None,
-    add_one_hot_features: bool = True
+        self,
+        tensor_type: str = "coo",
+        batches_strategy=None,
+        feature_mode: str = "dataset",
+        random_feat_dim: int = 64,
+        random_feat_seed: int = 42,
     ) -> torch.Tensor:
         """
         Load dataset
@@ -241,8 +268,11 @@ class Dataset:
         if self.adj is not None and self.adj.layout == torch.sparse_coo:
             self._squeeze_single_batch_adj()
 
-        if add_one_hot_features:
-            self._ensure_features()
+        self._apply_feature_mode(
+            feature_mode=feature_mode,
+            random_feat_dim=random_feat_dim,
+            random_seed=random_feat_seed,
+        )
 
         return self.adj, self.features, self.label
 

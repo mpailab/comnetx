@@ -4,14 +4,14 @@
   "USE_TIMESTAMP_SUFFIX": false,
 
   "DATASETS": [
-    "moreno_vdb",
-    "convote",
-    "contact",
-    "sociopatterns-infectious",
-    "wiki_talk_ht",
-    "wiki_talk_cy"
+    "dyn_acm",
+    "dyn_bat",
+    "dyn_dblp",
+    "dyn_eat",
+    "dyn_uat",
+    "dyn_wiki"
   ],
-  "BATCHES": ["999:100", "999:10", "99:10"],
+  "BATCHES": ["999:10"],
 
   "BASELINES": ["magi"],
   "MODES": ["naive", "smart"],
@@ -23,5 +23,9 @@
     "aggregation_mode": ["normalized"]
   },
 
-  "BASELINE_ITERATIONS": [1, 10, 25]
+  "BASELINE_ITERATIONS": [1, 10, 25],
+
+  "FEATURE_MODES": ["dataset", "onehot", "random"],
+  "RANDOM_FEATURE_DIM": 64,
+  "RANDOM_FEATURE_SEED": 42
 }
