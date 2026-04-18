@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 from metrics import Metrics
 
 TEST_DIR = os.path.dirname(__file__)

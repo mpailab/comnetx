@@ -22,6 +22,19 @@ TGC_GRAPHS = ["arxivai", "arxivcs", "arxivlarge", "arxivmath", "arxivphy",
 
 DATASETS_PATH = "/auto/datasets/graphs"
 
+def build_features_or_one_hot(features, num_nodes: int, dataset_name: str, max_one_hot_nodes: int = 10000):
+    if features is not None:
+        return features.detach().cpu().numpy().astype(np.float32)
+
+    if num_nodes > max_one_hot_nodes:
+        raise ValueError(
+            f"[{dataset_name}] Features are missing and one-hot encoding is too large "
+            f"for {num_nodes} nodes."
+        )
+
+    print(f"[{dataset_name}] Features are missing -> using one-hot encoding")
+    return np.eye(num_nodes, dtype=np.float32)
+
 def download_and_process_magi(dataset_name: str, save_path: str):
     """
     Downloads dataset (Planetoid, Reddit, OGB, Amazon), processes it 
@@ -61,8 +74,8 @@ def download_and_process_magi(dataset_name: str, save_path: str):
         features = data.x
         label = data.y
 
-        if features is not None:
-            np.save(os.path.join(save_dir, f'{name}_feat.npy'), features.detach().cpu().numpy())
+        features_np = build_features_or_one_hot(features, num_nodes, name)
+        np.save(os.path.join(save_dir, f'{name}_feat.npy'), features_np)
         
         if label is not None:
             np.save(os.path.join(save_dir, f'{name}_label.npy'), label.detach().cpu().numpy())
@@ -113,13 +126,13 @@ def download_attr_graph(name: str, save_path: str = DATASETS_PATH):
     features = data.x
     labels = data.y
     edge_index = data.edge_index
-    num_nodes = labels.size(0)
+    num_nodes = data.num_nodes if hasattr(data, "num_nodes") else int(edge_index.max().item()) + 1
 
     save_dir = os.path.join(save_path, dname)
     os.makedirs(save_dir, exist_ok=True)
 
-    if features is not None:
-        np.save(os.path.join(save_dir, f"{dname}_feat.npy"), features.detach().cpu().numpy())
+    features_np = build_features_or_one_hot(features, num_nodes, dname)
+    np.save(os.path.join(save_dir, f"{dname}_feat.npy"), features_np)
     if labels is not None and labels.dim() == 1:
         np.save(os.path.join(save_dir, f"{dname}_label.npy"), labels.detach().cpu().numpy())
     else:
@@ -140,32 +153,38 @@ def download_ogb_graph(name: str, save_path: str = DATASETS_PATH):
     save_dir = os.path.join(save_path, dname)
     os.makedirs(save_dir, exist_ok=True)
 
+    ogb_root = "/auto/datasets/graphs/comnetx/ogb/"
+
     if dname in ["ogbn-products", "ogbn-arxiv", "ogbn-papers100m"]:
-        dataset = NodePropPredDataset(name=dname, root="/auto/datasets/graphs/comnetx/ogb/")
+        dataset = NodePropPredDataset(name=dname, root=ogb_root)
         graph, labels = dataset[0]
         labels = torch.from_numpy(labels).long().view(-1)
     else:
-        dataset = LinkPropPredDataset(name=dname, root="/auto/datasets/graphs/comnetx/ogb/")
+        dataset = LinkPropPredDataset(name=dname, root=ogb_root)
         graph = dataset[0]
         labels = None
 
-    if graph["node_feat"] is not None:
-        feats = torch.from_numpy(graph["node_feat"]).float()
-        np.save(os.path.join(save_dir, f"{dname}_feat.npy"), feats.cpu().numpy())
-    else:
-        num_nodes = graph["num_nodes"]
-        np.save(os.path.join(save_dir, f"{dname}_feat.npy"), np.ones((num_nodes, 1), dtype=np.float32))
+    num_nodes = graph["num_nodes"]
 
-    if labels is not None:
-        np.save(os.path.join(save_dir, f"{dname}_label.npy"), labels.cpu().numpy())
-    else:
-        num_nodes = graph["num_nodes"]
-        np.save(os.path.join(save_dir, f"{dname}_label.npy"), np.full((num_nodes,), -1, dtype=np.int64))
+    feats = (
+        torch.from_numpy(graph["node_feat"]).float()
+        if graph["node_feat"] is not None
+        else None
+    )
+    features_np = build_features_or_one_hot(feats, num_nodes, dname)
+    np.save(os.path.join(save_dir, f"{dname}_feat.npy"), features_np)
+
+    labels_np = (
+        labels.cpu().numpy()
+        if labels is not None
+        else np.full((num_nodes,), -1, dtype=np.int64)
+    )
+    np.save(os.path.join(save_dir, f"{dname}_label.npy"), labels_np)
 
     indices = torch.from_numpy(graph["edge_index"]).long()
-    num_nodes = graph["num_nodes"]
     values = torch.ones(indices.size(1), dtype=torch.float32)
     adj = torch.sparse_coo_tensor(indices, values, size=(num_nodes, num_nodes)).coalesce()
+
     adj_data = {
         "indices": adj.indices().cpu().numpy(),
         "values": adj.values().cpu().numpy(),

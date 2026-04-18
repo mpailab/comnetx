@@ -47,15 +47,13 @@ class Optimizer:
         self.adj = adj_matrix.float().to(self.device)
 
         if features is None:
-            self.features = torch.zeros(
-                (self.nodes_num, 1),
-                dtype=self.adj.dtype,
-                device=self.device,
-            )
-            self.feat_gen = True
+            self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype, device=self.device)
+            self.synthetic_features = True
+            self.has_real_features = False
         else:
             self.features = features.float().to(self.device)
-            self.feat_gen = False
+            self.synthetic_features = self._is_sparse_identity(self.features)
+            self.has_real_features = not self.synthetic_features
 
         self.set_communities(communities)
         self.method = method
@@ -94,11 +92,58 @@ class Optimizer:
         community_weights = counts.to(dtype=dtype).reciprocal()
         return community_weights.index_select(0, inverse)
 
+    @staticmethod
+    def _is_sparse_identity(features: torch.Tensor) -> bool:
+        if not isinstance(features, torch.Tensor):
+            return False
+        if features.layout != torch.sparse_coo:
+            return False
+
+        feat = features.coalesce()
+        if feat.dim() != 2:
+            return False
+
+        n, m = feat.shape
+        if n != m or feat._nnz() != n:
+            return False
+
+        row, col = feat.indices()
+        vals = feat.values()
+
+        if not torch.equal(row, col):
+            return False
+        if not torch.all(vals == 1):
+            return False
+        if not torch.equal(torch.sort(row).values, torch.arange(n, device=row.device)):
+            return False
+
+        return True
+
+    def _aggregate_features(
+        self,
+        pattern: torch.Tensor,
+        features: Optional[torch.Tensor],
+    ) -> Optional[torch.Tensor]:
+        if features is None:
+            return None
+
+        if isinstance(features, torch.Tensor) and features.layout == torch.sparse_coo:
+            features = features.coalesce()
+
+            if self._is_sparse_identity(features):
+                return pattern.coalesce()
+
+            return torch.sparse.mm(pattern, features)
+
+        return torch.sparse.mm(pattern, features)
+
     def _local_algorithm_requires_features(self) -> bool:
-        if self.method in {"magi", "dmon", "dese"}:
+        if self.method in {"magi", "dmon"}:
             return True
+        if self.method == "dese":
+            return self.has_real_features
         if self.method == "s2cag":
-            return not self.feat_gen
+            return self.has_real_features
         return False
 
     def runtime_device(self) -> torch.device:
@@ -349,19 +394,12 @@ class Optimizer:
                 res = remap.to(torch.long)
             elif self.method == "dese":
                 from baselines.dese import dese
-                if self.feat_gen:
-                    raise ValueError("dese cann`t work without real features")
-                else:
-                    res = dese(
-                        adj,
-                        features,
-                        labels,
-                        n_epochs=self.baseline_iter,
-                        timing_info=timing_info,
-                    )
+                if not self.has_real_features:
+                    raise ValueError("dese can't work without real features")
+                res = dese(adj, features, labels, n_epochs=self.baseline_iter, timing_info=timing_info)
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
-                if self.feat_gen:
+                if not self.has_real_features:
                     features = None
                 res = s2cag(
                     adj,

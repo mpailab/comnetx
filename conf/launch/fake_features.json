@@ -1,0 +1,27 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
+
+  "DATASETS": [
+    "moreno_vdb",
+    "convote",
+    "contact",
+    "sociopatterns-infectious",
+    "wiki_talk_ht",
+    "wiki_talk_cy"
+  ],
+  "BATCHES": ["999:100", "999:10", "99:10"],
+
+  "BASELINES": ["magi"],
+  "MODES": ["naive", "smart"],
+
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["normalized"]
+  },
+
+  "BASELINE_ITERATIONS": [1, 10, 25]
+}

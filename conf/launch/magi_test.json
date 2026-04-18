@@ -1,0 +1,21 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
+  
+  "DATASETS": ["dyn_wiki", "dyn_blogcatalog", "dyn_wikics", "dyn_coauthorcs", "dyn_pubmed",
+               "dyn_coauthorphysics", "dyn_nell", "dyn_flickr", "dyn_ogbn-arxiv", "dyn_reddit2",
+               "dyn_ogbn-products"],
+  "BATCHES": ["999:100", "999:10", "99:10"],
+  
+  "BASELINES": ["magi"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1]
+  },
+
+  "BASELINE_ITERATIONS": [1, 50, 100, 200]
+}
