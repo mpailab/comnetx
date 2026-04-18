@@ -337,18 +337,16 @@ class Optimizer:
                     n_epochs=self.baseline_iter,
                     timing_info=timing_info,
                 )
-            elif self.method == "prgpt:infomap":
+            elif self.method in ("prgpt:infomap", "prgpt:locale"):
                 from baselines.rough_PRGPT import rough_prgpt
-                res = rough_prgpt(adj, refine="infomap", timing_info = timing_info)
-            elif self.method == "prgpt:locale":
-                from baselines.rough_PRGPT import rough_prgpt
-                res = rough_prgpt(adj, refine="locale", timing_info = timing_info)
+                refine = self.method.split(":")[1]
+                res = rough_prgpt(adj, refine=refine, timing_info=timing_info)
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
                 res = leidenalg_partition(adj, timing_info = timing_info)
-            elif self.method in ["ldleiden", "dfleiden"]:
+            elif self.method in ("ldleiden", "dfleiden", "networkit"):
                 from baselines.dgc import _run_leiden
-                res = _run_leiden(self.method, adj, timing_info = timing_info, measure_algorithm_time=True)
+                res = _run_leiden(self.method, adj, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
                 res = adapted_dmon(
@@ -358,9 +356,9 @@ class Optimizer:
                     epochs=self.baseline_iter,
                     timing_info=timing_info,
                 )
-            elif self.method == "networkit":
-                from baselines.network import networkit_partition
-                res = networkit_partition(adj, timing_info = timing_info)
+            # elif self.method == "networkit":
+            #     from baselines.network import networkit_partition
+            #     res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "mfc":
                 from baselines.mfc import (
                     mfc_adopted,

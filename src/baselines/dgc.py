@@ -18,10 +18,8 @@ ALG_CLASS = {
 def _run_leiden(
     method,
     adj: torch.Tensor,
-    directed: bool = False,
     options=None,
-    timing_info=None,
-    measure_algorithm_time: bool = False,
+    timing_info=None
 ) -> torch.Tensor:
     conversion_time = 0.0
 
@@ -36,21 +34,22 @@ def _run_leiden(
     time_s = time.time()
     if options is not None:
         options = AlgorithmOptions(**options)
-    algo = ALG_CLASS[method](nodes_num=adj.size(0), directed=directed, options=options)
-    algo.update(adj)
+    algo = ALG_CLASS[method](adj, directed=False, options=options)
     time_e = time.time()
     conversion_time += time_e - time_s
     if timing_info is not None:
         timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + conversion_time
 
     # Run the Leiden algorithm
-    if measure_algorithm_time:
-        time_s = time.time()
-        algo.apply()
-        time_e = time.time()
+    if method == "ldleiden":
+        update_ms, run_ms = algo.apply(with_update_timing=True)
         if timing_info is not None:
-            timing_info["algorithm_time"] = timing_info.get("algorithm_time", 0.0) + (time_e - time_s)
+            timing_info["algorithm_time"] = timing_info.get("algorithm_time", 0.0) + run_ms / 1000
+            timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + update_ms / 1000
     else:
-        algo.apply()  # without timing
+        time_s = time.time()
+        run_ms = algo.apply()
+        if timing_info is not None:
+            timing_info["algorithm_time"] = timing_info.get("algorithm_time", 0.0) + run_ms / 1000
 
     return algo.partition().to(torch.long)
