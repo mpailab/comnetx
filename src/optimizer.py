@@ -7,14 +7,6 @@ from typing import Optional, Callable
 import sparse
 from our_utils import print_zone
 
-
-# Type aliases
-LocalAlgorithmFn = Callable[
-    [torch.Tensor, Optional[torch.Tensor], bool, Optional[torch.Tensor]],
-    torch.Tensor,
-]
-
-
 class Optimizer:
 
     def __init__(self,

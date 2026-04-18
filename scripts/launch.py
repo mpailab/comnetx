@@ -88,9 +88,24 @@ SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 #    "smart_neighborhood_step": [1, 2, 3]
 # }
 SMART_PARAMS_LISTS = list(product(*SMART_PARAMS_GRID.values())) if SMART_PARAMS_GRID else [()]
-ABBR = {"smart_subcoms_depth": "L", "smart_neighborhood_step": "r"}
+ABBR = {
+    "smart_subcoms_depth": "L",
+    "smart_neighborhood_step": "r",
+    "aggregation_mode": "agg"          # новое сокращение
+}
 REVERSE_ABBR = {v: k for k, v in ABBR.items()}
-SMART_PAR_DEFAULT = {"smart_subcoms_depth": 5, "smart_neighborhood_step": 1}
+SMART_PAR_DEFAULT = {
+    "smart_subcoms_depth": 5,
+    "smart_neighborhood_step": 1,
+    "aggregation_mode": "sum"   # "sum" или "norm"
+}
+
+AGG_MODE_MAP = {
+    "sum": "sum",
+    "norm": "norm",
+    "normalized": "norm",
+    "normalize": "norm"
+}
 
 def init(db, baseline, dataset_name):
     if baseline not in db:
@@ -125,7 +140,6 @@ def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None):
         res = f"{res}-{params_string}-{gpu_sfx}"
     else:
         res = f"{res}-{mode}"
-        
     return res
 
 def measure():
@@ -149,42 +163,52 @@ def measure():
                         else:
                             smart_params_list = [()]
 
-                        for smart_params_tuple in smart_params_list:
-                            if smart_params_tuple:
-                                keys = list(SMART_PARAMS_GRID.keys())
-                                smart_params_dict = dict(zip(keys, smart_params_tuple))
-                            else:
-                                smart_params_dict = SMART_PAR_DEFAULT
+                    for smart_params_tuple in smart_params_list:
+                        smart_params_dict = SMART_PAR_DEFAULT.copy()
+                        if smart_params_tuple:
+                            keys = list(SMART_PARAMS_GRID.keys())
+                            smart_params_dict.update(zip(keys, smart_params_tuple))
 
-                            algname = get_algname(method, mode, USE_GPU, smart_params_dict, baseline_iter)
-                            db = init(db, algname, dataset_name)
+                        agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # "sum" или "norm"
+                        agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
+                        smart_params_dict["aggregation_mode"] = agg_mode_short
 
-                            try:
-                                with print_zone(VERBOSE >= 1):
-                                    print("-----------------------------------------------")
-                                    print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
-                                    print(f"Baseline: {algname}")
-                                results = dynamic_launch(
-                                    ds,
-                                    batches_strategy,
-                                    method,
-                                    baseline_iter=baseline_iter,
-                                    mode=mode,
-                                    smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
-                                    smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
-                                    verbose=VERBOSE,
-                                    use_gpu=USE_GPU
-                                )
-                            except Exception as e:
-                                if CATCH_ERRORS:
-                                    err_tuple = (algname, dataset_name, batches_strategy, str(e))
-                                    errors.append(err_tuple)
-                                    print(f"Error {e} on:", dataset_name, batches_strategy, algname)
-                                else:
-                                    raise
+                        algname = get_algname(
+                            method,
+                            mode,
+                            USE_GPU,
+                            smart_params_dict,   # содержит agg_mode_short
+                            baseline_iter
+                        )
+                        db = init(db, algname, dataset_name)
+
+                        try:
+                            with print_zone(VERBOSE >= 1):
+                                print("-----------------------------------------------")
+                                print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
+                                print(f"Baseline: {algname}")
+                            results = dynamic_launch(
+                                ds,
+                                batches_strategy,
+                                method,
+                                baseline_iter=baseline_iter,
+                                mode=mode,
+                                smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
+                                smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
+                                verbose=VERBOSE,
+                                use_gpu=USE_GPU,
+                                aggregation_mode=agg_mode_full   # передаём "sum" или "normalized"
+                            )
+                        except Exception as e:
+                            if CATCH_ERRORS:
+                                err_tuple = (algname, dataset_name, batches_strategy, str(e))
+                                errors.append(err_tuple)
+                                print(f"Error {e} on:", dataset_name, batches_strategy, algname)
                             else:
-                                db[algname][dataset_name][MACHINE][str(batches_strategy)] = results
-                                save(db, errors)
+                                raise
+                        else:
+                            db[algname][dataset_name][MACHINE][str(batches_strategy)] = results
+                            save(db, errors)
     return db, errors
 
 if __name__ == "__main__":
