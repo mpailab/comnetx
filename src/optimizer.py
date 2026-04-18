@@ -83,19 +83,12 @@ class Optimizer:
             )
         return aliases[mode]
 
-    def _aggregation_pattern_values(
-        self,
+    @staticmethod
+    def _normalized_aggregation_pattern_values(
         counts: torch.Tensor,
         inverse: torch.Tensor,
         dtype: torch.dtype,
     ) -> torch.Tensor:
-        if self.aggregation_mode == "sum":
-            return torch.ones(
-                inverse.size(0),
-                dtype=dtype,
-                device=inverse.device,
-            )
-
         community_weights = counts.to(dtype=dtype).reciprocal()
         return community_weights.index_select(0, inverse)
 
@@ -522,24 +515,24 @@ class Optimizer:
 
             # Aggregate adjacency and features matrices
             aggr_idx = torch.stack((inverse, ext_nodes))
-            aggr_values = self._aggregation_pattern_values(
-                counts,
-                inverse,
-                adj_work.dtype,
-            )
-            aggr_ptn = sparse.tensor(
+            aggr_adj_ptn = sparse.tensor(
                 aggr_idx,
                 (n, self.nodes_num),
                 adj_work.dtype,
-                values=aggr_values,
             )
-            aggr_adj = self.aggregate(adj_work, aggr_ptn)
-            aggr_features = (
-                self._aggregate_features(aggr_ptn, features_work)
-                if needs_features
-                else None
-            )
-            del aggr_ptn
+            aggr_adj = self.aggregate(adj_work, aggr_adj_ptn)
+            del aggr_adj_ptn
+
+            aggr_features = None
+            if needs_features:
+                ext_features = features_work.index_select(0, ext_nodes)
+                aggr_features = torch.zeros(
+                    (n, ext_features.size(1)),
+                    dtype=ext_features.dtype,
+                    device=ext_features.device,
+                )
+                aggr_features.index_add_(0, inverse, ext_features)
+                aggr_features /= counts.to(dtype=ext_features.dtype).unsqueeze(1)
 
             # Apply local algorithm for aggregated graph
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(
