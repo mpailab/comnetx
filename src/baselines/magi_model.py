@@ -8,6 +8,9 @@ from torch_geometric.utils import to_undirected, add_remaining_self_loops
 from torch_sparse import SparseTensor
 from sklearn.cluster import KMeans, SpectralClustering
 import time
+import scipy.sparse as sp
+from scipy.sparse.linalg import eigsh
+from sklearn.neighbors import NearestNeighbors
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -344,7 +347,7 @@ def magi(adj: torch.Tensor,
             z_all[n_id[:batch_size]] = out
 
     embeddings = F.normalize(z_all, p=2, dim=1)
-
+    """
     if inferred_k is not None and inferred_k > 0:
         pred_labels, _ = clustering(
             feature=embeddings,
@@ -371,8 +374,189 @@ def magi(adj: torch.Tensor,
             new_labels = torch.tensor(new_labels, dtype=torch.long, device=device)
         else:
             new_labels = new_labels.to(dtype=torch.long, device=device)
+    """
 
+    num_points = embeddings.size(0)
+
+    if embeddings.ndim == 1:
+        embeddings = embeddings.unsqueeze(0)
+        num_points = 1
+
+    if num_points <= 1:
+        return torch.zeros(num_points, dtype=torch.long, device=device)
+
+    if inferred_k is None:
+        inferred_k = estimate_k_eigengap_sparse_embeddings(
+            embeddings=embeddings,
+            k_max=min(30, num_points - 1),
+            knn_k=min(20, max(2, num_points - 1)),
+            metric="cosine",
+            mutual=False,
+        )
+        print(f"Estimated number of clusters by sparse eigengap: k={inferred_k}")
+
+    inferred_k = int(max(1, min(inferred_k, num_points)))
+
+    if inferred_k == 1:
+        return torch.zeros(num_points, dtype=torch.long, device=device)
+
+    pred_labels, _ = clustering(
+        feature=embeddings,
+        n_clusters=inferred_k,
+        kmeans_device=args.kmeans_device,
+        batch_size=args.kmeans_batch,
+        tol=1e-4,
+        device=device,
+        spectral_clustering=False,
+    )
+    new_labels = torch.as_tensor(pred_labels, dtype=torch.long, device=device)
     return new_labels
+
+def estimate_k_eigengap_sparse_embeddings(
+    embeddings: torch.Tensor,
+    k_max: int = 30,
+    knn_k: int = 20,
+    metric: str = "cosine",
+    mutual: bool = False,
+    zero_tol: float = 1e-6,
+) -> int:
+    """
+    Sparse eigengap estimation on embeddings.
+
+    Steps:
+    1) build sparse kNN similarity graph from embeddings
+    2) build normalized Laplacian L = I - D^{-1/2} W D^{-1/2}
+    3) compute several smallest eigenvalues
+    4) choose k by eigengap
+
+    Parameters
+    ----------
+    embeddings : torch.Tensor [N, D]
+    k_max : int
+        Maximum number of clusters to consider.
+    knn_k : int
+        Number of neighbors in sparse similarity graph.
+    metric : str
+        "cosine" or "euclidean"
+    mutual : bool
+        If True, use mutual kNN; otherwise symmetrize with max.
+    zero_tol : float
+        Threshold for detecting zero eigenvalues.
+
+    Returns
+    -------
+    int
+        Estimated number of clusters.
+    """
+    x = embeddings.detach().float().cpu().numpy()
+    n = x.shape[0]
+
+    if n <= 1:
+        return 1
+    if n == 2:
+        return 2
+
+    k_max = max(2, min(k_max, n - 1))
+    knn_k = max(2, min(knn_k, n - 1))
+
+    if metric == "cosine":
+        norms = np.linalg.norm(x, axis=1, keepdims=True)
+        norms = np.clip(norms, 1e-12, None)
+        x = x / norms
+
+    nn = NearestNeighbors(
+        n_neighbors=knn_k + 1,
+        metric=metric,
+        algorithm="auto",
+        n_jobs=-1,
+    )
+    nn.fit(x)
+
+    # sparse distance graph
+    W = nn.kneighbors_graph(x, mode="distance")
+    W = W.tocsr()
+
+    # remove self-loops from kNN stage
+    W.setdiag(0.0)
+    W.eliminate_zeros()
+
+    # distance -> similarity
+    if W.nnz == 0:
+        return 1
+
+    if metric == "cosine":
+        # cosine distance in sklearn = 1 - cosine_similarity
+        W.data = 1.0 - W.data
+    elif metric == "euclidean":
+        sigma = np.median(W.data)
+        sigma = max(float(sigma), 1e-12)
+        W.data = np.exp(-(W.data ** 2) / (2.0 * sigma * sigma))
+    else:
+        raise ValueError(f"Unsupported metric: {metric}")
+
+    W.data = np.clip(W.data, 0.0, None)
+    W.eliminate_zeros()
+
+    # symmetrization
+    if mutual:
+        W = W.minimum(W.T).tocsr()
+    else:
+        W = W.maximum(W.T).tocsr()
+
+    if W.nnz == 0:
+        return 1
+
+    degrees = np.asarray(W.sum(axis=1)).ravel()
+    d_inv_sqrt = np.zeros_like(degrees, dtype=np.float64)
+    mask = degrees > 0
+    d_inv_sqrt[mask] = 1.0 / np.sqrt(degrees[mask])
+
+    D_inv_sqrt = sp.diags(d_inv_sqrt, format="csr")
+    I = sp.eye(n, format="csr", dtype=np.float64)
+    L = I - D_inv_sqrt @ W @ D_inv_sqrt
+
+    # how many eigenvalues to compute
+    n_eigs = min(k_max + 1, n - 1)
+    if n_eigs < 2:
+        return 1
+
+    try:
+        evals = eigsh(L, k=n_eigs, which="SM", return_eigenvectors=False)
+    except Exception:
+        # safe fallback
+        return min(2, n)
+
+    evals = np.sort(np.real(evals))
+    evals = np.clip(evals, 0.0, None)
+
+    # if graph is nearly disconnected, multiplicity of zero eigenvalue is informative
+    n_zero = int(np.sum(evals < zero_tol))
+    if n_zero >= 2:
+        return min(n_zero, k_max)
+
+    gaps = np.diff(evals)
+    if gaps.size == 0:
+        return 1
+
+    k_hat = int(np.argmax(gaps) + 1)
+    return max(1, min(k_hat, k_max))
+
+def estimate_k_eigengap(embeddings: torch.Tensor, k_max: int = 30):
+    x = embeddings.detach()
+    x = torch.nn.functional.normalize(x, dim=1)
+
+    sim = x @ x.T
+    sim = torch.clamp(sim, min=0)
+
+    deg = sim.sum(dim=1)
+    D_inv_sqrt = torch.diag(1.0 / torch.sqrt(deg + 1e-8))
+    L = torch.eye(sim.size(0), device=sim.device) - D_inv_sqrt @ sim @ D_inv_sqrt
+
+    evals = torch.linalg.eigvalsh(L)
+    evals = evals[:k_max + 1]
+    gaps = evals[1:] - evals[:-1]
+    k = int(torch.argmax(gaps[:k_max - 1]).item()) + 1
+    return k
 
 
 def find_best_k_with_modularity(adj_sparse : torch.Tensor,

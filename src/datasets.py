@@ -115,18 +115,38 @@ class Dataset:
             ).coalesce()
 
 
-    def _make_one_hot_features(self, num_nodes: int | None = None) -> torch.Tensor:
+    def _make_synthetic_features(
+        self,
+        num_nodes: int | None = None,
+        mode: str = "random",
+        feat_dim: int = 64,
+        seed: int = 42,
+    ) -> torch.Tensor:
         n = self._infer_num_nodes() if num_nodes is None else int(num_nodes)
-        idx = torch.arange(n, dtype=torch.long)
-        indices = torch.stack([idx, idx], dim=0)
-        values = torch.ones(n, dtype=torch.float32)
-        self.features_kind = "identity"
-        return torch.sparse_coo_tensor(indices, values, size=(n, n)).coalesce()
+
+        if mode == "identity":
+            idx = torch.arange(n, dtype=torch.long)
+            indices = torch.stack([idx, idx], dim=0)
+            values = torch.ones(n, dtype=torch.float32)
+            self.features_kind = "identity"
+            return torch.sparse_coo_tensor(indices, values, size=(n, n)).coalesce()
+
+        if mode == "random":
+            g = torch.Generator(device="cpu")
+            g.manual_seed(seed)
+            self.features_kind = "random"
+            return torch.randn((n, feat_dim), dtype=torch.float32, generator=g)
+
+        raise ValueError(f"Unsupported synthetic feature mode: {mode}")
 
 
     def _ensure_features(self):
         if self.features is None:
-            self.features = self._make_one_hot_features()
+            self.features = self._make_synthetic_features(
+                mode="random",
+                feat_dim=64,
+                seed=42,
+            )
 
     def load(
     self,

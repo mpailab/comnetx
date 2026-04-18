@@ -99,6 +99,51 @@ class Optimizer:
         community_weights = counts.to(dtype=dtype).reciprocal()
         return community_weights.index_select(0, inverse)
 
+    @staticmethod
+    def _is_sparse_identity(features: torch.Tensor) -> bool:
+        if not isinstance(features, torch.Tensor):
+            return False
+        if features.layout != torch.sparse_coo:
+            return False
+
+        feat = features.coalesce()
+        if feat.dim() != 2:
+            return False
+
+        n, m = feat.shape
+        if n != m or feat._nnz() != n:
+            return False
+
+        row, col = feat.indices()
+        vals = feat.values()
+
+        if not torch.equal(row, col):
+            return False
+        if not torch.all(vals == 1):
+            return False
+        if not torch.equal(torch.sort(row).values, torch.arange(n, device=row.device)):
+            return False
+
+        return True
+
+    def _aggregate_features(
+        self,
+        pattern: torch.Tensor,
+        features: Optional[torch.Tensor],
+    ) -> Optional[torch.Tensor]:
+        if features is None:
+            return None
+
+        if isinstance(features, torch.Tensor) and features.layout == torch.sparse_coo:
+            features = features.coalesce()
+
+            if self._is_sparse_identity(features):
+                return pattern.coalesce()
+
+            return torch.sparse.mm(pattern, features)
+
+        return torch.sparse.mm(pattern, features)
+
     def _local_algorithm_requires_features(self) -> bool:
         if self.method in {"magi", "dmon"}:
             return True
