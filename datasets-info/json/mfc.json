@@ -1,0 +1,32 @@
+{
+    "mfc_Cora": {
+        "n": 12022,
+        "m": 419966,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "mfc_DBLP": {
+        "n": 12107,
+        "m": 187884,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "mfc_DBLPdyn": {
+        "n": 44652,
+        "m": 391534,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "mfc_enron": {
+        "n": 182,
+        "m": 11078,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "mfc_highschool": {
+        "n": 327,
+        "m": 41594,
+        "d": "undirected",
+        "w": "unweighted"
+    }
+}

@@ -2,10 +2,12 @@
   "dynamic": {
     "konect": "/auto/datasets/graphs/dynamic_konect_project_datasets",
     "dyn_attr": "/auto/datasets/graphs/comnetx/dynamic_attr_datasets",
-    "tgc": "/auto/datasets/graphs/comnetx/4TGC/data_npy"
+    "tgc": "/auto/datasets/graphs/comnetx/4TGC/data_npy",
+    "mfc": "/home/egorov/comnetx/Converted"
   },
   "static": {
     "magi": "/auto/datasets/graphs/small",
+    "s2cag":"/auto/datasets/graphs/comnetx/baselines/S2CAG/batched/",
     "dyn_sbm": "/auto/datasets/graphs/dyn_sbm",
     "sbm": "/auto/datasets/graphs/sbm",
     "small": "/auto/datasets/graphs/small",

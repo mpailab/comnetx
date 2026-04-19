@@ -118,6 +118,8 @@ class Dataset:
             batches_strategy = "1" if batches_strategy is None else str(batches_strategy)
             if fmt == "konect":
                 self._load_konect(batches_strategy=batches_strategy)
+            if fmt == "mfc":
+                self._load_mfc(batches_strategy=batches_strategy)
             elif fmt == "dyn_attr":
                 self._load_dynamic_attr_graph(batches_strategy=batches_strategy)
             elif fmt == "tgc":
@@ -134,7 +136,7 @@ class Dataset:
                 self._load_prgpt_dataset(dataset_type, num_nodes, mu, beta, snap, num_snapshots)
 
         if self.root_section == "static":
-            if fmt == "magi":
+            if fmt == "magi" or fmt == "s2cag":
                 self._load_npy_format(coo_adj=True)
             elif fmt == "attr":
                 self._load_attr_graph()
@@ -472,6 +474,36 @@ class Dataset:
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
         self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
     
+    def _load_mfc(self, batches_strategy = "1"):
+        """
+        Загружает граф KONECT в соответствии со стратегией батчинга
+
+        Args:
+            batches_strategy: "N" | "p:n" | "real"
+                - "N": N равных батчей (готовый файл out.{self.name}.{N}_batches для N = 1, 10, 100, 1000)
+                - "p:n" : Стратегия с доминирующим первым батчем.
+                      `p` — целое число из ряда 9, 99, 999, ... (соответствует 9%, 99%, 99.9%, ...).
+                      Первый батч содержит p% данных, оставшиеся (100-p)% делятся на `n` частей.
+                      Пример: "999:10" → 99.9% + 10x0.01% батчей.
+                      (файл out.{self.name}.{p+1}_batches + постобработка)
+                - "real" : исходные временные метки (файл out.{self.name}.sort)
+            По умолчанию "1" (весь граф — один батч).
+        """
+        if batches_strategy == "real":
+            p, n = 0, 0
+            filepath = os.path.join(self.dataset_root, f"{self.name}.txt")
+        else:  # N стратегия
+            p, n = 0, int(batches_strategy)
+            filepath = os.path.join(self.dataset_root, f"{self.name}_{batches_strategy}_batches.txt")
+
+        # Чтение файла
+        with open(filepath) as _:
+            first_string = _.readline()
+            #num_nodes = int(first_string.split()[0])
+            edges_num = int(first_string.split()[1])
+        i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
+        self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+
     def get_dynamic_adj(self, i, j, w, t, p, n):
         min_ind = min(i.min(), j.min())
         max_ind = max(i.max(), j.max())
