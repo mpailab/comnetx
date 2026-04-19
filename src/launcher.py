@@ -43,47 +43,58 @@ def dynamic_launch(ds, batches_strategy,
     
     if dynamic_mode and underlying_static_method == "mfc":       
 
-        from baselines.mfc import mfc_adopted
-        from metrics import Metrics
-        
-        time_s = time.time()
-        labels = ds.label
-        if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
-            labels = labels.squeeze(0)
-        initial_partition = None
-        if is_special_strategy:
-            first_snapshot = ds.adj[0]
-            temp_algo = LDLeiden(first_snapshot, directed=ds.is_directed)
-            temp_algo.apply()
-            initial_partition = temp_algo.partition()
-            init_mod = temp_algo.modularity()
-            with print_zone(verbose >= 1):
-                print(f"Initial modularity: {init_mod:.2g}")
-        
-        with print_zone(verbose >= 2):
-            coms = mfc_adopted(
-                        adj=ds.adj,
-                        labels=labels,
-                        network_type="MFC",
-                        return_labels=True,
-                        num_epoch=baseline_iter,
-                        pure_mfc=True,
-                        initial_partition=initial_partition,
-                    )
+        # Основной цикл по батчам
+        if ds.adj.ndim == 2:
+            batches_iter = [ds.adj]
+        elif ds.adj.ndim == 3:
+            batches_iter = torch.unbind(ds.adj)
+        else:
+            raise ValueError(f"Unsupported ds.adj ndim: {ds.adj.ndim}")
+
+        for i, batch in enumerate(batches_iter):
+            with print_zone(verbose >= 2):
+                print("  Batch", i)
+
+            # --- Обработка специальной стратегии (":") для динамического режима ---
+            if dynamic_mode and is_special_strategy and i == 0:
+                temp_algo = LDLeiden(batch, directed=ds.is_directed)
+                temp_algo.apply()  # выполняем разбиение
+                initial_partition = temp_algo.partition()
+                init_mod = temp_algo.modularity()
+                with print_zone(verbose >= 1):
+                    print(f"Initial modularity: {init_mod:.2g}")
             
-            time_e = time.time()
-            measured_time = time_e - time_s
-            mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
+            with print_zone(verbose >= 2):
+                coms = mfc_adopted(
+                            adj=ds.adj,
+                            labels=labels,
+                            network_type="MFC",
+                            return_labels=True,
+                            num_epoch=baseline_iter,
+                            pure_mfc=True,
+                            initial_partition=initial_partition,
+                        )
+                
+                time_e = time.time()
+                measured_time = time_e - time_s
+                mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
 
-            print(f"Modularity: {mod:.2g}")
-            print(f"Baseline calls: {1}")
-            print(f"Time: {measured_time:.2f}")
+                print(f"Modularity: {mod:.2g}")
+                print(f"Baseline calls: {1}")
+                print(f"Time: {measured_time:.2f}")
 
-        results.append({'modularity': mod, 'time': measured_time})
+            results.append({'modularity': mod, 'time': measured_time})
 
     else:
     # Основной цикл по батчам
-        for i, batch in enumerate(torch.unbind(ds.adj)):
+        if ds.adj.ndim == 2:
+            batches_iter = [ds.adj]
+        elif ds.adj.ndim == 3:
+            batches_iter = torch.unbind(ds.adj)
+        else:
+            raise ValueError(f"Unsupported ds.adj ndim: {ds.adj.ndim}")
+
+        for i, batch in enumerate(batches_iter):
             
             with print_zone(verbose >= 2):
                 print("  Batch", i)

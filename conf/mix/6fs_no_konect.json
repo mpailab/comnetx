@@ -1,0 +1,21 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  
+  "DATASETS": ["dyn_acm", "dyn_bat", "dyn_citeseer", "dyn_cora",
+               "dyn_wiki", "dyn_coauthorcs", "dyn_pubmed", "dyn_coauthorphysics",
+               "dyn_nell", "dyn_flickr", "dyn_ogbn-arxiv",
+               "patent", "dblp-tgc", "arxivcs", "arxivmath", "arxivphy", "arxivlarge"],
+  "BATCHES": ["999:10"],
+  
+  "BASELINES": ["ldleiden", "leidenalg", "networkit", "dfleiden", "prgpt:infomap", "prgpt:locale"],
+  "MODES": ["naive", "smart"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["sum"]
+  }
+}

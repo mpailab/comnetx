@@ -156,30 +156,69 @@ def test_aggregate_via_sparse_helper():
 
 @pytest.mark.unit
 @pytest.mark.short
-def test_aggregation_mode_sum_pattern_values():
+def test_normalized_aggregation_pattern_values():
     adj = torch.zeros((4, 4), dtype=torch.float32).to_sparse_coo()
-    opt = Optimizer(adj, aggregation_mode="sum")
     counts = torch.tensor([3, 1])
     inverse = torch.tensor([0, 0, 0, 1])
 
-    values = opt._aggregation_pattern_values(counts, inverse, adj.dtype)
-
-    assert torch.equal(values, torch.ones(4, dtype=adj.dtype))
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_aggregation_mode_normalized_pattern_values():
-    adj = torch.zeros((4, 4), dtype=torch.float32).to_sparse_coo()
-    opt = Optimizer(adj, aggregation_mode="normalized")
-    counts = torch.tensor([3, 1])
-    inverse = torch.tensor([0, 0, 0, 1])
-
-    values = opt._aggregation_pattern_values(counts, inverse, adj.dtype)
+    values = Optimizer._normalized_aggregation_pattern_values(
+        counts,
+        inverse,
+        adj.dtype,
+    )
 
     assert torch.allclose(
         values,
         torch.tensor([1 / 3, 1 / 3, 1 / 3, 1], dtype=adj.dtype),
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_run_uses_sum_pattern_for_adj_and_normalized_pattern_for_features(
+    monkeypatch,
+):
+    adj = torch.tensor(
+        [
+            [0, 1, 0, 0],
+            [1, 0, 0, 0],
+            [0, 0, 0, 1],
+            [0, 0, 1, 0],
+        ],
+        dtype=torch.float32,
+    ).to_sparse_coo()
+    features = torch.tensor([[2.0], [4.0], [10.0], [14.0]])
+    communities = torch.tensor([[0, 0, 0, 0], [0, 0, 1, 1]])
+    opt = Optimizer(
+        adj,
+        features=features,
+        communities=communities,
+        subcoms_depth=2,
+        method="magi",
+        aggregation_mode="sum",
+    )
+    captured = {"aggr_pattern_values": [], "aggr_features": []}
+
+    def fake_aggregate(adj_in, pattern):
+        captured["aggr_pattern_values"].append(pattern.values().clone())
+        return torch.eye(pattern.size(0), dtype=adj_in.dtype).to_sparse_coo()
+
+    def fake_local_algorithm(adj_in, features_in, limited, labels=None):
+        captured["aggr_features"].append(features_in.clone())
+        return torch.arange(features_in.size(0), dtype=torch.long)
+
+    monkeypatch.setattr(Optimizer, "aggregate", staticmethod(fake_aggregate))
+    monkeypatch.setattr(opt, "local_algorithm", fake_local_algorithm)
+
+    opt.run(torch.tensor([True, False, False, False]))
+
+    assert torch.equal(
+        captured["aggr_pattern_values"][0],
+        torch.ones(4, dtype=adj.dtype),
+    )
+    assert torch.allclose(
+        captured["aggr_features"][0],
+        torch.tensor([[3.0], [12.0]], dtype=features.dtype),
     )
 
 

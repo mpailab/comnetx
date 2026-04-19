@@ -14,7 +14,7 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 test_root = os.path.join(PROJECT_PATH, "test")
 
 # from baselines.s2cag import main
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 from baselines.s2cag import s2cag
 from metrics import Metrics
 
@@ -235,10 +235,11 @@ def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
     info = load_konect_info()
     datasets = {}
+    KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
     for name in info.keys():
         path = os.path.join(KONECT_PATH, name)
         if os.path.exists(path):
-            datasets[name] = Dataset(name, KONECT_PATH)
+            datasets[name] = Dataset(name)
     return datasets
 
 KONECT_DATASETS = get_all_konect_datasets()
@@ -250,7 +251,7 @@ KONECT_DATASETS = get_all_konect_datasets()
     ids=list(KONECT_DATASETS.keys())
 )
 def test_s2cag_konect_dataset(name):
-    dataset = Dataset(name, path=KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     
@@ -300,7 +301,7 @@ def test_s2cag_konect_dataset(name):
 
 def test_s2cag_single_konect_dataset():
     name = "dblp-cite"
-    dataset = Dataset(name, KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load(tensor_type="coo")
     adj = adj.coalesce()
     

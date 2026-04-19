@@ -73,6 +73,29 @@ MODES = conf["MODES"] # ["smart", "naive", "raw"]
 SMART_VERSION = conf["SMART_VERSION"]
 USE_GPU = conf.get("USE_GPU", True)
 
+feature_modes_raw = conf.get("FEATURE_MODES")
+if feature_modes_raw is None:
+    feature_modes_raw = [conf.get("FEATURE_MODE", "dataset")]
+elif isinstance(feature_modes_raw, str):
+    feature_modes_raw = [feature_modes_raw]
+elif not isinstance(feature_modes_raw, list):
+    raise ValueError(
+        f'conf["FEATURE_MODES"] must be str or list, got: {type(feature_modes_raw)}'
+    )
+
+FEATURE_MODES = [str(mode).lower() for mode in feature_modes_raw]
+
+supported_feature_modes = {"dataset", "onehot", "random"}
+bad_feature_modes = [mode for mode in FEATURE_MODES if mode not in supported_feature_modes]
+if bad_feature_modes:
+    raise ValueError(
+        f"Unsupported feature modes: {bad_feature_modes}. "
+        f"Supported: {sorted(supported_feature_modes)}"
+    )
+
+RANDOM_FEATURE_DIM = conf.get("RANDOM_FEATURE_DIM", 64)
+RANDOM_FEATURE_SEED = conf.get("RANDOM_FEATURE_SEED", 42)
+
 # baseline iterations
 SUPPORTED_ITER_METHODS = {"magi", "dmon", "dese", "flmig", "s2cag", "mfc"}
 BASELINE_ITER_VALS = conf.get("BASELINE_ITERATIONS", [None])
@@ -128,7 +151,7 @@ def save(db, errors):
         with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
             json.dump(errors, _, indent=4)
 
-def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None):
+def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None, feature_mode="dataset"):
     if method in SUPPORTED_ITER_METHODS and baseline_iter is not None:
         res = f"{method}-i:{baseline_iter}"
     else:
@@ -140,6 +163,7 @@ def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None):
         res = f"{res}-{params_string}-{gpu_sfx}"
     else:
         res = f"{res}-{mode}"
+    res = f"{res}-feat:{feature_mode}"
     return res
 
 def measure():
@@ -148,67 +172,75 @@ def measure():
 
     for dataset_name in DATASETS:
         for batches_strategy in BATCHES:
-            ds = Dataset(dataset_name, paths_config)
-            ds.load(batches_strategy=batches_strategy)
-            for method in METHODS:
-                for mode in MODES:
-                    if method in SUPPORTED_ITER_METHODS:
-                        iter_vals = BASELINE_ITER_VALS
-                    else:
-                        iter_vals = [None]
+            for feature_mode in FEATURE_MODES:
+                ds = Dataset(dataset_name, paths_config)
+                ds.load(
+                    batches_strategy=batches_strategy,
+                    feature_mode=feature_mode,
+                    random_feat_dim=RANDOM_FEATURE_DIM,
+                    random_feat_seed=RANDOM_FEATURE_SEED,
+                )
 
-                    for baseline_iter in iter_vals:
-                        if mode == "smart" and SMART_PARAMS_GRID:
-                            smart_params_list = SMART_PARAMS_LISTS
+                for method in METHODS:
+                    for mode in MODES:
+                        if method in SUPPORTED_ITER_METHODS:
+                            iter_vals = BASELINE_ITER_VALS
                         else:
-                            smart_params_list = [()]
+                            iter_vals = [None]
 
-                    for smart_params_tuple in smart_params_list:
-                        smart_params_dict = SMART_PAR_DEFAULT.copy()
-                        if smart_params_tuple:
-                            keys = list(SMART_PARAMS_GRID.keys())
-                            smart_params_dict.update(zip(keys, smart_params_tuple))
-
-                        agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # "sum" или "norm"
-                        agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
-                        smart_params_dict["aggregation_mode"] = agg_mode_short
-
-                        algname = get_algname(
-                            method,
-                            mode,
-                            USE_GPU,
-                            smart_params_dict,   # содержит agg_mode_short
-                            baseline_iter
-                        )
-                        db = init(db, algname, dataset_name)
-
-                        try:
-                            with print_zone(VERBOSE >= 1):
-                                print("-----------------------------------------------")
-                                print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
-                                print(f"Baseline: {algname}")
-                            results = dynamic_launch(
-                                ds,
-                                batches_strategy,
-                                method,
-                                baseline_iter=baseline_iter,
-                                mode=mode,
-                                smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
-                                smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
-                                verbose=VERBOSE,
-                                use_gpu=USE_GPU,
-                                aggregation_mode=agg_mode_full   # передаём "sum" или "normalized"
-                            )
-                        except Exception as e:
-                            if CATCH_ERRORS:
-                                err_tuple = (algname, dataset_name, batches_strategy, str(e))
-                                errors.append(err_tuple)
-                                print(f"Error {e} on:", dataset_name, batches_strategy, algname)
+                        for baseline_iter in iter_vals:
+                            if mode == "smart" and SMART_PARAMS_GRID:
+                                smart_params_list = SMART_PARAMS_LISTS
                             else:
-                                raise
-                        else:
-                            db[algname][dataset_name][MACHINE][str(batches_strategy)] = results
-                            save(db, errors)
+                                smart_params_list = [()]
+
+                            for smart_params_tuple in smart_params_list:
+                                smart_params_dict = SMART_PAR_DEFAULT.copy()
+                                if smart_params_tuple:
+                                    keys = list(SMART_PARAMS_GRID.keys())
+                                    smart_params_dict.update(zip(keys, smart_params_tuple))
+
+                                agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # "sum" или "norm"
+                                agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
+                                smart_params_dict["aggregation_mode"] = agg_mode_short
+
+                                algname = get_algname(
+                                    method,
+                                    mode,
+                                    USE_GPU,
+                                    smart_params_dict,
+                                    baseline_iter,
+                                    feature_mode=feature_mode,
+                                )
+                                db = init(db, algname, dataset_name)
+
+                                try:
+                                    with print_zone(VERBOSE >= 1):
+                                        print("-----------------------------------------------")
+                                        print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
+                                        print(f"Baseline: {algname}")
+                                    results = dynamic_launch(
+                                        ds,
+                                        batches_strategy,
+                                        method,
+                                        baseline_iter=baseline_iter,
+                                        mode=mode,
+                                        smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
+                                        smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
+                                        verbose=VERBOSE,
+                                        use_gpu=USE_GPU,
+                                        aggregation_mode=agg_mode_full   # передаём "sum" или "normalized"
+                                    )
+                                except Exception as e:
+                                    if CATCH_ERRORS:
+                                        err_tuple = (algname, dataset_name, batches_strategy, str(e))
+                                        errors.append(err_tuple)
+                                        print(f"Error {e} on:", dataset_name, batches_strategy, algname)
+                                    else:
+                                        raise
+                                else:
+                                    db[algname][dataset_name][MACHINE][str(batches_strategy)] = results
+                                    save(db, errors)
     return db, errors
 
 if __name__ == "__main__":
