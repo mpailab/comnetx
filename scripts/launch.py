@@ -120,7 +120,7 @@ REVERSE_ABBR = {v: k for k, v in ABBR.items()}
 SMART_PAR_DEFAULT = {
     "smart_subcoms_depth": 5,
     "smart_neighborhood_step": 1,
-    "aggregation_mode": "sum"   # "sum" или "norm"
+    "aggregation_mode": "sum"   # режим агрегации фичей: "sum" или "norm"
 }
 
 AGG_MODE_MAP = {
@@ -200,7 +200,7 @@ def measure():
                                     keys = list(SMART_PARAMS_GRID.keys())
                                     smart_params_dict.update(zip(keys, smart_params_tuple))
 
-                                agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # "sum" или "norm"
+                                agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # режим агрегации фичей: "sum" или "norm"
                                 agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
                                 smart_params_dict["aggregation_mode"] = agg_mode_short
 
@@ -229,7 +229,7 @@ def measure():
                                         smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
                                         verbose=VERBOSE,
                                         use_gpu=USE_GPU,
-                                        aggregation_mode=agg_mode_full   # передаём "sum" или "normalized"
+                                        aggregation_mode=agg_mode_full   # передаём режим агрегации фичей
                                     )
                                 except Exception as e:
                                     if CATCH_ERRORS:
