@@ -8,6 +8,9 @@ from torch_geometric.utils import to_undirected, add_remaining_self_loops
 from torch_sparse import SparseTensor
 from sklearn.cluster import KMeans, SpectralClustering
 import time
+import scipy.sparse as sp
+from scipy.sparse.linalg import eigsh
+from sklearn.neighbors import NearestNeighbors
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -19,6 +22,12 @@ if SRC_PATH not in sys.path: sys.path.insert(0, SRC_PATH)
 
 if MAGI_PATH not in sys.path: sys.path.insert(0, MAGI_PATH)
 
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+
+torch.set_float32_matmul_precision("high")
+
 from magi.model import Model, Encoder
 from magi.utils import get_mask
 from magi.neighbor_sampler import NeighborSampler
@@ -27,13 +36,98 @@ from magi.batch_kmeans_cuda import kmeans
 from metrics import Metrics
 
 
+def squeeze_single_batch_adj(adj: torch.Tensor) -> torch.Tensor:
+    if isinstance(adj, torch.Tensor) and adj.layout == torch.sparse_coo:
+        adj = adj.coalesce()
+        if adj.ndim == 3 and adj.shape[0] == 1:
+            idx = adj.indices()
+            vals = adj.values()
+            return torch.sparse_coo_tensor(
+                idx[1:],
+                vals,
+                size=adj.shape[1:],
+                dtype=vals.dtype,
+                device=vals.device,
+            ).coalesce()
+    return adj
 
-def magi(adj : torch.Tensor, 
-         features : torch.Tensor, 
-         labels : torch.Tensor | None = None, 
-         n_clusters: int | None = None, 
-         device=None, 
+def is_sparse_identity_features(features: torch.Tensor) -> bool:
+    if not isinstance(features, torch.Tensor):
+        return False
+    if features.layout != torch.sparse_coo:
+        return False
+
+    feat = features.coalesce()
+    if feat.dim() != 2:
+        return False
+
+    n, m = feat.shape
+    if n != m or feat._nnz() != n:
+        return False
+
+    row, col = feat.indices()
+    vals = feat.values()
+
+    if not torch.equal(row, col):
+        return False
+    if not torch.all(vals == 1):
+        return False
+    if not torch.equal(torch.sort(row).values, torch.arange(n, device=row.device)):
+        return False
+
+    return True
+
+def get_batch_features(
+    features: torch.Tensor,
+    n_id: torch.Tensor,
+    num_features: int,
+    device: torch.device,
+    identity_features: bool,
+) -> torch.Tensor:
+    if identity_features:
+        return F.one_hot(n_id.to(device), num_classes=num_features).float()
+
+    if isinstance(features, torch.Tensor) and features.layout == torch.sparse_coo:
+        feat = features.coalesce()
+        row, col = feat.indices()
+        val = feat.values()
+
+        n_id_dev = n_id.to(row.device)
+
+        # оставляем только строки, которые входят в batch
+        keep = torch.isin(row, n_id_dev)
+        row = row[keep]
+        col = col[keep]
+        val = val[keep]
+
+        if row.numel() == 0:
+            return torch.zeros((n_id.numel(), num_features), dtype=torch.float32, device=device)
+
+        # remap global node ids -> local batch row ids
+        order = torch.argsort(n_id_dev)
+        sorted_n = n_id_dev[order]
+        pos = torch.searchsorted(sorted_n, row)
+        mapped_rows = order[pos]
+
+        batch_sparse = torch.sparse_coo_tensor(
+            torch.stack([mapped_rows, col], dim=0),
+            val,
+            size=(n_id.numel(), num_features),
+            device=val.device,
+        ).coalesce()
+
+        return batch_sparse.to(device).to_dense()
+
+    idx = n_id.to(features.device)
+    return features.index_select(0, idx).to(device)
+
+def magi(adj: torch.Tensor,
+         features: torch.Tensor,
+         labels: torch.Tensor | None = None,
+         n_clusters: int | None = None,
+         device=None,
          n_epochs=None,
+         batchsize: int = 2048,
          timing_info=None):
 
     """
@@ -65,12 +159,15 @@ def magi(adj : torch.Tensor,
         Predicted cluster assignments for all nodes, shape [N].
     """
 
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     if n_epochs is None:
         n_epochs = 100
     class Args:
         batchsize = 2048
         max_duration = 60
-        kmeans_device = 'cpu'
+        kmeans_device = 'cuda' if device.type == 'cuda' else 'cpu'
         kmeans_batch = -1
         hidden_channels = '1024,256'
         size = '10,10'
@@ -84,30 +181,57 @@ def magi(adj : torch.Tensor,
         wd = 0
         dropout = 0
     args = Args()
-
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     print("device: ", device)
 
     time_s = time.time()
-    features = features.to(device)
-    if n_clusters is None:
-        if labels is None:
-            num_nodes = adj.size(0)
-            labels = torch.arange(num_nodes, device=device)
-        else:
-            labels = labels.to(device)
+
+    adj = squeeze_single_batch_adj(adj)
+
+    if adj.ndim != 2:
+        raise ValueError(
+            f"MAGI supports only static adjacency [N, N]. Got shape {adj.shape}"
+        )
+
+    if features is None:
+        raise ValueError("MAGI requires features, but got None")
+
+    identity_features = False
+
+    if isinstance(features, torch.Tensor) and features.layout == torch.sparse_coo:
+        features = features.coalesce()
+        if is_sparse_identity_features(features):
+            identity_features = True
+        # обычные sparse features оставляем sparse
+    else:
+        features = features.to(device)
+        
+    if n_clusters is not None:
+        inferred_k = n_clusters
+    elif labels is not None:
+        labels = labels.to(device)
         inferred_k = len(torch.unique(labels))
     else:
-        inferred_k = n_clusters
+        inferred_k = None
 
-    N, num_features = features.shape[0], features.shape[-1]
+    N = adj.size(0)
+    num_features = features.shape[-1]
 
-    edge_index = adj.coalesce().indices() if hasattr(adj, 'indices') else adj
-    edge_index = to_undirected(add_remaining_self_loops(edge_index)[0])
-    new_values = torch.ones(edge_index.size(1), device=device)
-    adj_sparse = SparseTensor(row=edge_index[0].to(device), col=edge_index[1].to(device), value=new_values, sparse_sizes=(N, N))
+    if isinstance(adj, torch.Tensor) and adj.layout == torch.sparse_coo:
+        edge_index = adj.coalesce().indices().cpu()
+    else:
+        edge_index = torch.nonzero(adj.cpu(), as_tuple=False).t().contiguous()
+
+    edge_index = add_remaining_self_loops(edge_index, num_nodes=N)[0]
+    edge_index = to_undirected(edge_index, num_nodes=N).contiguous()
+
+    new_values = torch.ones(edge_index.size(1), dtype=torch.float32)
+    adj_sparse = SparseTensor(
+        row=edge_index[0],
+        col=edge_index[1],
+        value=new_values,
+        sparse_sizes=(N, N),
+    )
     time_e = time.time()
     if timing_info is not None:
         timing_info['conversion_time'] = time_e - time_s
@@ -135,17 +259,17 @@ def magi(adj : torch.Tensor,
                                    batch_size=args.batchsize,
                                    shuffle=True,
                                    drop_last=True,
-                                   num_workers=0,
+                                   num_workers=4,
                                    num_nodes=N)
 
     test_loader = NeighborSampler(edge_index, adj_sparse,
                                   is_train=False,
                                   node_idx=all_nodes,
                                   sizes=size,
-                                  batch_size=512,
+                                  batch_size=2048,
                                   shuffle=False,
                                   drop_last=False,
-                                  num_workers=0,
+                                  num_workers=4,
                                   num_nodes=N)
 
     encoder = Encoder(num_features, hidden_channels=hidden,
@@ -161,26 +285,50 @@ def magi(adj : torch.Tensor,
         labels = torch.arange(num_nodes)
 
     model.train()
+
     for epoch in range(args.epochs):
-        total_loss = 0
+        total_loss = 0.0
         batches = 0
-        for (batch_size, n_id, adjs), adj_batch, batch in train_loader:
+
+        for step, ((batch_size, n_id, adjs), adj_batch, batch) in enumerate(train_loader):
             adjs = [adjs] if len(hidden) == 1 else adjs
             adjs = [adj.to(device) for adj in adjs]
             adj_mask = get_mask(adj_batch)
-            optimizer.zero_grad()
-            out = model(features[n_id], adjs=adjs)
+
+            optimizer.zero_grad(set_to_none=True)
+
+            batch_x = get_batch_features(
+                features=features,
+                n_id=n_id,
+                num_features=num_features,
+                device=device,
+                identity_features=identity_features,
+            )
+            out = model(batch_x, adjs=adjs)
             out = F.normalize(out, p=2, dim=1)
+
+            if not torch.isfinite(out).all():
+                raise RuntimeError(f"Non-finite out at epoch={epoch}, step={step}")
+
             loss = model.loss(out, adj_mask)
+
+            if not torch.isfinite(loss):
+                raise RuntimeError(f"Non-finite loss at epoch={epoch}, step={step}")
+
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
-            total_loss += loss.item()
+            total_loss += loss.detach().item()
             batches += 1
 
-            print(f'(T) | Epoch {epoch:02d}, loss: {loss:.4f}, examples: {batch_size:d}')
-                      
-        avg_loss = total_loss / batches if batches > 0 else 0
+            # при желании лог раз в N шагов:
+            # if step % 50 == 0:
+            #     print(f"(T) | Epoch {epoch:02d}, step: {step:04d}, loss: {loss.detach().item():.4f}")
+
+        avg_loss = total_loss / batches if batches > 0 else 0.0
+
+            
 
     model.eval()
     z_all = torch.zeros((N, hidden[-1]), device=device)
@@ -188,11 +336,18 @@ def magi(adj : torch.Tensor,
         for (batch_size, n_id, adjs), _, batch in test_loader:
             adjs = [adjs] if len(hidden) == 1 else adjs
             adjs = [adj.to(device) for adj in adjs]
-            out = model(features[n_id], adjs=adjs)
+            batch_x = get_batch_features(
+                features=features,
+                n_id=n_id,
+                num_features=num_features,
+                device=device,
+                identity_features=identity_features,
+            )
+            out = model(batch_x, adjs=adjs)
             z_all[n_id[:batch_size]] = out
 
     embeddings = F.normalize(z_all, p=2, dim=1)
-
+    """
     if inferred_k is not None and inferred_k > 0:
         pred_labels, _ = clustering(
             feature=embeddings,
@@ -219,8 +374,189 @@ def magi(adj : torch.Tensor,
             new_labels = torch.tensor(new_labels, dtype=torch.long, device=device)
         else:
             new_labels = new_labels.to(dtype=torch.long, device=device)
+    """
 
+    num_points = embeddings.size(0)
+
+    if embeddings.ndim == 1:
+        embeddings = embeddings.unsqueeze(0)
+        num_points = 1
+
+    if num_points <= 1:
+        return torch.zeros(num_points, dtype=torch.long, device=device)
+
+    if inferred_k is None:
+        inferred_k = estimate_k_eigengap_sparse_embeddings(
+            embeddings=embeddings,
+            k_max=min(30, num_points - 1),
+            knn_k=min(20, max(2, num_points - 1)),
+            metric="cosine",
+            mutual=False,
+        )
+        print(f"Estimated number of clusters by sparse eigengap: k={inferred_k}")
+
+    inferred_k = int(max(1, min(inferred_k, num_points)))
+
+    if inferred_k == 1:
+        return torch.zeros(num_points, dtype=torch.long, device=device)
+
+    pred_labels, _ = clustering(
+        feature=embeddings,
+        n_clusters=inferred_k,
+        kmeans_device=args.kmeans_device,
+        batch_size=args.kmeans_batch,
+        tol=1e-4,
+        device=device,
+        spectral_clustering=False,
+    )
+    new_labels = torch.as_tensor(pred_labels, dtype=torch.long, device=device)
     return new_labels
+
+def estimate_k_eigengap_sparse_embeddings(
+    embeddings: torch.Tensor,
+    k_max: int = 30,
+    knn_k: int = 20,
+    metric: str = "cosine",
+    mutual: bool = False,
+    zero_tol: float = 1e-6,
+) -> int:
+    """
+    Sparse eigengap estimation on embeddings.
+
+    Steps:
+    1) build sparse kNN similarity graph from embeddings
+    2) build normalized Laplacian L = I - D^{-1/2} W D^{-1/2}
+    3) compute several smallest eigenvalues
+    4) choose k by eigengap
+
+    Parameters
+    ----------
+    embeddings : torch.Tensor [N, D]
+    k_max : int
+        Maximum number of clusters to consider.
+    knn_k : int
+        Number of neighbors in sparse similarity graph.
+    metric : str
+        "cosine" or "euclidean"
+    mutual : bool
+        If True, use mutual kNN; otherwise symmetrize with max.
+    zero_tol : float
+        Threshold for detecting zero eigenvalues.
+
+    Returns
+    -------
+    int
+        Estimated number of clusters.
+    """
+    x = embeddings.detach().float().cpu().numpy()
+    n = x.shape[0]
+
+    if n <= 1:
+        return 1
+    if n == 2:
+        return 2
+
+    k_max = max(2, min(k_max, n - 1))
+    knn_k = max(2, min(knn_k, n - 1))
+
+    if metric == "cosine":
+        norms = np.linalg.norm(x, axis=1, keepdims=True)
+        norms = np.clip(norms, 1e-12, None)
+        x = x / norms
+
+    nn = NearestNeighbors(
+        n_neighbors=knn_k + 1,
+        metric=metric,
+        algorithm="auto",
+        n_jobs=-1,
+    )
+    nn.fit(x)
+
+    # sparse distance graph
+    W = nn.kneighbors_graph(x, mode="distance")
+    W = W.tocsr()
+
+    # remove self-loops from kNN stage
+    W.setdiag(0.0)
+    W.eliminate_zeros()
+
+    # distance -> similarity
+    if W.nnz == 0:
+        return 1
+
+    if metric == "cosine":
+        # cosine distance in sklearn = 1 - cosine_similarity
+        W.data = 1.0 - W.data
+    elif metric == "euclidean":
+        sigma = np.median(W.data)
+        sigma = max(float(sigma), 1e-12)
+        W.data = np.exp(-(W.data ** 2) / (2.0 * sigma * sigma))
+    else:
+        raise ValueError(f"Unsupported metric: {metric}")
+
+    W.data = np.clip(W.data, 0.0, None)
+    W.eliminate_zeros()
+
+    # symmetrization
+    if mutual:
+        W = W.minimum(W.T).tocsr()
+    else:
+        W = W.maximum(W.T).tocsr()
+
+    if W.nnz == 0:
+        return 1
+
+    degrees = np.asarray(W.sum(axis=1)).ravel()
+    d_inv_sqrt = np.zeros_like(degrees, dtype=np.float64)
+    mask = degrees > 0
+    d_inv_sqrt[mask] = 1.0 / np.sqrt(degrees[mask])
+
+    D_inv_sqrt = sp.diags(d_inv_sqrt, format="csr")
+    I = sp.eye(n, format="csr", dtype=np.float64)
+    L = I - D_inv_sqrt @ W @ D_inv_sqrt
+
+    # how many eigenvalues to compute
+    n_eigs = min(k_max + 1, n - 1)
+    if n_eigs < 2:
+        return 1
+
+    try:
+        evals = eigsh(L, k=n_eigs, which="SM", return_eigenvectors=False)
+    except Exception:
+        # safe fallback
+        return min(2, n)
+
+    evals = np.sort(np.real(evals))
+    evals = np.clip(evals, 0.0, None)
+
+    # if graph is nearly disconnected, multiplicity of zero eigenvalue is informative
+    n_zero = int(np.sum(evals < zero_tol))
+    if n_zero >= 2:
+        return min(n_zero, k_max)
+
+    gaps = np.diff(evals)
+    if gaps.size == 0:
+        return 1
+
+    k_hat = int(np.argmax(gaps) + 1)
+    return max(1, min(k_hat, k_max))
+
+def estimate_k_eigengap(embeddings: torch.Tensor, k_max: int = 30):
+    x = embeddings.detach()
+    x = torch.nn.functional.normalize(x, dim=1)
+
+    sim = x @ x.T
+    sim = torch.clamp(sim, min=0)
+
+    deg = sim.sum(dim=1)
+    D_inv_sqrt = torch.diag(1.0 / torch.sqrt(deg + 1e-8))
+    L = torch.eye(sim.size(0), device=sim.device) - D_inv_sqrt @ sim @ D_inv_sqrt
+
+    evals = torch.linalg.eigvalsh(L)
+    evals = evals[:k_max + 1]
+    gaps = evals[1:] - evals[:-1]
+    k = int(torch.argmax(gaps[:k_max - 1]).item()) + 1
+    return k
 
 
 def find_best_k_with_modularity(adj_sparse : torch.Tensor,
@@ -258,9 +594,18 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
     best_modularity = -float('inf')
     best_labels = None
 
+    row, col, val = adj_sparse.coo()
+    size = adj_sparse.sizes()
+    adj_torch = torch.sparse_coo_tensor(
+        torch.stack([row, col], dim=0),
+        val,
+        size=size,
+        device=val.device
+    ).coalesce()
+
     for k in k_range:
         pred_labels, cluster_centers = clustering(
-            feature = embeddings,
+            feature=embeddings,
             n_clusters=k,
             kmeans_device=device.type,
             batch_size=-1,
@@ -269,24 +614,7 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
             spectral_clustering=False
         )
 
-        """
-        if cluster_centers is not None:
-            dists = torch.cdist(embeddings, cluster_centers.to(device))
-            assignments = torch.softmax(-dists, dim=1)
-        else:
-            assignments = torch.nn.functional.one_hot(torch.tensor(pred_labels, device=device), num_classes=k).float()
-        """
-        
-        row, col, val = adj_sparse.coo() 
-        size = adj_sparse.sizes()
-        adj_torch = torch.sparse_coo_tensor(
-            torch.stack([row, col], dim=0),
-            val,
-            size=size,
-            device=val.device
-        ).coalesce()
-        common_device = adj_torch.device
-        assignments = torch.as_tensor(pred_labels, device=common_device, dtype=torch.int64)
+        assignments = torch.as_tensor(pred_labels, device=adj_torch.device, dtype=torch.long)
         mod = Metrics.modularity(adj_torch, assignments)
 
         print(f"Modularity for k={k}: {mod:.4f}")
@@ -296,7 +624,6 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
             best_k = k
             best_labels = pred_labels
 
-    print(f"Best k={best_k} with modularity {best_modularity:.4f}")
     return best_k, best_labels
 
 
@@ -390,7 +717,7 @@ def main():
     new_labels = magi(
         adj,
         features,
-        epochs=args.epochs,
+        n_epochs=args.epochs,
         batchsize=args.batchsize,
         n_clusters=args.n_clusters,
     )

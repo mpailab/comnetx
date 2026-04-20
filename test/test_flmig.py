@@ -22,7 +22,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"
 from datasets import Dataset
 from baselines.flmig import flmig_adopted, PROJECT_PATH
 
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 
 def list_small_datasets():
     out = []
@@ -89,11 +89,12 @@ def load_konect_info():
 def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
     info = load_konect_info()
+    KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
     datasets = {}
     for name in info.keys():
         path = os.path.join(KONECT_PATH, name)
         if os.path.exists(path):
-            datasets[name] = Dataset(name, KONECT_PATH)
+            datasets[name] = Dataset(name)
     return datasets
 
 KONECT_DATASETS = get_all_konect_datasets()
@@ -105,7 +106,7 @@ KONECT_DATASETS = get_all_konect_datasets()
     ids=list(KONECT_DATASETS.keys())
 )
 def test_flmig_konect_dataset(name):
-    dataset = Dataset(name, path=KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     
@@ -150,7 +151,7 @@ def test_flmig_konect_dataset(name):
  
 def test_flmig_single_konect_dataset():
     name = "munmun_digg_reply"
-    dataset = Dataset(name, KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load(tensor_type="coo")
     adj = adj.coalesce()
     

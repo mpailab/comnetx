@@ -121,10 +121,15 @@ def test_load_wiki_talk_ht_dataset(temp_dataset_dir, monkeypatch):
 
     assert isinstance(tensor, torch.Tensor)
     assert tensor.is_sparse
-    assert tensor.shape[0] == tensor.shape[1]
+    if tensor.ndim == 2:  # static
+        assert tensor.shape[0] == tensor.shape[1]
+    elif tensor.ndim == 3:  # dynamic (T,N,N)
+        assert tensor.shape[1] == tensor.shape[2]
+    else:
+        pytest.fail(f"Unexpected tensor shape: {tensor.shape}")
 
 @pytest.mark.short
-def test_tensor_dense_output(temp_dataset_dir):
+def test_tensor_dense_output(temp_dataset_dir, monkeypatch):
     temp_path = Path(temp_dataset_dir)
     download_and_process_magi("Cora", str(temp_path))
     
@@ -134,7 +139,7 @@ def test_tensor_dense_output(temp_dataset_dir):
     paths_file.write_text(json.dumps({"small": str(temp_path)}))
     
     monkeypatch.setattr("datasets.INFO", paths_dir)
-    loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+    loader = Dataset(dataset_name="Cora", paths_config=str(paths_file))
     tensor, features, label = loader.load(tensor_type="dense")
 
     assert isinstance(tensor, torch.Tensor)
@@ -160,7 +165,7 @@ def test_tensor_csr_output(temp_dataset_dir, monkeypatch):
     assert tensor.shape[0] == tensor.shape[1]
 
 @pytest.mark.short
-def test_tensor_csc_output(temp_dataset_dir):
+def test_tensor_csc_output(temp_dataset_dir, monkeypatch):
     temp_path = Path(temp_dataset_dir)
     download_and_process_magi("Cora", str(temp_path))
     
@@ -170,7 +175,7 @@ def test_tensor_csc_output(temp_dataset_dir):
     paths_file.write_text(json.dumps({"small": str(temp_path)}))
     
     monkeypatch.setattr("datasets.INFO", paths_dir)
-    loader = Dataset(dataset_name="Citeseer", path=temp_dataset_dir)
+    loader = Dataset(dataset_name="Cora", paths_config=str(paths_file))
     tensor, features, label = loader.load(tensor_type="csc")
 
     assert isinstance(tensor, torch.Tensor)
@@ -191,25 +196,53 @@ def test_exist_small_datasets():
         assert ds.label is not None
 
 @pytest.mark.short
-def test_invalid_tensor_type(temp_dataset_dir):
-    download_and_process_magi("Cora", temp_dataset_dir)
-    loader = Dataset(dataset_name="Cora", path=temp_dataset_dir)
+def test_invalid_tensor_type(temp_dataset_dir, monkeypatch):
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
+    loader = Dataset(dataset_name="Cora", paths_config=str(paths_file))
     with pytest.raises(ValueError, match="Unsupported tensor type"):
         loader.load(tensor_type="invalid")
 
 @pytest.mark.short
-def test_unsupported_dataset(temp_dataset_dir):
-    loader = Dataset(dataset_name="unsupported-ds", path=temp_dataset_dir)
-    with pytest.raises(ValueError, match="Unsupported dataset"):
+def test_unsupported_dataset(temp_dataset_dir, monkeypatch):
+    temp_path = Path(temp_dataset_dir)
+    download_and_process_magi("Cora", str(temp_path))
+    
+    paths_dir = temp_path / "datasets-info"
+    paths_dir.mkdir(exist_ok=True)
+    paths_file = paths_dir / "paths.json"
+    paths_file.write_text(json.dumps({"small": str(temp_path)}))
+    
+    monkeypatch.setattr("datasets.INFO", paths_dir)
+    with pytest.raises(ValueError, match="Dataset 'unsupported-ds' not in konect.json/magi.json and no pattern match."):
+        loader = Dataset("unsupported-ds")
         loader.load()
 
 @pytest.mark.short
-def test_load_prgpt_static_dataset():
+def test_load_prgpt_static_dataset(tmp_path, monkeypatch):
     # ---------- STATIC ----------
-    ds = Dataset(
-        dataset_name="static_5_100000_2.5_3.0",
-        path=PRGPT_DIR
-    )
+    prgpt_dir = Path(PRGPT_DIR)
+    dataset_name = "static_5_100000_2.5_3.0"
+
+    info_dir = tmp_path / "datasets-info"
+    info_dir.mkdir()
+
+    test_paths_file = info_dir / "paths.json"
+    test_paths_file.write_text(json.dumps({"dyn_sbm": str(prgpt_dir)}))
+
+    dyn_sbm_path = info_dir / "dyn_sbm.json"
+    dyn_sbm_path.write_text(json.dumps([dataset_name.lower()]))
+
+    monkeypatch.setattr("datasets.INFO", info_dir)
+
+    ds = Dataset(dataset_name, paths_config=str(test_paths_file))
     adj, features, labels = ds.load(tensor_type="coo")
 
     assert adj is not None, "self.adj None"
@@ -424,13 +457,26 @@ def test_local_wiki_attr_graph_full_pipeline():
     print(f"✅ wiki: {adj.shape[0]}n/{adj._nnz()}e → {ds.dataset_root}")
 
 @pytest.mark.short
-def test_load_existing_cora_dynamic_konect():
+def test_load_existing_cora_dynamic_konect(tmp_path, monkeypatch):
     """Тест cora dynamic out.cora.*_batches (small → konect формат)."""
     
-    info_dir = Path(__file__).parent.parent / "datasets-info"
-    paths_data = json.loads((info_dir / "paths.json").read_text())
+    #info_dir = Path(__file__).parent.parent / "datasets-info"
+    #paths_data = json.loads((info_dir / "paths.json").read_text())
     cora_dir = Path("/auto/datasets/graphs/dyn_atr_datasets/cora")
+    info_dir = tmp_path / "datasets-info"  # ← В tmp_path!
+    info_dir.mkdir()
     
+    test_paths_file = info_dir / "test_paths.json"
+    test_paths_file.write_text(json.dumps({"dynamic_konect": str(cora_dir.parent)}))
+    
+    # 2. konect.json (создай, не читай!)
+    konect_path = info_dir / "konect.json"
+    konect_data = {"cora": {"d": "undirected", "n": 2708, "m": 5429, "w": "unweighted"}}
+    konect_path.write_text(json.dumps(konect_data, indent=2))  # ← Создай сразу!
+    
+    # 3. Monkeypatch
+    monkeypatch.setattr("datasets.INFO", info_dir)
+
     dataset_name = "cora"
     strategies = ["1", "10", "100", "1000"]
     
@@ -440,29 +486,21 @@ def test_load_existing_cora_dynamic_konect():
         batch_file = cora_dir / f"out.{dataset_name}.{bs}_batches"
         assert batch_file.exists(), f"{batch_file} отсутствует — запустите save_small_datasets_in_konect_format()"
     
-    konect_path = info_dir / "konect.json"
-    konect_backup = info_dir / "konect.json.backup"
-    konect_data = json.loads(konect_path.read_text())
-
-    shutil.copy2(konect_path, konect_backup)
-    konect_data["cora"] = {"d": "undirected", "n": 2708, "m": 5429, "w": "unweighted"}
-    konect_path.write_text(json.dumps(konect_data, indent=2))
-    
-    paths_data["dynamic_konect"] = str(cora_dir.parent)
-    (info_dir / "paths.json").write_text(json.dumps(paths_data, indent=2))
+    #paths_data["dynamic_konect"] = str(cora_dir.parent)
+    #(info_dir / "paths.json").write_text(json.dumps(paths_data, indent=2))
     
     try:
         for bs in strategies:
             print(f"  → {bs}_batches")
             
-            ds = Dataset(dataset_name, str(info_dir / "paths.json"))
+            ds = Dataset(dataset_name, paths_config=str(test_paths_file))
             adj, feat, lbl = ds.load("coo", batches_strategy=bs)
             
             assert ds.dataset_format == "dynamic_konect"
             assert ds.is_directed is False
             
             if bs == "1":
-                assert adj.dim() == 2 and adj.shape == (2708, 2708)
+                assert adj.dim() == 3 and adj.shape == (1, 2708, 2708)
                 assert adj._nnz() == 10556
             else:
                 assert adj.dim() == 3
@@ -473,8 +511,6 @@ def test_load_existing_cora_dynamic_konect():
             print(f"     ✓ L={adj.shape[0] if adj.dim()==3 else 1}, E={adj._nnz()}")
     
     finally:
-        if konect_backup.exists():
-            shutil.move(konect_backup, konect_path)
         print("\ncora dynamic_konect: все стратегии OK!")
 
 def collect_dynamic_attr_datasets():

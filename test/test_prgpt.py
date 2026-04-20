@@ -10,7 +10,7 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from baselines.rough_PRGPT import rough_prgpt, to_com_tensor
-from datasets import Dataset, KONECT_PATH
+from datasets import Dataset
 KONECT_INFO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets-info"))
 
 def load_konect_info():
@@ -33,10 +33,11 @@ def get_all_konect_datasets():
     """Return a dict {dataset_name: Dataset object}."""
     info = load_konect_info()
     datasets = {}
+    KONECT_PATH = "/auto/datasets/graphs/dynamic_konect_project_datasets"
     for name in info.keys():
         path = os.path.join(KONECT_PATH, name)
         if os.path.exists(path):
-            datasets[name] = Dataset(name, KONECT_PATH)
+            datasets[name] = Dataset(name)
     return datasets
 
 KONECT_DATASETS = get_all_konect_datasets()
@@ -48,7 +49,7 @@ KONECT_DATASETS = get_all_konect_datasets()
     ids=list(KONECT_DATASETS.keys())
 )
 def test_run_prgpt_isolated(name):
-    dataset = Dataset(name, path=KONECT_PATH)
+    dataset = Dataset(name)
     adj, features, labels = dataset.load()
     adj = adj.coalesce()
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -118,7 +119,7 @@ def test_rough_prgpt_on_konect(name, dataset):
 
 @pytest.fixture(scope="class")
 def custom_dataset():
-    ds = Dataset("europe_osm", KONECT_PATH)
+    ds = Dataset("europe_osm")
     ds.load()
     return ds
 
@@ -127,7 +128,7 @@ def test_rough_prgpt_infomap_on_custom(custom_dataset):
 
 @pytest.fixture(scope="class")
 def facebook_dataset():
-    ds = Dataset("facebook-wosn-links", KONECT_PATH)
+    ds = Dataset("facebook-wosn-links")
     ds.load()
     return ds
 
@@ -139,7 +140,7 @@ def test_rough_prgpt_locale_on_facebook(facebook_dataset):
 
 @pytest.fixture(scope="class")
 def chess_dataset():
-    ds = Dataset("chess", KONECT_PATH)
+    ds = Dataset("chess")
     ds.load()
     return ds
 
@@ -148,7 +149,7 @@ def test_rough_prgpt_locale_on_chess(chess_dataset):
 
 @pytest.fixture(scope="class")
 def convote_dataset():
-    ds = Dataset("convote", KONECT_PATH)
+    ds = Dataset("convote")
     ds.load()
     return ds
 

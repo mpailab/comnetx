@@ -196,5 +196,13 @@ baselines/GraphChallenge/
 results/*.json
 test/graphs/small_konect/
 test/*.json
+results/mfc/*.pkl
 
 neighborhood_analysis
+
+.codex
+.devcontainer
+.dockerignore
+Dockerfile
+docker-compose.yml
+AGENTS.md

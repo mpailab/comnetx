@@ -1,0 +1,31 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
+
+  "DATASETS": [
+    "dyn_acm",
+    "dyn_bat",
+    "dyn_dblp",
+    "dyn_eat",
+    "dyn_uat",
+    "dyn_wiki"
+  ],
+  "BATCHES": ["999:10"],
+
+  "BASELINES": ["magi"],
+  "MODES": ["naive", "smart"],
+
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["normalized"]
+  },
+
+  "BASELINE_ITERATIONS": [1, 10, 25],
+
+  "FEATURE_MODES": ["dataset", "onehot", "random"],
+  "RANDOM_FEATURE_DIM": 64,
+  "RANDOM_FEATURE_SEED": 42
+}

@@ -9,12 +9,11 @@ PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
 
 from baselines.leiden import sparse_tensor_to_igraph, leidenalg_partition
-from datasets import Dataset, KONECT_PATH
-from metrics import Metrics
+from datasets import Dataset
 
 @pytest.fixture(scope="class")
 def facebook_dataset():
-    ds = Dataset("facebook-wosn-links", KONECT_PATH)
+    ds = Dataset("facebook-wosn-links")
     ds.load()
     return ds
 
