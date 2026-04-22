@@ -8,7 +8,7 @@ from optimizer import Optimizer
 from our_utils import print_zone
 
 from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
-from baselines.dgc import ALG_CLASS, create_leiden
+from baselines.dgc import create_leiden
 
 def compute_initial_partition(
     batch,
@@ -59,7 +59,8 @@ def dynamic_launch(ds, batches_strategy,
 
     results = []
     is_special_strategy = ":" in str(batches_strategy)
-    init_batch_number = batches_strategy.split(":")[0]
+    if is_special_strategy:
+        init_batch_number = str(batches_strategy).split(":")[0]
     
     if dynamic_mode and underlying_static_method == "mfc":       
 

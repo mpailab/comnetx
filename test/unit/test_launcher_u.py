@@ -37,6 +37,7 @@ def _load_launcher(monkeypatch):
     stub.DFLeiden = _DummyDynamicAlgo
     stub.Leidenalg = _DummyDynamicAlgo
     stub.Networkit = _DummyDynamicAlgo
+    stub.AlgorithmOptions = type('AlgorithmOptions', (), {})
     monkeypatch.setitem(sys.modules, "dynamic_graphs_communities", stub)
 
     spec = importlib.util.spec_from_file_location(
