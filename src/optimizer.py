@@ -339,7 +339,7 @@ class Optimizer:
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
                 res = leidenalg_partition(adj, timing_info = timing_info)
-            elif self.method in ("ldleiden", "dfleiden", "networkit"):
+            elif self.method in ("ldleiden", "dfleiden"):
                 from baselines.dgc import _run_leiden
                 res = _run_leiden(self.method, adj, timing_info = timing_info)
             elif self.method == "dmon":
@@ -351,9 +351,9 @@ class Optimizer:
                     epochs=self.baseline_iter,
                     timing_info=timing_info,
                 )
-            # elif self.method == "networkit":
-            #     from baselines.network import networkit_partition
-            #     res = networkit_partition(adj, timing_info = timing_info)
+            elif self.method == "networkit":
+                 from baselines.network import networkit_partition
+                 res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "mfc":
                 from baselines.mfc import (
                     mfc_adopted,

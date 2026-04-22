@@ -31,6 +31,12 @@ MACHINE_DEFAULT = os.getenv('HOSTNAME')
 MACHINE_PARENT = os.getenv('PARENT_HOSTNAME') # задать в bash : export PARENT_HOSTNAME=<parent_hostname>
 MACHINE = MACHINE_PARENT if MACHINE_PARENT is not None else MACHINE_DEFAULT
 
+INIT_COMMUNITIES_DIR = {
+    "node69" : "/home/dev/communities",
+    "astra" : "/auto/datasets/"
+}
+CACHE_DIR = INIT_COMMUNITIES_DIR.get(MACHINE, None)
+
 # output
 VERBOSE = conf.get("VERBOSE", 1) # 0, 1, 2, 3
 CATCH_ERRORS = conf.get("CATCH_ERRORS", True)
@@ -229,7 +235,8 @@ def measure():
                                         smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
                                         verbose=VERBOSE,
                                         use_gpu=USE_GPU,
-                                        aggregation_mode=agg_mode_full   # передаём режим агрегации фичей
+                                        aggregation_mode=agg_mode_full,
+                                        cache_dir = CACHE_DIR
                                     )
                                 except Exception as e:
                                     if CATCH_ERRORS:

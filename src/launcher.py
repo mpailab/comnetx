@@ -2,17 +2,43 @@ import torch
 import json
 import os
 import time
+import numpy as np
 
 from optimizer import Optimizer
 from our_utils import print_zone
 
 from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
-ALG_CLASS = {
-    "leidenalg": Leidenalg,
-    "networkit": Networkit,
-    "ldleiden": LDLeiden,
-    "dfleiden": DFLeiden
-}
+from baselines.dgc import ALG_CLASS, create_leiden
+
+def compute_initial_partition(
+    batch,
+    dataset_name,
+    init_batch_number,
+    method_name = "leidenalg",
+    cache_dir = None
+):
+    if cache_dir is not None:
+        os.makedirs(cache_dir, exist_ok=True)
+        filename = os.path.join(
+            cache_dir, f"{dataset_name}_b:{init_batch_number}_by_{method_name}.npz"
+        )
+        # Если файл есть — загружаем
+        if os.path.exists(filename):
+            with np.load(filename, allow_pickle=True) as data:
+                init_partition = data["partition"]
+                init_mod = float(data["mod"])
+            return init_partition, init_mod
+
+    # Иначе вычисляем
+    temp_algo = create_leiden(method_name, batch)
+    temp_algo.apply()
+    init_partition = temp_algo.partition()
+    init_mod = temp_algo.modularity()
+
+    if cache_dir is not None:
+        np.savez_compressed(filename, partition=init_partition, mod=init_mod)
+
+    return init_partition, init_mod
 
 def dynamic_launch(ds, batches_strategy,
                     underlying_static_method: str,
@@ -22,7 +48,8 @@ def dynamic_launch(ds, batches_strategy,
                     smart_neighborhood_step: int = 1,
                     verbose: int = 1,
                     use_gpu: bool = False,
-                    aggregation_mode: str = "sum"):
+                    aggregation_mode: str = "sum",
+                    cache_dir = None):
 
     dataset_name = ds.name
     smart_mode = (mode == "smart")
@@ -32,14 +59,7 @@ def dynamic_launch(ds, batches_strategy,
 
     results = []
     is_special_strategy = ":" in str(batches_strategy)
-
-    # Для динамического режима подготовим переменные вне цикла
-    if dynamic_mode and not (underlying_static_method=="mfc"):
-        # Проверка поддерживаемого алгоритма
-        if underlying_static_method in ALG_CLASS:
-            algo_class = ALG_CLASS[underlying_static_method]
-        else:
-            raise ValueError(f"Dynamic mode not supported for {underlying_static_method}")
+    init_batch_number = batches_strategy.split(":")[0]
     
     if dynamic_mode and underlying_static_method == "mfc":       
 
@@ -57,10 +77,10 @@ def dynamic_launch(ds, batches_strategy,
 
             # --- Обработка специальной стратегии (":") для динамического режима ---
             if dynamic_mode and is_special_strategy and i == 0:
-                temp_algo = LDLeiden(batch, directed=ds.is_directed)
-                temp_algo.apply()  # выполняем разбиение
-                initial_partition = temp_algo.partition()
-                init_mod = temp_algo.modularity()
+                init_partition, init_mod = compute_initial_partition(batch,
+                                                                     dataset_name, init_batch_number,
+                                                                     "leidenalg",
+                                                                     cache_dir)
                 with print_zone(verbose >= 1):
                     print(f"Initial modularity: {init_mod:.2g}")
             
@@ -72,7 +92,7 @@ def dynamic_launch(ds, batches_strategy,
                             return_labels=True,
                             num_epoch=baseline_iter,
                             pure_mfc=True,
-                            initial_partition=initial_partition,
+                            initial_partition=init_partition,
                         )
                 
                 time_e = time.time()
@@ -101,23 +121,21 @@ def dynamic_launch(ds, batches_strategy,
 
             # --- Обработка специальной стратегии (":") для динамического режима ---
             if dynamic_mode and is_special_strategy and i == 0:
-                temp_algo = LDLeiden(batch, directed=ds.is_directed)
-                temp_algo.apply()  # выполняем разбиение
-                initial_partition = temp_algo.partition()
-                mod = temp_algo.modularity()
+                init_partition, init_mod = compute_initial_partition(batch,
+                                                                     dataset_name, init_batch_number,
+                                                                     "leidenalg",
+                                                                     cache_dir)
                 with print_zone(verbose >= 1):
-                    print(f"Initial modularity: {mod:.2g}")
+                    print(f"Initial modularity: {init_mod:.2g}")
 
-                algo = algo_class(batch,
-                                directed=ds.is_directed,
-                                partition=initial_partition)
+                algo = create_leiden(underlying_static_method, batch, partition=init_partition)
                 # FIXME тут apply() не нужен, но без него ниже падает с
                 # segmentation fault.
                 algo.apply()
                 continue
             elif dynamic_mode and not is_special_strategy and i == 0:
                 # Обычный случай: создаём алгоритм без начального разбиения
-                algo = algo_class(batch, directed=ds.is_directed, partition=None)
+                algo = create_leiden(underlying_static_method, batch, partition=None)
 
             # --- Если режим динамический, обрабатываем батч через algo ---
             if dynamic_mode:
@@ -144,19 +162,17 @@ def dynamic_launch(ds, batches_strategy,
                                 use_gpu=use_gpu,
                                 aggregation_mode=aggregation_mode)
                 if is_special_strategy:
-                    opt.method = "ldleiden"
-                    n = opt.nodes_num
-                    l = opt.subcoms_depth
-                    coms = opt.local_algorithm(opt.adj, opt.features)
-                    coms = coms.repeat(l).reshape((l, n))
+                    init_partition, init_mod = compute_initial_partition(batch,
+                                                                         dataset_name, init_batch_number,
+                                                                         "leidenalg",
+                                                                         cache_dir)
+                    n, l = opt.nodes_num, opt.subcoms_depth
+                    coms = torch.as_tensor(init_partition, dtype=torch.long).repeat(l).reshape((l, n))
                     opt.set_communities(communities = coms)
-                    opt.method = underlying_static_method
-                    opt.local_algorithm_calls = 0
-                    mod = opt.modularity(directed = ds.is_directed)
                     with print_zone(verbose >= 1):
-                        print(f"Initial modularity: {mod:.2g}")
+                        print(f"Initial modularity: {init_mod:.2g}")
                     continue
-                elif smart_mode:
+                if smart_mode:
                     if batch.is_sparse:
                         batch_idx = (
                             batch.indices()
