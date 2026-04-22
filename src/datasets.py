@@ -368,7 +368,7 @@ class Dataset:
         """Загрузка temporal graph clustering (TGC) датасетов из npy/joblib."""
         dname = self.name.lower()
         load_dir = os.path.join(self.dataset_root, dname)
-        
+
         if ":" in batches_strategy:  # p:n стратегия
             p_str, n_str = batches_strategy.split(":")
             p, n = int(p_str), int(n_str)
@@ -379,21 +379,22 @@ class Dataset:
 
         feat_file = os.path.join(load_dir, f"{dname}_feat.npy")
         label_file = os.path.join(load_dir, f"{dname}_label.npy")
-        
+
         if not all(os.path.exists(f) for f in [label_file, adj_file]):
             raise FileNotFoundError(
                 f"Для стратегии {batches_strategy} файлы TGC отсутствуют в {load_dir}. "
                 f"Нужны как минимум label и adjacency. Запустите: python src/download.py {dname}"
             )
 
-        features_np = build_features_or_one_hot(features, num_nodes, dname)
-        np.save(os.path.join(save_dir, f"{dname}_feat.npy"), features_np)
+        self.features = None
+        if os.path.exists(feat_file):
+            self.features = torch.tensor(np.load(feat_file), dtype=torch.float)
 
         self.label = torch.tensor(np.load(label_file), dtype=torch.long)
-        
+
         adj_data = joblib.load(adj_file)
-        t, i, j = adj_data['indices']
-        w = adj_data['values']
+        t, i, j = adj_data["indices"]
+        w = adj_data["values"]
         self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
 
     def _load_prgpt_dataset(self, dataset_type='static',
