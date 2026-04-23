@@ -9,6 +9,8 @@ from our_utils import print_zone
 
 from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
 from baselines.dgc import create_leiden
+from baselines.mfc import mfc_adopted
+from metrics import Metrics
 
 def compute_initial_partition(
     batch,
