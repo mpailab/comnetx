@@ -32,7 +32,7 @@ MACHINE_PARENT = os.getenv('PARENT_HOSTNAME') # задать в bash : export PA
 MACHINE = MACHINE_PARENT if MACHINE_PARENT is not None else MACHINE_DEFAULT
 
 INIT_COMMUNITIES_DIR = {
-    "node69" : "/home/dev/communities",
+    "cn69" : "/home/dev/communities",
     "astra" : "/auto/datasets/"
 }
 CACHE_DIR = INIT_COMMUNITIES_DIR.get(MACHINE, None)
