@@ -30,7 +30,11 @@ class Optimizer:
             n is the number of nodes.
 
         aggregation_mode : str
-            Pattern aggregation mode. Supported values: "sum", "normalized".
+            Feature aggregation mode. Supported values: "sum", "normalized".
+            The aggregated adjacency matrix is always computed by summing edge
+            weights between communities. This parameter only controls feature
+            aggregation: "sum" keeps per-community feature sums, while
+            "normalized" divides them by community size.
         """
        
         self.size = adj_matrix.size()
@@ -82,15 +86,6 @@ class Optimizer:
                 f"Expected one of: {supported}."
             )
         return aliases[mode]
-
-    @staticmethod
-    def _normalized_aggregation_pattern_values(
-        counts: torch.Tensor,
-        inverse: torch.Tensor,
-        dtype: torch.dtype,
-    ) -> torch.Tensor:
-        community_weights = counts.to(dtype=dtype).reciprocal()
-        return community_weights.index_select(0, inverse)
 
     @staticmethod
     def _is_sparse_identity(features: torch.Tensor) -> bool:
@@ -344,7 +339,7 @@ class Optimizer:
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
                 res = leidenalg_partition(adj, timing_info = timing_info)
-            elif self.method in ("ldleiden", "dfleiden", "networkit"):
+            elif self.method in ("ldleiden", "dfleiden"):
                 from baselines.dgc import _run_leiden
                 res = _run_leiden(self.method, adj, timing_info = timing_info)
             elif self.method == "dmon":
@@ -356,9 +351,9 @@ class Optimizer:
                     epochs=self.baseline_iter,
                     timing_info=timing_info,
                 )
-            # elif self.method == "networkit":
-            #     from baselines.network import networkit_partition
-            #     res = networkit_partition(adj, timing_info = timing_info)
+            elif self.method == "networkit":
+                 from baselines.network import networkit_partition
+                 res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "mfc":
                 from baselines.mfc import (
                     mfc_adopted,
@@ -527,7 +522,8 @@ class Optimizer:
                     device=ext_features.device,
                 )
                 aggr_features.index_add_(0, inverse, ext_features)
-                aggr_features /= counts.to(dtype=ext_features.dtype).unsqueeze(1)
+                if self.aggregation_mode == "normalized":
+                    aggr_features /= counts.to(dtype=ext_features.dtype).unsqueeze(1)
 
             # Apply local algorithm for aggregated graph
             coms = self.local_algorithm(aggr_adj, aggr_features, l > 0).to(
