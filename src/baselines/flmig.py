@@ -135,7 +135,7 @@ def flmig_adopted(
         timing_info: dict | None — сюда накапливаем conversion_time.
     """
     if Number_iter is None:
-        Number_iter = 20
+        Number_iter = 1
     if timing_info is None:
         timing_info = {}
 
