@@ -1,0 +1,14 @@
+{
+    "dyn_wiki": 0.77,
+    "dyn_blogcatalog": 0.37,
+    "dyn_wikics": 0.65,
+    "dyn_coauthorcs": 0.76,
+    "dyn_pubmed": 0.78,
+    "dyn_coauthorphysics": 0.69,
+    "dyn_nell": 0.84,
+    "dyn_acm": 0.82,
+    "dyn_bat": 0.28,
+    "dyn_citeseer": 0.89,
+    "dyn_cora": 0.82,
+    "dyn_dblp": 0.87
+}
