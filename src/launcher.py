@@ -16,29 +16,32 @@ def compute_initial_partition(
     batch,
     dataset_name,
     init_batch_number,
-    method_name = "leidenalg",
-    cache_dir = None
+    method_name="leidenalg",
+    cache_dir=None,
+    to_tensor_format=True
 ):
+    loaded = False
     if cache_dir is not None:
         os.makedirs(cache_dir, exist_ok=True)
         filename = os.path.join(
             cache_dir, f"{dataset_name}_b:{init_batch_number}_by_{method_name}.npz"
         )
-        # Если файл есть — загружаем
         if os.path.exists(filename):
             with np.load(filename, allow_pickle=True) as data:
                 init_partition = data["partition"]
                 init_mod = float(data["mod"])
-            return init_partition, init_mod
+            loaded = True
 
-    # Иначе вычисляем
-    temp_algo = create_leiden(method_name, batch)
-    temp_algo.apply()
-    init_partition = temp_algo.partition()
-    init_mod = temp_algo.modularity()
+    if not loaded:
+        temp_algo = create_leiden(method_name, batch)
+        temp_algo.apply()
+        init_partition = temp_algo.partition()
+        init_mod = temp_algo.modularity()
+        if cache_dir is not None:
+            np.savez_compressed(filename, partition=init_partition, mod=init_mod)
 
-    if cache_dir is not None:
-        np.savez_compressed(filename, partition=init_partition, mod=init_mod)
+    if to_tensor_format:
+        init_partition = torch.as_tensor(init_partition, dtype=torch.long)
 
     return init_partition, init_mod
 
@@ -70,12 +73,13 @@ def dynamic_launch(ds, batches_strategy,
         labels = ds.label
         if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
             labels = labels.squeeze(0)
-        initial_partition = None
         if is_special_strategy:
             first_snapshot = ds.adj[0]
+            init_partition = None
             init_partition, init_mod = compute_initial_partition(first_snapshot,
-                                        dataset_name, init_batch_number,
-                                        "leidenalg",cache_dir)
+                                                                 dataset_name, init_batch_number,
+                                                                 "leidenalg",
+                                                                 cache_dir)
             with print_zone(verbose >= 1):
                 print(f"Initial modularity: {init_mod:.2g}")
         
@@ -87,7 +91,7 @@ def dynamic_launch(ds, batches_strategy,
                         return_labels=True,
                         num_epoch=baseline_iter,
                         pure_mfc=True,
-                        initial_partition=initial_partition,
+                        initial_partition=init_partition,
                     )
             
             time_e = time.time()
@@ -161,7 +165,7 @@ def dynamic_launch(ds, batches_strategy,
                                                                          "leidenalg",
                                                                          cache_dir)
                     n, l = opt.nodes_num, opt.subcoms_depth
-                    coms = torch.as_tensor(init_partition, dtype=torch.long).repeat(l).reshape((l, n))
+                    coms = init_partition.repeat(l).reshape((l, n))
                     opt.set_communities(communities = coms)
                     with print_zone(verbose >= 1):
                         print(f"Initial modularity: {init_mod:.2g}")
