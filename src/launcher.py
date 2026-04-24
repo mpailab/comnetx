@@ -70,12 +70,9 @@ def dynamic_launch(ds, batches_strategy,
     if dynamic_mode and underlying_static_method == "mfc":       
         
         time_s = time.time()
-        labels = ds.label
-        if labels is not None and labels.dim() == 2 and labels.size(0) == 1:
-            labels = labels.squeeze(0)
+        init_partition = None
         if is_special_strategy:
-            first_snapshot = ds.adj[0]
-            init_partition = None
+            first_snapshot = ds.adj[0] 
             init_partition, init_mod = compute_initial_partition(first_snapshot,
                                                                  dataset_name, init_batch_number,
                                                                  "leidenalg",
@@ -86,7 +83,7 @@ def dynamic_launch(ds, batches_strategy,
         with print_zone(verbose >= 2):
             coms = mfc_adopted(
                         adj=ds.adj,
-                        labels=labels,
+                        labels=None,
                         network_type="MFC",
                         return_labels=True,
                         num_epoch=baseline_iter,
