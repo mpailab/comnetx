@@ -9,34 +9,39 @@ from our_utils import print_zone
 
 from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
 from baselines.dgc import create_leiden
+from baselines.mfc import mfc_adopted
+from metrics import Metrics
 
 def compute_initial_partition(
     batch,
     dataset_name,
     init_batch_number,
-    method_name = "leidenalg",
-    cache_dir = None
+    method_name="leidenalg",
+    cache_dir=None,
+    to_tensor_format=True
 ):
+    loaded = False
     if cache_dir is not None:
         os.makedirs(cache_dir, exist_ok=True)
         filename = os.path.join(
             cache_dir, f"{dataset_name}_b:{init_batch_number}_by_{method_name}.npz"
         )
-        # Если файл есть — загружаем
         if os.path.exists(filename):
             with np.load(filename, allow_pickle=True) as data:
                 init_partition = data["partition"]
                 init_mod = float(data["mod"])
-            return init_partition, init_mod
+            loaded = True
 
-    # Иначе вычисляем
-    temp_algo = create_leiden(method_name, batch)
-    temp_algo.apply()
-    init_partition = temp_algo.partition()
-    init_mod = temp_algo.modularity()
+    if not loaded:
+        temp_algo = create_leiden(method_name, batch)
+        temp_algo.apply()
+        init_partition = temp_algo.partition()
+        init_mod = temp_algo.modularity()
+        if cache_dir is not None:
+            np.savez_compressed(filename, partition=init_partition, mod=init_mod)
 
-    if cache_dir is not None:
-        np.savez_compressed(filename, partition=init_partition, mod=init_mod)
+    if to_tensor_format:
+        init_partition = torch.as_tensor(init_partition, dtype=torch.long)
 
     return init_partition, init_mod
 
@@ -63,49 +68,38 @@ def dynamic_launch(ds, batches_strategy,
         init_batch_number = str(batches_strategy).split(":")[0]
     
     if dynamic_mode and underlying_static_method == "mfc":       
-
-        # Основной цикл по батчам
-        if ds.adj.ndim == 2:
-            batches_iter = [ds.adj]
-        elif ds.adj.ndim == 3:
-            batches_iter = torch.unbind(ds.adj)
-        else:
-            raise ValueError(f"Unsupported ds.adj ndim: {ds.adj.ndim}")
-
-        for i, batch in enumerate(batches_iter):
-            with print_zone(verbose >= 2):
-                print("  Batch", i)
-
-            # --- Обработка специальной стратегии (":") для динамического режима ---
-            if dynamic_mode and is_special_strategy and i == 0:
-                init_partition, init_mod = compute_initial_partition(batch,
-                                                                     dataset_name, init_batch_number,
-                                                                     "leidenalg",
-                                                                     cache_dir)
-                with print_zone(verbose >= 1):
-                    print(f"Initial modularity: {init_mod:.2g}")
+        
+        time_s = time.time()
+        init_partition = None
+        if is_special_strategy:
+            first_snapshot = ds.adj[0] 
+            init_partition, init_mod = compute_initial_partition(first_snapshot,
+                                                                 dataset_name, init_batch_number,
+                                                                 "leidenalg",
+                                                                 cache_dir)
+            with print_zone(verbose >= 1):
+                print(f"Initial modularity: {init_mod:.2g}")
+        
+        with print_zone(verbose >= 2):
+            coms = mfc_adopted(
+                        adj=ds.adj,
+                        labels=None,
+                        network_type="MFC",
+                        return_labels=True,
+                        num_epoch=baseline_iter,
+                        pure_mfc=True,
+                        initial_partition=init_partition,
+                    )
             
-            with print_zone(verbose >= 2):
-                coms = mfc_adopted(
-                            adj=ds.adj,
-                            labels=labels,
-                            network_type="MFC",
-                            return_labels=True,
-                            num_epoch=baseline_iter,
-                            pure_mfc=True,
-                            initial_partition=init_partition,
-                        )
-                
-                time_e = time.time()
-                measured_time = time_e - time_s
-                mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
+            time_e = time.time()
+            measured_time = time_e - time_s
+            mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
 
-                print(f"Modularity: {mod:.2g}")
-                print(f"Baseline calls: {1}")
-                print(f"Time: {measured_time:.2f}")
+            print(f"Modularity: {mod:.2g}")
+            print(f"Baseline calls: {1}")
+            print(f"Time: {measured_time:.2f}")
 
-            results.append({'modularity': mod, 'time': measured_time})
-
+        results.append({'modularity': mod, 'time': measured_time})
     else:
     # Основной цикл по батчам
         if ds.adj.ndim == 2:
@@ -168,7 +162,7 @@ def dynamic_launch(ds, batches_strategy,
                                                                          "leidenalg",
                                                                          cache_dir)
                     n, l = opt.nodes_num, opt.subcoms_depth
-                    coms = torch.as_tensor(init_partition, dtype=torch.long).repeat(l).reshape((l, n))
+                    coms = init_partition.repeat(l).reshape((l, n))
                     opt.set_communities(communities = coms)
                     with print_zone(verbose >= 1):
                         print(f"Initial modularity: {init_mod:.2g}")

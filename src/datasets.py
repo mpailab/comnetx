@@ -66,7 +66,7 @@ class Dataset:
             )
         
     def detect_dataset_format(self):
-        dname = self.name.lower()
+        dname = self.name[0].lower() + self.name[1:]
         for file_path in INFO.glob("*.json"):
             fmt = file_path.stem
             with open(file_path) as f:
@@ -198,7 +198,7 @@ class Dataset:
         label - ? #TODO
         """    
 
-        dname = self.name.lower()
+        dname = self.name[0].lower() + self.name[1:]
         fmt = self.dataset_format
 
         if not self.is_dynamic and batches_strategy is not None:
@@ -277,7 +277,7 @@ class Dataset:
         return self.adj, self.features, self.label
 
     def _load_npy_format(self, coo_adj=True):
-        dname = self.name.lower()
+        dname = self.name[0].lower() + self.name[1:]
         load_dir = os.path.join(self.dataset_root, dname)
 
         feat_path = os.path.join(load_dir, f"{dname}_feat.npy")
@@ -314,7 +314,7 @@ class Dataset:
 
     def _load_attr_graph(self):
         """Загрузка attributed graphs (flickr, wikics...) из npy/joblib."""
-        dname = self.name.lower()
+        dname = self.name[0].lower() + self.name[1:]
         load_dir = os.path.join(self.dataset_root, dname)
         
         feat_file = os.path.join(load_dir, f"{dname}_feat.npy")
@@ -339,7 +339,7 @@ class Dataset:
 
     def _load_dynamic_attr_graph(self, batches_strategy):
         """Загрузка dynamic attr graphs из .npz файлов."""
-        dname = self.name.lower()
+        dname = self.name[0].lower() + self.name[1:]
         dataset_path = os.path.join(self.dataset_root, dname)
         
         pure_name = self.name.split("dyn_")[-1]
@@ -366,7 +366,7 @@ class Dataset:
 
     def _load_tgc_graphs(self, batches_strategy):
         """Загрузка temporal graph clustering (TGC) датасетов из npy/joblib."""
-        dname = self.name.lower()
+        dname = self.name[0].lower() + self.name[1:]
         load_dir = os.path.join(self.dataset_root, dname)
 
         if ":" in batches_strategy:  # p:n стратегия
