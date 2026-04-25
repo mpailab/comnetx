@@ -35,6 +35,8 @@ jobs:
           pip install --only-binary=:all: 'tensorflow==2.15.0'
           pip install psutil
           pip install pyinstrument
+          pip install gudhi
+          
 
       - name: Run unit tests
         env:
