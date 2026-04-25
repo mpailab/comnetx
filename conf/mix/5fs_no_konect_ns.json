@@ -9,7 +9,7 @@
                "patent", "dblp-tgc", "arxivcs", "arxivmath", "arxivphy", "arxivlarge"],
   "BATCHES": ["999:10"],
   
-  "BASELINES": ["ldleiden", "leidenalg", "networkit", "dfleiden", "prgpt:infomap", "prgpt:locale"],
+  "BASELINES": ["ldleiden", "leidenalg", "dfleiden", "prgpt:infomap", "prgpt:locale"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",
