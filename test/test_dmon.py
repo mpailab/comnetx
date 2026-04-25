@@ -1,6 +1,5 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'
 import torch
 import numpy as np

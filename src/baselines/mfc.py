@@ -77,6 +77,33 @@ def _to_dense(adj_t: torch.Tensor) -> torch.Tensor:
         return adj_t.to_dense()
     return adj_t
 
+def _prepare_feature_snapshots(features, num_snapshots: int):
+    if features is None:
+        return None
+
+    if isinstance(features, torch.Tensor):
+        if features.dim() == 2:
+            feature_snapshots = [features] * num_snapshots
+        elif features.dim() == 3:
+            feature_snapshots = [features[t] for t in range(features.size(0))]
+        else:
+            raise ValueError(
+                f"features must have shape [N, F] or [T, N, F], got {tuple(features.shape)}"
+            )
+    elif isinstance(features, list):
+        feature_snapshots = features
+    else:
+        raise ValueError("features must be torch.Tensor, list, or None")
+
+    if len(feature_snapshots) == 1 and num_snapshots > 1:
+        feature_snapshots = feature_snapshots * num_snapshots
+
+    if len(feature_snapshots) != num_snapshots:
+        raise ValueError(
+            f"features snapshots mismatch: expected {num_snapshots}, got {len(feature_snapshots)}"
+        )
+
+    return feature_snapshots
 
 def _normalize_initial_partition(initial_partition: torch.Tensor, nodes_num: int) -> torch.Tensor:
     if initial_partition.dim() == 2 and initial_partition.size(0) == 1:
@@ -98,7 +125,8 @@ def _normalize_initial_partition(initial_partition: torch.Tensor, nodes_num: int
 
 def load_graphs_from_tensors(adj_matrices,
                              labels_list,
-                             network_type: str,
+                             features=None,
+                             network_type: str = "MFC",
                              file_name: str = "from_tensor",
                              complete_graph: bool = False):
     """
@@ -164,9 +192,23 @@ def load_graphs_from_tensors(adj_matrices,
         num_classes = 2
 
     snapshots = NetworkSnapshots(graph_snapshots, labels_dicts[0], network_type, file_name)
-    return snapshots, num_classes
+    snapshot_items = list(snapshots)
 
-def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
+    feature_snapshots = _prepare_feature_snapshots(features, len(snapshot_items))
+
+    if feature_snapshots is not None:
+        patched_items = []
+        for (adj, _, labels), feat in zip(snapshot_items, feature_snapshots):
+            if isinstance(feat, torch.Tensor):
+                feat = feat.float().to(adj.device if hasattr(adj, "device") else "cpu")
+                if feat.is_sparse:
+                    feat = feat.to_dense()
+            patched_items.append((adj, feat, labels))
+        snapshot_items = patched_items
+
+    return snapshot_items, num_classes
+
+def load_graphs(file_name, network_type, adj_matrix=None, labels=None, features=None):
     if file_name == "from_tensor":
         if adj_matrix is None or labels is None:
             raise ValueError("Для 'from_tensor' нужно передать adj_matrix и labels.")
@@ -175,19 +217,22 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None):
         return load_graphs_from_tensors(
             adj_matrices=adj_matrix,
             labels_list=labels,
+            features=features,
             network_type=network_type,
             file_name=file_name,
         )
     else:
         raise NameError
 
-def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
-    model_init = InitModel(device="cuda")
+def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_mf=250):
+    compute_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_init = InitModel(device=str(compute_device))
     snapshot_list, n_cluster = load_graphs(
         "from_tensor",
         network_type=network_type,
         adj_matrix=adj_matrix,
         labels=labels,
+        features=features,
     )
     args = Args(n_cluster, "from_tensor", network_type) # fix 20 cluster or assume known n_cluster
     args.num_epoch = num_epoch
@@ -201,15 +246,26 @@ def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
     results_raw = [] 
     results_topo = []
     # base deep clustering training
-    for idx, (adj,features,labels) in enumerate(snapshot_list):
+    for idx, (adj, features, labels) in enumerate(snapshot_list):
+        if isinstance(features, torch.Tensor):
+            features = features.to(compute_device)
+
+        if isinstance(adj, torch.Tensor):
+            adj = adj.to(compute_device)
+
+        if isinstance(labels, torch.Tensor):
+            labels = labels.to(compute_device)
+
         model = model_init(network_type, adj, features.size(1), args)
         model_list.append(model)
-        base_train(network_type,
-                   model,
-                   features,
-                   adj,
-                   args,
-                   str(idx))
+        base_train(
+            network_type,
+            model,
+            features,
+            adj,
+            args,
+            str(idx),
+        )
         with torch.no_grad():
             if network_type == "SDCN":
                 _, Q, _, Z = model(features,adj)
@@ -218,7 +274,8 @@ def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
             results_raw.append([
                 Z.cpu().detach().numpy(),
                 Q.cpu().detach().numpy(),
-                adj,labels
+                adj.cpu() if isinstance(adj, torch.Tensor) else adj,
+                labels.cpu() if isinstance(labels, torch.Tensor) else labels,
             ])
             # record dgm at each time step
             community_graph = build_community_graph(Q,adj)
@@ -229,7 +286,16 @@ def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
     # topological regulaized training
     for t in range(len(snapshot_list)):
         m = model_list[t]
-        adj,features,labels = snapshot_list[t]
+        adj, features, labels = snapshot_list[t]
+
+        if isinstance(features, torch.Tensor):
+            features = features.to(compute_device)
+
+        if isinstance(adj, torch.Tensor):
+            adj = adj.to(compute_device)
+
+        if isinstance(labels, torch.Tensor):
+            labels = labels.to(compute_device)
         
         if len(snapshot_list)!=1:
             # print('several snapshot')
@@ -260,7 +326,8 @@ def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
             results_topo.append([
                 Z.cpu().detach().numpy(),
                 Q.cpu().detach().numpy(),
-                adj,labels
+                adj.cpu() if isinstance(adj, torch.Tensor) else adj,
+                labels.cpu() if isinstance(labels, torch.Tensor) else labels,
             ])
             # update dgm at time 
             community_graph = build_community_graph(Q,adj)
@@ -278,6 +345,7 @@ def main(network_type, adj_matrix, labels, num_epoch=500, start_mf=250):
 
 def mfc_adopted(
     adj: torch.Tensor,
+    features: torch.Tensor | None = None,
     labels: torch.Tensor | None = None,
     network_type: str = "MFC",
     return_labels: bool = False,
@@ -314,6 +382,8 @@ def mfc_adopted(
     t0 = time.time()
     if adj.device.type == "cuda":
         adj = adj.cpu()
+    if features is not None and features.device.type == "cuda":
+        features = features.cpu()
     if labels is not None and labels.device.type == "cuda":
         labels = labels.cpu()
     if initial_partition is not None and initial_partition.device.type == "cuda":
@@ -350,6 +420,7 @@ def mfc_adopted(
         network_type=network_type,
         adj_matrix=adj_matrices,
         labels=labels_list,
+        features=features,
         num_epoch=num_epoch,
         start_mf=start_mf,
     )
