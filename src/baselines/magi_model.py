@@ -11,6 +11,7 @@ import time
 import scipy.sparse as sp
 from scipy.sparse.linalg import eigsh
 from sklearn.neighbors import NearestNeighbors
+from chemomae.clustering import VMFMixture, elbow_vmf
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -386,14 +387,14 @@ def magi(adj: torch.Tensor,
         return torch.zeros(num_points, dtype=torch.long, device=device)
 
     if inferred_k is None:
-        inferred_k = estimate_k_eigengap_sparse_embeddings(
+        inferred_k = estimate_k_elbow_vmf(
             embeddings=embeddings,
-            k_max=min(30, num_points - 1),
-            knn_k=min(20, max(2, num_points - 1)),
-            metric="cosine",
-            mutual=False,
+            device=device,
+            k_max=min(50, num_points),
+            random_state=42,
+            criterion="bic",
         )
-        print(f"Estimated number of clusters by sparse eigengap: k={inferred_k}")
+        print(f"Estimated number of clusters by elbow_vmf: k={inferred_k}")
 
     inferred_k = int(max(1, min(inferred_k, num_points)))
 
@@ -411,6 +412,33 @@ def magi(adj: torch.Tensor,
     )
     new_labels = torch.as_tensor(pred_labels, dtype=torch.long, device=device)
     return new_labels
+
+def estimate_k_elbow_vmf(
+    embeddings: torch.Tensor,
+    device: torch.device,
+    k_max: int = 50,
+    random_state: int = 42,
+    criterion: str = "bic",
+) -> int:
+    X = embeddings.detach().cpu()
+    X = F.normalize(X, p=2, dim=1)
+
+    num_points = X.size(0)
+    if num_points <= 1:
+        return 1
+
+    k_max = min(k_max, num_points)
+
+    k_list, scores, K, idx, kappa = elbow_vmf(
+        VMFMixture,
+        X,
+        device="cpu",
+        k_max=k_max,
+        chunk=5_000_000,
+        random_state=random_state,
+        criterion=criterion,
+    )
+    return int(K)
 
 def estimate_k_eigengap_sparse_embeddings(
     embeddings: torch.Tensor,

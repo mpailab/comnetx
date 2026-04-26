@@ -4,11 +4,11 @@
   "USE_TIMESTAMP_SUFFIX": true,
 
   "DATASETS": [
-    "dyn_coauthorcs"
+    "dyn_cora"
   ],
   "BATCHES": ["999:10"],
 
-  "BASELINES": ["magi"],
+  "BASELINES": ["mfc"],
   "MODES": ["naive", "smart"],
 
   "SMART_VERSION": "v1",
