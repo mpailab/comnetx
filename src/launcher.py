@@ -6,42 +6,156 @@ import numpy as np
 
 from optimizer import Optimizer
 from our_utils import print_zone
+import sparse
 
 from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
 from baselines.dgc import create_leiden
 from baselines.mfc import mfc_adopted
 from metrics import Metrics
 
+
 def compute_initial_partition(
-    batch,
+    adj_matrix,
     dataset_name,
     init_batch_number,
     method_name="leidenalg",
     cache_dir=None,
-    to_tensor_format=True
+    subcoms_depth=1,
+    device=None,
 ):
+    """
+    Build an initial community partition for an adjacency matrix.
+
+    Parameters
+    ----------
+    adj_matrix : torch.Tensor
+        Adjacency matrix of the initial graph snapshot with shape (n, n).
+        The argument used to be named ``batch``, but it is the adjacency matrix
+        itself, not a batch of arbitrary data.
+    dataset_name : str
+        Dataset key used only for the cache file name.
+    init_batch_number : int | str
+        Initial batch identifier used only for the cache file name.
+    method_name : str
+        Static community detection method passed to ``create_leiden``.
+    cache_dir : str | None
+        Directory for storing/loading the computed partition and modularity.
+    subcoms_depth : int
+        Number of partition layers to build. ``1`` preserves the previous
+        behavior and returns a single label vector with shape (n,). Values above
+        ``1`` return a layered tensor/array with shape (subcoms_depth, n).
+    device : torch.device | str | None
+        Device for all tensors created inside this function. If None, use the
+        device of ``adj_matrix``.
+
+    Returns
+    -------
+    tuple[torch.Tensor, float]
+        Initial partition labels and modularity of the first full-graph
+        partition. For layered output each row contains labels for original
+        graph nodes restored from the corresponding aggregated graph.
+    """
+    if subcoms_depth < 1:
+        raise ValueError("subcoms_depth must be at least 1")
+
+    if device is None:
+        device = adj_matrix.device
+    else:
+        device = torch.device(device)
+
     loaded = False
     if cache_dir is not None:
         os.makedirs(cache_dir, exist_ok=True)
+        depth_suffix = "" if subcoms_depth == 1 else f"_d:{subcoms_depth}"
         filename = os.path.join(
-            cache_dir, f"{dataset_name}_b:{init_batch_number}_by_{method_name}.npz"
+            cache_dir,
+            f"{dataset_name}_b:{init_batch_number}_by_{method_name}{depth_suffix}.npz",
         )
         if os.path.exists(filename):
             with np.load(filename, allow_pickle=True) as data:
-                init_partition = data["partition"]
+                init_partition = torch.as_tensor(
+                    data["partition"],
+                    dtype=torch.long,
+                    device=device,
+                )
                 init_mod = float(data["mod"])
             loaded = True
 
     if not loaded:
-        temp_algo = create_leiden(method_name, batch)
+        adj_algo = adj_matrix.to(device)
+        temp_algo = create_leiden(method_name, adj_algo)
         temp_algo.apply()
-        init_partition = temp_algo.partition()
+        # Most backends return partition labels on CPU; keep the launcher state
+        # on the requested runtime device from the first conversion onward.
+        init_partition = torch.as_tensor(
+            temp_algo.partition(),
+            dtype=torch.long,
+            device=device,
+        )
         init_mod = temp_algo.modularity()
-        if cache_dir is not None:
-            np.savez_compressed(filename, partition=init_partition, mod=init_mod)
 
-    if to_tensor_format:
-        init_partition = torch.as_tensor(init_partition, dtype=torch.long)
+        if subcoms_depth > 1:
+            layers = [init_partition]
+            nodes_num = adj_matrix.size(0)
+            adj_work = adj_algo.float()
+            if not adj_work.is_sparse:
+                adj_work = adj_work.to_sparse_coo()
+            adj_work = adj_work.coalesce()
+            node_mask = torch.ones(
+                nodes_num,
+                dtype=torch.bool,
+                device=adj_work.device,
+            )
+
+            for _ in range(1, subcoms_depth):
+                # Reindex current communities to compact ids before building
+                # the aggregation pattern P used in P * A * P.T.
+                current_partition = layers[-1].to(adj_work.device)
+                old_idx, inverse = torch.unique(
+                    current_partition,
+                    sorted=True,
+                    return_inverse=True,
+                )
+                aggr_idx = torch.stack((
+                    inverse,
+                    torch.arange(nodes_num, device=device),
+                ))
+                aggr_adj_ptn = sparse.tensor(
+                    aggr_idx,
+                    (old_idx.size(0), nodes_num),
+                    adj_work.dtype,
+                )
+                aggr_adj = Optimizer.aggregate(adj_work, aggr_adj_ptn)
+                del aggr_adj_ptn
+
+                # Run the same local method on the aggregated graph and restore
+                # labels back to original graph nodes.
+                temp_algo = create_leiden(method_name, aggr_adj)
+                temp_algo.apply()
+                aggr_partition = torch.as_tensor(
+                    temp_algo.partition(),
+                    dtype=torch.long,
+                    device=device,
+                )
+                restored_partition = old_idx[aggr_partition[inverse]]
+                layers.append(restored_partition)
+
+                # Keep the working adjacency consistent with Optimizer.run:
+                # after each layer, remove edges that cross the new partition.
+                adj_work = Optimizer.cut_by_partition(
+                    adj_work,
+                    node_mask,
+                    restored_partition,
+                )
+
+            init_partition = torch.stack(layers)
+
+        if cache_dir is not None:
+            np.savez_compressed(
+                filename,
+                partition=init_partition.cpu().numpy(),
+                mod=init_mod,
+            )
 
     return init_partition, init_mod
 
@@ -160,10 +274,12 @@ def dynamic_launch(ds, batches_strategy,
                     init_partition, init_mod = compute_initial_partition(batch,
                                                                          dataset_name, init_batch_number,
                                                                          "leidenalg",
-                                                                         cache_dir)
-                    n, l = opt.nodes_num, opt.subcoms_depth
-                    coms = init_partition.repeat(l).reshape((l, n))
-                    opt.set_communities(communities = coms)
+                                                                         cache_dir,
+                                                                         subcoms_depth=opt.subcoms_depth,
+                                                                         device=opt.runtime_device())
+                    if init_partition.dim() == 1:
+                        init_partition = init_partition.unsqueeze(0)
+                    opt.set_communities(communities = init_partition)
                     with print_zone(verbose >= 1):
                         print(f"Initial modularity: {init_mod:.2g}")
                     continue
