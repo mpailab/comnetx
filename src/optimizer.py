@@ -133,7 +133,7 @@ class Optimizer:
         return torch.sparse.mm(pattern, features)
 
     def _local_algorithm_requires_features(self) -> bool:
-        if self.method in {"magi", "dmon"}:
+        if self.method in {"magi", "dmon", "mfc"}:
             return True
         if self.method == "dese":
             return self.has_real_features
@@ -365,6 +365,7 @@ class Optimizer:
 
                 return mfc_adopted(
                     adj=adj,
+                    features=features,
                     labels=labels,
                     network_type="MFC",
                     return_labels=True,

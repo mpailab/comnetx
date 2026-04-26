@@ -8,14 +8,12 @@ if dese_root not in sys.path:
 
 import torch
 import torch.optim as optim
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from collections import Counter
 import networkx as nx
 from matplotlib.colors import ListedColormap
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 torch.autograd.set_detect_anomaly(True)
 
 import argparse
@@ -35,7 +33,7 @@ def main():
     parser.add_argument('--height', type=int, default=2,
                         help='Height of the SE tree.')
     parser.add_argument('--gpu', type=int, default=0,
-                        help='GPU index. Default: -1, using CPU.')
+                        help='Use CUDA if >= 0, otherwise use CPU.')
     parser.add_argument('--decay_rate', type=int, default=None,
                         help='Decay rate of the number of clusters in each layer.')
     parser.add_argument('--num_clusters_layer', type=list, default=[10],
@@ -72,17 +70,20 @@ def main():
 
     args = parser.parse_args()
 
+    device = torch.device("cuda" if torch.cuda.is_available() and args.gpu >= 0 else "cpu")
+
     adj = torch.load(args.adj)
     adj = torch.sparse_coo_tensor(
         adj.indices(),
         adj.values().float(),
         adj.size()
-    ).coalesce()
-    features = torch.load(args.features)
-    labels = torch.load(args.labels)
+    ).coalesce().to(device)
+
+    features = torch.load(args.features).to(device)
+    labels = torch.load(args.labels).to(device)
     new_labels = dese(adj, features, labels, args)
 
-    torch.save(new_labels, args.out)
+    torch.save(new_labels.cpu(), args.out)
     print("DeSE finished successfully")
 
 if __name__ == "__main__":

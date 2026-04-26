@@ -10,7 +10,6 @@ import sparse
 
 from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
 from baselines.dgc import create_leiden
-from baselines.mfc import mfc_adopted
 from metrics import Metrics
 
 
@@ -182,7 +181,7 @@ def dynamic_launch(ds, batches_strategy,
         init_batch_number = str(batches_strategy).split(":")[0]
     
     if dynamic_mode and underlying_static_method == "mfc":       
-        
+        from baselines.mfc import mfc_adopted
         time_s = time.time()
         init_partition = None
         if is_special_strategy:
