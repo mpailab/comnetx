@@ -2,7 +2,8 @@ import sys
 import os
 import torch
 import pytest
-import networkit
+
+networkit = pytest.importorskip("networkit")
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
