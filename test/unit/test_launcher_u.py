@@ -55,6 +55,24 @@ def _load_launcher(monkeypatch):
     return module
 
 
+def _test_config(launcher, **overrides):
+    defaults = {
+        "dataset_name": "fake",
+        "method": "leidenalg",
+        "baseline_iter": None,
+        "mode": "raw",
+        "smart_subcoms_depth": 1,
+        "smart_neighborhood_step": 1,
+        "verbose": 0,
+        "use_gpu": False,
+        "aggregation_mode": "sum",
+        "cache_dir": None,
+        "init_batch_number": None,
+    }
+    defaults.update(overrides)
+    return launcher._LaunchConfig(**defaults)
+
+
 class _SpyOptimizer:
     init_calls = []
     set_calls = []
@@ -201,6 +219,56 @@ def test_compute_initial_partition_builds_layered_tensor(monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.short
+def test_build_layered_initial_partition_restores_original_node_labels(
+    monkeypatch,
+):
+    launcher = _load_launcher(monkeypatch)
+
+    class _FakeLeiden:
+        calls = []
+
+        def __init__(self, adj):
+            type(self).calls.append(adj)
+
+        def apply(self):
+            return 0.0
+
+        def partition(self):
+            return torch.tensor([0, 0], dtype=torch.long)
+
+    monkeypatch.setattr(
+        launcher,
+        "create_leiden",
+        lambda method_name, adj: _FakeLeiden(adj),
+    )
+
+    adj = torch.tensor(
+        [
+            [0, 1, 1, 0],
+            [1, 0, 0, 1],
+            [1, 0, 0, 1],
+            [0, 1, 1, 0],
+        ],
+        dtype=torch.float32,
+    )
+    initial_partition = torch.tensor([0, 0, 1, 1], dtype=torch.long)
+
+    layered = launcher._build_layered_initial_partition(
+        adj,
+        adj,
+        initial_partition,
+        "leidenalg",
+        subcoms_depth=2,
+        device=torch.device("cpu"),
+    )
+
+    assert torch.equal(layered[0], initial_partition)
+    assert torch.equal(layered[1], torch.tensor([0, 0, 0, 0]))
+    assert _FakeLeiden.calls[0].shape == torch.Size([2, 2])
+
+
+@pytest.mark.unit
+@pytest.mark.short
 def test_compute_initial_partition_loads_cached_partition_as_tensor(
     monkeypatch,
     tmp_path,
@@ -229,6 +297,46 @@ def test_compute_initial_partition_loads_cached_partition_as_tensor(
     assert partition.dtype == torch.long
     assert partition.device == torch.device("cpu")
     assert torch.equal(partition, torch.tensor([1, 1, 0]))
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_initial_partition_cache_helpers_build_save_and_load(
+    monkeypatch,
+    tmp_path,
+):
+    launcher = _load_launcher(monkeypatch)
+    shallow_path = launcher._initial_partition_cache_path(
+        tmp_path,
+        "fake",
+        0,
+        "leidenalg",
+        subcoms_depth=1,
+    )
+    deep_path = launcher._initial_partition_cache_path(
+        tmp_path,
+        "fake",
+        "999",
+        "leidenalg",
+        subcoms_depth=3,
+    )
+
+    assert Path(shallow_path).name == "fake_b:0_by_leidenalg.npz"
+    assert Path(deep_path).name == "fake_b:999_by_leidenalg_d:3.npz"
+    assert launcher._load_cached_initial_partition(
+        tmp_path / "missing.npz",
+        torch.device("cpu"),
+    ) is None
+
+    partition = torch.tensor([[0, 1], [1, 1]], dtype=torch.long)
+    launcher._save_cached_initial_partition(deep_path, partition, 0.91)
+    loaded_partition, loaded_mod = launcher._load_cached_initial_partition(
+        deep_path,
+        torch.device("cpu"),
+    )
+
+    assert loaded_mod == pytest.approx(0.91)
+    assert torch.equal(loaded_partition, partition)
 
 
 @pytest.mark.unit
@@ -312,6 +420,85 @@ def test_load_dataset_if_needed_accepts_objects_and_legacy_names(monkeypatch):
 
 @pytest.mark.unit
 @pytest.mark.short
+def test_build_launch_config_normalizes_public_launch_arguments(monkeypatch):
+    launcher = _load_launcher(monkeypatch)
+    ds = types.SimpleNamespace(name="fake-dataset")
+
+    config = launcher._build_launch_config(
+        ds=ds,
+        batches_strategy="999:100",
+        underlying_static_method="leidenalg",
+        baseline_iter=5,
+        mode=" SMART ",
+        smart_subcoms_depth=4,
+        smart_neighborhood_step=2,
+        verbose=3,
+        use_gpu=True,
+        aggregation_mode="normalized",
+        cache_dir="/tmp/cache",
+    )
+
+    assert config.dataset_name == "fake-dataset"
+    assert config.method == "leidenalg"
+    assert config.baseline_iter == 5
+    assert config.mode == "smart"
+    assert config.smart_subcoms_depth == 4
+    assert config.smart_neighborhood_step == 2
+    assert config.verbose == 3
+    assert config.use_gpu is True
+    assert config.aggregation_mode == "normalized"
+    assert config.cache_dir == "/tmp/cache"
+    assert config.init_batch_number == "999"
+
+
+@pytest.mark.unit
+@pytest.mark.short
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"smart_subcoms_depth": 0}, "smart_subcoms_depth"),
+        ({"smart_neighborhood_step": -1}, "smart_neighborhood_step"),
+    ],
+)
+def test_build_launch_config_rejects_invalid_smart_parameters(
+    monkeypatch,
+    override,
+    message,
+):
+    launcher = _load_launcher(monkeypatch)
+    kwargs = {
+        "ds": types.SimpleNamespace(name="fake-dataset"),
+        "batches_strategy": 1,
+        "underlying_static_method": "leidenalg",
+        "baseline_iter": None,
+        "mode": "smart",
+        "smart_subcoms_depth": 1,
+        "smart_neighborhood_step": 1,
+        "verbose": 0,
+        "use_gpu": False,
+        "aggregation_mode": "sum",
+        "cache_dir": None,
+    }
+    kwargs.update(override)
+
+    with pytest.raises(ValueError, match=message):
+        launcher._build_launch_config(**kwargs)
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_print_verbose_only_prints_enabled_levels(monkeypatch, capsys):
+    launcher = _load_launcher(monkeypatch)
+
+    launcher._print_verbose(1, 2, "hidden")
+    assert capsys.readouterr().out == ""
+
+    launcher._print_verbose(2, 2, "visible", 7)
+    assert capsys.readouterr().out == "visible 7\n"
+
+
+@pytest.mark.unit
+@pytest.mark.short
 def test_normalize_launch_mode_strips_case_and_rejects_invalid_values(
     monkeypatch,
 ):
@@ -346,8 +533,8 @@ def test_adjacency_batch_helpers_handle_static_dynamic_and_bad_shapes(
     static_adj = torch.arange(4, dtype=torch.float32).reshape(2, 2)
     dynamic_adj = torch.arange(12, dtype=torch.float32).reshape(3, 2, 2)
 
-    static_batches = launcher._iter_adjacency_batches(static_adj)
-    dynamic_batches = launcher._iter_adjacency_batches(dynamic_adj)
+    static_batches = list(launcher._iter_adjacency_batches(static_adj))
+    dynamic_batches = list(launcher._iter_adjacency_batches(dynamic_adj))
 
     assert static_batches == [static_adj]
     assert len(dynamic_batches) == 3
@@ -357,7 +544,7 @@ def test_adjacency_batch_helpers_handle_static_dynamic_and_bad_shapes(
 
     bad_adj = torch.zeros((1, 1, 1, 1), dtype=torch.float32)
     with pytest.raises(ValueError, match="Unsupported ds.adj ndim"):
-        launcher._iter_adjacency_batches(bad_adj)
+        list(launcher._iter_adjacency_batches(bad_adj))
     with pytest.raises(ValueError, match="Unsupported ds.adj ndim"):
         launcher._first_snapshot(bad_adj)
 
@@ -498,12 +685,12 @@ def test_run_optimizer_batch_raw_mode_resets_labels_and_subtracts_conversion(
     opt = _BatchOptimizer()
     clock = iter([10.0, 13.0])
     monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
+    config = _test_config(launcher, mode="raw")
 
     measured_time = launcher._run_optimizer_batch(
         opt,
-        mode="raw",
+        config,
         affected_nodes_mask=None,
-        smart_neighborhood_step=1,
     )
 
     communities, replace_depth = opt.set_communities_call
@@ -521,12 +708,12 @@ def test_run_optimizer_batch_naive_mode_reuses_existing_labels(monkeypatch):
     previous_labels = opt.coms
     clock = iter([20.0, 22.0])
     monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
+    config = _test_config(launcher, mode="naive")
 
     measured_time = launcher._run_optimizer_batch(
         opt,
-        mode="naive",
+        config,
         affected_nodes_mask=None,
-        smart_neighborhood_step=1,
     )
 
     assert measured_time == pytest.approx(1.75)
@@ -543,12 +730,16 @@ def test_run_optimizer_batch_smart_mode_expands_mask_and_runs_optimizer(
     affected_mask = torch.tensor([True, False])
     clock = iter([30.0, 31.0])
     monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
+    config = _test_config(
+        launcher,
+        mode="smart",
+        smart_neighborhood_step=2,
+    )
 
     measured_time = launcher._run_optimizer_batch(
         opt,
-        mode="smart",
+        config,
         affected_nodes_mask=affected_mask,
-        smart_neighborhood_step=2,
     )
 
     assert measured_time == pytest.approx(1.0)
@@ -567,9 +758,7 @@ def test_print_optimizer_batch_result_uses_method_specific_timing(
     opt = types.SimpleNamespace(last_timing_info={"algorithm_time": 1.25})
 
     launcher._print_optimizer_batch_result(
-        verbose=2,
-        method="ldleiden",
-        mode="raw",
+        _test_config(launcher, method="ldleiden", mode="raw", verbose=2),
         opt=opt,
         modularity=0.5,
         measured_time=9.0,
@@ -580,9 +769,7 @@ def test_print_optimizer_batch_result_uses_method_specific_timing(
     assert "Time: 9.00" not in ldleiden_output
 
     launcher._print_optimizer_batch_result(
-        verbose=2,
-        method="leidenalg",
-        mode="raw",
+        _test_config(launcher, method="leidenalg", mode="raw", verbose=2),
         opt=opt,
         modularity=0.5,
         measured_time=9.0,
@@ -644,14 +831,17 @@ def test_run_dynamic_mfc_uses_initial_partition_and_returns_single_result(
     )
     clock = iter([1.0, 2.5])
     monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
-
-    results = launcher._run_dynamic_mfc(
-        ds,
+    config = _test_config(
+        launcher,
         dataset_name="fake",
         init_batch_number="999",
         baseline_iter=7,
-        verbose=0,
         cache_dir="/tmp/cache",
+    )
+
+    results = launcher._run_dynamic_mfc(
+        ds,
+        config,
     )
 
     assert results == [{"modularity": 0.42, "time": pytest.approx(1.5)}]
@@ -719,14 +909,16 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         "_compute_launch_initial_partition",
         fake_compute_launch_initial_partition,
     )
-
-    results = launcher._run_dynamic_backend(
-        batches,
+    config = _test_config(
+        launcher,
         dataset_name="fake",
         method="ldleiden",
         init_batch_number="999",
-        verbose=0,
-        cache_dir=None,
+    )
+
+    results = launcher._run_dynamic_backend(
+        batches,
+        config,
     )
 
     assert results == [{"modularity": 0.66, "time": 1.5}]
@@ -735,6 +927,16 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
     assert created_algos[0].partition is initial_partition
     assert created_algos[0].apply_calls == 2
     assert created_algos[0].updated_batches == [batches[1]]
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_run_dynamic_backend_rejects_empty_batch_iterable(monkeypatch):
+    launcher = _load_launcher(monkeypatch)
+    config = _test_config(launcher, method="ldleiden", mode="dynamic")
+
+    with pytest.raises(ValueError, match="no adjacency batches"):
+        launcher._run_dynamic_backend(iter(()), config)
 
 
 class _PipelineOptimizer:
@@ -801,21 +1003,21 @@ def test_run_optimizer_modes_processes_batches_through_optimizer(
         torch.zeros((2, 2), dtype=torch.float32),
         torch.ones((2, 2), dtype=torch.float32),
     ]
-
-    results = launcher._run_optimizer_modes(
-        ds,
-        batches,
+    config = _test_config(
+        launcher,
         dataset_name="fake",
         method="leidenalg",
         baseline_iter=3,
         mode="raw",
         smart_subcoms_depth=5,
         smart_neighborhood_step=1,
-        verbose=0,
-        use_gpu=False,
         aggregation_mode="sum",
-        init_batch_number=None,
-        cache_dir=None,
+    )
+
+    results = launcher._run_optimizer_modes(
+        ds,
+        batches,
+        config,
     )
 
     opt = _PipelineOptimizer.instances[-1]

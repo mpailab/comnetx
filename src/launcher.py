@@ -1,16 +1,183 @@
 import torch
-import json
 import os
 import time
 import numpy as np
+from dataclasses import dataclass
+from os import PathLike
 
 from optimizer import Optimizer
-from our_utils import print_zone
 import sparse
 
-from dynamic_graphs_communities import LDLeiden, DFLeiden, Leidenalg, Networkit
 from baselines.dgc import create_leiden
 from metrics import Metrics
+
+
+def _initial_partition_cache_path(
+    cache_dir: str | PathLike,
+    dataset_name,
+    init_batch_number,
+    method_name,
+    subcoms_depth: int,
+) -> str:
+    """
+    Build the cache file path for an initial partition.
+
+    Parameters
+    ----------
+    cache_dir : str | os.PathLike
+        Directory that stores cached initial partitions.
+    dataset_name : str
+        Dataset key embedded into the file name.
+    init_batch_number : int | str
+        Bootstrap batch marker embedded into the file name.
+    method_name : str
+        Static method name embedded into the file name.
+    subcoms_depth : int
+        Number of stored hierarchy layers. Depth 1 keeps the historical cache
+        name, while deeper partitions include a depth suffix.
+
+    Returns
+    -------
+    str
+        Full path to the ``.npz`` cache file.
+    """
+    depth_suffix = "" if subcoms_depth == 1 else f"_d:{subcoms_depth}"
+    filename = f"{dataset_name}_b:{init_batch_number}_by_{method_name}"
+    return os.path.join(cache_dir, f"{filename}{depth_suffix}.npz")
+
+
+def _load_cached_initial_partition(cache_file: str | PathLike | None, device):
+    """
+    Load an initial partition cache when the file already exists.
+
+    Parameters
+    ----------
+    cache_file : str | os.PathLike | None
+        Candidate cache path. ``None`` disables loading.
+    device : torch.device
+        Runtime device for the returned partition tensor.
+
+    Returns
+    -------
+    tuple[torch.Tensor, float] | None
+        Cached partition and modularity, or ``None`` when no cache file exists.
+    """
+    if cache_file is None or not os.path.exists(cache_file):
+        return None
+
+    with np.load(cache_file, allow_pickle=False) as data:
+        partition = torch.as_tensor(
+            data["partition"],
+            dtype=torch.long,
+            device=device,
+        )
+        modularity = float(data["mod"])
+    return partition, modularity
+
+
+def _save_cached_initial_partition(
+    cache_file: str | PathLike | None,
+    partition,
+    modularity: float,
+) -> None:
+    """
+    Persist an initial partition cache when caching is enabled.
+
+    Parameters
+    ----------
+    cache_file : str | os.PathLike | None
+        Destination cache path. ``None`` disables saving.
+    partition : torch.Tensor
+        Partition tensor to save on CPU so cache files are device-independent.
+    modularity : float
+        Modularity associated with the first full-graph partition.
+    """
+    if cache_file is None:
+        return
+
+    np.savez_compressed(cache_file, partition=partition.cpu().numpy(), mod=modularity)
+
+
+def _build_layered_initial_partition(
+    adj_matrix,
+    adj_algo,
+    init_partition,
+    method_name,
+    subcoms_depth: int,
+    device,
+):
+    """
+    Extend a flat initial partition into a hierarchy of community layers.
+
+    Parameters
+    ----------
+    adj_matrix : torch.Tensor
+        Original graph snapshot; its node count defines restored layer length.
+    adj_algo : torch.Tensor
+        Same snapshot already moved to the runtime device used by the backend.
+    init_partition : torch.Tensor
+        First full-graph partition produced by the static backend.
+    method_name : str
+        Static method name passed to ``create_leiden`` for aggregated graphs.
+    subcoms_depth : int
+        Desired number of hierarchy layers in the returned tensor.
+    device : torch.device
+        Runtime device for backend partitions and returned layers.
+
+    Returns
+    -------
+    torch.Tensor
+        Tensor with shape ``(subcoms_depth, nodes_num)``. Each row contains
+        labels restored to the original graph nodes.
+    """
+    layers = [init_partition]
+    nodes_num = adj_matrix.size(0)
+
+    # Optimizer.aggregate expects sparse COO input. Dense snapshots are
+    # converted once, then the working adjacency stays sparse between layers.
+    adj_work = adj_algo.float()
+    if not adj_work.is_sparse:
+        adj_work = adj_work.to_sparse_coo()
+    adj_work = adj_work.coalesce()
+
+    node_mask = torch.ones(nodes_num, dtype=torch.bool, device=adj_work.device)
+    node_ids = torch.arange(nodes_num, device=adj_work.device)
+
+    for _ in range(1, subcoms_depth):
+        # Reindex current communities to compact ids before building the
+        # aggregation pattern P used in P * A * P.T.
+        current_partition = layers[-1].to(adj_work.device)
+        old_idx, inverse = torch.unique(
+            current_partition,
+            sorted=True,
+            return_inverse=True,
+        )
+        aggr_idx = torch.stack((inverse, node_ids))
+        aggr_adj_ptn = sparse.tensor(
+            aggr_idx,
+            (old_idx.size(0), nodes_num),
+            adj_work.dtype,
+        )
+        aggr_adj = Optimizer.aggregate(adj_work, aggr_adj_ptn)
+        del aggr_adj_ptn
+
+        # Run the same local method on the aggregated graph and restore labels
+        # back to original graph nodes.
+        temp_algo = create_leiden(method_name, aggr_adj)
+        temp_algo.apply()
+        aggr_partition = torch.as_tensor(
+            temp_algo.partition(),
+            dtype=torch.long,
+            device=device,
+        )
+        restored_partition = old_idx[aggr_partition[inverse]]
+        layers.append(restored_partition)
+
+        # Keep the working adjacency consistent with Optimizer.run: after each
+        # layer, remove edges that cross the new partition.
+        adj_work = Optimizer.cut_by_partition(adj_work, node_mask, restored_partition)
+
+    return torch.stack(layers)
 
 
 def compute_initial_partition(
@@ -18,7 +185,7 @@ def compute_initial_partition(
     dataset_name,
     init_batch_number,
     method_name="leidenalg",
-    cache_dir=None,
+    cache_dir: str | PathLike | None = None,
     subcoms_depth=1,
     device=None,
 ):
@@ -37,7 +204,7 @@ def compute_initial_partition(
         Initial batch identifier used only for the cache file name.
     method_name : str
         Static community detection method passed to ``create_leiden``.
-    cache_dir : str | None
+    cache_dir : str | os.PathLike | None
         Directory for storing/loading the computed partition and modularity.
     subcoms_depth : int
         Number of partition layers to build. ``1`` preserves the previous
@@ -62,104 +229,83 @@ def compute_initial_partition(
     else:
         device = torch.device(device)
 
-    loaded = False
+    cache_file = None
     if cache_dir is not None:
         os.makedirs(cache_dir, exist_ok=True)
-        depth_suffix = "" if subcoms_depth == 1 else f"_d:{subcoms_depth}"
-        filename = os.path.join(
+        cache_file = _initial_partition_cache_path(
             cache_dir,
-            f"{dataset_name}_b:{init_batch_number}_by_{method_name}{depth_suffix}.npz",
+            dataset_name,
+            init_batch_number,
+            method_name,
+            subcoms_depth,
         )
-        if os.path.exists(filename):
-            with np.load(filename, allow_pickle=True) as data:
-                init_partition = torch.as_tensor(
-                    data["partition"],
-                    dtype=torch.long,
-                    device=device,
-                )
-                init_mod = float(data["mod"])
-            loaded = True
 
-    if not loaded:
-        adj_algo = adj_matrix.to(device)
-        temp_algo = create_leiden(method_name, adj_algo)
-        temp_algo.apply()
-        # Most backends return partition labels on CPU; keep the launcher state
-        # on the requested runtime device from the first conversion onward.
-        init_partition = torch.as_tensor(
-            temp_algo.partition(),
-            dtype=torch.long,
-            device=device,
+        cached_partition = _load_cached_initial_partition(cache_file, device)
+        if cached_partition is not None:
+            return cached_partition
+
+    adj_algo = adj_matrix.to(device)
+    temp_algo = create_leiden(method_name, adj_algo)
+    temp_algo.apply()
+    # Most backends return partition labels on CPU; keep the launcher state on
+    # the requested runtime device from the first conversion onward.
+    init_partition = torch.as_tensor(
+        temp_algo.partition(),
+        dtype=torch.long,
+        device=device,
+    )
+    init_mod = temp_algo.modularity()
+
+    if subcoms_depth > 1:
+        init_partition = _build_layered_initial_partition(
+            adj_matrix,
+            adj_algo,
+            init_partition,
+            method_name,
+            subcoms_depth,
+            device,
         )
-        init_mod = temp_algo.modularity()
 
-        if subcoms_depth > 1:
-            layers = [init_partition]
-            nodes_num = adj_matrix.size(0)
-            adj_work = adj_algo.float()
-            if not adj_work.is_sparse:
-                adj_work = adj_work.to_sparse_coo()
-            adj_work = adj_work.coalesce()
-            node_mask = torch.ones(
-                nodes_num,
-                dtype=torch.bool,
-                device=adj_work.device,
-            )
-
-            for _ in range(1, subcoms_depth):
-                # Reindex current communities to compact ids before building
-                # the aggregation pattern P used in P * A * P.T.
-                current_partition = layers[-1].to(adj_work.device)
-                old_idx, inverse = torch.unique(
-                    current_partition,
-                    sorted=True,
-                    return_inverse=True,
-                )
-                aggr_idx = torch.stack((
-                    inverse,
-                    torch.arange(nodes_num, device=device),
-                ))
-                aggr_adj_ptn = sparse.tensor(
-                    aggr_idx,
-                    (old_idx.size(0), nodes_num),
-                    adj_work.dtype,
-                )
-                aggr_adj = Optimizer.aggregate(adj_work, aggr_adj_ptn)
-                del aggr_adj_ptn
-
-                # Run the same local method on the aggregated graph and restore
-                # labels back to original graph nodes.
-                temp_algo = create_leiden(method_name, aggr_adj)
-                temp_algo.apply()
-                aggr_partition = torch.as_tensor(
-                    temp_algo.partition(),
-                    dtype=torch.long,
-                    device=device,
-                )
-                restored_partition = old_idx[aggr_partition[inverse]]
-                layers.append(restored_partition)
-
-                # Keep the working adjacency consistent with Optimizer.run:
-                # after each layer, remove edges that cross the new partition.
-                adj_work = Optimizer.cut_by_partition(
-                    adj_work,
-                    node_mask,
-                    restored_partition,
-                )
-
-            init_partition = torch.stack(layers)
-
-        if cache_dir is not None:
-            np.savez_compressed(
-                filename,
-                partition=init_partition.cpu().numpy(),
-                mod=init_mod,
-            )
+    _save_cached_initial_partition(cache_file, init_partition, init_mod)
 
     return init_partition, init_mod
 
 
 _LAUNCH_MODES = {"smart", "naive", "raw", "dynamic"}
+
+
+@dataclass(frozen=True)
+class _LaunchConfig:
+    """Small immutable bundle for options shared by launcher helpers."""
+
+    # Dataset key used in cache filenames and reporting.
+    dataset_name: str
+    # Static baseline or dynamic backend method name.
+    method: str
+    # Optional iteration/epoch budget forwarded to baselines that use it.
+    baseline_iter: int | None
+    # Normalized launch mode: "smart", "naive", "raw", or "dynamic".
+    mode: str
+    # Number of hierarchy levels maintained by smart mode.
+    smart_subcoms_depth: int
+    # Graph-neighborhood expansion radius for smart updates.
+    smart_neighborhood_step: int
+    # Output verbosity level used by launcher-local reporting.
+    verbose: int
+    # Whether Optimizer-backed modes may use CUDA when available.
+    use_gpu: bool
+    # Feature aggregation mode passed to Optimizer.
+    aggregation_mode: str
+    # Optional directory for cached initial partitions.
+    cache_dir: str | PathLike | None
+    # Bootstrap batch marker extracted from p:n strategies.
+    init_batch_number: str | None
+
+
+def _print_verbose(verbose: int, level: int, *args, **kwargs) -> None:
+    """Print only when the requested verbosity level is enabled."""
+    if verbose >= level:
+        print(*args, **kwargs)
 
 
 def _load_dataset_if_needed(ds, batches_strategy):
@@ -191,6 +337,47 @@ def _load_dataset_if_needed(ds, batches_strategy):
     dataset = Dataset(ds)
     dataset.load(batches_strategy=batches_strategy)
     return dataset
+
+
+def _build_launch_config(
+    ds,
+    batches_strategy,
+    underlying_static_method,
+    baseline_iter,
+    mode,
+    smart_subcoms_depth,
+    smart_neighborhood_step,
+    verbose,
+    use_gpu,
+    aggregation_mode,
+    cache_dir: str | PathLike | None,
+) -> _LaunchConfig:
+    """
+    Normalize public launch parameters into the compact internal config object.
+
+    ``dynamic_launch`` keeps its historical public signature, while private
+    helpers receive this single object instead of long, order-sensitive argument
+    lists.
+    """
+    normalized_mode = _normalize_launch_mode(mode)
+    if smart_subcoms_depth < 1:
+        raise ValueError("smart_subcoms_depth must be at least 1")
+    if smart_neighborhood_step < 0:
+        raise ValueError("smart_neighborhood_step must be non-negative")
+
+    return _LaunchConfig(
+        dataset_name=ds.name,
+        method=underlying_static_method,
+        baseline_iter=baseline_iter,
+        mode=normalized_mode,
+        smart_subcoms_depth=smart_subcoms_depth,
+        smart_neighborhood_step=smart_neighborhood_step,
+        verbose=verbose,
+        use_gpu=use_gpu,
+        aggregation_mode=aggregation_mode,
+        cache_dir=cache_dir,
+        init_batch_number=_init_batch_number(batches_strategy),
+    )
 
 
 def _normalize_launch_mode(mode: str) -> str:
@@ -249,7 +436,7 @@ def _init_batch_number(batches_strategy):
 
 def _iter_adjacency_batches(adj_matrix):
     """
-    Convert a static or temporal adjacency tensor into an iterable of batches.
+    Lazily iterate over static or temporal adjacency batches.
 
     Parameters
     ----------
@@ -259,9 +446,9 @@ def _iter_adjacency_batches(adj_matrix):
 
     Returns
     -------
-    list[torch.Tensor] | tuple[torch.Tensor, ...]
-        A one-element list for static graphs, or the snapshots returned by
-        ``torch.unbind`` for dynamic graphs.
+    Iterator[torch.Tensor]
+        A one-element iterator for static graphs, or a lazy iterator over the
+        first dimension for dynamic graphs.
 
     Raises
     ------
@@ -269,9 +456,12 @@ def _iter_adjacency_batches(adj_matrix):
         If the adjacency tensor has an unsupported number of dimensions.
     """
     if adj_matrix.ndim == 2:
-        return [adj_matrix]
+        yield adj_matrix
+        return
     if adj_matrix.ndim == 3:
-        return torch.unbind(adj_matrix)
+        for batch_idx in range(adj_matrix.size(0)):
+            yield adj_matrix[batch_idx]
+        return
     raise ValueError(f"Unsupported ds.adj ndim: {adj_matrix.ndim}")
 
 
@@ -306,7 +496,7 @@ def _compute_launch_initial_partition(
     adj_matrix,
     dataset_name,
     init_batch_number,
-    cache_dir=None,
+    cache_dir: str | PathLike | None = None,
     subcoms_depth=1,
     device=None,
     verbose=0,
@@ -355,8 +545,7 @@ def _compute_launch_initial_partition(
         subcoms_depth=subcoms_depth,
         device=device,
     )
-    with print_zone(verbose >= 1):
-        print(f"Initial modularity: {init_mod:.2g}")
+    _print_verbose(verbose, 1, f"Initial modularity: {init_mod:.2g}")
     return init_partition
 
 
@@ -392,23 +581,22 @@ def _active_nodes_mask(batch, nodes_num: int, device: torch.device) -> torch.Ten
         # duplicate entries do not produce unnecessary downstream work.
         batch_coo = batch if batch.is_coalesced() else batch.coalesce()
         active_nodes = batch_coo.indices().unique()
+        mask = torch.zeros(nodes_num, dtype=torch.bool, device=device)
+        if active_nodes.numel() > 0:
+            mask[active_nodes.to(device)] = True
+        return mask
     else:
-        # Dense non-zero coordinates have shape (nnz, 2). A flat unique() over
-        # both columns gives the same endpoint set as sparse COO indices.
-        nonzero_coordinates = torch.nonzero(batch, as_tuple=False)
-        active_nodes = nonzero_coordinates.unique()
-
-    mask = torch.zeros(nodes_num, dtype=torch.bool, device=device)
-    if active_nodes.numel() > 0:
-        mask[active_nodes.to(device)] = True
-    return mask
+        # Dense matrices can avoid materializing every non-zero coordinate.
+        # Reducing rows and columns gives the endpoint set with O(n) output
+        # memory instead of O(nnz) coordinate memory.
+        active_mask = (batch != 0).any(dim=0) | (batch != 0).any(dim=1)
+        return active_mask.to(device)
 
 
 def _run_optimizer_batch(
     opt: Optimizer,
-    mode: str,
+    config: _LaunchConfig,
     affected_nodes_mask,
-    smart_neighborhood_step: int,
 ) -> float:
     """
     Run one Optimizer-backed batch and return measured algorithm time.
@@ -418,16 +606,12 @@ def _run_optimizer_batch(
     opt : Optimizer
         Stateful optimizer holding the current adjacency, features, and
         community layers.
-    mode : str
-        One of ``"smart"``, ``"naive"``, or ``"raw"``. Dynamic mode is handled
-        by a separate backend path.
+    config : _LaunchConfig
+        Normalized launch options. ``config.mode`` is one of ``"smart"``,
+        ``"naive"``, or ``"raw"`` in this helper.
     affected_nodes_mask : torch.Tensor | None
         Smart-mode mask returned by ``_active_nodes_mask`` or
         ``Optimizer.update_adj``. It is ignored by naive/raw modes.
-    smart_neighborhood_step : int
-        Number of graph-neighborhood expansion steps applied before smart mode
-        reruns the local method.
-
     Returns
     -------
     float
@@ -443,29 +627,26 @@ def _run_optimizer_batch(
     time_s = time.perf_counter()
     conversion_time_s = opt.conversion_time
 
-    if mode == "smart":
+    if config.mode == "smart":
         # Smart mode expands the directly affected nodes, then reruns the local
         # algorithm only inside the touched hierarchy maintained by Optimizer.
         runtime_adj = opt.runtime_adj()
         affected_nodes_mask = opt.neighborhood(
             runtime_adj,
             affected_nodes_mask,
-            step=smart_neighborhood_step,
+            step=config.smart_neighborhood_step,
         )
         opt.run(affected_nodes_mask)
     else:
         # Naive mode reuses the previous labels as a warm start. Raw mode starts
         # the static baseline from scratch by passing labels=None.
-        labels = opt.coms if mode == "naive" else None
+        labels = opt.coms if config.mode == "naive" else None
         coms = opt.local_algorithm(
             opt.runtime_adj(),
             opt.runtime_features(),
             labels=labels,
         )
-        opt.set_communities(
-            communities=coms.unsqueeze(0),
-            replace_subcoms_depth=True,
-        )
+        opt.set_communities(communities=coms.unsqueeze(0), replace_subcoms_depth=True)
 
     time_e = time.perf_counter()
     conversion_time_e = opt.conversion_time
@@ -476,9 +657,7 @@ def _run_optimizer_batch(
 
 
 def _print_optimizer_batch_result(
-    verbose: int,
-    method: str,
-    mode: str,
+    config: _LaunchConfig,
     opt: Optimizer,
     modularity: float,
     measured_time: float,
@@ -488,13 +667,9 @@ def _print_optimizer_batch_result(
 
     Parameters
     ----------
-    verbose : int
-        Launcher verbosity; per-batch output is enabled at level 2 and above.
-    method : str
-        Static method name used by Optimizer.
-    mode : str
-        Launcher mode, used to preserve ldleiden timing semantics for raw and
-        naive runs.
+    config : _LaunchConfig
+        Normalized launch options. Verbosity controls printing, and method/mode
+        preserve ldleiden timing semantics for raw and naive runs.
     opt : Optimizer
         Optimizer instance containing optional backend timing metadata.
     modularity : float
@@ -502,22 +677,20 @@ def _print_optimizer_batch_result(
     measured_time : float
         Batch time to report for all methods except the ldleiden special case.
     """
-    with print_zone(verbose >= 2):
-        print(f"Modularity: {modularity:.2g}")
-        if method == "ldleiden" and mode in {"naive", "raw"}:
-            algorithm_time = opt.last_timing_info["algorithm_time"]
-            print(f"Algorithm time: {algorithm_time:.2f}")
-        else:
-            print(f"Time: {measured_time:.2f}")
+    if config.verbose < 2:
+        return
+
+    print(f"Modularity: {modularity:.2g}")
+    if config.method == "ldleiden" and config.mode in {"naive", "raw"}:
+        algorithm_time = opt.last_timing_info["algorithm_time"]
+        print(f"Algorithm time: {algorithm_time:.2f}")
+    else:
+        print(f"Time: {measured_time:.2f}")
 
 
 def _run_dynamic_mfc(
     ds,
-    dataset_name,
-    init_batch_number,
-    baseline_iter,
-    verbose,
-    cache_dir,
+    config: _LaunchConfig,
 ):
     """
     Run MFC's own dynamic implementation.
@@ -526,17 +699,9 @@ def _run_dynamic_mfc(
     ----------
     ds : Dataset-like object
         Loaded dataset containing ``adj`` and ``is_directed`` attributes.
-    dataset_name : str
-        Dataset key used for initial-partition cache naming.
-    init_batch_number : str | None
-        Bootstrap marker for p:n strategies. ``None`` disables bootstrap
-        partition loading/computation.
-    baseline_iter : int | None
-        Number of MFC epochs/iterations forwarded to ``mfc_adopted``.
-    verbose : int
-        Launcher verbosity.
-    cache_dir : str | os.PathLike | None
-        Optional cache directory for the bootstrap partition.
+    config : _LaunchConfig
+        Normalized launch options, including dataset/cache keys, verbosity, and
+        MFC iteration budget.
 
     Returns
     -------
@@ -554,54 +719,45 @@ def _run_dynamic_mfc(
 
     time_s = time.perf_counter()
     init_partition = None
-    if init_batch_number is not None:
+    if config.init_batch_number is not None:
         # p:n runs start from a static partition of the first snapshot. That
         # partition is passed into MFC so its dynamic run begins from the same
         # state as the other launch modes.
         first_snapshot = _first_snapshot(ds.adj)
         init_partition = _compute_launch_initial_partition(
             adj_matrix=first_snapshot,
-            dataset_name=dataset_name,
-            init_batch_number=init_batch_number,
-            cache_dir=cache_dir,
-            verbose=verbose,
+            dataset_name=config.dataset_name,
+            init_batch_number=config.init_batch_number,
+            cache_dir=config.cache_dir,
+            verbose=config.verbose,
         )
 
     # mfc_adopted owns the temporal loop internally and returns one final label
-    # vector. Keep this computation outside print_zone so verbosity only affects
-    # reporting, never whether the dynamic run itself happens.
+    # vector. Keep this computation outside verbose-only reporting so verbosity
+    # only affects reporting, never whether the dynamic run itself happens.
     coms = mfc_adopted(
         adj=ds.adj,
         labels=None,
         network_type="MFC",
         return_labels=True,
-        num_epoch=baseline_iter,
+        num_epoch=config.baseline_iter,
         pure_mfc=True,
         initial_partition=init_partition,
     )
 
     measured_time = time.perf_counter() - time_s
-    mod = Metrics.modularity(
-        _first_snapshot(ds.adj),
-        coms,
-        directed=ds.is_directed,
-    )
+    mod = Metrics.modularity(_first_snapshot(ds.adj), coms, directed=ds.is_directed)
 
-    with print_zone(verbose >= 2):
-        print(f"Modularity: {mod:.2g}")
-        print(f"Baseline calls: {1}")
-        print(f"Time: {measured_time:.2f}")
+    _print_verbose(config.verbose, 2, f"Modularity: {mod:.2g}")
+    _print_verbose(config.verbose, 2, f"Baseline calls: {1}")
+    _print_verbose(config.verbose, 2, f"Time: {measured_time:.2f}")
 
     return [{"modularity": mod, "time": measured_time}]
 
 
 def _run_dynamic_backend(
     batches_iter,
-    dataset_name,
-    method,
-    init_batch_number,
-    verbose,
-    cache_dir,
+    config: _LaunchConfig,
 ):
     """
     Run LDLeiden/DFLeiden/leidenalg/networkit through the streaming API.
@@ -610,45 +766,43 @@ def _run_dynamic_backend(
     ----------
     batches_iter : Iterable[torch.Tensor]
         Sequence of adjacency snapshots or update batches.
-    dataset_name : str
-        Dataset key used for initial-partition cache naming.
-    method : str
-        Dynamic backend method name accepted by ``create_leiden``.
-    init_batch_number : str | None
-        Bootstrap marker for p:n strategies. ``None`` runs without an external
-        initial partition.
-    verbose : int
-        Launcher verbosity.
-    cache_dir : str | os.PathLike | None
-        Optional cache directory for the bootstrap partition.
+    config : _LaunchConfig
+        Normalized launch options, including backend method, cache keys, and
+        verbosity.
 
     Returns
     -------
     list[dict[str, float]]
         Per-processed-batch modularity and runtime entries.
+
+    Raises
+    ------
+    ValueError
+        If the backend receives no adjacency batches at all.
     """
     results = []
     algo = None
+    seen_batch = False
 
     for batch_idx, batch in enumerate(batches_iter):
-        with print_zone(verbose >= 2):
-            print("  Batch", batch_idx)
+        seen_batch = True
+        _print_verbose(config.verbose, 2, "  Batch", batch_idx)
 
         if batch_idx == 0:
             # The first batch constructs the dynamic backend object. For p:n
             # strategies, the first batch is only the initial state; metrics are
             # recorded from subsequent update batches to match historical data.
             init_partition = None
-            if init_batch_number is not None:
+            if config.init_batch_number is not None:
                 init_partition = _compute_launch_initial_partition(
                     adj_matrix=batch,
-                    dataset_name=dataset_name,
-                    init_batch_number=init_batch_number,
-                    cache_dir=cache_dir,
-                    verbose=verbose,
+                    dataset_name=config.dataset_name,
+                    init_batch_number=config.init_batch_number,
+                    cache_dir=config.cache_dir,
+                    verbose=config.verbose,
                 )
 
-            algo = create_leiden(method, batch, partition=init_partition)
+            algo = create_leiden(config.method, batch, partition=init_partition)
 
             if init_partition is not None:
                 # FIXME: Some dynamic backends need a priming apply() after receiving
@@ -664,11 +818,13 @@ def _run_dynamic_backend(
         measured_time = elapsed_ms / 1000.0
         mod = algo.modularity()
 
-        with print_zone(verbose >= 2):
-            print(f"Modularity: {mod:.2g}")
-            print(f"Time: {measured_time:.2f}")
+        _print_verbose(config.verbose, 2, f"Modularity: {mod:.2g}")
+        _print_verbose(config.verbose, 2, f"Time: {measured_time:.2f}")
 
         results.append({"modularity": mod, "time": measured_time})
+
+    if not seen_batch:
+        raise ValueError("dynamic backend received no adjacency batches")
 
     return results
 
@@ -676,17 +832,7 @@ def _run_dynamic_backend(
 def _run_optimizer_modes(
     ds,
     batches_iter,
-    dataset_name,
-    method,
-    baseline_iter,
-    mode,
-    smart_subcoms_depth,
-    smart_neighborhood_step,
-    verbose,
-    use_gpu,
-    aggregation_mode,
-    init_batch_number,
-    cache_dir,
+    config: _LaunchConfig,
 ):
     """
     Run smart, naive, and raw modes through the shared Optimizer pipeline.
@@ -697,29 +843,8 @@ def _run_optimizer_modes(
         Loaded dataset containing ``features`` and ``is_directed`` attributes.
     batches_iter : Iterable[torch.Tensor]
         Sequence of adjacency snapshots or update batches.
-    dataset_name : str
-        Dataset key used for initial-partition cache naming.
-    method : str
-        Static community detection method executed through ``Optimizer``.
-    baseline_iter : int | None
-        Iteration/epoch count forwarded to baseline methods that use it.
-    mode : str
-        One of ``"smart"``, ``"naive"``, or ``"raw"``.
-    smart_subcoms_depth : int
-        Number of hierarchy levels used by smart mode.
-    smart_neighborhood_step : int
-        Neighborhood expansion radius for smart mode.
-    verbose : int
-        Launcher verbosity.
-    use_gpu : bool
-        Whether Optimizer should use CUDA when available.
-    aggregation_mode : str
-        Feature aggregation mode forwarded to Optimizer.
-    init_batch_number : str | None
-        Bootstrap marker for p:n strategies. ``None`` runs the first batch
-        through the selected mode immediately.
-    cache_dir : str | os.PathLike | None
-        Optional cache directory for the bootstrap partition.
+    config : _LaunchConfig
+        Normalized launch options for Optimizer-backed modes.
 
     Returns
     -------
@@ -731,8 +856,7 @@ def _run_optimizer_modes(
     features = getattr(ds, "features", None)
 
     for batch_idx, batch in enumerate(batches_iter):
-        with print_zone(verbose >= 2):
-            print("  Batch", batch_idx)
+        _print_verbose(config.verbose, 2, "  Batch", batch_idx)
 
         if batch_idx == 0:
             # The first batch initializes Optimizer's persistent state. Later
@@ -740,26 +864,30 @@ def _run_optimizer_modes(
             opt = Optimizer(
                 batch,
                 features,
-                subcoms_depth=smart_subcoms_depth if mode == "smart" else 1,
-                method=method,
-                baseline_iter=baseline_iter,
-                verbose=verbose,
-                use_gpu=use_gpu,
-                aggregation_mode=aggregation_mode,
+                subcoms_depth=(
+                    config.smart_subcoms_depth
+                    if config.mode == "smart"
+                    else 1
+                ),
+                method=config.method,
+                baseline_iter=config.baseline_iter,
+                verbose=config.verbose,
+                use_gpu=config.use_gpu,
+                aggregation_mode=config.aggregation_mode,
             )
 
-            if init_batch_number is not None:
+            if config.init_batch_number is not None:
                 # p:n strategies treat batch zero as the initial graph state.
                 # The initial partition is installed and timing starts from the
                 # following update batch.
                 init_partition = _compute_launch_initial_partition(
                     adj_matrix=batch,
-                    dataset_name=dataset_name,
-                    init_batch_number=init_batch_number,
-                    cache_dir=cache_dir,
+                    dataset_name=config.dataset_name,
+                    init_batch_number=config.init_batch_number,
+                    cache_dir=config.cache_dir,
                     subcoms_depth=opt.subcoms_depth,
                     device=opt.runtime_device(),
-                    verbose=verbose,
+                    verbose=config.verbose,
                 )
                 if init_partition.dim() == 1:
                     init_partition = init_partition.unsqueeze(0)
@@ -770,7 +898,7 @@ def _run_optimizer_modes(
             # was no previous adjacency to diff against.
             affected_nodes_mask = (
                 _active_nodes_mask(batch, opt.nodes_num, opt.runtime_device())
-                if mode == "smart"
+                if config.mode == "smart"
                 else None
             )
         else:
@@ -778,24 +906,12 @@ def _run_optimizer_modes(
             # and optionally returns the directly affected nodes for smart mode.
             affected_nodes_mask = opt.update_adj(
                 batch,
-                return_mask=(mode == "smart"),
+                return_mask=(config.mode == "smart"),
             )
 
-        measured_time = _run_optimizer_batch(
-            opt,
-            mode,
-            affected_nodes_mask,
-            smart_neighborhood_step,
-        )
+        measured_time = _run_optimizer_batch(opt, config, affected_nodes_mask)
         mod = opt.modularity(directed=ds.is_directed)
-        _print_optimizer_batch_result(
-            verbose,
-            method,
-            mode,
-            opt,
-            mod,
-            measured_time,
-        )
+        _print_optimizer_batch_result(config, opt, mod, measured_time)
 
         results.append({"modularity": mod, "time": measured_time})
 
@@ -815,10 +931,10 @@ def _print_launch_summary(results, verbose: int) -> None:
         higher levels print total time after per-batch details.
     """
     total_measured_time = sum(result["time"] for result in results)
-    with print_zone(verbose == 1):
+    if verbose == 1:
         final_mod = results[-1]["modularity"] if results else 0
         print(f"Final modularity: {final_mod:.2g}")
-    with print_zone(verbose >= 1):
+    if verbose >= 1:
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")
 
@@ -832,7 +948,7 @@ def dynamic_launch(ds, batches_strategy,
                     verbose: int = 1,
                     use_gpu: bool = False,
                     aggregation_mode: str = "sum",
-                    cache_dir = None):
+                    cache_dir: str | PathLike | None = None):
     """
     Launch community detection experiments for static and dynamic graph batches.
 
@@ -876,51 +992,31 @@ def dynamic_launch(ds, batches_strategy,
     preserving the existing result format.
     """
     # Normalize the external API first. The rest of the function can then work
-    # with a loaded dataset object and one validated mode value.
+    # with a loaded dataset object and one compact config value.
     ds = _load_dataset_if_needed(ds, batches_strategy)
-    mode = _normalize_launch_mode(mode)
-
-    dataset_name = ds.name
-    init_batch_number = _init_batch_number(batches_strategy)
-    batches_iter = _iter_adjacency_batches(ds.adj)
+    config = _build_launch_config(
+        ds=ds,
+        batches_strategy=batches_strategy,
+        underlying_static_method=underlying_static_method,
+        baseline_iter=baseline_iter,
+        mode=mode,
+        smart_subcoms_depth=smart_subcoms_depth,
+        smart_neighborhood_step=smart_neighborhood_step,
+        verbose=verbose,
+        use_gpu=use_gpu,
+        aggregation_mode=aggregation_mode,
+        cache_dir=cache_dir,
+    )
 
     # Select the execution engine. MFC dynamic mode owns its full temporal loop,
     # other dynamic methods use the streaming backend API, and all remaining
     # modes use Optimizer.
-    if mode == "dynamic" and underlying_static_method == "mfc":
-        results = _run_dynamic_mfc(
-            ds,
-            dataset_name,
-            init_batch_number,
-            baseline_iter,
-            verbose,
-            cache_dir,
-        )
-    elif mode == "dynamic":
-        results = _run_dynamic_backend(
-            batches_iter,
-            dataset_name,
-            underlying_static_method,
-            init_batch_number,
-            verbose,
-            cache_dir,
-        )
+    if config.mode == "dynamic" and config.method == "mfc":
+        results = _run_dynamic_mfc(ds, config)
+    elif config.mode == "dynamic":
+        results = _run_dynamic_backend(_iter_adjacency_batches(ds.adj), config)
     else:
-        results = _run_optimizer_modes(
-            ds,
-            batches_iter,
-            dataset_name,
-            underlying_static_method,
-            baseline_iter,
-            mode,
-            smart_subcoms_depth,
-            smart_neighborhood_step,
-            verbose,
-            use_gpu,
-            aggregation_mode,
-            init_batch_number,
-            cache_dir,
-        )
+        results = _run_optimizer_modes(ds, _iter_adjacency_batches(ds.adj), config)
 
-    _print_launch_summary(results, verbose)
+    _print_launch_summary(results, config.verbose)
     return results
