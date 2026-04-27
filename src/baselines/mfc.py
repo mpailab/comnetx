@@ -335,22 +335,15 @@ def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_m
             dgm1_new = wrcf_layer_dim1(community_graph)
             dgm_list[t] = [dgm0_new,dgm1_new]
 
-    from pathlib import Path
-    out_dir = Path(PROJECT_PATH) / "results" / "mfc"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with (out_dir / "results_raw.pkl").open("wb") as handle:
-        pickle.dump(results_raw, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with (out_dir / "results_topo.pkl").open("wb") as handle:
-        pickle.dump(results_topo, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    return results_raw, results_topo
 
 def mfc_adopted(
     adj: torch.Tensor,
     features: torch.Tensor | None = None,
     network_type: str = "MFC",
-    return_labels: bool = False,
     timing_info: dict | None = None,
     num_epoch = None,
-    pure_mfc: bool = False,
+    dynamic: bool = False,
     initial_partition: torch.Tensor | None = None,
 ):
     """
@@ -362,8 +355,6 @@ def mfc_adopted(
         Adjacency matrix [N, N], sparse или dense.
     network_type : str
         MFC/GEC/DAEGC/SDCN.
-    return_labels : bool
-        Если True, вернуть кластерные метки для узлов.
     timing_info : dict or None
         Словарь, куда накапливается conversion_time.
     """
@@ -379,7 +370,7 @@ def mfc_adopted(
     t0 = time.time()
     adj_bin = _binarize_adj(adj)
 
-    if pure_mfc:
+    if dynamic:
         adj_matrices = adj_bin
         first_snapshot = adj_bin[0]
         if initial_partition is not None:
@@ -391,17 +382,12 @@ def mfc_adopted(
     else:
         adj_matrices = [adj_bin]
         init_labels = _degree_bins_labels(adj_bin)
+    labels_list = [init_labels]
 
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
-    labels_list = [init_labels]
-
-    t0 = time.time()
-    
-    # print(f"adj_matrices = {adj_matrices}") #my
-
-    main(
+    raw, topo = main(
         network_type=network_type,
         adj_matrix=adj_matrices,
         labels=labels_list,
@@ -409,109 +395,13 @@ def mfc_adopted(
         num_epoch=num_epoch,
         start_mf=start_mf,
     )
-    t1 = time.time()
-    timing_info["conversion_time"] += (t1 - t0)
-
-    out_dir = Path(PROJECT_PATH) / "results" / "mfc"
     
-    if return_labels:
-        raw_pkl = out_dir / "results_raw.pkl"
-        assert raw_pkl.is_file(), "results_raw.pkl not found"
-        
-        with raw_pkl.open("rb") as f:
-            raw = pickle.load(f)
-        assert isinstance(raw, list) and len(raw) >= 1
-        
-        snap = raw[0]
-        Z, Q, adj_out, labels_out = snap
-        
-        import numpy as np
-        Q = np.asarray(Q)
-        
-        labels = torch.tensor(np.argmax(Q, axis=1), dtype=torch.long)
-        
-        # Очищаем результаты (опционально, чтобы не засорять диск)
-        # (out_dir / "results_raw.pkl").unlink(missing_ok=True)
-        # (out_dir / "results_topo.pkl").unlink(missing_ok=True)
-        assert labels.shape[0] == adj_matrices[0].shape[1], \
-            f"Labels size mismatch: {labels.shape} vs {adj_matrices[0].shape}"
+    snap = raw[0]
+    Z, Q, adj_out, labels_out = snap
+    
+    import numpy as np
+    Q = np.asarray(Q)
+    
+    labels = torch.tensor(np.argmax(Q, axis=1), dtype=torch.long)
 
-        return labels
-
-    else:
-        raw_pkl = out_dir / "results_raw.pkl"
-        assert raw_pkl.is_file(), "results_raw.pkl not found after main()"
-        
-        with raw_pkl.open("rb") as f:
-            raw = pickle.load(f)
-        print("MFC completed successfully!")
-        print(f"Results saved to: {out_dir}")
-        print(f"- results_raw.pkl: {len(raw)} snapshots")
-        print(f"- results_topo.pkl: topological regularized results")
-        return None
-
-def _load_from_cli(adj_root: str, dataset_name: str | None):
-    from datasets import Dataset
-
-    if dataset_name is None:
-        raise SystemExit("For MFC CLI please provide --dataset-name DATASET_KEY")
-
-    ds = Dataset(dataset_name, path=adj_root)
-    adj, features, labels = ds.load(tensor_type="coo")
-
-    # 1) локально приводим adjacency к бинарной для MFC
-    adj = _binarize_adj(adj)
-
-    # 2) метки: реальные если есть, иначе псевдо-кластеры по структуре
-    if labels is None:
-        labels = _degree_bins_labels(adj)
-    else:
-        labels = labels.to(torch.long)
-
-    return adj, labels
-
-if __name__ == "__main__":
-    import argparse
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--adj", type=str, required=True,
-                    help="Root directory with datasets (used by Dataset)")
-    ap.add_argument("--dataset-name", type=str, required=True,
-                    help="Dataset key (name) for Dataset")
-    ap.add_argument("--network-type", type=str, default="MFC",
-                    help="MFC/GEC/DAEGC/SDCN")
-    ap.add_argument("--snapshots", type=int, default=1,
-                    help="How many identical snapshots to build from loaded graph")
-    args = ap.parse_args()
-
-    adj, labels = _load_from_cli(args.adj, args.dataset_name)
-
-    for _ in range(max(1, int(args.snapshots))):
-        _ = mfc_adopted(
-            adj=adj,
-            network_type=args.network_type,
-            return_labels=False,
-        )
-
-
-# network_type = "MFC" # GEC/DAEGC/MFC/SDCN
-# adj0 = torch.tensor([
-#     [0,1,0,0],
-#     [1,0,1,0],
-#     [0,1,0,0],
-#     [0,0,0,0],
-# ], dtype=torch.float32)
-
-# adj1 = torch.tensor([
-#     [0,1,0,0],
-#     [1,0,1,1],
-#     [0,1,0,1],
-#     [0,1,1,0]
-# ], dtype=torch.float32)
-
-
-# labels0 = torch.tensor([0,1,0,0])
-# labels1 = torch.tensor([0,1,0,0])
-# main(network_type=network_type,
-#      adj_matrix=[adj0, ], 
-#      labels=[labels0, ])
+    return labels

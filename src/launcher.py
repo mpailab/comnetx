@@ -750,9 +750,8 @@ def _run_dynamic_mfc(
             adj=ds.adj,
             features=getattr(ds, "features", None),
             network_type="MFC",
-            return_labels=True,
             num_epoch=config.baseline_iter,
-            pure_mfc=True,
+            dynamic=True,
             initial_partition=init_partition,
         )
 

@@ -360,7 +360,6 @@ class Optimizer:
                     adj=adj,
                     features=features,
                     network_type="MFC",
-                    return_labels=True,
                     timing_info=timing_info,
                     num_epoch=self.baseline_iter,
                     initial_partition = labels
