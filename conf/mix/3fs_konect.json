@@ -10,8 +10,8 @@
                "hyves", "dblp_coauthor"],
   "BATCHES": ["999:10"],
   
-  "BASELINES": ["ldleiden", "leidenalg", "dfleiden"],
-  "MODES": ["naive", "smart"],
+  "BASELINES": ["leidenalg", "ldleiden", "dfleiden"],
+  "MODES": ["naive", "dynamic", "smart"],
   
   "SMART_VERSION": "v1",
   "SMART_PARAMS_GRID": {

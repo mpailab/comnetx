@@ -10,7 +10,7 @@
   "BATCHES": ["999:10"],
   
   "BASELINES": ["ldleiden", "leidenalg", "dfleiden", "prgpt:infomap", "prgpt:locale"],
-  "MODES": ["naive", "smart"],
+  "MODES": ["naive", "dynamic", "smart"],
   
   "SMART_VERSION": "v1",
   "SMART_PARAMS_GRID": {

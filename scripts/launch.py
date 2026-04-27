@@ -110,6 +110,8 @@ if isinstance(BASELINE_ITER_VALS, (int, float)):
     BASELINE_ITER_VALS = [BASELINE_ITER_VALS]
 elif not isinstance(BASELINE_ITER_VALS, list):
     BASELINE_ITER_VALS = [None]
+# dynamic
+SUPPORTED_DYNAMIC_METHODS = {"ldleiden", "dfleiden", "mfc"}
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:
@@ -194,6 +196,9 @@ def measure():
                             iter_vals = BASELINE_ITER_VALS
                         else:
                             iter_vals = [None]
+                        if mode == "dynamic" and method not in SUPPORTED_DYNAMIC_METHODS:
+                            print(f"Warning! Ingnore dynamic mode for method: {method}")
+                            continue
 
                         for baseline_iter in iter_vals:
                             if mode == "smart" and SMART_PARAMS_GRID:
