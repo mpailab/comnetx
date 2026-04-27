@@ -363,18 +363,18 @@ class Optimizer:
                     return_labels=True,
                     timing_info=timing_info,
                     num_epoch=self.baseline_iter,
+                    initial_partition = labels
                 )
 
             elif self.method == "flmig":
                 from baselines.flmig import flmig_adopted
-                flmig_labels = flmig_adopted(
+                res = flmig_adopted(
                     adj=adj,
                     Number_iter=self.baseline_iter,
                     return_labels=True,
                     timing_info=timing_info,
+                    initial_labels=labels
                 )
-                _, remap = torch.unique(flmig_labels, sorted=True, return_inverse=True)
-                res = remap.to(torch.long)
             elif self.method == "dese":
                 from baselines.dese import dese
                 if not self.has_real_features:

@@ -90,8 +90,8 @@ elif not isinstance(feature_modes_raw, list):
         f'conf["FEATURE_MODES"] must be str or list, got: {type(feature_modes_raw)}'
     )
 
+# features
 FEATURE_MODES = [str(mode).lower() for mode in feature_modes_raw]
-
 supported_feature_modes = {"dataset", "onehot", "random"}
 bad_feature_modes = [mode for mode in FEATURE_MODES if mode not in supported_feature_modes]
 if bad_feature_modes:
@@ -99,7 +99,6 @@ if bad_feature_modes:
         f"Unsupported feature modes: {bad_feature_modes}. "
         f"Supported: {sorted(supported_feature_modes)}"
     )
-
 RANDOM_FEATURE_DIM = conf.get("RANDOM_FEATURE_DIM", 64)
 RANDOM_FEATURE_SEED = conf.get("RANDOM_FEATURE_SEED", 42)
 
@@ -110,8 +109,11 @@ if isinstance(BASELINE_ITER_VALS, (int, float)):
     BASELINE_ITER_VALS = [BASELINE_ITER_VALS]
 elif not isinstance(BASELINE_ITER_VALS, list):
     BASELINE_ITER_VALS = [None]
-# dynamic
+
+# modes
 SUPPORTED_DYNAMIC_METHODS = {"ldleiden", "dfleiden", "mfc"}
+SUPPORTED_NAIVE_METHODS = {"magi", "leidenalg", "ldleiden", "dfleiden", "dmon", "dese", "s2cag", "mfc"}
+# don't support naive: prgpt:infomap, prgpt:locale, networkit
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:
