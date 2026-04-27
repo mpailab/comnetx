@@ -81,15 +81,15 @@ def dynamic_launch(ds, batches_strategy,
         
         with print_zone(verbose >= 2):
             coms = mfc_adopted(
-                        adj=ds.adj,
-                        labels=None,
-                        network_type="MFC",
-                        return_labels=True,
-                        num_epoch=baseline_iter,
-                        pure_mfc=True,
-                        initial_partition=init_partition,
-                    )
-            
+                adj=ds.adj,
+                features=ds.features,
+                network_type="MFC",
+                return_labels=True,
+                num_epoch=baseline_iter,
+                pure_mfc=True,
+                initial_partition=init_partition,
+            )
+                        
             time_e = time.time()
             measured_time = time_e - time_s
             mod = Metrics.modularity(ds.adj[0], coms, directed = ds.is_directed)
