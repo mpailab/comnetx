@@ -736,7 +736,6 @@ def _run_dynamic_mfc(
     # mfc_adopted owns the temporal loop internally and returns one final label
     # vector. Keep this computation outside verbose-only reporting so verbosity
     # only affects reporting, never whether the dynamic run itself happens.
-    print(getattr(ds, "features", None))
     with print_zone(config.verbose >= 4):
         coms = mfc_adopted(
             adj=ds.adj,
