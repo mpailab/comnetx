@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.metrics import adjusted_rand_score, f1_score, normalized_mutual_info_score, balanced_accuracy_score
 from torch_sparse import SparseTensor
 from scipy.optimize import linear_sum_assignment
+from our_utils import suppress_warnings_context
 
 # import tensorflow as tensor 
 # import torch as tensor 
@@ -10,6 +11,19 @@ def _to_numpy(x):
     if isinstance(x, torch.Tensor):
         return x.detach().cpu().numpy()
     return np.asarray(x)
+
+def calculate_ground_truth_metrics(true_labels, pred_labels):
+    #true_labels = _to_numpy(true_labels)
+    #pred_labels = _to_numpy(pred_labels)
+    metrics = {}
+    with suppress_warnings_context():
+        metrics["purity"] = Metrics.purity_score(true_labels, pred_labels)
+        metrics["ari"] = Metrics.ari_score(true_labels, pred_labels)
+        metrics["f1"] = Metrics.macro_f1(true_labels, pred_labels)
+        metrics["acc"] = Metrics.accuracy(true_labels, pred_labels)
+        metrics["nmi"] = Metrics.nmi(true_labels, pred_labels)
+        metrics["bal_acc"] = Metrics.balanced_acc(true_labels, pred_labels)
+    return metrics
 
 class Metrics:
 

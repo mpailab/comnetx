@@ -9,7 +9,7 @@ from optimizer import Optimizer
 import sparse
 
 from baselines.dgc import create_leiden
-from metrics import Metrics
+from metrics import Metrics, calculate_ground_truth_metrics
 from our_utils import print_zone
 
 
@@ -492,6 +492,12 @@ def _first_snapshot(adj_matrix):
         return adj_matrix[0]
     raise ValueError(f"Unsupported ds.adj ndim: {adj_matrix.ndim}")
 
+def final_adj(adj_matrix):
+    if adj_matrix.ndim == 2:
+        return adj_matrix
+    if adj_matrix.ndim == 3:
+        pass
+
 
 def _compute_launch_initial_partition(
     adj_matrix,
@@ -737,7 +743,7 @@ def _run_dynamic_mfc(
     # vector. Keep this computation outside verbose-only reporting so verbosity
     # only affects reporting, never whether the dynamic run itself happens.
     with print_zone(config.verbose >= 4):
-        coms = mfc_adopted(
+        last_partition = mfc_adopted(
             adj=ds.adj,
             features=getattr(ds, "features", None),
             network_type="MFC",
@@ -748,13 +754,13 @@ def _run_dynamic_mfc(
         )
 
     measured_time = time.perf_counter() - time_s
-    mod = Metrics.modularity(_first_snapshot(ds.adj), coms, directed=ds.is_directed)
+    mod = Metrics.modularity(_first_snapshot(ds.adj), last_partition, directed=ds.is_directed)
 
     _print_verbose(config.verbose, 2, f"Modularity: {mod:.2g}")
     _print_verbose(config.verbose, 2, f"Baseline calls: {1}")
     _print_verbose(config.verbose, 2, f"Time: {measured_time:.2f}")
 
-    return [{"modularity": mod, "time": measured_time}]
+    return [{"modularity": mod, "time": measured_time}], last_partition
 
 
 def _run_dynamic_backend(
@@ -828,7 +834,11 @@ def _run_dynamic_backend(
     if not seen_batch:
         raise ValueError("dynamic backend received no adjacency batches")
 
-    return results
+    last_partition = torch.as_tensor(
+        algo.partition(),
+        dtype=torch.long,
+    )
+    return results, last_partition
 
 
 def _run_optimizer_modes(
@@ -916,11 +926,12 @@ def _run_optimizer_modes(
         _print_optimizer_batch_result(config, opt, mod, measured_time)
 
         results.append({"modularity": mod, "time": measured_time})
+    
+    last_partition = opt.coms[0]
+    return results, last_partition
 
-    return results
 
-
-def _print_launch_summary(results, verbose: int) -> None:
+def _print_launch_summary(results, metrics_list, verbose: int) -> None:
     """
     Print the same final summary format for all launch paths.
 
@@ -933,9 +944,13 @@ def _print_launch_summary(results, verbose: int) -> None:
         higher levels print total time after per-batch details.
     """
     total_measured_time = sum(result["time"] for result in results)
+    final_result = results[-1]
     if verbose == 1:
-        final_mod = results[-1]["modularity"] if results else 0
+        final_mod = final_result["modularity"] if results else 0
         print(f"Final modularity: {final_mod:.2g}")
+    if verbose >= 1:
+        for met in metrics_list:
+            print(f"{met}: {final_result[met]:.2g}")
     if verbose >= 1:
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")
@@ -1014,11 +1029,15 @@ def dynamic_launch(ds, batches_strategy,
     # other dynamic methods use the streaming backend API, and all remaining
     # modes use Optimizer.
     if config.mode == "dynamic" and config.method == "mfc":
-        results = _run_dynamic_mfc(ds, config)
+        results, last_partition = _run_dynamic_mfc(ds, config)
     elif config.mode == "dynamic":
-        results = _run_dynamic_backend(_iter_adjacency_batches(ds.adj), config)
+        results, last_partition = _run_dynamic_backend(_iter_adjacency_batches(ds.adj), config)
     else:
-        results = _run_optimizer_modes(ds, _iter_adjacency_batches(ds.adj), config)
+        results, last_partition = _run_optimizer_modes(ds, _iter_adjacency_batches(ds.adj), config)
 
-    _print_launch_summary(results, config.verbose)
+    metrics = calculate_ground_truth_metrics(ds.label, last_partition) if ds.label is not None else {}
+    if results:
+        results[-1].update(metrics)
+        metrics_list = list(metrics.keys())
+        _print_launch_summary(results, metrics_list, config.verbose)
     return results

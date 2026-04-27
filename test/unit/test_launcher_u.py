@@ -120,6 +120,7 @@ def fake_dataset():
         adj=torch.zeros((1, 2, 2), dtype=torch.float32),
         features=torch.zeros((2, 1), dtype=torch.float32),
         is_directed=False,
+        label=None
     )
 
 
@@ -839,7 +840,7 @@ def test_run_dynamic_mfc_uses_initial_partition_and_returns_single_result(
         cache_dir="/tmp/cache",
     )
 
-    results = launcher._run_dynamic_mfc(
+    results, last_partition = launcher._run_dynamic_mfc(
         ds,
         config,
     )
@@ -872,7 +873,7 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
     class _FakeDynamicAlgo:
         def __init__(self, batch, partition):
             self.batch = batch
-            self.partition = partition
+            self._partition = partition
             self.apply_calls = 0
             self.updated_batches = []
             created_algos.append(self)
@@ -886,6 +887,9 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
 
         def modularity(self):
             return 0.66
+        
+        def partition(self):
+            return self._partition
 
     def fake_create_leiden(method, batch, partition=None):
         captured["method"] = method
@@ -916,7 +920,7 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         init_batch_number="999",
     )
 
-    results = launcher._run_dynamic_backend(
+    results, last_partition = launcher._run_dynamic_backend(
         batches,
         config,
     )
@@ -924,7 +928,7 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
     assert results == [{"modularity": 0.66, "time": 1.5}]
     assert captured["method"] == "ldleiden"
     assert captured["initial_args"] == (batches[0], "fake", "999")
-    assert created_algos[0].partition is initial_partition
+    assert created_algos[0].partition() is initial_partition
     assert created_algos[0].apply_calls == 2
     assert created_algos[0].updated_batches == [batches[1]]
 
@@ -1014,7 +1018,7 @@ def test_run_optimizer_modes_processes_batches_through_optimizer(
         aggregation_mode="sum",
     )
 
-    results = launcher._run_optimizer_modes(
+    results, last_partition = launcher._run_optimizer_modes(
         ds,
         batches,
         config,
@@ -1047,6 +1051,7 @@ def test_print_launch_summary_reports_final_modularity_and_total_time(
             {"modularity": 0.1, "time": 1.0},
             {"modularity": 0.2, "time": 2.5},
         ],
+        [],
         verbose=1,
     )
 
