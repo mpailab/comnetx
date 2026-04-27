@@ -336,10 +336,10 @@ class Optimizer:
                 res = rough_prgpt(adj, refine=refine, timing_info=timing_info)
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
-                res = leidenalg_partition(adj, timing_info = timing_info)
+                res = leidenalg_partition(adj, init_partition = labels, timing_info = timing_info)
             elif self.method in ("ldleiden", "dfleiden"):
                 from baselines.dgc import _run_leiden
-                res = _run_leiden(self.method, adj, timing_info = timing_info)
+                res = _run_leiden(self.method, adj, init_partition = labels, timing_info = timing_info)
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
                 res = adapted_dmon(

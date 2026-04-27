@@ -650,7 +650,7 @@ def _run_optimizer_batch(
     else:
         # Naive mode reuses the previous labels as a warm start. Raw mode starts
         # the static baseline from scratch by passing labels=None.
-        labels = opt.coms if config.mode == "naive" else None
+        labels = opt.coms[0] if config.mode == "naive" else None
         coms = opt.local_algorithm(
             opt.runtime_adj(),
             opt.runtime_features(),

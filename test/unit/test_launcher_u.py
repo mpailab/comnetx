@@ -709,7 +709,7 @@ def test_run_optimizer_batch_raw_mode_resets_labels_and_subtracts_conversion(
 def test_run_optimizer_batch_naive_mode_reuses_existing_labels(monkeypatch):
     launcher = _load_launcher(monkeypatch)
     opt = _BatchOptimizer()
-    previous_labels = opt.coms
+    previous_labels = opt.coms[0]
     clock = iter([20.0, 22.0])
     monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
     config = _test_config(launcher, mode="naive")
@@ -721,7 +721,7 @@ def test_run_optimizer_batch_naive_mode_reuses_existing_labels(monkeypatch):
     )
 
     assert measured_time == pytest.approx(1.75)
-    assert opt.local_algorithm_labels is previous_labels
+    assert torch.equal(opt.local_algorithm_labels, previous_labels)
 
 
 @pytest.mark.unit

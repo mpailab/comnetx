@@ -33,6 +33,7 @@ def create_leiden(method: str, adj, options=None, partition=None):
 def _run_leiden(
     method,
     adj: torch.Tensor,
+    init_partition=None,
     options=None,
     timing_info=None
 ):
@@ -50,7 +51,7 @@ def _run_leiden(
     if options is not None:
         options = AlgorithmOptions(**options)
 
-    algo = create_leiden(method, adj, options)
+    algo = create_leiden(method, adj, options, partition = init_partition)
 
     time_e = time.time()
     conversion_time += time_e - time_s
