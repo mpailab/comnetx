@@ -133,11 +133,9 @@ class Optimizer:
         return torch.sparse.mm(pattern, features)
 
     def _local_algorithm_requires_features(self) -> bool:
-        if self.method in {"magi", "dmon", "mfc"}:
+        if self.method in {"magi", "dmon"}:
             return True
-        if self.method == "dese":
-            return self.has_real_features
-        if self.method == "s2cag":
+        if self.method in {"dese", "s2cag", "mfc"}:
             return self.has_real_features
         return False
 
@@ -356,7 +354,8 @@ class Optimizer:
                  res = networkit_partition(adj, timing_info = timing_info)
             elif self.method == "mfc":
                 from baselines.mfc import mfc_adopted
-
+                if not self.has_real_features:
+                    features = None
                 res = mfc_adopted(
                     adj=adj,
                     features=features,
