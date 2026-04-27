@@ -33,7 +33,7 @@ MACHINE = MACHINE_PARENT if MACHINE_PARENT is not None else MACHINE_DEFAULT
 
 INIT_COMMUNITIES_DIR = {
     "cn69" : "/home/dev/communities",
-    "astra" : "/auto/datasets/"
+    "astra" : "/auto/datasets/communities"
 }
 CACHE_DIR = INIT_COMMUNITIES_DIR.get(MACHINE, None)
 
@@ -76,7 +76,6 @@ BATCHES = conf["BATCHES"] # [1, 10, 100, "real", "10:100"]
 # algorithm
 METHODS = conf["BASELINES"] # ["prgpt:locale", "prgpt:infomap", "leidenalg", "networkit", "magi", "dmon"]
 MODES = conf["MODES"] # ["smart", "naive", "raw"]
-SMART_VERSION = conf["SMART_VERSION"]
 USE_GPU = conf.get("USE_GPU", True)
 
 feature_modes_raw = conf.get("FEATURE_MODES")

@@ -10,6 +10,7 @@ import sparse
 
 from baselines.dgc import create_leiden
 from metrics import Metrics
+from our_utils import print_zone
 
 
 def _initial_partition_cache_path(
@@ -735,15 +736,17 @@ def _run_dynamic_mfc(
     # mfc_adopted owns the temporal loop internally and returns one final label
     # vector. Keep this computation outside verbose-only reporting so verbosity
     # only affects reporting, never whether the dynamic run itself happens.
-    coms = mfc_adopted(
-        adj=ds.adj,
-        features=getattr(ds, "features", None),
-        network_type="MFC",
-        return_labels=True,
-        num_epoch=config.baseline_iter,
-        pure_mfc=True,
-        initial_partition=init_partition,
-    )
+    print(getattr(ds, "features", None))
+    with print_zone(config.verbose >= 4):
+        coms = mfc_adopted(
+            adj=ds.adj,
+            features=getattr(ds, "features", None),
+            network_type="MFC",
+            return_labels=True,
+            num_epoch=config.baseline_iter,
+            pure_mfc=True,
+            initial_partition=init_partition,
+        )
 
     measured_time = time.perf_counter() - time_s
     mod = Metrics.modularity(_first_snapshot(ds.adj), coms, directed=ds.is_directed)
