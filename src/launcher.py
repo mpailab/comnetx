@@ -737,7 +737,7 @@ def _run_dynamic_mfc(
     # only affects reporting, never whether the dynamic run itself happens.
     coms = mfc_adopted(
         adj=ds.adj,
-        labels=None,
+        features=getattr(ds, "features", None),
         network_type="MFC",
         return_labels=True,
         num_epoch=config.baseline_iter,

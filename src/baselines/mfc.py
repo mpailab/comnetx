@@ -346,7 +346,6 @@ def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_m
 def mfc_adopted(
     adj: torch.Tensor,
     features: torch.Tensor | None = None,
-    labels: torch.Tensor | None = None,
     network_type: str = "MFC",
     return_labels: bool = False,
     timing_info: dict | None = None,
@@ -361,8 +360,6 @@ def mfc_adopted(
     ----------
     adj : torch.Tensor
         Adjacency matrix [N, N], sparse или dense.
-    labels : torch.Tensor or None
-        Начальные метки [N]. Если None, строятся псевдо-кластеры по степеням.
     network_type : str
         MFC/GEC/DAEGC/SDCN.
     return_labels : bool
@@ -380,36 +377,24 @@ def mfc_adopted(
         timing_info = {}
 
     t0 = time.time()
-    if adj.device.type == "cuda":
-        adj = adj.cpu()
-    if features is not None and features.device.type == "cuda":
-        features = features.cpu()
-    if labels is not None and labels.device.type == "cuda":
-        labels = labels.cpu()
-    if initial_partition is not None and initial_partition.device.type == "cuda":
-        initial_partition = initial_partition.cpu()
-    t1 = time.time()
-    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
-
-    t0 = time.time()
     adj_bin = _binarize_adj(adj)
-    if labels is None:
-        init_labels = _degree_bins_labels(adj_bin)
-    else:
-        init_labels = labels.to(torch.long)
-    t1 = time.time()
-    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
 
     if pure_mfc:
         adj_matrices = adj_bin
         first_snapshot = adj_bin[0]
         if initial_partition is not None:
-            init_labels = _normalize_initial_partition(initial_partition, first_snapshot.size(0))
+            init_labels = _normalize_initial_partition(
+                initial_partition, first_snapshot.size(0)
+            )
         else:
             init_labels = _degree_bins_labels(first_snapshot)
     else:
         adj_matrices = [adj_bin]
-        
+        init_labels = _degree_bins_labels(adj_bin)
+
+    t1 = time.time()
+    timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
+
     labels_list = [init_labels]
 
     t0 = time.time()
@@ -499,14 +484,11 @@ if __name__ == "__main__":
                     help="How many identical snapshots to build from loaded graph")
     args = ap.parse_args()
 
-    # 1) загрузка через Dataset
     adj, labels = _load_from_cli(args.adj, args.dataset_name)
 
-    # 2) размножаем при необходимости
     for _ in range(max(1, int(args.snapshots))):
         _ = mfc_adopted(
             adj=adj,
-            labels=labels,
             network_type=args.network_type,
             return_labels=False,
         )
