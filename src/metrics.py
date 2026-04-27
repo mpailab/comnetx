@@ -17,12 +17,12 @@ def calculate_ground_truth_metrics(true_labels, pred_labels):
     #pred_labels = _to_numpy(pred_labels)
     metrics = {}
     with suppress_warnings_context():
-        metrics["purity"] = Metrics.purity_score(true_labels, pred_labels)
-        metrics["ari"] = Metrics.ari_score(true_labels, pred_labels)
-        metrics["f1"] = Metrics.macro_f1(true_labels, pred_labels)
-        metrics["acc"] = Metrics.accuracy(true_labels, pred_labels)
-        metrics["nmi"] = Metrics.nmi(true_labels, pred_labels)
-        metrics["bal_acc"] = Metrics.balanced_acc(true_labels, pred_labels)
+        metrics["Purity"] = Metrics.purity_score(true_labels, pred_labels)
+        metrics["ARI"] = Metrics.ari_score(true_labels, pred_labels)
+        metrics["F1"] = Metrics.macro_f1(true_labels, pred_labels)
+        metrics["Accuracy"] = Metrics.accuracy(true_labels, pred_labels)
+        metrics["NMI"] = Metrics.nmi(true_labels, pred_labels)
+        metrics["Balanced_accuracy"] = Metrics.balanced_acc(true_labels, pred_labels)
     return metrics
 
 class Metrics:

@@ -945,16 +945,51 @@ def _print_launch_summary(results, metrics_list, verbose: int) -> None:
     """
     total_measured_time = sum(result["time"] for result in results)
     final_result = results[-1]
-    if verbose == 1:
-        final_mod = final_result["modularity"] if results else 0
-        print(f"Final modularity: {final_mod:.2g}")
     if verbose >= 1:
         for met in metrics_list:
             print(f"{met}: {final_result[met]:.2g}")
-    if verbose >= 1:
+        final_mod = final_result["modularity"]
+        print(f"Final modularity: {final_mod:.2g}")
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")
 
+def compute_ground_truth_modularity(ds) -> float | None:
+    if ds.label is None:
+        return None
+
+    adj = ds.adj
+    labels = ds.label
+    directed = getattr(ds, "is_directed", False)
+
+    if adj.ndim == 2:
+        full_adj = adj
+    elif adj.ndim == 3:
+        first = adj[0]
+        device = first.device
+        dtype = first.dtype
+        full_adj = None
+        for batch in adj:
+            batch_dev = batch.to(device=device, dtype=dtype)
+            if batch_dev.is_sparse and not batch_dev.is_coalesced():
+                batch_dev = batch_dev.coalesce()
+            if full_adj is None:
+                full_adj = batch_dev.clone()
+            else:
+                full_adj = full_adj + batch_dev
+    else:
+        raise ValueError(f"Unsupported ds.adj ndim: {adj.ndim}")
+
+    if full_adj is None:
+        return 0.0
+
+    # Приводим к разреженному виду, ожидаемому Metrics.modularity
+    if not full_adj.is_sparse:
+        full_adj = full_adj.to_sparse_coo()
+    else:
+        full_adj = full_adj.coalesce()
+
+    mod = Metrics.modularity(full_adj, labels, directed=directed)
+    return mod
 
 def dynamic_launch(ds, batches_strategy,
                     underlying_static_method: str,
@@ -1035,9 +1070,14 @@ def dynamic_launch(ds, batches_strategy,
     else:
         results, last_partition = _run_optimizer_modes(ds, _iter_adjacency_batches(ds.adj), config)
 
-    metrics = calculate_ground_truth_metrics(ds.label, last_partition) if ds.label is not None else {}
+    metrics = {}
+    if ds.label is not None:
+        metrics = calculate_ground_truth_metrics(ds.label, last_partition)
+        true_mod = compute_ground_truth_modularity(ds)
+        metrics["Labels modularity"] = true_mod
     if results:
         results[-1].update(metrics)
         metrics_list = list(metrics.keys())
         _print_launch_summary(results, metrics_list, config.verbose)
+
     return results
