@@ -2,8 +2,9 @@ import sys
 import os
 import torch
 import pytest
-import leidenalg
-import igraph as ig
+
+leidenalg = pytest.importorskip("leidenalg")
+ig = pytest.importorskip("igraph")
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(PROJECT_PATH, "src"))
