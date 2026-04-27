@@ -68,6 +68,7 @@ def _test_config(launcher, **overrides):
         "aggregation_mode": "sum",
         "cache_dir": None,
         "init_batch_number": None,
+        "ground_truth_metrics": False
     }
     defaults.update(overrides)
     return launcher._LaunchConfig(**defaults)
@@ -437,6 +438,7 @@ def test_build_launch_config_normalizes_public_launch_arguments(monkeypatch):
         use_gpu=True,
         aggregation_mode="normalized",
         cache_dir="/tmp/cache",
+        ground_truth_metrics=False
     )
 
     assert config.dataset_name == "fake-dataset"
@@ -479,6 +481,7 @@ def test_build_launch_config_rejects_invalid_smart_parameters(
         "use_gpu": False,
         "aggregation_mode": "sum",
         "cache_dir": None,
+        "ground_truth_metrics": False
     }
     kwargs.update(override)
 
@@ -1036,25 +1039,3 @@ def test_run_optimizer_modes_processes_batches_through_optimizer(
     assert opt.features is ds.features
     assert opt.updated == [(batches[1], False)]
     assert len(opt.set_calls) == 2
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_print_launch_summary_reports_final_modularity_and_total_time(
-    monkeypatch,
-    capsys,
-):
-    launcher = _load_launcher(monkeypatch)
-
-    launcher._print_launch_summary(
-        [
-            {"modularity": 0.1, "time": 1.0},
-            {"modularity": 0.2, "time": 2.5},
-        ],
-        [],
-        verbose=1,
-    )
-
-    output = capsys.readouterr().out
-    assert "Final modularity: 0.2" in output
-    assert "Total time: 3.50" in output

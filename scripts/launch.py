@@ -50,6 +50,8 @@ if args.paths_config:
 else:
     paths_config = None
 
+GROUND_TRUTH_METRICS = conf.get("GROUND_TRUTH_METRICS", False)
+
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
     info = json.load(_)
@@ -235,7 +237,8 @@ def measure():
                                         verbose=VERBOSE,
                                         use_gpu=USE_GPU,
                                         aggregation_mode=agg_mode_full,
-                                        cache_dir = CACHE_DIR
+                                        cache_dir = CACHE_DIR,
+                                        ground_truth_metrics = GROUND_TRUTH_METRICS
                                     )
                                 except Exception as e:
                                     if CATCH_ERRORS:

@@ -301,6 +301,7 @@ class _LaunchConfig:
     cache_dir: str | PathLike | None
     # Bootstrap batch marker extracted from p:n strategies.
     init_batch_number: str | None
+    ground_truth_metrics: bool
 
 
 def _print_verbose(verbose: int, level: int, *args, **kwargs) -> None:
@@ -352,6 +353,7 @@ def _build_launch_config(
     use_gpu,
     aggregation_mode,
     cache_dir: str | PathLike | None,
+    ground_truth_metrics: bool
 ) -> _LaunchConfig:
     """
     Normalize public launch parameters into the compact internal config object.
@@ -378,6 +380,7 @@ def _build_launch_config(
         aggregation_mode=aggregation_mode,
         cache_dir=cache_dir,
         init_batch_number=_init_batch_number(batches_strategy),
+        ground_truth_metrics= ground_truth_metrics
     )
 
 
@@ -948,18 +951,10 @@ def _print_launch_summary(results, metrics_list, verbose: int) -> None:
     if verbose >= 1:
         for met in metrics_list:
             print(f"{met}: {final_result[met]:.2g}")
-        final_mod = final_result["modularity"]
-        print(f"Final modularity: {final_mod:.2g}")
         print(f"Total time: {total_measured_time:.2f}")
         print("-----------------------------------------------")
 
-def compute_ground_truth_modularity(ds) -> float | None:
-    if ds.label is None:
-        return None
-
-    adj = ds.adj
-    labels = ds.label
-    directed = getattr(ds, "is_directed", False)
+def _compute_full_adj(adj):
 
     if adj.ndim == 2:
         full_adj = adj
@@ -979,17 +974,12 @@ def compute_ground_truth_modularity(ds) -> float | None:
     else:
         raise ValueError(f"Unsupported ds.adj ndim: {adj.ndim}")
 
-    if full_adj is None:
-        return 0.0
-
-    # Приводим к разреженному виду, ожидаемому Metrics.modularity
     if not full_adj.is_sparse:
         full_adj = full_adj.to_sparse_coo()
     else:
         full_adj = full_adj.coalesce()
 
-    mod = Metrics.modularity(full_adj, labels, directed=directed)
-    return mod
+    return full_adj
 
 def dynamic_launch(ds, batches_strategy,
                     underlying_static_method: str,
@@ -1000,7 +990,8 @@ def dynamic_launch(ds, batches_strategy,
                     verbose: int = 1,
                     use_gpu: bool = False,
                     aggregation_mode: str = "sum",
-                    cache_dir: str | PathLike | None = None):
+                    cache_dir: str | PathLike | None = None,
+                    ground_truth_metrics: bool = False):
     """
     Launch community detection experiments for static and dynamic graph batches.
 
@@ -1058,6 +1049,7 @@ def dynamic_launch(ds, batches_strategy,
         use_gpu=use_gpu,
         aggregation_mode=aggregation_mode,
         cache_dir=cache_dir,
+        ground_truth_metrics = ground_truth_metrics
     )
 
     # Select the execution engine. MFC dynamic mode owns its full temporal loop,
@@ -1070,13 +1062,18 @@ def dynamic_launch(ds, batches_strategy,
     else:
         results, last_partition = _run_optimizer_modes(ds, _iter_adjacency_batches(ds.adj), config)
 
-    metrics = {}
-    if ds.label is not None:
-        metrics = calculate_ground_truth_metrics(ds.label, last_partition)
-        true_mod = compute_ground_truth_modularity(ds)
-        metrics["Labels modularity"] = true_mod
     if results:
+        full_adj = _compute_full_adj(ds.adj)
+
+        metrics = {}
+        if config.ground_truth_metrics and ds.label is not None:
+            metrics = calculate_ground_truth_metrics(ds.label, last_partition)
+            labels_mod = Metrics.modularity(full_adj, ds.label, directed=ds.is_directed)
+            metrics["Labels modularity"] = labels_mod
+        final_mod = Metrics.modularity(full_adj, last_partition, directed=ds.is_directed)
+        metrics["Final modularity"] = final_mod
         results[-1].update(metrics)
+        
         metrics_list = list(metrics.keys())
         _print_launch_summary(results, metrics_list, config.verbose)
 
