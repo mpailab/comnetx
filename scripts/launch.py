@@ -156,7 +156,7 @@ else:
     DATE_SUFFIX = "now"
 def save(db, errors):
     os.makedirs(os.path.join(PROJECT_PATH, "results"), exist_ok = True)
-    with open(os.path.join(PROJECT_PATH, "results", f"measurements_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
+    with open(os.path.join(PROJECT_PATH, "results", f"{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
         json.dump(db, _, indent=4)
     if errors:
         with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
