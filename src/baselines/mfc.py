@@ -368,16 +368,16 @@ def mfc_adopted(
 
     t0 = time.time()
     
-    adj_bin = _binarize_adj(adj)
-    if adj.ndim == 2:
-        adj_matrices = [adj_bin]
-    elif adj.ndim == 3:
-        adj_matrices = [adj_bin[t] for t in range(adj_bin.size(0))]
-    
+    # adj_bin = _binarize_adj(adj)
     # if adj.ndim == 2:
-    #     adj_matrices = [_binarize_adj(adj)]
+    #     adj_matrices = [adj_bin]
     # elif adj.ndim == 3:
-    #     adj_matrices = [_binarize_adj(adj[t]) for t in range(adj.size(0))]
+    #     adj_matrices = [adj_bin[t] for t in range(adj_bin.size(0))]
+    
+    if adj.ndim == 2:
+        adj_matrices = [_binarize_adj(adj)]
+    elif adj.ndim == 3:
+        adj_matrices = [_binarize_adj(adj[t]) for t in range(adj.size(0))]
 
     first_snapshot = adj_matrices[0]
     if initial_partition is not None:
