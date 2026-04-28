@@ -113,7 +113,7 @@ elif not isinstance(BASELINE_ITER_VALS, list):
 # modes
 SUPPORTED_DYNAMIC_METHODS = {"ldleiden", "dfleiden", "mfc"}
 SUPPORTED_NAIVE_METHODS = {"magi", "leidenalg", "ldleiden", "dfleiden", "dmon", "dese", "s2cag", "mfc"}
-# don't support naive: prgpt:infomap, prgpt:locale, networkit
+# don't support naive - use raw instead: prgpt:infomap, prgpt:locale, networkit
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:
