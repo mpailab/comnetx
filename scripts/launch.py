@@ -201,7 +201,11 @@ def measure():
                         if mode == "dynamic" and method not in SUPPORTED_DYNAMIC_METHODS:
                             print(f"Warning! Ingnore dynamic mode for method: {method}")
                             continue
+                        method_name = method.split(":")[0]
 
+                        if method_name == "dfleiden" and mode == "smart":
+                            print("Warning! Ignore smart mode for method: dfleiden")
+                            continue
                         for baseline_iter in iter_vals:
                             if mode == "smart" and SMART_PARAMS_GRID:
                                 smart_params_list = SMART_PARAMS_LISTS
