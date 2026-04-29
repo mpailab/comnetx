@@ -110,10 +110,11 @@ if isinstance(BASELINE_ITER_VALS, (int, float)):
 elif not isinstance(BASELINE_ITER_VALS, list):
     BASELINE_ITER_VALS = [None]
 
-# modes
+# methods types
 SUPPORTED_DYNAMIC_METHODS = {"ldleiden", "dfleiden", "mfc"}
 SUPPORTED_NAIVE_METHODS = {"magi", "leidenalg", "ldleiden", "dfleiden", "dmon", "dese", "s2cag", "mfc"}
-# don't support naive: prgpt:infomap, prgpt:locale, networkit
+# don't support naive - use raw instead: prgpt:infomap, prgpt:locale, networkit
+SUPPORTED_FEATURES_METHODS = {"magi", "dmon", "mfc", "dese", "s2cag"}
 
 SMART_PARAMS_GRID = conf.get("SMART_PARAMS_GRID", {})
 # Пример SMART_PARAMS_GRID в конфиге:
@@ -131,7 +132,7 @@ REVERSE_ABBR = {v: k for k, v in ABBR.items()}
 SMART_PAR_DEFAULT = {
     "smart_subcoms_depth": 5,
     "smart_neighborhood_step": 1,
-    "aggregation_mode": "sum"   # режим агрегации фичей: "sum" или "norm"
+    "aggregation_mode": "norm"   # режим агрегации фичей: "sum" или "norm"
 }
 
 AGG_MODE_MAP = {
@@ -141,14 +142,14 @@ AGG_MODE_MAP = {
     "normalize": "norm"
 }
 
-def init(db, baseline, dataset_name):
-    if baseline not in db:
-        db[baseline] = {}
-    if dataset_name not in db[baseline]:
-        db[baseline][dataset_name] = {}
-    if MACHINE not in db[baseline][dataset_name]:
-        db[baseline][dataset_name][MACHINE] = {}
-    return db
+def init(db, algname, dataset_name):
+    if algname not in db:
+        db[algname] = {}
+    if dataset_name not in db[algname]:
+        db[algname][dataset_name] = {}
+    if MACHINE not in db[algname][dataset_name]:
+        db[algname][dataset_name][MACHINE] = {}
+    return db[algname][dataset_name][MACHINE]
 
 if conf.get("USE_TIMESTAMP_SUFFIX", True):
     DATE_SUFFIX = datetime.now().strftime('%Y%m%d_%H%M')
@@ -174,7 +175,8 @@ def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None, fe
         res = f"{res}-{params_string}-{gpu_sfx}"
     else:
         res = f"{res}-{mode}"
-    res = f"{res}-feat:{feature_mode}"
+    if method in SUPPORTED_FEATURES_METHODS:
+        res = f"{res}-feat:{feature_mode}"
     return res
 
 def measure():
@@ -183,6 +185,7 @@ def measure():
 
     for dataset_name in DATASETS:
         for batches_strategy in BATCHES:
+            batches_strategy = str(batches_strategy)
             for feature_mode in FEATURE_MODES:
                 ds = Dataset(dataset_name, paths_config)
                 ds.load(
@@ -221,6 +224,8 @@ def measure():
                                 agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # режим агрегации фичей: "sum" или "norm"
                                 agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
                                 smart_params_dict["aggregation_mode"] = agg_mode_short
+                                if method not in SUPPORTED_FEATURES_METHODS:
+                                    del smart_params_dict["aggregation_mode"]
 
                                 algname = get_algname(
                                     method,
@@ -230,7 +235,9 @@ def measure():
                                     baseline_iter,
                                     feature_mode=feature_mode,
                                 )
-                                db = init(db, algname, dataset_name)
+                                local_db = init(db, algname, dataset_name)
+                                if batches_strategy in local_db:
+                                    continue
 
                                 try:
                                     with print_zone(VERBOSE >= 1):
@@ -259,7 +266,7 @@ def measure():
                                     else:
                                         raise
                                 else:
-                                    db[algname][dataset_name][MACHINE][str(batches_strategy)] = results
+                                    local_db[batches_strategy] = results
                                     save(db, errors)
     return db, errors
 

@@ -343,7 +343,6 @@ def mfc_adopted(
     network_type: str = "MFC",
     timing_info: dict | None = None,
     num_epoch = None,
-    dynamic: bool = False,
     initial_partition: torch.Tensor | None = None,
 ):
     """
@@ -352,7 +351,7 @@ def mfc_adopted(
     Parameters
     ----------
     adj : torch.Tensor
-        Adjacency matrix [N, N], sparse или dense.
+        Adjacency matrix [N, N] or [T, N, N], sparse или dense.
     network_type : str
         MFC/GEC/DAEGC/SDCN.
     timing_info : dict or None
@@ -368,21 +367,25 @@ def mfc_adopted(
         timing_info = {}
 
     t0 = time.time()
-    adj_bin = _binarize_adj(adj)
+    
+    # adj_bin = _binarize_adj(adj)
+    # if adj.ndim == 2:
+    #     adj_matrices = [adj_bin]
+    # elif adj.ndim == 3:
+    #     adj_matrices = [adj_bin[t] for t in range(adj_bin.size(0))]
+    
+    if adj.ndim == 2:
+        adj_matrices = [_binarize_adj(adj)]
+    elif adj.ndim == 3:
+        adj_matrices = [_binarize_adj(adj[t]) for t in range(adj.size(0))]
 
-    if dynamic:
-        adj_matrices = adj_bin
-        first_snapshot = adj_bin[0]
-        if initial_partition is not None:
-            init_labels = _normalize_initial_partition(
-                initial_partition, first_snapshot.size(0)
-            )
-        else:
-            init_labels = _degree_bins_labels(first_snapshot)
+    first_snapshot = adj_matrices[0]
+    if initial_partition is not None:
+        init_labels = _normalize_initial_partition(
+            initial_partition, first_snapshot.size(0)
+        )
     else:
-        adj_matrices = [adj_bin]
-        init_labels = _degree_bins_labels(adj_bin)
-    labels_list = [init_labels]
+        init_labels = _degree_bins_labels(first_snapshot)
 
     t1 = time.time()
     timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + (t1 - t0)
@@ -390,7 +393,7 @@ def mfc_adopted(
     raw, topo = main(
         network_type=network_type,
         adj_matrix=adj_matrices,
-        labels=labels_list,
+        labels=[init_labels],
         features=features,
         num_epoch=num_epoch,
         start_mf=start_mf,

@@ -1,0 +1,21 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
+  
+  "DATASETS": ["dyn_bat", "wiki_talk_ht"],
+  "BATCHES": ["999:10"],
+  
+  "BASELINES": ["mfc"],
+  "MODES": ["dynamic", "naive", "smart"],
+  "FEATURE_MODES" : ["dataset", "random", "onehot"],
+  
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["norm"]
+  },
+
+  "BASELINE_ITERATIONS": [1]
+}

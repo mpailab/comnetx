@@ -854,7 +854,6 @@ def test_run_dynamic_mfc_uses_initial_partition_and_returns_single_result(
     assert captured["init_batch_number"] == "999"
     assert captured["cache_dir"] == "/tmp/cache"
     assert captured["mfc_kwargs"]["num_epoch"] == 7
-    assert captured["mfc_kwargs"]["dynamic"] is True
     assert captured["mfc_kwargs"]["initial_partition"] is initial_partition
     assert captured["metric_args"][2] is True
 
