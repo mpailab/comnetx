@@ -21,8 +21,55 @@ for p in (SRC_PATH, MFC_root):
 
 from Code.train import base_train, retrain_with_topo
 from Code.dataloader import get_complete_graphs, NetworkSnapshots
+import Models.GraphFiltrationLayer as graph_filtration_layer
 from Models.GraphFiltrationLayer import WrcfLayer,build_community_graph
 from Experiments.main import Args, InitModel
+
+if not hasattr(graph_filtration_layer, "_comnetx_original_wasserstein_distance"):
+    graph_filtration_layer._comnetx_original_wasserstein_distance = (
+        graph_filtration_layer.wasserstein_distance
+    )
+
+
+def _has_off_diagonal_points(dgm) -> bool:
+    if dgm is None:
+        return False
+
+    if torch.is_tensor(dgm):
+        if dgm.numel() == 0 or dgm.size(-1) < 2:
+            return False
+        finite = torch.isfinite(dgm).all(dim=-1)
+        off_diagonal = ~torch.isclose(dgm[..., 0], dgm[..., 1])
+        return bool(torch.any(finite & off_diagonal).detach().cpu())
+
+    dgm = np.asarray(dgm)
+    if dgm.size == 0 or dgm.ndim == 0 or dgm.shape[-1] < 2:
+        return False
+    finite = np.isfinite(dgm).all(axis=-1)
+    off_diagonal = ~np.isclose(dgm[..., 0], dgm[..., 1])
+    return bool(np.any(finite & off_diagonal))
+
+
+def _zero_wasserstein_distance(dgm_a, dgm_b):
+    if torch.is_tensor(dgm_a):
+        return dgm_a.sum() * 0.0
+    if torch.is_tensor(dgm_b):
+        return dgm_b.sum() * 0.0
+    return 0.0
+
+
+def _safe_wasserstein_distance(dgm_a, dgm_b, *args, **kwargs):
+    if (not _has_off_diagonal_points(dgm_a)
+            and not _has_off_diagonal_points(dgm_b)):
+        return _zero_wasserstein_distance(dgm_a, dgm_b)
+
+    return graph_filtration_layer._comnetx_original_wasserstein_distance(
+        dgm_a, dgm_b, *args, **kwargs
+    )
+
+
+def _patch_toporeg_wasserstein_distance() -> None:
+    graph_filtration_layer.wasserstein_distance = _safe_wasserstein_distance
 
 def _degree_bins_labels(adj: torch.Tensor, k_min: int = 2, k_max: int = 20) -> torch.Tensor:
     """
@@ -225,6 +272,8 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None, features=
         raise NameError
 
 def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_mf=250):
+    _patch_toporeg_wasserstein_distance()
+
     compute_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_init = InitModel(device=str(compute_device))
     snapshot_list, n_cluster = load_graphs(
