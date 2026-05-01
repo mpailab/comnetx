@@ -10,13 +10,14 @@
                "hyves", "dblp_coauthor"],
   "BATCHES": ["999:10"],
   
-  "BASELINES": ["prgpt:infomap", "prgpt:locale"],
-  "MODES": ["naive", "smart"],
+  "BASELINES": ["dmon"],
+  "MODES": ["naive"],
+  "FEATURE_MODES": ["random"],
+  "BASELINE_ITERATIONS": [10, 200],
   
-  "SMART_VERSION": "v1",
   "SMART_PARAMS_GRID": {
     "smart_subcoms_depth": [3],
     "smart_neighborhood_step": [1],
-    "aggregation_mode": ["sum"]
+    "aggregation_mode": ["norm"]
   }
 }
