@@ -2,6 +2,7 @@
   "VERBOSE": 1,
   "CATCH_ERRORS": true,
   "USE_TIMESTAMP_SUFFIX": true,
+  "GROUND_TRUTH_METRICS": false,
   
   "DATASETS": [
     "dyn_bat", "sociopatterns-infectious", "wiki_talk_ht", "wiki_talk_br", "opsahl-ucsocial",
