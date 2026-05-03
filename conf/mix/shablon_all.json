@@ -1,0 +1,31 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  "GROUND_TRUTH_METRICS": false,
+  
+  "DATASETS": [
+    "dyn_bat", "sociopatterns-infectious", "wiki_talk_ht", "wiki_talk_br", "opsahl-ucsocial",
+    "dnc-temporalGraph", "wiki_talk_cy", "dyn_wiki", "dyn_cora", "dyn_acm", "wiki_talk_oc",
+    "dyn_citeseer", "wiki_talk_eo", "patent", "dblp-cite", "dyn_coauthorcs", "dyn_pubmed",
+    "dblp-tgc", "dyn_coauthorphysics", "topology", "wiki_talk_sk", "facebook-wosn-wall",
+    "slashdot-threads", "lkml-reply", "facebook-wosn-links", "dyn_nell", "enron", "dyn_flickr",
+    "sx-askubuntu", "arxivcs", "dyn_ogbn-arxiv", "sx-superuser", "arxivmath", "digg-friends",
+    "wiki_talk_vi", "wiki_talk_ru", "arxivphy", "wiki_talk_ar", "arxivlarge", "hyves", "dblp_coauthor"],
+  "BATCHES": ["999:10"],
+  
+  "BASELINES": ["ldleiden", "dfleiden", "leidenalg",
+                "prgpt:infomap", "prgpt:locale", "flmig",
+                "mfc", "s2cag",
+                "magi", "dmon",
+                "networkit", "dese"],
+  "MODES": ["naive", "smart", "dynamic"],
+  "FEATURE_MODES": ["random", "dataset", "onehot"],
+  "BASELINE_ITERATIONS": [1, 10, 100],
+  
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["norm"]
+  }
+}
