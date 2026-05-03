@@ -23,6 +23,7 @@ from Code.train import base_train, retrain_with_topo
 from Code.dataloader import get_complete_graphs, NetworkSnapshots
 import Models.GraphFiltrationLayer as graph_filtration_layer
 from Models.GraphFiltrationLayer import WrcfLayer,build_community_graph
+from Models.GMF import GAEMF
 from Experiments.main import Args, InitModel
 
 if not hasattr(graph_filtration_layer, "_comnetx_original_wasserstein_distance"):
@@ -70,6 +71,71 @@ def _safe_wasserstein_distance(dgm_a, dgm_b, *args, **kwargs):
 
 def _patch_toporeg_wasserstein_distance() -> None:
     graph_filtration_layer.wasserstein_distance = _safe_wasserstein_distance
+
+
+def _regularized_pinv(weight: torch.Tensor) -> torch.Tensor:
+    weight = torch.nan_to_num(weight, nan=0.0, posinf=1.0, neginf=-1.0)
+    rows, cols = weight.shape
+    dtype = weight.dtype
+    device = weight.device
+
+    scale = torch.linalg.norm(weight.detach()).clamp_min(1.0)
+    ridge = torch.as_tensor(1e-6, dtype=dtype, device=device) * scale
+
+    if rows <= cols:
+        eye = torch.eye(rows, dtype=dtype, device=device)
+        gram = weight @ weight.T
+        return weight.T @ torch.linalg.solve(gram + ridge * eye, eye)
+
+    eye = torch.eye(cols, dtype=dtype, device=device)
+    gram = weight.T @ weight
+    return torch.linalg.solve(gram + ridge * eye, weight.T)
+
+
+def _stable_pinv(weight: torch.Tensor, rcond: float = 1e-8) -> torch.Tensor:
+    try:
+        return torch.pinverse(weight, rcond=rcond)
+    except RuntimeError as exc:
+        message = str(exc).lower()
+        is_svd_failure = (
+            "svd" in message
+            or "failed to converge" in message
+            or "ill-conditioned" in message
+            or "singular" in message
+        )
+        if not is_svd_failure:
+            raise
+        return _regularized_pinv(weight)
+
+
+def _safe_indicator_normalize(scores: torch.Tensor) -> torch.Tensor:
+    row_min = scores.min(dim=1, keepdim=True).values
+    row_max = scores.max(dim=1, keepdim=True).values
+    eps = torch.finfo(scores.dtype).eps
+
+    row_range = (row_max - row_min).clamp_min(eps)
+    normalized = (scores - row_min) / row_range
+    row_sum = normalized.sum(dim=1, keepdim=True)
+
+    indicator = normalized / row_sum.clamp_min(eps)
+    uniform = torch.full_like(indicator, 1.0 / indicator.size(1))
+    return torch.where(row_sum > eps, indicator, uniform)
+
+
+def _stable_gaemf_forward(self, _input, flag):
+    z = self.encode(_input)
+    A_pred = torch.sigmoid(torch.matmul(z, z.t()))
+    if type(flag) != bool or flag is True:
+        pinv_weight = _stable_pinv(self.cluster_centroid, rcond=1e-8)
+        indicator = _safe_indicator_normalize(torch.mm(z, pinv_weight))
+        return A_pred, z, indicator
+    return A_pred, z, None
+
+
+def _patch_gaemf_pinv() -> None:
+    if not hasattr(GAEMF, "_comnetx_original_forward"):
+        GAEMF._comnetx_original_forward = GAEMF.forward
+    GAEMF.forward = _stable_gaemf_forward
 
 def _degree_bins_labels(adj: torch.Tensor, k_min: int = 2, k_max: int = 20) -> torch.Tensor:
     """
@@ -273,6 +339,7 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None, features=
 
 def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_mf=250):
     _patch_toporeg_wasserstein_distance()
+    _patch_gaemf_pinv()
 
     compute_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_init = InitModel(device=str(compute_device))
