@@ -312,6 +312,21 @@ class Dataset:
                 f"Expected: {coo_path} or {dense_path}"
             )
 
+    def align_features_and_labels(self):
+        """
+        Приводит размерности features и label в соответствие с обрезанной матрицей смежности.
+        Предполагается, что атрибуты `old_min_ind` и `old_max_ind` были сохранены при обрезке `adj`.
+        """
+        if not hasattr(self, 'old_min_ind') or not hasattr(self, 'old_max_ind'):
+            return
+
+        nodes_num = self.adj.shape[1] # формула подходит и для TxNxN и для NxN
+        if  self.features is not None and self.features.shape[0] != nodes_num:
+            self.features = self.features[self.old_min_ind : self.old_max_ind + 1]
+        if self.label is not None and self.label.shape[0] != nodes_num:
+            self.label = self.label[self.old_min_ind : self.old_max_ind + 1]
+        return
+    
     def _load_attr_graph(self):
         """Загрузка attributed graphs (flickr, wikics...) из npy/joblib."""
         dname = self.name[0].lower() + self.name[1:]
@@ -363,6 +378,7 @@ class Dataset:
             feat_data = np.load(feat_path, allow_pickle=True)
             self.features = torch.from_numpy(feat_data.get("features", None)) if "features" in feat_data else None
             self.label = torch.from_numpy(feat_data.get("labels", None)) if "labels" in feat_data else None
+        self.align_features_and_labels()
 
     def _load_tgc_graphs(self, batches_strategy):
         """Загрузка temporal graph clustering (TGC) датасетов из npy/joblib."""
@@ -396,6 +412,7 @@ class Dataset:
         t, i, j = adj_data["indices"]
         w = adj_data["values"]
         self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+        self.align_features_and_labels()
 
     def _load_prgpt_dataset(self, dataset_type='static',
                        num_nodes=10000,
@@ -597,6 +614,7 @@ class Dataset:
             edges_num = int(first_string.split()[1])
         i, j, w, t = np.loadtxt(filepath, skiprows=1, dtype=int, unpack=True)
         self.adj = self.get_dynamic_adj(i, j, w, t, p, n)
+        self.align_features_and_labels()
     
     def get_dynamic_adj(self, i, j, w, t, p, n):
         min_ind = min(i.min(), j.min())
@@ -604,6 +622,8 @@ class Dataset:
         i -= min_ind
         j -= min_ind
         num_nodes = max_ind - min_ind + 1
+        self.old_min_ind = min_ind
+        self.old_max_ind = max_ind
 
         def make_adj(i_arr, j_arr, w_arr):
             idx = np.vstack((i_arr, j_arr))
