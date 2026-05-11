@@ -50,7 +50,7 @@ if args.paths_config:
 else:
     paths_config = None
 
-GROUND_TRUTH_METRICS = conf.get("GROUND_TRUTH_METRICS", False)
+GROUND_TRUTH_METRICS = conf.get("GROUND_TRUTH_METRICS", True)
 
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
