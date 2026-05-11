@@ -1,0 +1,20 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  
+  "DATASETS": [
+    "dyn_cora", "dyn_acm", "dyn_citeseer", "patent", "dyn_pubmed", "lkml-reply", "arxivmath"],
+  "BATCHES": ["999:10"],
+  
+  "BASELINES": ["dfleiden", "mfc"],
+  "MODES": ["dynamic"],
+  "FEATURE_MODES": ["dataset"],
+  "BASELINE_ITERATIONS": [100],
+  
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["norm"]
+  }
+}
