@@ -12,17 +12,17 @@ def _to_numpy(x):
         return x.detach().cpu().numpy()
     return np.asarray(x)
 
-def calculate_ground_truth_metrics(true_labels, pred_labels):
-    #true_labels = _to_numpy(true_labels)
-    #pred_labels = _to_numpy(pred_labels)
+def calculate_ground_truth_metrics(true_labels, pred_labels, only_fast_metrics=True):
     metrics = {}
     with suppress_warnings_context():
-        metrics["Purity"] = Metrics.purity_score(true_labels, pred_labels)
         metrics["ARI"] = Metrics.ari_score(true_labels, pred_labels)
         metrics["F1"] = Metrics.macro_f1(true_labels, pred_labels)
-        metrics["Accuracy"] = Metrics.accuracy(true_labels, pred_labels)
-        metrics["NMI"] = Metrics.nmi(true_labels, pred_labels)
-        metrics["Balanced_accuracy"] = Metrics.balanced_acc(true_labels, pred_labels)
+        metrics["NMI"] = Metrics.nmi(true_labels, pred_labels) 
+        if not only_fast_metrics:
+            metrics["Purity"] = Metrics.purity_score(true_labels, pred_labels)
+            metrics["Accuracy"] = Metrics.accuracy(true_labels, pred_labels)
+            metrics["Balanced_accuracy"] = Metrics.balanced_acc(true_labels, pred_labels)
+
     return metrics
 
 class Metrics:
