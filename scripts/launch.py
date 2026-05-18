@@ -74,6 +74,7 @@ else:
   print('conf["DATASETS"] is not str or list:', conf["DATASETS"])
   sys.exit(1)
 BATCHES = conf["BATCHES"] # [1, 10, 100, "real", "10:100"]
+FORCE_UNDIRECTED = conf.get("FORCE_UNDIRECTED", False)
 
 # algorithm
 METHODS = conf["BASELINES"] # ["prgpt:locale", "prgpt:infomap", "leidenalg", "networkit", "magi", "dmon"]
@@ -194,6 +195,9 @@ def measure():
                     random_feat_dim=RANDOM_FEATURE_DIM,
                     random_feat_seed=RANDOM_FEATURE_SEED,
                 )
+                if FORCE_UNDIRECTED and ds.is_directed:
+                    ds._force_undirected()
+                    ds.name = f"{dataset_name}-sym"
 
                 for method in METHODS:
                     for mode in MODES:
@@ -231,14 +235,14 @@ def measure():
                                     baseline_iter,
                                     feature_mode=feature_mode,
                                 )
-                                local_db = init(db, algname, dataset_name)
+                                local_db = init(db, algname, ds.name)
                                 if batches_strategy in local_db:
                                     continue
 
                                 try:
                                     with print_zone(VERBOSE >= 1):
                                         print("-----------------------------------------------")
-                                        print(f"Dataset: {dataset_name} ({batches_strategy} batches)")
+                                        print(f"Dataset: {ds.name} ({batches_strategy} batches)")
                                         print(f"Baseline: {algname}")
                                     results = dynamic_launch(
                                         ds,

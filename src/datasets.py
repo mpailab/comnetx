@@ -173,6 +173,28 @@ class Dataset:
 
         raise ValueError(f"Unsupported synthetic feature mode: {mode}")
 
+    def _force_undirected(self):
+        """Принудительно делает граф неориентированным"""
+
+        # Если тензор не в формате coo, временно переводим для удобства
+        if self.adj.layout != torch.sparse_coo:
+            self.adj = self.adj.to_sparse_coo()
+
+        if self.adj.ndim == 2:
+            # static: adj + adj.T
+            self.adj = (self.adj + self.adj.transpose(0, 1)).coalesce()
+        elif self.adj.ndim == 3:
+            # dynamic: применяем к каждому срезу
+            adjs = []
+            for t in range(self.adj.size(0)):
+                a = self.adj[t]
+                adjs.append((a + a.transpose(0, 1)).coalesce())
+            self.adj = torch.stack(adjs)
+        else:
+            raise ValueError(f"Unsupported ndim for undirected conversion: {self.adj.ndim}")
+
+        self.is_directed = False
+
     def load(
         self,
         tensor_type: str = "coo",
@@ -180,6 +202,7 @@ class Dataset:
         feature_mode: str = "dataset",
         random_feat_dim: int = 64,
         random_feat_seed: int = 42,
+        force_undirected: bool = False,
     ) -> torch.Tensor:
         """
         Load dataset
@@ -267,6 +290,9 @@ class Dataset:
 
         if self.adj is not None and self.adj.layout == torch.sparse_coo:
             self._squeeze_single_batch_adj()
+        
+        if force_undirected:
+            self._force_undirected()
 
         self._apply_feature_mode(
             feature_mode=feature_mode,
