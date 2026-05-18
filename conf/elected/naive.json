@@ -4,7 +4,7 @@
   "USE_TIMESTAMP_SUFFIX": true,
   
   "DATASETS": [
-    "dyn_cora", "dyn_acm", "dyn_citeseer", "patent", "dyn_pubmed", "lkml-reply", "arxivmath"],
+    "dyn_cora", "dyn_acm", "dyn_citeseer", "patent", "dyn_pubmed", "arxivmath"],
   "BATCHES": ["999:10"],
   
   "BASELINES": ["leidenalg", "flmig",
