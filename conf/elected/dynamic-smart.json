@@ -9,8 +9,8 @@
   "FORCE_UNDIRECTED": true,
   
   "BASELINES": ["dfleiden", "mfc"],
-  "MODES": ["dynamic"],
-  "FEATURE_MODES": ["dataset"],
+  "MODES": ["smart"],
+  "FEATURE_MODES": ["random"],
   "BASELINE_ITERATIONS": [100],
   
   "SMART_PARAMS_GRID": {
