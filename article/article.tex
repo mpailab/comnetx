@@ -1,0 +1,614 @@
+\RequirePackage{etex}
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+
+\usepackage{amsmath, amsthm, amssymb, stmaryrd, enumitem, array, float}
+\usepackage{tikz, tikz-network}
+\usepackage{algorithm, algpseudocode}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{tablefootnote}
+\usepackage[multiple]{footmisc}
+\usepackage{multirow}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\textwidth=165mm \textheight=237mm \oddsidemargin=4.6mm \topmargin=-7.4mm \headheight=0mm \headsep=0mm
+\righthyphenmin=2
+\sloppy
+
+%------------------------------- New theorems
+
+% These will be typeset in italics
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+% These will be typeset in Roman
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem*{problem}{Problem}
+\newtheorem{example}{Example}
+
+%------------------------------- Macros
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
+\newcommand{\TT}{\mathcal{T}}
+\newcommand{\QQ}{\mathcal{Q}}
+
+
+%-------------------------------
+
+
+\begin{document}
+
+\title{Local Community Detection in Large-scale Dynamic Networks}
+
+\author{
+\IEEEauthorblockN{Anonymous}
+\IEEEauthorblockA{Anonymous} \\
+
+\and
+\IEEEauthorblockN{Anonymous}
+\IEEEauthorblockA{Anonymous} \\
+
+\and
+\IEEEauthorblockN{Anonymous}
+\IEEEauthorblockA{Anonymous} \\
+
+\and
+\IEEEauthorblockN{Anonymous}
+\IEEEauthorblockA{Anonymous} \\
+
+\and
+\IEEEauthorblockN{Anonymous}
+\IEEEauthorblockA{Anonymous} \\
+}
+
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+
+\begin{IEEEkeywords}
+\end{IEEEkeywords}
+
+%----------------------------------------------------------------------------------------
+
+\section{Introduction} \label{S:1}
+Dynamic networks model systems whose interactions change over time, including social, biological, transportation, communication, and information networks~\cite{N03,OSH07,PBV07}. Community detection (CD) is a central task in such data: it identifies groups of vertices with coherent structural or functional roles and supports monitoring, recommendation, anomaly detection, and exploratory analysis~\cite{POM09,SF09,RCC04,FL02}. Modularity remains one of the most widely used quality criteria~\cite{NG04,BDG08}, and scalable methods such as Louvain and Leiden are strong practical baselines~\cite{BGLL08,TWE19,Sah23}. However, these methods were mainly designed for static snapshots. In dynamic settings, even a small batch of edge updates may require rerunning a solver on the entire graph, which is prohibitive for large networks.
+
+Existing dynamic CD methods reduce this cost by reusing previous partitions, applying incremental modularity updates, or processing affected neighborhoods~\cite{RC17,LHK14,HKT17,ZK21,SLe24}. These ideas are essential for scalability, but they are often tied to a specific objective or update rule. Meanwhile, modern graph clustering increasingly incorporates attributes and neural representations~\cite{CCL23,ZXY20,DSD24,LXZ23,JLL23}. Feature-aware and GNN-based methods can capture richer dependencies than purely topological heuristics, yet repeatedly applying them to full snapshots is even more expensive. A dynamic framework should therefore support both classical and feature-aware solvers without redesigning each solver from scratch.
+
+The key challenge is locality. If a batch update modifies only a small part of the graph, the algorithm should inspect and update only a bounded neighborhood of the affected vertices. This is natural for real-time graph analytics, but preserving the quality of a strong base solver under local processing is nontrivial: an overly small subgraph can lose important community context, whereas an overly large one eliminates the computational benefit.
+
+In this paper, we present \textit{ComNetX}, a local hierarchical framework for dynamic community detection. ComNetX maintains a hierarchy of communities, identifies the communities affected by a batch update, constructs compact aggregated subproblems, and invokes the selected solver only on these local instances. The aggregation step preserves surrounding community context while avoiding full-snapshot recomputation. When a solver uses node attributes, the same aggregation pattern is applied to the feature matrix, making the framework compatible with topology-only and feature-aware methods. In this way, ComNetX acts as an algorithmic layer around existing CD solvers rather than as a solver tied to a single objective.
+
+Our contributions are as follows:
+\begin{enumerate}[leftmargin=*]
+    \item We formalize a unified dynamic adaptation setting for arbitrary community detection solvers and contrast naive full-snapshot recomputation with local processing.
+    \item We introduce ComNetX, a hierarchical local wrapper that aggregates affected communities, transfers features when required, and projects updated labels back to the original graph.
+    \item We provide a formal locality and complexity analysis showing that, under a bounded local expansion condition, the method satisfies the definition of a local dynamic algorithm.
+    \item We evaluate the framework on heterogeneous dynamic graph benchmarks and compare local adaptations with naive execution and native dynamic baselines.
+\end{enumerate}
+
+The paper is organized as follows. Section~\ref{S:2} gives the preliminary definitions. Section~\ref{S:3} presents the ComNetX methodology and analysis. Section~\ref{S:4} reports the experiments. Section~\ref{S:5} reviews related work, and Section~\ref{S:6} concludes the paper.
+%----------------------------------------------------------------------------------------
+
+%%%%%%%%%%%%%%%%%%METHOD%%%%%%%%%%%%%%%%%%
+\section{Preliminary}\label{S:2}
+\subsection{Static vs Dynamic Graphs}
+
+In accordance with~\cite{ZK21, SLe24}, a \textit{dynamic} graph is represented as a sequence of graphs $G_t$, where $G_t = (V_t, E_t, W_t)$ denotes the graph in a discrete time step $t \geq 0$, $V_t \subseteq V$, $E_t \subseteq E$, and $W_t = (w_{i,j}^t) \subseteq \mathbb{R}^2$. We consider a scenario where the changes between graphs $G_{t-1}$ and $G_t$ at consecutive time steps $t-1$ and $t$ are represented as a \textit{batch update}
+\begin{equation*}
+\Delta_t =  \{ (i,j,\delta_{i,j}) \mid i,j \in V, \delta_{i,j} \in \mathbb{R} \}
+\end{equation*}
+at time step $t$, where $\delta_{i,j}$ denotes the change in the weight of edge $(i,j)$ between two consecutive snapshots of the graph. A positive value of $\delta_{i,j}$ corresponds to an insertion or an increase in edge weight,
+whereas a negative value corresponds to a deletion or a decrease. This batch update is divided into a set of edge deletions
+\begin{equation*}
+  E_{t-1} \setminus E_t = \{ (i,j) \mid i,j \in V,\ w_{i,j}^{t-1} + \delta_{i,j} = 0 \}
+\end{equation*}
+and a set of the next time step edges
+\begin{equation*}
+  E_t = \{ (i,j) \mid i,j \in V,\ w_{i,j}^{t} = w_{i,j}^{t-1} + \delta_{i,j} \neq 0 \}.
+\end{equation*}
+We associate a \textit{static} graph $G$ with a sequence of graphs $G_0, G_1$, where $G_0$ is an empty graph and $G_1 = G$.
+
+\subsection{Dynamic Community Detection}
+
+Given a sequence of graphs $G_0,\ldots,G_l$ defined by a sequence of batch updates $\Delta_1,\ldots,\Delta_l$. A \textit{dynamic} community detection algorithm $A$ at each step $t \geq 1$ takes the graph $G_{t-1}$ with a partition $P_A(t-1)$ and a batch update $\Delta_t$ as input and returns a partition $P_A(t)$ of the graph $G_t$, where $P_A(0)$ is the singleton partition. Let $\QQ_A(t)$ be the modularity of the partition $P_A(t)$, and $\TT_A(t)$ the processing time\footnote{The processing time $\TT_A(t)$ is the computational complexity that describes the amount of computer time it takes to run an algorithm $A$.} of the algorithm $A$ called its \textit{complexity} at time step $t$.
+
+In general, the complexity of a dynamic algorithm is expected to depend mainly on the size of the update $|\Delta_t|$. 
+At the same time, it should remain essentially independent of the size $|G_t|$ of the graph $G_t$, except for possible logarithmic or sublinear factors. 
+Ideally, the processing time grows proportionally to the number of modified edges. 
+When the batch update contains only a single edge (that is, $|\Delta_t|=1$), the algorithm is expected to process it in constant or near constant time. 
+A dynamic algorithm with these properties will be efficient even for very large graphs.
+
+We call a dynamic algorithm $A$ \textit{local} if there exists a constant radius $r \in \mathbb{N}$, independent of $|G_t|$ and $t$, such that at each time step $t$ the algorithm inspects and updates only the induced subgraph on the nodes
+\begin{equation*}
+B_r(S_t) \;=\; \{\, v \in V_t \mid \operatorname{dist}_{G_t}(v,S_t) \le r \,\},
+\end{equation*}
+where $S_t$ is the set of nodes affected by $\Delta_t$,
+and $\operatorname{dist}_{G_t}(v, S_t)$ denotes the shortest distance in $G_t$ from node $v$ to the set of nodes $S_t$.
+In this case, the running time $\TT_A(t)$ is bounded by a function of $|B_r(S_t)|$ and the fixed parameter $r$, but not directly by $|G_t|$.
+
+Although in the worst case, the size of $B_r(S_t)$ can still scale with $|G_t|$, in most real-world networks only a very small fraction of nodes have relatively high degree. Therefore, on average, at each time step the local dynamic algorithm can inspect and update only a subgraph whose size is proportional to $|\Delta_t|$.
+
+\subsection{Modularity maximization}
+The problem of modularity optimization can be formulated on an undirected graph $G = (V, E)$, where $V$ is the set of $n$ vertices and $E$ is the set of $m$ edges. 
+The goal of community detection is to find a partition 
+$P = \{C_1, C_2, \ldots, C_k\}$ such that 
+$V(G) = C_1 \cup C_2 \cup \ldots \cup C_k$ and 
+$C_i \cap C_j = \varnothing$ for all $i \neq j$. 
+The \textit{modularity} function~\cite{NG04} measures the quality of such a partition by comparing the actual density of intra-community edges to that expected under a null model of random connections. 
+In this model, two vertices $i$ and $j$ with degrees $d_i$ and $d_j$ are expected to be connected with probability $\frac{d_i d_j}{2m}$. 
+Formally, modularity is defined as:
+\begin{equation}
+Q = \frac{1}{2m} \sum_{i,j} \left[ A_{ij} - \gamma \frac{d_i d_j}{2m} \right] \delta(c_i, c_j),
+\end{equation}
+where $A_{ij}$ is the adjacency matrix of $G$ 
+($A_{ij}=1$ if an edge exists between $i$ and $j$, otherwise $0$), 
+$\delta(c_i, c_j)=1$ if vertices $i$ and $j$ belong to the same community, 
+and $\gamma > 0$ is a \textit{resolution parameter} controlling the granularity of detected communities (with $\gamma = 1$ corresponding to the classical modularity formulation). 
+The degree of a vertex $i$ is given by $d_i = \sum_j A_{ij}$.
+Modularity values range within $Q \in (-\tfrac{1}{2}, 1]$, where $Q = 0$ indicates no 
+correlation between edge density and community structure. 
+Although high modularity generally signals strong community organization,  positive modularity can also appear in random graphs~\cite{MS20}, meaning it should be interpreted cautiously. 
+Despite known limitations---such as the resolution limit problem~\cite{G10}---modularity remains one of the most widely used and practically effective metrics for graph clustering~\cite{FH16}. 
+Optimizing modularity is an NP-hard problem, motivating the development of numerous heuristic, hierarchical, local, and even neural architectures~\cite{LLC24, BKH24} that integrate modularity-based objectives to efficiently approximate its maximum in large-scale networks~\cite{Mazza23}.
+\section{Methodology}\label{S:3}
+\subsection{Applying Static Algorithms to Dynamic Community Detection}
+\subsubsection{Naive approach}
+
+We define the naive dynamic algorithm \( \mathcal{A}_{\text{nd}} \) based on the static algorithm \( \mathcal{A} \) as follows. At each discrete time step \( t \), the algorithm applies \( \mathcal{A} \) to the entire graph snapshot \( G_t \). The only temporal coupling is achieved by using the previous partition \( P(t-1) \) as the initial state for the current optimization.
+Formally, for \( t \geq 1 \):
+\[
+P(t) = \mathcal{A}\big( G_t,\ P(t-1) \big),
+\]
+where \( P(0) \) is defined as the singleton partition.
+
+This strategy is fundamentally non-local. The application of \( \mathcal{A} \) to the entirety of \( G_t \) at each step implies that the computational complexity \( \TT_{\mathcal{A}_{\text{nd}}}(t) \) is inherently dependent on the global properties of \( G_t \), specifically its size \( |G_t| \). Consequently, the algorithm does not satisfy the locality condition, as it must inspect and potentially update the entire vertex set \( V_t \), regardless of the extent of the changes introduced by the batch update \( \Delta_t \).
+
+\subsubsection{Proposed local approach}
+We propose a novel approach that enables the transformation of any static algorithm into a local dynamic algorithm. Within our framework, we maintain a multi-level hierarchy of communities and process only a limited neighborhood of the vertices affected by the batch update.
+
+
+%----------------------------------------------------------------------------------------
+
+\section{Experiments} \label{S:4}
+
+This section presents an empirical evaluation of our method for transforming static community detection algorithms into local dynamic ones.
+We first demonstrate the advantages over the straightforward naive dynamic adaptation and then assess the competitiveness of the resulting dynamic algorithms against state-of-the-art native dynamic solvers.
+
+\subsection{Experimental setup}
+
+\subsubsection{Datasets}
+We evaluate on six real-world networks summarised in Table~\ref{tab:datasets}.
+All datasets are equipped with node features (e.g., bag-of-words representations of scientific papers) and possess a ground-truth community partition, which allows us to complement the modularity-based evaluation with extrinsic clustering metrics.
+For the purpose of this study all graphs are treated as undirected.
+\textit{dyn\_cora}, \textit{dyn\_acm}, and \textit{dyn\_citeseer} are originally undirected citation or co-authorship networks.
+The remaining three datasets---\textit{patent} (patent citations), \textit{dyn\_pubmed} (biomedical citations), and \textit{arxivmath} (arXiv preprint citations)---are initially directed; we symmetrise them by replacing each directed edge with an undirected one, ignoring edge direction.
+This preprocessing ensures that all baseline algorithms operate on a uniform input format without penalising those that do not natively support directed edges.
+
+For each network we construct a dynamic scenario as follows.
+All edges are first sorted chronologically if the network is temporal; otherwise, the edges are randomly shuffled.
+The edge sequence is then partitioned into $1000$ equal-sized batch updates $\Delta_1, \dots, \Delta_{1000}$.
+The first $999$ batches are applied cumulatively to obtain the initial graph $G_{999}$.
+On $G_{999}$ we compute a high-quality reference partition $P(999)$ using the Leiden algorithm~\cite{TWE19}.
+The remaining batch $\Delta_{1000}$ is further split into $10$ mini-batches, yielding a sequence of ten consecutive dynamic updates.
+Each algorithm starts from $G_{999}$ and $P(999)$ and processes these ten updates sequentially.
+This protocol guarantees a realistic dynamic setting with a strong initial partition while keeping the evaluation computationally tractable.
+
+\begin{table}[ht]
+\centering
+\caption{Real-world datasets used in the experiments.}
+\label{tab:datasets}
+\begin{tabular}{lrr}
+\hline
+\textbf{Dataset} & \textbf{Nodes} & \textbf{Edges} \\
+\hline
+dyn\_cora      & 2\,708   & 5\,278    \\
+dyn\_acm       & 3\,025   & 13\,128   \\
+dyn\_citeseer  & 3\,327   & 4\,552    \\
+patent         & 12\,214  & 41\,916   \\
+dyn\_pubmed    & 19\,717  & 44\,338   \\
+arxivmath      & 270\,013 & 799\,745  \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Metrics}
+We evaluate both the quality of the detected communities and the computational efficiency.
+\begin{itemize}
+    \item \textbf{Modularity} ($Q$): the standard modularity of the partition obtained after processing all ten updates, measured on the final graph $G_{1000}$.
+    \item \textbf{Adjusted Rand Index (ARI)}, \textbf{F1-score}, and \textbf{Normalized Mutual Information (NMI)}: extrinsic clustering metrics computed against the ground-truth community labels. These measure the agreement between the detected partition and the known community structure, with higher values indicating better alignment.
+    \item \textbf{Total processing time} ($T$): the cumulative wall-clock time (in seconds) required to process the ten mini-batches, i.e., the sum of the execution times of the dynamic algorithm over the whole update sequence.
+\end{itemize}
+To isolate the performance of the core community-detection logic, we exclude the time spent on data-format conversions; each baseline operates on its own native graph representation, and the time needed to translate batch updates into that representation is not included in $T$.
+All experiments are repeated five times and the average values are reported.
+
+\subsubsection{Baselines}
+We compare against two families of algorithms:
+\begin{enumerate}
+    \item \textbf{Static algorithms} that we convert into dynamic ones either through our local hierarchical approach or through the naive per-snapshot re-execution:
+    \begin{itemize}
+        \item \textit{Leidenalg}~\cite{TWE19}: the Leiden algorithm for static modularity optimisation.
+        \item \textit{FLMIG}~\cite{TTB24}: a fast local move iterated greedy method based on Louvain-style moves.
+        \item Deep graph clustering models: DMoN~\cite{TPP23}, MAGI~\cite{LLC24}, PRGPT-Infomap and PRGPT-Locale~\cite{QZG24}, and S$^2$CAG~\cite{LYZ25}.
+    \end{itemize}
+    \item \textbf{Native dynamic algorithms} designed to handle graph updates natively:
+    \begin{itemize}
+        \item \textit{DF-Leiden}~\cite{SLe24}: an OpenMP-parallel dynamic variant of Leiden (run in single-threaded mode for a fair comparison with the other methods).
+        \item \textit{MFC}~\cite{KZL24}: a GNN-based dynamic community detection method (also restricted to a single thread).
+    \end{itemize}
+\end{enumerate}
+Detailed characteristics of each baseline, including whether they exploit node features, are given in Table~\ref{T:1}.
+All methods are applied to the graphs as they are, without explicit restrictions on edge direction or weights; our experiments did not reveal a systematic degradation for algorithms operating outside their originally intended graph type.
+
+\begin{table*}[t]
+    \centering
+    \begin{tabular}{|c|c|C{0.14\linewidth}|c|c|}
+        \hline
+        Solution & Year & Base algorithm & Type & Uses node features \\
+        \hline
+        Leidenalg\tablefootnote{https://github.com/vtraag/libleidenalg} & 2023
+        &  Leiden & Static & No \\
+        \hline
+        FLMIG\tablefootnote{https://github.com/salahinfo/FLMIG\_algorithm}
+        & 2023
+        &  Louvain (prune) & Static & No \\
+        \hline
+        DMON\tablefootnote{https://github.com/google-research/google-research/tree/master/graph\_embedding/dmon}
+        & 2020
+        &  GNN & Static & Yes \\
+        \hline
+        MAGI\tablefootnote{https://github.com/EdisonLeeeee/MAGI.git} & 2024
+        &  GNN & Static & Yes \\
+        \hline
+        PRGPT-Infomap\tablefootnote{https://github.com/KuroginQin/PRGPT} & 2024
+        &  GNN & Static & No \\
+        \hline
+        PRGPT-Locale\tablefootnote{https://github.com/KuroginQin/PRGPT} & 2024
+        &  GNN & Static & No \\
+        \hline
+        S$^2$CAG\tablefootnote{https://github.com/HKBU-LAGAS/S2CAG}
+        & 2025
+        &  GNN & Static & Yes \\
+        \hline
+        DF-Leiden\tablefootnote{https://github.com/puzzlef/leiden-communities-openmp-dynamic}
+        & 2024
+        &  Leiden & Dynamic & No \\
+        \hline
+        MFC\tablefootnote{https://github.com/kundtx/MFC-TopoReg}
+        & 2024
+        &  GNN & Dynamic & Yes \\
+        \hline
+    \end{tabular}
+    \caption{Solutions used for performance comparison.}
+    \label{T:1}
+\end{table*}
+
+For algorithms that involve iterative training, we use the following configuration:
+MFC runs $100$ iterations,
+FLMIG uses a single iteration,
+and S$^2$CAG, MAGI, and DMoN are trained for $10$ epochs.
+Preliminary experiments with larger numbers of iterations/epochs showed negligible improvement in partition quality while substantially increasing runtime; the chosen values therefore provide a practical balance between quality and efficiency.
+All methods are executed in single-threaded mode to ensure a fair comparison, even when multi-threaded implementations are available.
+
+\subsubsection{Configuration of the proposed local adaptation}
+Our dynamic adapter uses a hierarchical community structure with $\texttt{subcoms\_depth} = 3$ (two additional levels of sub-communities beneath the top-level partition) and a neighbourhood radius $\texttt{neighborhood\_step} = 1$, meaning that only the immediate neighbours of the vertices touched by the batch update are inspected.
+Increasing the radius quickly leads to inspecting the whole graph and degrades performance, while changing the hierarchy depth either increases the administrative overhead or diminishes the benefits of the multi-level representation.
+
+For GNN-based static algorithms that require node features (DMoN, MAGI, S$^2$CAG; the PRGPT variants do not use features), we supply randomly generated $64$-dimensional feature vectors when running them inside our proposed local adapter.
+In contrast, the same algorithms applied in the naive dynamic scenario and the native dynamic MFC use the original dataset-provided features (except on \textit{lkml-reply}, which carries no features).
+The original features are often high-dimensional and carry global structural information that can mislead the optimisation on the small subgraphs induced by our local updates; the compact random features avoid this interference and keep the computational overhead low.
+
+\subsection{Experimental results}
+
+\subsubsection{Proposed vs.\ Naive Dynamic Adaptation}
+
+Tables~\ref{tab:mod-time} and~\ref{tab:extrinsic} report the modularity--runtime trade-off and the agreement with ground-truth communities for every combination of algorithm, adaptation strategy, and dataset.
+For each method we contrast the conventional dynamic baseline (``Naive'' for static methods that re-run on the full snapshot, ``Dynamic'' for natively dynamic algorithms) with the variant obtained through our local hierarchical adapter (``Local'').
+The Local variant is also applied to the natively dynamic algorithms DF-Leiden and MFC.
+This is possible because any dynamic algorithm can be used as a static one: it receives a graph and an initial partition, and returns an updated partition without relying on any history of previous updates.
+Our adapter treats such an algorithm exactly like a classical static method, restricting its execution to the subgraph induced by the batch neighbourhood and the corresponding sub-communities of the hierarchical decomposition.
+The results demonstrate that our adapter can accelerate and, in several cases, even improve the quality of already dynamic solvers.
+
+\begin{table*}[ht]
+\centering
+\caption{Modularity ($Q$) and total processing time in seconds ($T$) on the ten-update sequence. Each cell shows $Q$ / $T$. ``OOM'' indicates out of memory.}
+\label{tab:mod-time}
+\setlength{\tabcolsep}{2pt}
+\footnotesize
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
+\hline
+\multicolumn{7}{l}{\textit{DF-Leiden}} \\
+Dynamic & 0.81\,/\,0.00 & 0.82\,/\,0.01 & 0.89\,/\,0.00 & 0.86\,/\,0.03 & 0.76\,/\,0.10 & 0.85\,/\,3.74 \\
+Local   & 0.80\,/\,0.22 & 0.80\,/\,0.10 & 0.88\,/\,0.07 & 0.78\,/\,0.23 & 0.78\,/\,0.11 & 0.88\,/\,0.44 \\
+\hline
+\multicolumn{7}{l}{\textit{MFC}} \\
+Dynamic & 0.42\,/\,881.5 & 0.49\,/\,1532 & 0.43\,/\,1832 & 0.70\,/\,816.3 & 0.18\,/\,2949 & OOM \\
+Local   & 0.73\,/\,31.5  & 0.26\,/\,32.2  & 0.67\,/\,22.9  & 0.78\,/\,38.4  & 0.02\,/\,35.9  & 0.06\,/\,381.7 \\
+\hline
+\multicolumn{7}{l}{\textit{Leidenalg}} \\
+Naive & 0.82\,/\,1.25 & 0.83\,/\,1.32 & 0.89\,/\,0.83 & 0.86\,/\,2.90 & 0.79\,/\,6.51 & 0.89\,/\,150.7 \\
+Local & 0.81\,/\,0.54 & 0.79\,/\,0.25 & 0.88\,/\,0.10 & 0.86\,/\,1.86 & 0.78\,/\,0.29 & 0.88\,/\,3.64 \\
+\hline
+\multicolumn{7}{l}{\textit{FLMIG}} \\
+Naive & 0.82\,/\,15.7 & 0.75\,/\,20.0 & 0.87\,/\,29.8 & 0.86\,/\,73.1 & 0.75\,/\,178.9 & 0.87\,/\,103535 \\
+Local & 0.77\,/\,0.35 & 0.52\,/\,1.64 & 0.72\,/\,0.36 & 0.74\,/\,18.3 & 0.08\,/\,1.90 & 0.59\,/\,37.9 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
+Naive & 0.80\,/\,2.79 & 0.70\,/\,5.28 & 0.84\,/\,2.07 & 0.64\,/\,16.5 & 0.73\,/\,25.4 & 0.55\,/\,533.3 \\
+Local & 0.74\,/\,0.43 & 0.67\,/\,1.20 & 0.84\,/\,0.38 & 0.86\,/\,12.4 & 0.09\,/\,1.07 & 0.07\,/\,13.4 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
+Naive & 0.82\,/\,3.11 & 0.82\,/\,5.56 & 0.89\,/\,2.33 & 0.77\,/\,16.7 & 0.79\,/\,28.7 & 0.88\,/\,795.6 \\
+Local & 0.77\,/\,0.35 & 0.62\,/\,1.18 & 0.80\,/\,0.38 & 0.84\,/\,12.7 & 0.42\,/\,1.18 & 0.07\,/\,13.5 \\
+\hline
+\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
+Naive & 0.69\,/\,38.5 & 0.04\,/\,252.6 & 0.78\,/\,164.2 & 0.38\,/\,13.6 & 0.62\,/\,110.0 & 0.00\,/\,2281 \\
+Local & 0.78\,/\,6.61 & 0.62\,/\,7.66 & 0.77\,/\,4.48 & 0.66\,/\,21.8 & 0.52\,/\,13.8 & 0.54\,/\,178.1 \\
+\hline
+\multicolumn{7}{l}{\textit{MAGI}} \\
+Naive & 0.34\,/\,75.1 & 0.06\,/\,81.7 & 0.35\,/\,57.9 & 0.82\,/\,127.4 & 0.49\,/\,300.3 & OOM \\
+Local & 0.73\,/\,144.4& 0.33\,/\,460.5& 0.76\,/\,254.8& 0.59\,/\,524.6& 0.06\,/\,533.1& 0.07\,/\,868.2 \\
+\hline
+\multicolumn{7}{l}{\textit{DMoN}} \\
+Naive & 0.06\,/\,16.7 & 0.13\,/\,17.7 & 0.10\,/\,15.1 & $-$0.04\,/\,101.9 & 0.14\,/\,294.0 & OOM \\
+Local & 0.79\,/\,28.6 & 0.61\,/\,30.3 & 0.77\,/\,23.2 & 0.54\,/\,33.4 & 0.10\,/\,31.6 & 0.16\,/\,65.1 \\
+\hline
+\end{tabular}
+\end{table*}
+
+\begin{table*}[ht]
+\centering
+\caption{ARI / F1 / NMI with respect to ground truth on the final snapshot. ``OOM'' indicates out of memory.}
+\label{tab:extrinsic}
+\setlength{\tabcolsep}{1.5pt}
+\footnotesize
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
+\hline
+\multicolumn{7}{l}{\textit{DF-Leiden}} \\
+Dynamic & 0.24/8e-4/0.44 & 0.07/1e-4/0.26 & 0.10/3e-4/0.33 & 0.18/1e-3/0.37 & 0.08/0/0.19 & 0.12/7e-7/0.39 \\
+Local   & 0.24/1e-2/0.45 & 0.05/3e-4/0.25 & 0.10/2e-4/0.33 & 0.17/2e-2/0.36 & 0.09/5e-3/0.20 & 0.17/1e-5/0.40 \\
+\hline
+\multicolumn{7}{l}{\textit{MFC}} \\
+Dynamic & 0.01/8e-4/0.15 & 0.01/0/0.15 & 0.01/4e-5/0.17 & 0.13/3e-2/0.19 & 0.03/1e-3/0.02 & OOM \\
+Local   & 0.21/2e-3/0.43 & 0.01/2e-5/0.20 & 0.07/4e-4/0.29 & 0.19/2e-2/0.37 & 0.00/3e-2/0.02 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{Leidenalg}} \\
+Naive & 0.24/8e-3/0.46 & 0.05/1e-3/0.26 & 0.10/6e-4/0.33 & 0.16/4e-2/0.36 & 0.10/1e-2/0.21 & 0.17/1e-7/0.42 \\
+Local & 0.28/3e-3/0.46 & 0.04/1e-4/0.24 & 0.10/6e-4/0.33 & 0.18/2e-2/0.37 & 0.09/1e-2/0.18 & 0.17/8e-7/0.40 \\
+\hline
+\multicolumn{7}{l}{\textit{FLMIG}} \\
+Naive & 0.24/9e-3/0.46 & 0.09/2e-3/0.22 & 0.07/2e-4/0.27 & 0.16/4e-2/0.36 & 0.07/1e-2/0.13 & 0.13/2e-7/0.34 \\
+Local & 0.22/2e-3/0.42 & 0.02/2e-4/0.20 & 0.08/3e-4/0.29 & 0.18/2e-2/0.37 & 0.01/3e-2/0.03 & 0.05/4e-7/0.22 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
+Naive & 0.25/9e-4/0.45 & 0.19/7e-4/0.30 & 0.20/2e-3/0.35 & 0.25/2e-2/0.38 & 0.21/7e-3/0.23 & 0.08/0/0.27 \\
+Local & 0.21/5e-3/0.43 & 0.06/1e-3/0.23 & 0.14/5e-4/0.33 & 0.18/2e-2/0.37 & 0.004/8e-3/0.04 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
+Naive & 0.25/2e-3/0.47 & 0.06/2e-4/0.27 & 0.10/5e-4/0.33 & 0.21/5e-3/0.37 & 0.09/8e-3/0.20 & 0.20/7e-6/0.42 \\
+Local & 0.24/5e-3/0.44 & 0.04/9e-4/0.23 & 0.07/5e-4/0.30 & 0.18/2e-2/0.37 & 0.10/4e-2/0.14 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
+Naive & 0.21/2e-2/0.44 & 0.00/0/0.09 & 0.03/4e-4/0.25 & 0.05/8e-2/0.06 & 0.08/2e-2/0.17 & 3e-6/0/0.00 \\
+Local & 0.26/3e-3/0.46 & 0.04/3e-6/0.24 & 0.08/6e-5/0.32 & 0.17/6e-3/0.36 & 0.07/1e-5/0.14 & 0.02/4e-7/0.16 \\
+\hline
+\multicolumn{7}{l}{\textit{MAGI}} \\
+Naive & 0.07/1e-3/0.42 & 0.005/1e-5/0.25 & 0.01/2e-5/0.31 & 0.10/3e-2/0.27 & 0.05/2e-4/0.22 & OOM \\
+Local & 0.21/4e-3/0.43 & 0.01/5e-4/0.19 & 0.11/3e-4/0.30 & 0.17/1e-2/0.36 & 0.001/5e-5/0.02 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{DMoN}} \\
+Naive & 0.002/2e-5/0.25 & 0.003/4e-6/0.16 & 0.002/6e-6/0.24 & 0.002/1e-6/0.16 & 0.004/3e-6/0.04 & OOM \\
+Local & 0.26/1e-3/0.46 & 0.03/0/0.22 & 0.08/5e-6/0.32 & 0.17/2e-3/0.36 & $-$0.002/6e-7/0.05 & 0.004/4e-7/0.17 \\
+\hline
+\end{tabular}
+\end{table*}
+
+\textbf{Modularity and extrinsic quality preservation.}
+For Leidenalg, the Local adapter preserves the Naive modularity almost perfectly, with differences below $0.02$ on all graphs.
+The ARI, F1, and NMI values are likewise stable, and on \textit{dyn\_cora} Local even yields a slightly higher ARI ($0.28$ vs.\ $0.24$).
+FLMIG, whose aggressive pruning strategy is more sensitive to the restriction to a local neighbourhood, suffers a moderate drop in both modularity and extrinsic metrics, especially on the larger graphs.
+The GNN-based methods show a striking pattern: in the Naive (full-graph) setting, S$^2$CAG, DMoN, and MAGI often underfit severely or run out of memory, delivering near-zero modularity and poor ground-truth agreement.
+When switched to the Local mode with compact random features, the same models achieve substantially higher modularity (e.g., DMoN on \textit{dyn\_cora}: $0.06 \rightarrow 0.79$) and dramatically better ARI/F1/NMI scores.
+This confirms that the original high-dimensional features can mislead the optimisation on the small subgraphs induced by local updates, whereas the low-variance random features let the GNN focus on the local connectivity patterns.
+The PRGPT variants exhibit a mixed behaviour: on \textit{dyn\_citeseer} and \textit{patent} the Local adapter retains or improves the Naive quality, while on the larger graphs \textit{dyn\_pubmed} and \textit{arxivmath} the quality degrades considerably, indicating that these methods rely heavily on the global context provided by the full graph.
+Notably, our Local adapter also benefits the natively dynamic DF-Leiden: on \textit{dyn\_pubmed} and \textit{arxivmath} the Local variant achieves slightly higher modularity and ARI than the original dynamic algorithm, while reducing the runtime on \textit{arxivmath} by an order of magnitude ($0.44$\,s vs.\ $3.74$\,s).
+For MFC, the Local version significantly improves both modularity and ground-truth metrics on all but the smallest graphs, and avoids out-of-memory failures, although its absolute quality remains below that of the best methods.
+
+\textbf{Reduction in processing time.}
+The runtime advantage of the Local adapter is dramatic across the board.
+For Leidenalg on \textit{arxivmath}, $T$ drops from $150.7$\,s (Naive) to $3.64$\,s (Local), a $41\times$ speedup; on \textit{dyn\_pubmed} the factor exceeds $22\times$.
+FLMIG, which in the Naive mode requires over $28$ hours on \textit{arxivmath}, finishes in $37.9$\,s with the Local adapter -- a speedup of more than $2700\times$.
+Even the already fast PRGPT-Locale sees its time reduced by a factor of up to $59\times$ on \textit{arxivmath}.
+The GNN models profit similarly: S$^2$CAG on \textit{arxivmath} needs $2281$\,s (Naive) but only $178$\,s (Local); DMoN and MAGI, which run out of memory in the Naive setting on large graphs, become executable under the Local paradigm because only small neighbourhood graphs are ever materialised on the GPU.
+Crucially, the Local adapter also accelerates the native dynamic DF-Leiden on \textit{arxivmath} from $3.74$\,s to $0.44$\,s, demonstrating that its locality principle benefits even algorithms already designed for dynamic scenarios.
+
+\subsubsection{Comparison with Native Dynamic Methods}
+
+We now compare the best adapted static algorithms against the native dynamic solvers DF-Leiden and MFC (Tables~\ref{tab:mod-time} and \ref{tab:extrinsic}, top rows).
+We focus on the Local variant of Leidenalg, which consistently attains the highest quality among the adapted methods.
+
+\textbf{Modularity and extrinsic metrics.}
+On the three smallest datasets, DF-Leiden achieves modularity and ground-truth agreement scores close to those of Local Leidenalg; the differences in ARI are within $0.05$.
+As the graphs grow larger, the quality gap widens substantially: on \textit{dyn\_pubmed} DF-Leiden yields $Q=0.76$ vs.\ $0.78$ for Local Leidenalg, with ARI $0.08$ vs.\ $0.09$; on \textit{arxivmath} the modularity is $0.85$ against $0.88$, and ARI is $0.12$ vs.\ $0.17$.
+MFC consistently lags behind in both modularity and extrinsic metrics and runs out of memory on the largest graph.
+Thus, our approach retains the community quality of a state-of-the-art static algorithm in a dynamic setting, outperforming the native dynamic baselines on all datasets.
+
+\textbf{Processing time.}
+DF-Leiden is extremely fast on small graphs (${\le}0.01$\,s on the first three datasets), where Local Leidenalg requires $0.10$--$0.54$\,s -- an order of magnitude slower yet still negligible in absolute terms.
+For larger graphs the speed gap narrows: on \textit{arxivmath} DF-Leiden takes $3.74$\,s whereas Local Leidenalg finishes in $3.64$\,s, i.e., it is marginally faster while delivering a better partition.
+MFC is orders of magnitude slower and runs out of memory on the largest dataset.
+
+\textbf{Summary.}
+The comparison highlights a clear trade-off: DF-Leiden excels in raw speed on tiny graphs, but our Local Leidenalg matches or surpasses its speed on large networks while consistently offering higher quality.
+MFC cannot compete in either dimension.
+When coupled with GNN-based static detectors, our adapter additionally provides a practical solution for deploying deep graph clustering on dynamic networks that would otherwise be computationally prohibitive.
+The experiments also demonstrate that the local hierarchical paradigm is not limited to static algorithms: applying it to the dynamic DF-Leiden further improves both its quality and its scalability, underlining the generality of the proposed approach.
+
+\section{Related work} \label{S:5}
+\textbf{Static and modularity-based community detection.} Classical CD methods rely on modularity, information flow, label propagation, or related structural criteria. Louvain and Leiden are widely used because they combine high modularity with strong scalability~\cite{BGLL08,TWE19}, while Infomap and label-propagation methods offer alternative flow- and propagation-based views~\cite{RB07,SF09,TS23}. The quality and limitations of such partitions have been extensively studied, including resolution effects, ground-truth evaluation, and robustness of detected communities~\cite{POM09,YL15,YAT16,FH16}. Recent static methods continue to improve modularity optimization through greedy disassembly and local-move strategies~\cite{Rustamaji24,TTB24}, but direct application to evolving graphs still tends to require full recomputation.
+
+\textbf{Dynamic and local community detection.} Dynamic CD methods address evolving graphs by balancing snapshot quality, temporal smoothness, and update efficiency~\cite{RC17,JHG21,CZW23}. Incremental modularity and label-propagation algorithms update only parts of the previous solution~\cite{SLX14,MZW20,ZCL19,Seif20,XCS13}, while flow- and evolution-based approaches track persistent structures over time~\cite{Bov22,Sun22,Mazza23}. More recent work studies sparse temporal observations, fully dynamic graph routines, and scalable multicore variants~\cite{Conrad25,Blaskovic25,HHC22,SLu24,SKB25}. Locality is a key direction in this line: Delta-Screening and dynamic Leiden variants process affected regions rather than entire snapshots~\cite{ZK21,SLe24}; DLPA-S performs similarity-based local updates with connectivity post-processing~\cite{DKS26}; VD-STAR scales structural clustering to billion-edge graphs with amortized logarithmic updates~\cite{ZGR25}; and Spider combines seeded geodesic expansion with modularity-guided refinement~\cite{HK26}. These works motivate our locality requirement, but they are usually tied to a particular update rule or objective.
+
+\textbf{Attributed and GNN-based graph clustering.} Attributed networks and GNN-based clustering extend CD beyond purely topological criteria. Surveys and recent models show that neural embeddings can capture high-order dependencies and combine naturally with modularity or clustering losses~\cite{CCL23,LXZ23,TPP23,SGH09,LYD24,ZXZ20}. Examples include modularity-oriented contrastive learning and neural modularity maximization~\cite{LLC24,BKH24}, structural-entropy objectives~\cite{ZPS25}, pre-train-and-refine pipelines for scalable partitioning~\cite{QZG24,QZG24HPEC}, and spectral subspace clustering for attributed graphs~\cite{LYZ25}. Recent 2025 models further explore fairness, node importance, and correlation-aware graph convolutions~\cite{GPT25,CLH25,BCC25}. Although these methods improve expressiveness, they are often expensive to rerun after each graph update.
+
+Overall, prior work offers either efficient dynamic routines specialized to a fixed algorithmic design or expressive static/feature-aware solvers that are costly in dynamic settings. ComNetX is complementary: it acts as a lightweight local adapter around an arbitrary solver, including static algorithms, GNN-based methods, and native dynamic solvers, while restricting computation to affected aggregated subproblems.
+%----------------------------------------------------------------------------------------
+\section{Conclusion} \label{S:6}
+%----------------------------------------------------------------------------------------
+\begingroup
+\begin{thebibliography}{00}
+\scriptsize\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}\renewcommand{\baselinestretch}{0.78}\selectfont
+\bibitem{N03}
+    Newman, M.E.J. (2003). The structure and function of complex networks. \textit{SIAM Review}, 45(2), 167--256.
+\bibitem{OSH07}
+    Onnela, J., Saramäki, J., Hyvönen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of Natl. Acad. Sci. U.S.A.}, 104(18), 7332--7336.
+\bibitem{PBV07}
+    Palla, G., Barab{\'a}si, A., \& Vicsek, T. (2007). Quantifying social group evolution. \textit{Nature}, 446, 664--667. 
+\bibitem{POM09}
+    Porter, M.A., Onnela, J.P., \& Mucha, P.J. et al. (2009). Communities in Networks. \textit{Notices of the American Mathematical Society}, 56(9), 1082--1097. 
+\bibitem{SF09}
+    Fortunato, S. (2010). Community detection in graphs. \textit{Physics Reports}, 486(3--5), 75--174. 
+\bibitem{RCC04}
+    Radicchi, F., Castellano, C., \& Cecconi, F. et al. (2004) Defining and identifying communities in networks \textit{Proceedings of the National Academy of Sciences}, 101(9).
+\bibitem{YL15}
+    Yang, J., Leskovec, J. (2015) Defining and evaluating network communities based on ground-truth \textit{Knowledge and Information Systems}, 42(1), 181--213.
+\bibitem{FL02}
+    Flake, G.W., \& Lawrence, S. (2002) Self-Organization and Identification of Web Communities \textit{Computer}, 35(3), 66--70.
+\bibitem{NG04}
+    Newman, M.E.J., Girvan, M. (2004). Finding and evaluating community structure in networks. \textit{Physical Review E}, 69(2), 026113. 
+\bibitem{BDG08}
+    Brandes, U., Delling, D., \& Gaertler, M. (2008). On Modularity Clustering. \textit{IEEE Transactions on Knowledge and Data Engineering}, 20(2), 172--188.
+\bibitem{BGLL08}
+    Blondel, V., Guillaume, J., Lambiotte, R., \& Lefebvre, E. (2008). Fast unfolding of communities in large networks. \textit{Journal of Statistical Mechanics: Theory and Experiment}, P10008.
+\bibitem{TWE19}
+    Traag, V.A., Waltman, L., Van Eck, N.J. (2019). From Louvain to Leiden: guaranteeing well-connected communities. \textit{Scientific reports}, 9, Article 5233. 
+\bibitem{RC17}
+    Rossetti, G., Cazabet, R. (2017). Community Discovery in Dynamic Networks: A Survey. \textit{ACM Computing Surveys}, 51(2), 1--37. 
+\bibitem{Sah23}
+    Sahu, S. (2023v). GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting. \textit{arXiv preprint}. 
+\bibitem{CCL23}
+    Cheng, H., He, C., \& Liu, H. (2023). Community Detection Based on Directed Weighted Signed Graph Convolutional Networks. \textit{IEEE Transactions on Network Science and Engineering}, 11(2). 
+    Chunaev, P. (2020). Community detection in node-attributed social networks: A survey. \textit{Computer Science Review}, 37, 100286. 
+\bibitem{ZXY20}
+    Zhang, Y., Xiong, Y., \& Ye, Y. et al. (2020). SEAL: Learning Heuristics for Community Detection with Generative Adversarial Networks. \textit{Proceedings of KDD'20: The 26th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1103--1113. 
+\bibitem{DSD24}
+    Devesh, K.V.V., Sreesankar, S., \& Dinesan, K. et al. (2024). Analyzing GNN Models for Community Detection Using Graph Embeddings: A Comparative Study. \textit{Proceedings of 15th International Conference on Computing Communication and Networking Technologies (ICCCNT)}. 
+\bibitem{LXZ23}
+    Liu, Y., Xia, J., \& Zhou, S. (2023). A Survey of Deep Graph Clustering: Taxonomy, Challenge, Application, and Open Resource. \textit{arXiv preprint}. 
+\bibitem{JLL23}
+    Ji, S., Lu, X., \& Liu, M. et al. (2023). Community-based Dynamic Graph Learning for Popularity Prediction. \textit{Proceedings of KDD'23: The 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 930--940.
+\bibitem{RB07}
+    Rosvall, M., \& Bergstrom, C.T. (2007). An information-theoretic framework for resolving community structure in complex networks. \textit{Proceedings of the National Academy of Sciences}, 104, 7327--7331. 
+\bibitem{TS23}
+    Traag, V.A., Šubelj, L. (2023). Large network community detection by fast label propagation. \textit{Scientific Reports}, 13, 2701. 
+\bibitem{YAT16}
+    Yang, Z., Algesheimer, R., \& Tessone, C. J. (2016). A Comparative Analysis of Community Detection Algorithms on Artificial Networks. \textit{Scientific Reports}, 6, Article 30750. 
+\bibitem{Rustamaji24}
+    Rustamaji, H.C., Kusuma, W.A., Nurdiati, S., Batubara, I. (2024). Community detection with greedy modularity disassembly strategy. \textit{Scientific Reports}, 14, 4694. 
+\bibitem{JHG21}
+    José-García, A., Handl, Ju., Gómez-Flores, W., Garza-Fabre, M. (2021). An evolutionary many-objective approach to multiview clustering using feature and relational data. \textit{Applied Soft Computing}, 108, 107425. 
+\bibitem{CZW23}
+    Cai, L., Zhou, J., Wang, D. (2023). 
+    Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm. 
+    \textit{PeerJ Computer Science}, 9, e1477. 
+\bibitem{SLX14}
+    Shang, J., Liu, L., Xie, F., Chen, Z., Miao, J., Fang, X., \& Wu, C. (2014). A real-time detecting algorithm for tracking community structure of dynamic networks. \textit{arXiv preprint}. 
+\bibitem{MZW20}
+    Ma, Y., Zhao, Y., Wang, J., et al. (2020). Modularity-Based Incremental Label Propagation Algorithm for Community Detection. \textit{Applied Sciences}, 10(12), 4060. 
+\bibitem{LHK14}
+    Lu, H., Halappanava, M., \& Kalyanaraman, A. (2015). Parallel Heuristics for Scalable Community Detection. \textit{Parallel Computing}, 47, 19--37. 
+\bibitem{ZCL19}
+    Zhuang, D., Chang, J., \& Li, M. (2019). DynaMo: Dynamic community detection by incrementally maximizing modularity. \textit{IEEE Transactions on Knowledge and Data Engineering}, 33(5), 1934--1945.
+\bibitem{Seif20}
+    Seifikar M., Farzi S., Barati M. (2020). C-Blondel: An Efficient Louvain-Based Dynamic Community Detection Algorithm, \textit{IEEE Transactions on Computational Social Systems}, 7(2), 308--318.
+\bibitem{Bov22}
+    Bovet, A., Delvenne, J.-C., Lambiotte, R. (2022) Flow stability for dynamic community detection. \textit{Science Advances}, 8(19).
+\bibitem{XCS13}
+    Xie, J., Chen, M., \& Szymanski, B.K. (2013). LabelRankT: incremental community detection in dynamic networks via label propagation. \textit{DyNetMM: the Workshop on Dynamic Networks Management and Mining}, 25--32.
+\bibitem{Sun22}
+    Sun, Z., Sun, Y., Chang, X., et al. (2022). Dynamic community detection based on the Matthew effect. \textit{Physica A: Statistical Mechanics and its Applications}, 597, 127315.
+\bibitem{Mazza23}
+    Mazza, M., Cola, G., Tesconi, M. (2023). Modularity-based approach for tracking communities in dynamic social networks. \textit{Knowledge-Based Systems}, 281, 111067.
+\bibitem{Conrad25}
+    Conrad, N.D., Tonello, E., Zonker, J., et al. (2025). Detection of dynamic communities in temporal networks with sparse data. \textit{Applied Network Science}, 10, Article 1.
+\bibitem{Blaskovic25}
+    Blašković, F., Conrad, T.O.F., Klus, S., et al. (2025). Random walk based snapshot clustering for detecting community dynamics in temporal networks. \textit{Scientific Reports}, 15, 24414.
+\bibitem{HKT17}
+    Halappanavar, M., Lu, H., Kalyanaraman, A., \& Tumeo, A. (2017). Scalable static and dynamic community detection using Grappolo. \textit{Proceedings of the IEEE High Performance Extreme Computing Conference (HPEC)}, 1--6.
+\bibitem{HHC22}
+    Hanauer, K., Henzinger, M., \& Schulz, Ch. (2022). Recent Advances in Fully Dynamic Graph Algorithms – A Quick Reference Guide. \textit{ACM J. Exp. Algorithmics}, 27, 1--45.
+\bibitem{SLu24}
+    Sahu, S. (2024). DF Louvain: Fast Incrementally Expanding Approach for Community Detection on Dynamic Graphs. \textit{arXiv preprint}. 
+\bibitem{SKB25}
+    Sahu, S., Kothapalli, K., Banerjee, D.\,S. (2025).
+    Parallel Multicore Algorithms for Community Detection in Dynamic Graphs.
+    \textit{International Journal of Networking and Computing}, 15 (1), 2--31. 
+\bibitem{DKS26}
+    Douadi A., Kamel N., Sais L. (2026).
+    Incremental Similarity‐Based Label Propagation Algorithm for Dynamic Community Detection.
+    \textit{Concurrency and Computation: Practice and Experience}, 38 (2). 
+\bibitem{MS20}
+    McDiarmid, C., Skerman F. (2020). Modularity of Erdős‐Rényi random graphs. \textit{Random Structures \& Algorithms}, 57(1), 211--243.
+\bibitem{G10}
+    Good B.H., et al. (2010). Performance of modularity maximization in practical contexts. \textit{Physical Review E}, 81(4).
+\bibitem{FH16}
+    Fortunato, S., Hric D. (2016). Community detection in networks: A user guide. \textit{Physics Reports}, 659, 1--44.
+\bibitem{LLC24}
+    Liu, Y., Li, J., \& Chen, Y. et al. (2024). Revisiting Modularity Maximization for Graph Clustering: A Contrastive Learning Perspective. \textit{Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1968--1979.
+\bibitem{BKH24}
+    Bhowmick, A., Kosan, M., \& Huang, Z. et al. (2024). DGCLUSTER: a neural framework for attributed graph clustering via modularity maximization. \textit{Proceedings of the 38th AAAI Conference on Artificial Intelligence and 36th Conference on Innovative Applications of Artificial Intelligence and 14th Symposium on Educational Advances in Artificial Intelligence}, 11069--11077.
+\bibitem{ZGR25}
+    Zhao Z., Gan, J., \& Ruan, B. et al. (2025). Dynamic Structural Clustering Unleashed: Flexible Similarities, Versatile Updates and for All Parameters. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 3980--3991.
+\bibitem{TTB24}
+    Taibi, S., Toumi, L. \& Bouamama, S. (2024). Complex network community discovery using fast local move iterated greedy algorithm. \textit{The Journal of Supercomputing}, 81(1).
+\bibitem{HK26}
+    Harutyunyan H.A., Kamalipour P. (2026). Spider Community Detection: Seeded Geodesic Expansion with Modularity-Guided Refinement and Greedy Merge Matching. \textit{Computers}, 15(2):83.
+\bibitem{LYZ25}
+    Lin, X., Yang, R., \& Zheng, H. et al. (2025). Spectral Subspace Clustering for Attributed Graphs. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 789--799. 
+\bibitem{TPP23}
+    Tsitsulin, A., Palowitch, J., Perozzi, B. \& and Muller, E. (2023) Graph clustering with graph neural networks. \textit{The Journal of Machine Learning Research}, 24(1), 5809--5829.
+\bibitem{SGH09}
+    Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., \& Monfardini, G. (2009) The graph neural network model. \textit{IEEE transactions on neural networks}, 20(1), 61--80.
+\bibitem{LYD24}
+    Liu, C., Yang, Y., \& Ding, Y. et al (2024) DAG: Deep Adaptive and Generative K-Free Community Detection on Attributed Graphs. \textit{Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 5454--5465.
+\bibitem{ZXZ20}
+    Zhang, T., Xiong, Y., \& Zhang, J. et al (2020) CommDGI: Community Detection Oriented Deep Graph Infomax. \textit{Proceedings of the 29th ACM International Conference on Information \& Knowledge Management}, 1843--1852.
+\bibitem{ZPS25}
+    Zhang, J., Peng, H., \& Sun, L. et al. (2025). Unsupervised Graph Clustering with Deep Structural Entropy. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 3752--3763.
+\bibitem{QZG24}
+    Qin, M., Zhang, C., \& Gao, Y. et al. (2024). Pre-train and Refine: Towards Higher Efficiency in K-Agnostic Community Detection without Quality Degradation. \textit{Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 2467--2478.
+\bibitem{GPT25}
+    Gkartzios, C., Pitoura, E., Tsaparas., P. (2025). Modularity-Fair Deep Community Detection. \textit{Proceedings of the 2025 IEEE International Conference on Data Mining (ICDM)}, 287--296.
+\bibitem{CLH25}
+    Chen, N., Liu, Z., \& Hooi, B. et al. (2025). NodeImport: Imbalanced Node Classification with Node Importance Assessment. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 94--105.
+\bibitem{BCC25}
+    Bei, Y., Chen, W., \& Chen, H. et al. (2025). Correlation-Aware Graph Convolutional Networks for Multi-Label Node Classification. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}.
+\bibitem{QZG24HPEC}
+    Qin, M., Zhang, C. \& Gao, Y. et al. (2024). Towards Faster Graph Partitioning via Pre-training and Inductive Inference. \textit{2024 IEEE High Performance Extreme Computing Conference (HPEC)}.
+\bibitem{ZK21}
+    Zarayeneh, N., Kalyanaraman, A. (2021). Delta-Screening: A Fast and Efficient Technique to Update Communities in Dynamic Graphs. \textit{IEEE transactions on network science and engineering}, 8(2), 1614--1629.
+\bibitem{SLe24}
+    Sahu, S. (2024). A Starting Point for Dynamic Community Detection with Leiden Algorithm. \textit{arXiv preprint}.
+\bibitem{KZL24}
+    Kong, D., Zhang, A., \& Li, Y. (2024). Learning Persistent Community Structures in Dynamic Networks via Topological Data Analysis. \textit{The 38th Annual AAAI Conference on Artificial Intelligence (AAAI)}.
+\end{thebibliography}
+\endgroup
+
+\end{document}
