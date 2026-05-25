@@ -101,6 +101,12 @@ Backends:
 - Leidenalg for topology-only stability.
 - S2CAG or DMoN for feature-aware behavior.
 
+Execution split:
+
+- Use `leidenalg` for the full structural radius/depth grid. It is fast and isolates the topology-only ComNetX mechanism.
+- Use a feature-aware backend only for feature-mode and feature-aggregation ablations. `leidenalg` cannot test these because it ignores node features.
+- Keep GNN ablations light: run them first on `dyn_cora` and `dyn_pubmed`; add `arxivmath` only after the lightweight evidence is stable.
+
 ### E3. Locality/workload instrumentation
 
 Already partially available:
@@ -260,4 +266,3 @@ The article is ready for serious ICDM submission only when:
 - memory table supports OOM/scalability claims;
 - all related-work claims have checked references;
 - no TODO/TBD remains in the main paper.
-

@@ -19,6 +19,20 @@ python3 scripts/launch.py conf/paper_icdm/main_topology.json
 Use `--include-scale` if optional larger datasets should be added to the main
 configs.
 
+The configs are split by paper claim:
+
+- `main_topology.json`: the main fast topology-only comparison.
+- `ablation_topology_radius_depth.json`: structural ablation with `leidenalg`.
+- `main_gnn_feature.json`: feature-aware feasibility and quality comparison.
+- `ablation_feature_modes.json`: dataset/random/onehot feature ablation.
+- `ablation_feature_aggregation.json`: `norm` vs `sum` feature aggregation.
+- `ablation_gnn_radius_light.json`: small GNN-only radius check.
+- `long_horizon_topology.json`: long-horizon topology robustness.
+
+The feature ablations intentionally use feature-aware backends only. `leidenalg`
+is used for the full radius/depth ablation because it is fast and topology-only;
+it cannot test feature modes or feature aggregation.
+
 ## Summarize result JSONs
 
 Flatten one or more result files:
@@ -41,4 +55,3 @@ python3 scripts/paper/summarize_neighborhood_table.py
 
 This reproduces the LaTeX rows for the current Table 6 from
 `results/neighborhood/*.json`.
-

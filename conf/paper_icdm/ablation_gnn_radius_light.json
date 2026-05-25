@@ -7,8 +7,7 @@
   "USE_GPU": true,
   "DATASETS": [
     "dyn_cora",
-    "dyn_pubmed",
-    "arxivmath"
+    "dyn_pubmed"
   ],
   "BATCHES": [
     "999:10"
@@ -17,13 +16,10 @@
     "s2cag"
   ],
   "MODES": [
-    "naive",
     "smart"
   ],
   "FEATURE_MODES": [
-    "dataset",
-    "random",
-    "onehot"
+    "random"
   ],
   "RANDOM_FEATURE_DIM": 64,
   "BASELINE_ITERATIONS": [
@@ -31,9 +27,7 @@
   ],
   "SMART_PARAMS_GRID": {
     "smart_subcoms_depth": [
-      1,
-      3,
-      4
+      3
     ],
     "smart_neighborhood_step": [
       0,
@@ -41,8 +35,7 @@
       2
     ],
     "aggregation_mode": [
-      "norm",
-      "sum"
+      "norm"
     ]
   }
 }

@@ -27,6 +27,11 @@ ABLATION_DATASETS = [
     "arxivmath",
 ]
 
+FEATURE_ABLATION_DATASETS = [
+    "dyn_cora",
+    "dyn_pubmed",
+]
+
 OPTIONAL_SCALE_DATASETS = [
     "arxivcs",
     "dyn_ogbn-arxiv",
@@ -109,7 +114,7 @@ def build_configs(include_scale: bool) -> dict[str, dict]:
     cfg = base_config()
     cfg.update(
         {
-            "DATASETS": ABLATION_DATASETS,
+            "DATASETS": FEATURE_ABLATION_DATASETS,
             "BATCHES": ["999:10"],
             "BASELINES": ["s2cag"],
             "MODES": ["naive", "smart"],
@@ -117,13 +122,51 @@ def build_configs(include_scale: bool) -> dict[str, dict]:
             "RANDOM_FEATURE_DIM": 64,
             "BASELINE_ITERATIONS": [10],
             "SMART_PARAMS_GRID": {
-                "smart_subcoms_depth": [1, 3, 4],
-                "smart_neighborhood_step": [0, 1, 2],
+                "smart_subcoms_depth": [3],
+                "smart_neighborhood_step": [1],
+                "aggregation_mode": ["norm"],
+            },
+        }
+    )
+    configs["ablation_feature_modes.json"] = cfg
+
+    cfg = base_config()
+    cfg.update(
+        {
+            "DATASETS": FEATURE_ABLATION_DATASETS,
+            "BATCHES": ["999:10"],
+            "BASELINES": ["s2cag"],
+            "MODES": ["smart"],
+            "FEATURE_MODES": ["random"],
+            "RANDOM_FEATURE_DIM": 64,
+            "BASELINE_ITERATIONS": [10],
+            "SMART_PARAMS_GRID": {
+                "smart_subcoms_depth": [3],
+                "smart_neighborhood_step": [1],
                 "aggregation_mode": ["norm", "sum"],
             },
         }
     )
-    configs["ablation_feature_radius_depth_aggregation.json"] = cfg
+    configs["ablation_feature_aggregation.json"] = cfg
+
+    cfg = base_config()
+    cfg.update(
+        {
+            "DATASETS": FEATURE_ABLATION_DATASETS,
+            "BATCHES": ["999:10"],
+            "BASELINES": ["s2cag"],
+            "MODES": ["smart"],
+            "FEATURE_MODES": ["random"],
+            "RANDOM_FEATURE_DIM": 64,
+            "BASELINE_ITERATIONS": [10],
+            "SMART_PARAMS_GRID": {
+                "smart_subcoms_depth": [3],
+                "smart_neighborhood_step": [0, 1, 2],
+                "aggregation_mode": ["norm"],
+            },
+        }
+    )
+    configs["ablation_gnn_radius_light.json"] = cfg
 
     cfg = base_config()
     cfg.update(
@@ -187,4 +230,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
