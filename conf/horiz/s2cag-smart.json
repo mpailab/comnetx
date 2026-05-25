@@ -1,0 +1,22 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  
+  "DATASETS": [
+    "dyn_pubmed", "arxivmath"],
+  "BATCHES": ["999:5", "999:10", "999:20", "999:40", "999:80", "999:160", "999:320",
+              "99:50", "9:500"],
+  "FORCE_UNDIRECTED": true,
+  
+  "BASELINES": ["s2cag"],
+  "MODES": ["smart"],
+  "FEATURE_MODES": ["random"],
+  "BASELINE_ITERATIONS": [10],
+  
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [3],
+    "smart_neighborhood_step": [1],
+    "aggregation_mode": ["norm"]
+  }
+}
