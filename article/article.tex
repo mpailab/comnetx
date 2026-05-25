@@ -297,6 +297,7 @@ vertices in the expanded affected set are opened as singletons at the deepest
 stored level, and affected higher-level communities inherit the finer labels.
 This gives the backend enough freedom to split a changed region while keeping
 the unaffected part of the hierarchy fixed.
+Algorithm~\ref{alg:comnetx} summarizes the update procedure for one batch.
 
 \begin{algorithm}[t]
 \caption{ComNetX update for one batch}
@@ -525,7 +526,7 @@ separate feature-mode ablation is needed to attribute the gains precisely.
 \subsubsection{Proposed vs.\ Naive Dynamic Adaptation}
 
 This experiment addresses RQ1.
-Tables~\ref{tab:mod-time} and~\ref{tab:extrinsic} report the modularity--runtime trade-off and the agreement with ground-truth communities for every combination of algorithm, adaptation strategy, and dataset.
+Table~\ref{tab:main-results} summarizes the modularity--runtime trade-off and NMI agreement with ground-truth communities across all datasets. The full per-dataset modularity/runtime table and the full ARI/F1/NMI table are moved to Appendix~\ref{app:full-results}, because the main paper should emphasize the quality--efficiency pattern rather than expose every raw cell.
 For each method we contrast the conventional dynamic baseline (``Naive'' for static methods that re-run on the full snapshot, ``Dynamic'' for natively dynamic algorithms) with the variant obtained through our local hierarchical adapter (``Local'').
 The Local variant is also applied to the natively dynamic algorithms DF-Leiden and MFC.
 This is possible because any dynamic algorithm can be used as a static one: it receives a graph and an initial partition, and returns an updated partition without relying on any history of previous updates.
@@ -534,101 +535,29 @@ The results demonstrate that our adapter can accelerate and, in several cases, e
 
 \begin{table*}[ht]
 \centering
-\caption{Modularity ($Q$) and total processing time in seconds ($T$) on the ten-update sequence. Each cell shows $Q$ / $T$. ``OOM'' indicates out of memory.}
-\label{tab:mod-time}
-\setlength{\tabcolsep}{2pt}
+\caption{Main quality--efficiency summary of Local ComNetX against the corresponding baseline. $\overline{\Delta Q}$ and $\overline{\Delta\mathrm{NMI}}$ are Local minus baseline, averaged over datasets with finite baseline results. Geometric mean speedup excludes zero-time and OOM baseline entries. Full per-dataset values are reported in Appendix~\ref{app:full-results}.}
+\label{tab:main-results}
+\setlength{\tabcolsep}{4pt}
 \footnotesize
-\begin{tabular}{lcccccc}
-\hline
-\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
-\hline
-\multicolumn{7}{l}{\textit{DF-Leiden}} \\
-Dynamic & 0.81\,/\,0.00 & 0.82\,/\,0.01 & 0.89\,/\,0.00 & 0.86\,/\,0.03 & 0.76\,/\,0.10 & 0.85\,/\,3.74 \\
-Local   & 0.80\,/\,0.22 & 0.80\,/\,0.10 & 0.88\,/\,0.07 & 0.78\,/\,0.23 & 0.78\,/\,0.11 & 0.88\,/\,0.44 \\
-\hline
-\multicolumn{7}{l}{\textit{MFC}} \\
-Dynamic & 0.42\,/\,881.5 & 0.49\,/\,1532 & 0.43\,/\,1832 & 0.70\,/\,816.3 & 0.18\,/\,2949 & OOM \\
-Local   & 0.73\,/\,31.5  & 0.26\,/\,32.2  & 0.67\,/\,22.9  & 0.78\,/\,38.4  & 0.02\,/\,35.9  & 0.06\,/\,381.7 \\
-\hline
-\multicolumn{7}{l}{\textit{Leidenalg}} \\
-Naive & 0.82\,/\,1.25 & 0.83\,/\,1.32 & 0.89\,/\,0.83 & 0.86\,/\,2.90 & 0.79\,/\,6.51 & 0.89\,/\,150.7 \\
-Local & 0.81\,/\,0.54 & 0.79\,/\,0.25 & 0.88\,/\,0.10 & 0.86\,/\,1.86 & 0.78\,/\,0.29 & 0.88\,/\,3.64 \\
-\hline
-\multicolumn{7}{l}{\textit{FLMIG}} \\
-Naive & 0.82\,/\,15.7 & 0.75\,/\,20.0 & 0.87\,/\,29.8 & 0.86\,/\,73.1 & 0.75\,/\,178.9 & 0.87\,/\,103535 \\
-Local & 0.77\,/\,0.35 & 0.52\,/\,1.64 & 0.72\,/\,0.36 & 0.74\,/\,18.3 & 0.08\,/\,1.90 & 0.59\,/\,37.9 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
-Naive & 0.80\,/\,2.79 & 0.70\,/\,5.28 & 0.84\,/\,2.07 & 0.64\,/\,16.5 & 0.73\,/\,25.4 & 0.55\,/\,533.3 \\
-Local & 0.74\,/\,0.43 & 0.67\,/\,1.20 & 0.84\,/\,0.38 & 0.86\,/\,12.4 & 0.09\,/\,1.07 & 0.07\,/\,13.4 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
-Naive & 0.82\,/\,3.11 & 0.82\,/\,5.56 & 0.89\,/\,2.33 & 0.77\,/\,16.7 & 0.79\,/\,28.7 & 0.88\,/\,795.6 \\
-Local & 0.77\,/\,0.35 & 0.62\,/\,1.18 & 0.80\,/\,0.38 & 0.84\,/\,12.7 & 0.42\,/\,1.18 & 0.07\,/\,13.5 \\
-\hline
-\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
-Naive & 0.69\,/\,38.5 & 0.04\,/\,252.6 & 0.78\,/\,164.2 & 0.38\,/\,13.6 & 0.62\,/\,110.0 & 0.00\,/\,2281 \\
-Local & 0.78\,/\,6.61 & 0.62\,/\,7.66 & 0.77\,/\,4.48 & 0.66\,/\,21.8 & 0.52\,/\,13.8 & 0.54\,/\,178.1 \\
-\hline
-\multicolumn{7}{l}{\textit{MAGI}} \\
-Naive & 0.34\,/\,75.1 & 0.06\,/\,81.7 & 0.35\,/\,57.9 & 0.82\,/\,127.4 & 0.49\,/\,300.3 & OOM \\
-Local & 0.73\,/\,144.4& 0.33\,/\,460.5& 0.76\,/\,254.8& 0.59\,/\,524.6& 0.06\,/\,533.1& 0.07\,/\,868.2 \\
-\hline
-\multicolumn{7}{l}{\textit{DMoN}} \\
-Naive & 0.06\,/\,16.7 & 0.13\,/\,17.7 & 0.10\,/\,15.1 & $-$0.04\,/\,101.9 & 0.14\,/\,294.0 & OOM \\
-Local & 0.79\,/\,28.6 & 0.61\,/\,30.3 & 0.77\,/\,23.2 & 0.54\,/\,33.4 & 0.10\,/\,31.6 & 0.16\,/\,65.1 \\
-\hline
+\begin{tabular}{llrrrrr}
+\toprule
+\textbf{Backend} & \textbf{Baseline} & \textbf{$\overline{\Delta Q}$} &
+\textbf{$\overline{\Delta\mathrm{NMI}}$} & \textbf{Geo. speedup} &
+\textbf{arxivmath} & \textbf{OOM avoided} \\
+\midrule
+DF-Leiden      & Dynamic & $-$0.012 & +0.002 & 0.6$\times$  & 8.5$\times$ & 0 \\
+MFC            & Dynamic & +0.048 & +0.126 & 45.1$\times$ & OOM$\rightarrow$381.7s & 1 \\
+Leidenalg      & Naive   & $-$0.013 & $-$0.010 & 7.3$\times$  & 41.4$\times$ & 0 \\
+FLMIG          & Naive   & $-$0.250 & $-$0.042 & 60.0$\times$ & 2731.8$\times$ & 0 \\
+PRGPT-Infomap  & Naive   & $-$0.165 & $-$0.073 & 7.6$\times$  & 39.8$\times$ & 0 \\
+PRGPT-Locale   & Naive   & $-$0.242 & $-$0.073 & 8.9$\times$  & 58.9$\times$ & 0 \\
+S$^2$CAG       & Naive   & +0.230 & +0.112 & 8.7$\times$  & 12.8$\times$ & 0 \\
+MAGI           & Naive   & +0.082 & $-$0.034 & 0.3$\times$  & OOM$\rightarrow$868.2s & 1 \\
+DMoN           & Naive   & +0.484 & +0.112 & 1.4$\times$  & OOM$\rightarrow$65.1s & 1 \\
+\bottomrule
 \end{tabular}
 \end{table*}
 
-\begin{table*}[ht]
-\centering
-\caption{ARI / F1 / NMI with respect to ground truth on the final snapshot. ``OOM'' indicates out of memory.}
-\label{tab:extrinsic}
-\setlength{\tabcolsep}{1.5pt}
-\footnotesize
-\begin{tabular}{lcccccc}
-\hline
-\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
-\hline
-\multicolumn{7}{l}{\textit{DF-Leiden}} \\
-Dynamic & 0.24/8e-4/0.44 & 0.07/1e-4/0.26 & 0.10/3e-4/0.33 & 0.18/1e-3/0.37 & 0.08/0/0.19 & 0.12/7e-7/0.39 \\
-Local   & 0.24/1e-2/0.45 & 0.05/3e-4/0.25 & 0.10/2e-4/0.33 & 0.17/2e-2/0.36 & 0.09/5e-3/0.20 & 0.17/1e-5/0.40 \\
-\hline
-\multicolumn{7}{l}{\textit{MFC}} \\
-Dynamic & 0.01/8e-4/0.15 & 0.01/0/0.15 & 0.01/4e-5/0.17 & 0.13/3e-2/0.19 & 0.03/1e-3/0.02 & OOM \\
-Local   & 0.21/2e-3/0.43 & 0.01/2e-5/0.20 & 0.07/4e-4/0.29 & 0.19/2e-2/0.37 & 0.00/3e-2/0.02 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{Leidenalg}} \\
-Naive & 0.24/8e-3/0.46 & 0.05/1e-3/0.26 & 0.10/6e-4/0.33 & 0.16/4e-2/0.36 & 0.10/1e-2/0.21 & 0.17/1e-7/0.42 \\
-Local & 0.28/3e-3/0.46 & 0.04/1e-4/0.24 & 0.10/6e-4/0.33 & 0.18/2e-2/0.37 & 0.09/1e-2/0.18 & 0.17/8e-7/0.40 \\
-\hline
-\multicolumn{7}{l}{\textit{FLMIG}} \\
-Naive & 0.24/9e-3/0.46 & 0.09/2e-3/0.22 & 0.07/2e-4/0.27 & 0.16/4e-2/0.36 & 0.07/1e-2/0.13 & 0.13/2e-7/0.34 \\
-Local & 0.22/2e-3/0.42 & 0.02/2e-4/0.20 & 0.08/3e-4/0.29 & 0.18/2e-2/0.37 & 0.01/3e-2/0.03 & 0.05/4e-7/0.22 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
-Naive & 0.25/9e-4/0.45 & 0.19/7e-4/0.30 & 0.20/2e-3/0.35 & 0.25/2e-2/0.38 & 0.21/7e-3/0.23 & 0.08/0/0.27 \\
-Local & 0.21/5e-3/0.43 & 0.06/1e-3/0.23 & 0.14/5e-4/0.33 & 0.18/2e-2/0.37 & 0.004/8e-3/0.04 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
-Naive & 0.25/2e-3/0.47 & 0.06/2e-4/0.27 & 0.10/5e-4/0.33 & 0.21/5e-3/0.37 & 0.09/8e-3/0.20 & 0.20/7e-6/0.42 \\
-Local & 0.24/5e-3/0.44 & 0.04/9e-4/0.23 & 0.07/5e-4/0.30 & 0.18/2e-2/0.37 & 0.10/4e-2/0.14 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
-Naive & 0.21/2e-2/0.44 & 0.00/0/0.09 & 0.03/4e-4/0.25 & 0.05/8e-2/0.06 & 0.08/2e-2/0.17 & 3e-6/0/0.00 \\
-Local & 0.26/3e-3/0.46 & 0.04/3e-6/0.24 & 0.08/6e-5/0.32 & 0.17/6e-3/0.36 & 0.07/1e-5/0.14 & 0.02/4e-7/0.16 \\
-\hline
-\multicolumn{7}{l}{\textit{MAGI}} \\
-Naive & 0.07/1e-3/0.42 & 0.005/1e-5/0.25 & 0.01/2e-5/0.31 & 0.10/3e-2/0.27 & 0.05/2e-4/0.22 & OOM \\
-Local & 0.21/4e-3/0.43 & 0.01/5e-4/0.19 & 0.11/3e-4/0.30 & 0.17/1e-2/0.36 & 0.001/5e-5/0.02 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{DMoN}} \\
-Naive & 0.002/2e-5/0.25 & 0.003/4e-6/0.16 & 0.002/6e-6/0.24 & 0.002/1e-6/0.16 & 0.004/3e-6/0.04 & OOM \\
-Local & 0.26/1e-3/0.46 & 0.03/0/0.22 & 0.08/5e-6/0.32 & 0.17/2e-3/0.36 & $-$0.002/6e-7/0.05 & 0.004/4e-7/0.17 \\
-\hline
-\end{tabular}
-\end{table*}
 
 \textbf{Modularity and extrinsic quality preservation.}
 For Leidenalg, the Local adapter closely tracks the Naive modularity, with
@@ -705,7 +634,7 @@ reduction.
 \subsubsection{Comparison with Native Dynamic Methods}
 
 This experiment addresses RQ2.
-We now compare the best adapted static algorithms against the native dynamic solvers DF-Leiden and MFC (Tables~\ref{tab:mod-time} and \ref{tab:extrinsic}, top rows).
+We now compare the best adapted static algorithms against the native dynamic solvers DF-Leiden and MFC (Table~\ref{tab:main-results} and Appendix~\ref{app:full-results}).
 We focus on the Local variant of Leidenalg, which gives the most stable
 quality--runtime trade-off among the adapted methods.
 
@@ -738,45 +667,56 @@ The experiments also demonstrate that the local hierarchical paradigm is not lim
 
 This experiment addresses RQ3.
 The main mechanism behind the speedup is that ComNetX transforms a full-snapshot
-backend call into a sequence of small contracted calls. Table~\ref{tab:workload}
-is the key evidence that must accompany the runtime results: it should report
-how large the inspected and contracted instances are relative to the original
-graph. The expected pattern is that $|B_r(S_t)|$ remains a small fraction of
-the graph on most updates, while community closure increases the region enough
-to preserve partition quality but not enough to approach full recomputation.
+backend call into a sequence of small local calls. Table~\ref{tab:workload}
+reports the measured growth of update neighborhoods in the current
+$999{:}10$ dynamic streams. Since ComNetX uses $r=1$ in the reported
+experiments, the most important column is $|B_1(S_t)|/|V|$; the larger radii
+show how quickly locality would be lost if the expansion radius were increased.
 
 \begin{table*}[t]
 \centering
-\caption{Local workload induced by ComNetX. Values must be averaged over all
-updates and five dynamic streams. ``Expanded'' is $|B_r(S_t)|/|V|$,
-``Closed'' is $\max_\ell |U_t^\ell|/|V|$, and ``Contracted'' is the average
-number of nodes and edges passed to the backend. Replace all TBD cells with
-mean $\pm$ standard deviation before submission.}
+\caption{Empirical neighborhood growth for the update streams used in the
+experiments. $|S_t|$ is the average number of directly affected vertices.
+$B_h$ columns report the mean percentage of vertices within graph distance
+$h$ from $S_t$; the $B_1$ column also reports the maximum percentage across
+mini-batches. Values are computed from the available neighborhood logs for the
+$999{:}10$ protocol.}
 \label{tab:workload}
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \footnotesize
-\begin{tabular}{lccccc}
+\begin{tabular}{lrrrrrr}
 \toprule
-\textbf{Dataset} & \textbf{Expanded (\%)} & \textbf{Closed (\%)} &
-\textbf{Contracted nodes} & \textbf{Contracted edges} & \textbf{Speedup driver} \\
+\textbf{Dataset} & \textbf{Updates} & \textbf{$|S_t|$} &
+\textbf{$B_1$ mean/max (\%)} & \textbf{$B_2$ (\%)} &
+\textbf{$B_3$ (\%)} & \textbf{$B_5$ (\%)} \\
 \midrule
-dyn\_cora     & TBD & TBD & TBD & TBD & neighborhood / closure \\
-dyn\_acm      & TBD & TBD & TBD & TBD & neighborhood / closure \\
-dyn\_citeseer & TBD & TBD & TBD & TBD & neighborhood / closure \\
-patent        & TBD & TBD & TBD & TBD & contraction \\
-dyn\_pubmed   & TBD & TBD & TBD & TBD & contraction \\
-arxivmath     & TBD & TBD & TBD & TBD & contraction \\
+dyn\_cora     & 10 & 2.0   & 0.35 / 0.41 & 1.75 & 7.77  & 48.63 \\
+dyn\_acm      & 10 & 5.2   & 2.04 / 3.11 & 8.11 & 21.61 & 54.40 \\
+dyn\_citeseer & 8  & 2.0   & 1.01 / 3.13 & 3.06 & 5.82  & 15.58 \\
+patent        & 10 & 5.1   & 4.49 / 4.58 & 5.46 & 18.57 & 33.27 \\
+dyn\_pubmed   & 10 & 8.8   & 0.79 / 1.80 & 7.28 & 30.58 & 86.95 \\
+arxivmath     & 10 & 145.6 & 0.95 / 1.11 & 7.01 & 27.36 & 76.84 \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-To fill Table~\ref{tab:workload}, instrument the update loop immediately after
-the radius expansion, after hierarchical community closure, and after local
-aggregation. For every update and hierarchy level, log
-$(|S_t|, |B_r(S_t)|, |U_t^\ell|, k_\ell, \bar m_\ell)$, where $k_\ell$ and
-$\bar m_\ell$ are the number of nodes and edges in the contracted instance.
-Report both the mean and the maximum: the mean explains typical speed, whereas
-the maximum exposes worst-case updates that may dominate latency in production.
+The measured neighborhoods support the choice $r=1$: the average inspected
+radius-one region is below $5\%$ of the graph for all six datasets and below
+$1\%$ on the two largest citation graphs, \textit{dyn\_pubmed} and
+\textit{arxivmath}. At the same time, the larger-radius columns show that the
+locality budget is fragile. Moving from $r=1$ to $r=3$ would already inspect
+about $27$--$31\%$ of the vertices on \textit{arxivmath} and
+\textit{dyn\_pubmed}, and radius five would cover most of these graphs. This
+explains why the default configuration uses immediate neighborhoods and relies
+on hierarchical community closure, rather than deeper graph-radius expansion,
+to preserve context.
+
+The current neighborhood logs do not yet include the post-closure sets
+$U_t^\ell$ or the contracted backend sizes $(k_\ell,\bar m_\ell)$. For the
+final multi-run evaluation, the update loop should additionally log these
+quantities after hierarchical closure and local aggregation. Reporting them
+alongside Table~\ref{tab:workload} will directly connect neighborhood locality
+to the actual contracted instances seen by each backend.
 
 \subsubsection{Ablation Study}
 
@@ -830,7 +770,7 @@ regime of ComNetX.
 \subsubsection{Long-Horizon Robustness}
 
 This experiment addresses the drift component of RQ5.
-The ten-update protocol in Tables~\ref{tab:mod-time} and~\ref{tab:extrinsic}
+The ten-update protocol in Table~\ref{tab:main-results}
 is useful for controlled comparison, but a dynamic algorithm should also be
 tested over longer streams. Figure~\ref{fig:long-horizon} should therefore show
 how quality and cumulative time evolve over at least $50$--$100$ updates.
@@ -944,8 +884,7 @@ and when full recomputation is the correct fallback.
 \subsubsection{Evidence Summary}
 
 After the placeholder experiments are completed, the experimental section
-should support four concrete claims. First, Tables~\ref{tab:mod-time} and
-\ref{tab:extrinsic}, together with Table~\ref{tab:stability}, should show that
+should support four concrete claims. First, Table~\ref{tab:main-results}, together with Table~\ref{tab:stability}, should show that
 ComNetX preserves the quality of strong snapshot solvers while reducing update
 time on large graphs and that this conclusion is stable across dynamic streams.
 Second, Table~\ref{tab:workload} should explain this result by showing that the
@@ -1148,4 +1087,112 @@ where dynamic graph mining needs it most.
 \end{thebibliography}
 \endgroup
 
+
+\appendices
+\section{Full Per-Dataset Results}\label{app:full-results}
+
+This appendix reports the complete single-run result tables used to construct
+Table~\ref{tab:main-results}: Table~\ref{tab:full-mod-time} gives modularity
+and runtime, and Table~\ref{tab:full-extrinsic} gives ARI/F1/NMI. In the final
+submission, these tables should either be moved to supplementary material or
+replaced by mean $\pm$ standard deviation over the multi-stream protocol
+described in Table~\ref{tab:stability}.
+
+\begin{table*}[ht]
+\centering
+\caption{Full modularity ($Q$) and total processing time in seconds ($T$) on the ten-update sequence. Each cell shows $Q$ / $T$. ``OOM'' indicates out of memory.}
+\label{tab:full-mod-time}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
+\hline
+\multicolumn{7}{l}{\textit{DF-Leiden}} \\
+Dynamic & 0.81\,/\,0.00 & 0.82\,/\,0.01 & 0.89\,/\,0.00 & 0.86\,/\,0.03 & 0.76\,/\,0.10 & 0.85\,/\,3.74 \\
+Local   & 0.80\,/\,0.22 & 0.80\,/\,0.10 & 0.88\,/\,0.07 & 0.78\,/\,0.23 & 0.78\,/\,0.11 & 0.88\,/\,0.44 \\
+\hline
+\multicolumn{7}{l}{\textit{MFC}} \\
+Dynamic & 0.42\,/\,881.5 & 0.49\,/\,1532 & 0.43\,/\,1832 & 0.70\,/\,816.3 & 0.18\,/\,2949 & OOM \\
+Local   & 0.73\,/\,31.5  & 0.26\,/\,32.2  & 0.67\,/\,22.9  & 0.78\,/\,38.4  & 0.02\,/\,35.9  & 0.06\,/\,381.7 \\
+\hline
+\multicolumn{7}{l}{\textit{Leidenalg}} \\
+Naive & 0.82\,/\,1.25 & 0.83\,/\,1.32 & 0.89\,/\,0.83 & 0.86\,/\,2.90 & 0.79\,/\,6.51 & 0.89\,/\,150.7 \\
+Local & 0.81\,/\,0.54 & 0.79\,/\,0.25 & 0.88\,/\,0.10 & 0.86\,/\,1.86 & 0.78\,/\,0.29 & 0.88\,/\,3.64 \\
+\hline
+\multicolumn{7}{l}{\textit{FLMIG}} \\
+Naive & 0.82\,/\,15.7 & 0.75\,/\,20.0 & 0.87\,/\,29.8 & 0.86\,/\,73.1 & 0.75\,/\,178.9 & 0.87\,/\,103535 \\
+Local & 0.77\,/\,0.35 & 0.52\,/\,1.64 & 0.72\,/\,0.36 & 0.74\,/\,18.3 & 0.08\,/\,1.90 & 0.59\,/\,37.9 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
+Naive & 0.80\,/\,2.79 & 0.70\,/\,5.28 & 0.84\,/\,2.07 & 0.64\,/\,16.5 & 0.73\,/\,25.4 & 0.55\,/\,533.3 \\
+Local & 0.74\,/\,0.43 & 0.67\,/\,1.20 & 0.84\,/\,0.38 & 0.86\,/\,12.4 & 0.09\,/\,1.07 & 0.07\,/\,13.4 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
+Naive & 0.82\,/\,3.11 & 0.82\,/\,5.56 & 0.89\,/\,2.33 & 0.77\,/\,16.7 & 0.79\,/\,28.7 & 0.88\,/\,795.6 \\
+Local & 0.77\,/\,0.35 & 0.62\,/\,1.18 & 0.80\,/\,0.38 & 0.84\,/\,12.7 & 0.42\,/\,1.18 & 0.07\,/\,13.5 \\
+\hline
+\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
+Naive & 0.69\,/\,38.5 & 0.04\,/\,252.6 & 0.78\,/\,164.2 & 0.38\,/\,13.6 & 0.62\,/\,110.0 & 0.00\,/\,2281 \\
+Local & 0.78\,/\,6.61 & 0.62\,/\,7.66 & 0.77\,/\,4.48 & 0.66\,/\,21.8 & 0.52\,/\,13.8 & 0.54\,/\,178.1 \\
+\hline
+\multicolumn{7}{l}{\textit{MAGI}} \\
+Naive & 0.34\,/\,75.1 & 0.06\,/\,81.7 & 0.35\,/\,57.9 & 0.82\,/\,127.4 & 0.49\,/\,300.3 & OOM \\
+Local & 0.73\,/\,144.4& 0.33\,/\,460.5& 0.76\,/\,254.8& 0.59\,/\,524.6& 0.06\,/\,533.1& 0.07\,/\,868.2 \\
+\hline
+\multicolumn{7}{l}{\textit{DMoN}} \\
+Naive & 0.06\,/\,16.7 & 0.13\,/\,17.7 & 0.10\,/\,15.1 & $-$0.04\,/\,101.9 & 0.14\,/\,294.0 & OOM \\
+Local & 0.79\,/\,28.6 & 0.61\,/\,30.3 & 0.77\,/\,23.2 & 0.54\,/\,33.4 & 0.10\,/\,31.6 & 0.16\,/\,65.1 \\
+\hline
+\end{tabular}
+\end{table*}
+
+\begin{table*}[ht]
+\centering
+\caption{Full ARI / F1 / NMI with respect to ground truth on the final snapshot. ``OOM'' indicates out of memory.}
+\label{tab:full-extrinsic}
+\setlength{\tabcolsep}{1.5pt}
+\scriptsize
+\begin{tabular}{lcccccc}
+\hline
+\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
+\hline
+\multicolumn{7}{l}{\textit{DF-Leiden}} \\
+Dynamic & 0.24/8e-4/0.44 & 0.07/1e-4/0.26 & 0.10/3e-4/0.33 & 0.18/1e-3/0.37 & 0.08/0/0.19 & 0.12/7e-7/0.39 \\
+Local   & 0.24/1e-2/0.45 & 0.05/3e-4/0.25 & 0.10/2e-4/0.33 & 0.17/2e-2/0.36 & 0.09/5e-3/0.20 & 0.17/1e-5/0.40 \\
+\hline
+\multicolumn{7}{l}{\textit{MFC}} \\
+Dynamic & 0.01/8e-4/0.15 & 0.01/0/0.15 & 0.01/4e-5/0.17 & 0.13/3e-2/0.19 & 0.03/1e-3/0.02 & OOM \\
+Local   & 0.21/2e-3/0.43 & 0.01/2e-5/0.20 & 0.07/4e-4/0.29 & 0.19/2e-2/0.37 & 0.00/3e-2/0.02 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{Leidenalg}} \\
+Naive & 0.24/8e-3/0.46 & 0.05/1e-3/0.26 & 0.10/6e-4/0.33 & 0.16/4e-2/0.36 & 0.10/1e-2/0.21 & 0.17/1e-7/0.42 \\
+Local & 0.28/3e-3/0.46 & 0.04/1e-4/0.24 & 0.10/6e-4/0.33 & 0.18/2e-2/0.37 & 0.09/1e-2/0.18 & 0.17/8e-7/0.40 \\
+\hline
+\multicolumn{7}{l}{\textit{FLMIG}} \\
+Naive & 0.24/9e-3/0.46 & 0.09/2e-3/0.22 & 0.07/2e-4/0.27 & 0.16/4e-2/0.36 & 0.07/1e-2/0.13 & 0.13/2e-7/0.34 \\
+Local & 0.22/2e-3/0.42 & 0.02/2e-4/0.20 & 0.08/3e-4/0.29 & 0.18/2e-2/0.37 & 0.01/3e-2/0.03 & 0.05/4e-7/0.22 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
+Naive & 0.25/9e-4/0.45 & 0.19/7e-4/0.30 & 0.20/2e-3/0.35 & 0.25/2e-2/0.38 & 0.21/7e-3/0.23 & 0.08/0/0.27 \\
+Local & 0.21/5e-3/0.43 & 0.06/1e-3/0.23 & 0.14/5e-4/0.33 & 0.18/2e-2/0.37 & 0.004/8e-3/0.04 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
+Naive & 0.25/2e-3/0.47 & 0.06/2e-4/0.27 & 0.10/5e-4/0.33 & 0.21/5e-3/0.37 & 0.09/8e-3/0.20 & 0.20/7e-6/0.42 \\
+Local & 0.24/5e-3/0.44 & 0.04/9e-4/0.23 & 0.07/5e-4/0.30 & 0.18/2e-2/0.37 & 0.10/4e-2/0.14 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
+Naive & 0.21/2e-2/0.44 & 0.00/0/0.09 & 0.03/4e-4/0.25 & 0.05/8e-2/0.06 & 0.08/2e-2/0.17 & 3e-6/0/0.00 \\
+Local & 0.26/3e-3/0.46 & 0.04/3e-6/0.24 & 0.08/6e-5/0.32 & 0.17/6e-3/0.36 & 0.07/1e-5/0.14 & 0.02/4e-7/0.16 \\
+\hline
+\multicolumn{7}{l}{\textit{MAGI}} \\
+Naive & 0.07/1e-3/0.42 & 0.005/1e-5/0.25 & 0.01/2e-5/0.31 & 0.10/3e-2/0.27 & 0.05/2e-4/0.22 & OOM \\
+Local & 0.21/4e-3/0.43 & 0.01/5e-4/0.19 & 0.11/3e-4/0.30 & 0.17/1e-2/0.36 & 0.001/5e-5/0.02 & 0.004/4e-7/0.14 \\
+\hline
+\multicolumn{7}{l}{\textit{DMoN}} \\
+Naive & 0.002/2e-5/0.25 & 0.003/4e-6/0.16 & 0.002/6e-6/0.24 & 0.002/1e-6/0.16 & 0.004/3e-6/0.04 & OOM \\
+Local & 0.26/1e-3/0.46 & 0.03/0/0.22 & 0.08/5e-6/0.32 & 0.17/2e-3/0.36 & $-$0.002/6e-7/0.05 & 0.004/4e-7/0.17 \\
+\hline
+\end{tabular}
+\end{table*}
 \end{document}
