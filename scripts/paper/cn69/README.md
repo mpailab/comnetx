@@ -5,6 +5,8 @@ Run these scripts inside the cn69 Docker containers from
 GPUs, so the scripts do not set `CUDA_VISIBLE_DEVICES` themselves. They assume
 the dataset paths in `datasets-info/paths/cn69.json`, write standard launcher
 outputs under `results/`, and write shell logs under `output/` by default.
+Start long measurements from the host in background mode with `docker exec -d`;
+do not use interactive `docker exec -it` for the paper measurement batch.
 
 The eight scripts are intentionally complementary:
 

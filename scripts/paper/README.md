@@ -52,7 +52,8 @@ and controlled DSBM stress streams.
 
 Run the generated scripts inside the GPU-bound cn69 Docker containers from
 `/home/dev/users/bokov/comnetx`. The scripts do not set `CUDA_VISIBLE_DEVICES`;
-the container binding selects the GPU. Shell logs are written to `output/`.
+the container binding selects the GPU. Start long measurements in background
+mode with `docker exec -d`. Shell logs are written to `output/`.
 
 ```bash
 scripts/paper/cn69/gpu0_real_topology_batch_sweep.sh

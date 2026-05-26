@@ -297,7 +297,9 @@ single `docker compose run app` job. The working directory inside every
 container is `/home/dev/users/bokov/comnetx`. The containers are already bound
 to individual GPUs, so the generated scripts must not set `CUDA_VISIBLE_DEVICES`
 themselves. Shell logs are written to `output/` by default; standard result
-JSON files remain under `results/`.
+JSON files remain under `results/`. Long measurements are always started in
+background mode from the host with `docker exec -d`; do not use interactive
+`docker exec -it` for the paper measurement batch.
 
 Current container pool:
 
