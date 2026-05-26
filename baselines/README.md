@@ -32,3 +32,6 @@ https://github.com/SELGroup/DeSE
 
 S2CAG
 https://github.com/HKBU-LAGAS/S2CAG
+
+LAGO
+https://github.com/fondationsahar/dynamic_community_detection.git

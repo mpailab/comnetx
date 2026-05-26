@@ -90,6 +90,25 @@ def test_run_prgpt():
     opt.run(nodes_mask)
 
 
+@pytest.mark.short
+def test_run_lago():
+    A = torch.tensor([
+        [0, 1, 1, 0, 0, 0],
+        [1, 0, 1, 0, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1],
+        [0, 0, 0, 1, 0, 1],
+        [0, 0, 0, 1, 1, 0],
+    ], dtype=torch.float32).to_sparse_coo()
+    communities = torch.arange(6).unsqueeze(0)
+    opt = Optimizer(A, communities=communities, method="lago")
+    nodes_mask = torch.tensor([1, 1, 1, 0, 0, 0]).bool()
+
+    opt.run(nodes_mask)
+
+    assert opt.coms.shape == (1, 6)
+
+
 
 @pytest.mark.long
 def test_run_magi():

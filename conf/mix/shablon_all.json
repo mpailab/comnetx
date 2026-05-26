@@ -16,7 +16,7 @@
   
   "BASELINES": ["ldleiden", "dfleiden", "leidenalg",
                 "prgpt:infomap", "prgpt:locale", "flmig",
-                "mfc", "s2cag",
+                "mfc", "s2cag", "lago",
                 "magi", "dmon",
                 "networkit", "dese"],
   "MODES": ["naive", "smart", "dynamic"],

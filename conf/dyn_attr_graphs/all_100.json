@@ -8,7 +8,7 @@
   "BATCHES": ["100", "999:100"],
   
   "BASELINES": ["leidenalg", "networkit", "dfleiden", "ldleiden", "magi", "dmon",
-                "mfc", "flmig", "dese", "s2cag", "prgpt:infomap", "prgpt:locale"],
+                "mfc", "flmig", "dese", "s2cag", "prgpt:infomap", "prgpt:locale", "lago"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",

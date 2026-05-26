@@ -104,7 +104,7 @@ RANDOM_FEATURE_DIM = conf.get("RANDOM_FEATURE_DIM", 64)
 RANDOM_FEATURE_SEED = conf.get("RANDOM_FEATURE_SEED", 42)
 
 # baseline iterations
-SUPPORTED_ITER_METHODS = {"magi", "dmon", "dese", "flmig", "s2cag", "mfc"}
+SUPPORTED_ITER_METHODS = {"magi", "dmon", "dese", "flmig", "s2cag", "mfc", "lago"}
 BASELINE_ITER_VALS = conf.get("BASELINE_ITERATIONS", [None])
 if isinstance(BASELINE_ITER_VALS, (int, float)):
     BASELINE_ITER_VALS = [BASELINE_ITER_VALS]
@@ -112,8 +112,8 @@ elif not isinstance(BASELINE_ITER_VALS, list):
     BASELINE_ITER_VALS = [None]
 
 # methods types
-SUPPORTED_DYNAMIC_METHODS = {"ldleiden", "dfleiden", "mfc"}
-SUPPORTED_NAIVE_METHODS = {"magi", "leidenalg", "ldleiden", "dfleiden", "dmon", "dese", "s2cag", "mfc"}
+SUPPORTED_DYNAMIC_METHODS = {"ldleiden", "dfleiden", "mfc", "lago"}
+SUPPORTED_NAIVE_METHODS = {"magi", "leidenalg", "ldleiden", "dfleiden", "dmon", "dese", "s2cag", "mfc", "lago"}
 # don't support naive - use raw instead: prgpt:infomap, prgpt:locale, networkit
 SUPPORTED_FEATURES_METHODS = {"magi", "dmon", "mfc", "dese", "s2cag"}
 

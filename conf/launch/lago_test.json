@@ -1,0 +1,18 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+
+  "DATASETS": ["wiki_talk_ht"],
+  "BATCHES": ["999:10"],
+
+  "BASELINES": ["lago"],
+  "MODES": ["naive", "smart", "dynamic"],
+  "BASELINE_ITERATIONS": [1],
+  "USE_GPU": false,
+
+  "SMART_VERSION": "v1",
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [1],
+    "smart_neighborhood_step": [0]
+  }
+}

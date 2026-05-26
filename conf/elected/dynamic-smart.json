@@ -8,7 +8,7 @@
   "BATCHES": ["999:10"],
   "FORCE_UNDIRECTED": true,
   
-  "BASELINES": ["dfleiden", "mfc"],
+  "BASELINES": ["dfleiden", "mfc", "lago"],
   "MODES": ["smart"],
   "FEATURE_MODES": ["random"],
   "BASELINE_ITERATIONS": [100],

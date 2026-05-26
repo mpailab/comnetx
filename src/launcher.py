@@ -764,6 +764,42 @@ def _run_dynamic_mfc(
     return [{"modularity": mod, "time": measured_time}], last_partition
 
 
+def _run_dynamic_lago(
+    ds,
+    config: _LaunchConfig,
+):
+    """
+    Run LAGO on the complete temporal adjacency tensor.
+
+    LAGO consumes a link stream rather than a per-batch update API, so dynamic
+    mode forwards the whole loaded adjacency sequence and reports one final
+    partition, mirroring the shape of other full-temporal baselines.
+    """
+    from baselines.lago import lago_partition
+
+    timing_info = {"conversion_time": 0.0}
+    time_s = time.perf_counter()
+    with print_zone(config.verbose >= 4):
+        last_partition = lago_partition(
+            ds.adj,
+            directed=ds.is_directed,
+            nb_iter=config.baseline_iter,
+            timing_info=timing_info,
+        )
+    measured_time = max(
+        0.0,
+        time.perf_counter() - time_s - timing_info["conversion_time"],
+    )
+    full_adj = _compute_full_adj(ds.adj)
+    mod = Metrics.modularity(full_adj, last_partition, directed=ds.is_directed)
+
+    _print_verbose(config.verbose, 2, f"Modularity: {mod:.2g}")
+    _print_verbose(config.verbose, 2, f"Baseline calls: {1}")
+    _print_verbose(config.verbose, 2, f"Time: {measured_time:.2f}")
+
+    return [{"modularity": mod, "time": measured_time}], last_partition
+
+
 def _run_dynamic_backend(
     batches_iter,
     config: _LaunchConfig,
@@ -1055,6 +1091,8 @@ def dynamic_launch(ds, batches_strategy,
     # modes use Optimizer.
     if config.mode == "dynamic" and config.method == "mfc":
         results, last_partition = _run_dynamic_mfc(ds, config)
+    elif config.mode == "dynamic" and config.method == "lago":
+        results, last_partition = _run_dynamic_lago(ds, config)
     elif config.mode == "dynamic":
         results, last_partition = _run_dynamic_backend(_iter_adjacency_batches(ds.adj), config)
     else:

@@ -7,7 +7,7 @@
                "dyn_ogbn-products"],
   "BATCHES": ["999:10", "10"],
   
-  "BASELINES": ["flmig", "magi", "dmon", "s2cag", "dese"],
+  "BASELINES": ["flmig", "magi", "dmon", "s2cag", "dese", "lago"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",

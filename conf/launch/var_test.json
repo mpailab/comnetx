@@ -4,7 +4,7 @@
   "DATASETS": ["wiki_talk_ht"],
   "BATCHES": ["999:100"],
   
-  "BASELINES": ["prgpt:infomap", "prgpt:locale", "flmig", "leidenalg", "networkit"],
+  "BASELINES": ["prgpt:infomap", "prgpt:locale", "flmig", "leidenalg", "networkit", "lago"],
   "MODES": ["smart", "naive"],
   
   "SMART_VERSION": "v1",
