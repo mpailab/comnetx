@@ -47,6 +47,17 @@ Aggregate by algorithm, dataset, and batch:
 python3 scripts/paper/summarize_icdm_results.py results/paper/*.json --summary --output summary.csv
 ```
 
+## Build the full results registry
+
+```bash
+python3 scripts/paper/collect_results_registry.py
+```
+
+This scans `results/**/*.json` and writes a consolidated, searchable registry to
+`results/registry/`. It preserves repeated runs with the same parameters for
+stability analysis, while collapsing exact or near-exact duplicate series into
+`deduplicated_sources.*`.
+
 ## Rebuild the neighborhood table
 
 ```bash

@@ -218,7 +218,39 @@ Create scripts under scripts/paper/.
    - generates temporal SBM scenarios for stress testing.
    - output should be loadable by Dataset or convertible to the existing dynamic format.
 
-## 6. Iterative workflow
+## 6. Current result registry
+
+Canonical consolidated results registry:
+
+- Directory: `results/registry/`.
+- Generator script: `scripts/paper/collect_results_registry.py`.
+- Usage: `python scripts/paper/collect_results_registry.py`.
+- Registry README: `results/registry/README.md`.
+
+When continuing the article refactor or replacing preliminary table values, look
+here first:
+
+- `results/registry/all_results.csv` and `all_results.json`: compact searchable
+  records for all experiments and neighborhood analyses.
+- `results/registry/all_results_with_series.json`: full records with per-update
+  measurement series; use this for plots, long-horizon curves, and sanity checks.
+- `results/registry/summary_by_run_key.csv`: grouped view by original algorithm
+  string, dataset, batch strategy, ComNetX parameters, and backend settings; use
+  this for mean/std tables and stability discussion.
+- `results/registry/deduplicated_sources.csv`: exact or near-exact duplicate
+  series that were collapsed; check this before treating repeated files as
+  independent stability runs.
+- `results/registry/errors.csv`: failed runs from `errors_*.json`; use this to
+  explain missing baseline cells or decide what must be rerun.
+- `results/registry/manifest.json`: latest counts and generated output paths.
+
+Important convention: repeated runs with identical launch parameters are
+preserved unless their full per-update metric/time series is exact or
+near-identical after tolerance rounding. Therefore `summary_by_run_key.*` is the
+starting point for paper tables, while `all_results_with_series.json` is the
+source of truth for detailed curves and reproducibility checks.
+
+## 7. Iterative workflow
 
 Iteration A: Paper structure and claims
 
@@ -253,7 +285,7 @@ Iteration E: Final format pass
 - References verified.
 - Appendix after references unless final template requires otherwise.
 
-## 7. Definition of done
+## 8. Definition of done
 
 The article is ready for serious ICDM submission only when:
 
