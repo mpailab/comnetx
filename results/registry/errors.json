@@ -441,7 +441,7 @@
   },
   {
     "measurement_type": "error",
-    "source_file": "results/paper_icdm/errors_ablation_feature_radius_depth_aggregation_20260525_1852.json",
+    "source_file": "results/paper_icdm/1/errors_ablation_feature_radius_depth_aggregation_20260525_1852.json",
     "source_owner": "paper_icdm",
     "error_index": 0,
     "algorithm": "s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot",
@@ -463,7 +463,7 @@
   },
   {
     "measurement_type": "error",
-    "source_file": "results/paper_icdm/errors_main_gnn_feature_20260525_1852.json",
+    "source_file": "results/paper_icdm/1/errors_main_gnn_feature_20260525_1852.json",
     "source_owner": "paper_icdm",
     "error_index": 0,
     "algorithm": "dmon-i:10-naive-feat:dataset",
@@ -485,7 +485,7 @@
   },
   {
     "measurement_type": "error",
-    "source_file": "results/paper_icdm/errors_main_gnn_feature_20260525_1852.json",
+    "source_file": "results/paper_icdm/1/errors_main_gnn_feature_20260525_1852.json",
     "source_owner": "paper_icdm",
     "error_index": 1,
     "algorithm": "dmon-i:10-naive-feat:random",

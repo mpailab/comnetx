@@ -19,16 +19,16 @@ norm,magi-i:10-L:4-r:0-agg:norm-gpu-feat:random,dyn_citeseer,999:10,dyn_citeseer
 ,leidenalg-L:2-r:1-gpu,arxivmath,100,arxivmath,gpu,9,"CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`",,False,,error,leidenalg,,smart,1,,results/imported_logs/errors_leidenalg_20260526.json,imported_logs,2
 ,leidenalg-L:3-r:1-gpu,arxivmath,100,arxivmath,gpu,10,"CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`",,False,,error,leidenalg,,smart,1,,results/imported_logs/errors_leidenalg_20260526.json,imported_logs,3
 ,leidenalg-L:4-r:1-gpu,arxivmath,100,arxivmath,gpu,11,"CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`",,False,,error,leidenalg,,smart,1,,results/imported_logs/errors_leidenalg_20260526.json,imported_logs,4
-sum,s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot,dyn_pubmed,999:10,dyn_pubmed,gpu,0,SVD did not converge,onehot,False,10,error,s2cag,,smart,2,,results/paper_icdm/errors_ablation_feature_radius_depth_aggregation_20260525_1852.json,paper_icdm,3
+sum,s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot,dyn_pubmed,999:10,dyn_pubmed,gpu,0,SVD did not converge,onehot,False,10,error,s2cag,,smart,2,,results/paper_icdm/1/errors_ablation_feature_radius_depth_aggregation_20260525_1852.json,paper_icdm,3
 ,dmon-i:10-naive-feat:dataset,arxivmath,999:10,arxivmath,,0,"Exception encountered when calling layer 'dense' (type Dense).
 
 {{function_node __wrapped__MatMul_device_/job:localhost/replica:0/task:0/device:GPU:0}} OOM when allocating tensor with shape[270013,270013] and type float on /job:localhost/replica:0/task:0/device:GPU:0 by allocator GPU_0_bfc [Op:MatMul] name: 
 
 Call arguments received by layer 'dense' (type Dense):
-  • inputs=tf.Tensor(shape=(270013, 64), dtype=float32)",dataset,False,10,error,dmon,,naive,,,results/paper_icdm/errors_main_gnn_feature_20260525_1852.json,paper_icdm,
+  • inputs=tf.Tensor(shape=(270013, 64), dtype=float32)",dataset,False,10,error,dmon,,naive,,,results/paper_icdm/1/errors_main_gnn_feature_20260525_1852.json,paper_icdm,
 ,dmon-i:10-naive-feat:random,arxivmath,999:10,arxivmath,,1,"Exception encountered when calling layer 'dense' (type Dense).
 
 {{function_node __wrapped__MatMul_device_/job:localhost/replica:0/task:0/device:GPU:0}} OOM when allocating tensor with shape[270013,270013] and type float on /job:localhost/replica:0/task:0/device:GPU:0 by allocator GPU_0_bfc [Op:MatMul] name: 
 
 Call arguments received by layer 'dense' (type Dense):
-  • inputs=tf.Tensor(shape=(270013, 64), dtype=float32)",random,False,10,error,dmon,,naive,,,results/paper_icdm/errors_main_gnn_feature_20260525_1852.json,paper_icdm,
+  • inputs=tf.Tensor(shape=(270013, 64), dtype=float32)",random,False,10,error,dmon,,naive,,,results/paper_icdm/1/errors_main_gnn_feature_20260525_1852.json,paper_icdm,

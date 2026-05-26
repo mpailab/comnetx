@@ -97,31 +97,31 @@
   },
   {
     "canonical_source": "results/konovalov/sym_leidenalg_ns_20260518_1213.json",
-    "duplicate_source": "results/paper_icdm/main_topology_20260525_1848.json",
+    "duplicate_source": "results/paper_icdm/1/main_topology_20260525_1848.json",
     "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:10|cn69",
     "series_digest": "c1ef2aa0e806237457a9365c71a94b3919f8a0e2"
   },
   {
     "canonical_source": "results/drobyshev/dynamic_20260512_1205.json",
-    "duplicate_source": "results/paper_icdm/main_topology_20260525_1848.json",
+    "duplicate_source": "results/paper_icdm/1/main_topology_20260525_1848.json",
     "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|999:10|cn69",
     "series_digest": "7a455e8f83aba698634ad37b6301037ad2e8bf9d"
   },
   {
     "canonical_source": "results/drobyshev/dynamic_20260512_1205.json",
-    "duplicate_source": "results/paper_icdm/main_topology_20260525_1848.json",
+    "duplicate_source": "results/paper_icdm/1/main_topology_20260525_1848.json",
     "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|999:10|cn69",
     "series_digest": "2f985695d2e64916ff264d341492dc83434d5826"
   },
   {
     "canonical_source": "results/konovalov/sym_dfleiden_ds_20260518_1128.json",
-    "duplicate_source": "results/paper_icdm/main_topology_20260525_1848.json",
+    "duplicate_source": "results/paper_icdm/1/main_topology_20260525_1848.json",
     "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:10|cn69",
     "series_digest": "23e1b8b0b6d738087ee76d356cc6a683d3e9f603"
   },
   {
     "canonical_source": "results/drobyshev/dynamic_20260519_1126.json",
-    "duplicate_source": "results/paper_icdm/main_topology_20260525_1848.json",
+    "duplicate_source": "results/paper_icdm/1/main_topology_20260525_1848.json",
     "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|999:10|cn69",
     "series_digest": "0ea1475fd7bf9753821cb0e9f7f552c4ad03fb96"
   }

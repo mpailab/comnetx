@@ -1,7 +1,7 @@
 {
   "input_dir": "results",
   "output_dir": "results/registry",
-  "experiment_records": 2025,
+  "experiment_records": 2467,
   "neighborhood_records": 536,
   "error_records": 23,
   "deduplicated_sources": 21,
