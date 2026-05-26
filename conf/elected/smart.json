@@ -10,7 +10,7 @@
   
   "BASELINES": ["leidenalg", "flmig",
                 "prgpt:infomap", "prgpt:locale",
-                "s2cag",
+                "s2cag", "lago",
                 "magi", "dmon"],
   "MODES": ["smart"],
   "FEATURE_MODES": ["random"],

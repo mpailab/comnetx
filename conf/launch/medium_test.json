@@ -6,7 +6,7 @@
   "BATCHES": ["999:10"],
   
   "BASELINES": ["ldleiden", "leidenalg", "prgpt:infomap", "prgpt:locale", "magi", "dmon", "networkit",
-  "mfc", "flmig", "s2cag", "dese"],
+  "mfc", "flmig", "s2cag", "dese", "lago"],
   "MODES": ["naive", "smart"],
   "USE_GPU": true,
   

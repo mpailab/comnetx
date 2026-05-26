@@ -13,7 +13,7 @@ def sparse_tensor_to_igraph(sparse_tensor, directed=True):
     graph.es['weight'] = values.numpy()
     return graph
 
-def leidenalg_partition(adj : torch.Tensor, init_partition, timing_info=None):
+def leidenalg_partition(adj : torch.Tensor, init_partition=None, timing_info=None):
     conversion_time = 0.0
     if adj.device.type == "cuda":
         time_s = time.time()

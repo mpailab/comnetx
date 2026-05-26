@@ -6,7 +6,7 @@
   "DATASETS": ["dyn_wiki"],
   "BATCHES": ["999:10"],
   
-  "BASELINES": ["flmig", "dese", "s2cag", "magi", "dmon"],
+  "BASELINES": ["flmig", "dese", "s2cag", "magi", "dmon", "lago"],
   "MODES": ["naive", "smart"],
   
   "SMART_VERSION": "v1",

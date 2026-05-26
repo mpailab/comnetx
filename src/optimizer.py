@@ -352,6 +352,14 @@ class Optimizer:
             elif self.method == "networkit":
                  from baselines.network import networkit_partition
                  res = networkit_partition(adj, timing_info = timing_info)
+            elif self.method == "lago":
+                from baselines.lago import lago_partition
+                res = lago_partition(
+                    adj,
+                    init_partition=labels,
+                    nb_iter=self.baseline_iter,
+                    timing_info=timing_info,
+                )
             elif self.method == "mfc":
                 from baselines.mfc import mfc_adopted
                 if not self.has_real_features:

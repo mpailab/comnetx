@@ -100,6 +100,12 @@ def test_dynamic_launcher_s2cag(dyn_dataset):
 
 @pytest.mark.long
 @pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
+def test_dynamic_launcher_lago(dyn_dataset):
+    for mode in ["smart", "naive", "dynamic"]:
+        dynamic_launch(dyn_dataset, 100, "lago", mode=mode)
+
+@pytest.mark.long
+@pytest.mark.parametrize("dyn_dataset", DYNAMIC_DATASETS)
 def test_dynamic_launcher_prgpt(dyn_dataset):
     for method in ["prgpt:infomap", "prgpt:locale"]:
         for mode in ["smart", "naive"]:

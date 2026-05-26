@@ -5,7 +5,7 @@
   "DATASETS": ["wiki_talk_ht", "facebook-wosn-links"],
   "BATCHES": ["99:10"],
   
-  "BASELINES": ["ldleiden", "dfleiden"],
+  "BASELINES": ["ldleiden", "dfleiden", "lago"],
   "MODES": ["dynamic"],
   "USE_GPU": true,
   

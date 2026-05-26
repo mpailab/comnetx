@@ -40,7 +40,7 @@ def collect_datasets():
         raise ValueError(f"dataset_paths.json must be an object mapping names to paths, got {type(data)}")
     return data
 
-ALL_METHODS = ["flmig", "dmon", "magi", "prgpt", "leidenalg", "networkit"]
+ALL_METHODS = ["flmig", "dmon", "magi", "prgpt", "leidenalg", "networkit", "lago"]
 ALL_DATASETS = list(collect_datasets().keys())
 
 tf_spec = importlib.util.find_spec("tensorflow")
@@ -248,6 +248,24 @@ def runner_flmig():
             cmd += ["--max_rb", str(max_rb)]
         if "out" in ds and ds["out"]:
             cmd += ["--out", ds["out"]]
+        return subprocess.run(cmd, capture_output=True, text=True)
+    return run
+
+@pytest.fixture
+def runner_lago():
+    def run(ds, dataset_name=None, nb_iter=None, directed=False):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "src" / "baselines" / "lago.py"
+        cmd = [
+            sys.executable,
+            str(script),
+            "--adj", ds["adj"],
+            "--out", ds["out"],
+        ]
+        if nb_iter is not None:
+            cmd += ["--nb-iter", str(nb_iter)]
+        if directed:
+            cmd += ["--directed"]
         return subprocess.run(cmd, capture_output=True, text=True)
     return run
 

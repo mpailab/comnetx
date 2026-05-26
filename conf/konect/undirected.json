@@ -5,7 +5,7 @@
   "DATASETS": "undirected_datasets_by_nodes",
   "BATCHES": ["999:100", "100"],
   
-  "BASELINES": ["leidenalg", "ldleiden", "dfleiden", "networkit", "flmig", "prgpt:infomap", "prgpt:locale"],
+  "BASELINES": ["leidenalg", "ldleiden", "dfleiden", "networkit", "flmig", "prgpt:infomap", "prgpt:locale", "lago"],
 
   "MODES": ["smart", "naive"],
   
