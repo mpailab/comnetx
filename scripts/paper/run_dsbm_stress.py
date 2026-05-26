@@ -126,6 +126,14 @@ def save_results(output_dir: Path, name: str, db: dict[str, Any], errors: list[A
         (output_dir / f"errors_{name}.json").write_text(json.dumps(errors, indent=2), encoding="utf-8")
 
 
+def save_manifest(output_dir: Path, name: str, manifest: dict[str, Any]) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / f"manifest_{name}.json").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default="datasets-sbm")
@@ -150,14 +158,71 @@ def main() -> None:
     parser.add_argument("--name", default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--catch-errors", action="store_true")
+    parser.add_argument(
+        "--list-streams",
+        action="store_true",
+        help="Print selected DSBM streams and exit before running algorithms.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root)
     output_name = args.name or f"dsbm_stress_{datetime.now().strftime('%Y%m%d_%H%M')}"
     batch_suffix = None if args.all_batches else args.batch_suffix
+
+    if not root.exists():
+        raise SystemExit(
+            f"DSBM root does not exist: {root}. "
+            "Set DSBM_ROOT or pass --root to the DSBM runner."
+        )
+
     streams = selected_streams(root, batch_suffix, set(args.regimes), set(args.max_changes))
     if args.limit is not None:
         streams = streams[: args.limit]
+
+    manifest: dict[str, Any] = {
+        "root": str(root),
+        "batch_suffix": batch_suffix,
+        "all_batches": bool(args.all_batches),
+        "regimes": args.regimes,
+        "max_changes": args.max_changes,
+        "methods": args.methods,
+        "modes": args.modes,
+        "selected_streams": len(streams),
+        "selected_stream_paths": [str(path) for path in streams],
+        "attempted_runs": 0,
+        "successful_runs": 0,
+        "errors": 0,
+        "output": str(Path(args.output_dir) / f"{output_name}.json"),
+    }
+
+    if args.list_streams:
+        print(json.dumps(manifest, indent=2, ensure_ascii=False))
+        if not streams:
+            raise SystemExit("No DSBM streams selected.")
+        return
+
+    if not streams:
+        save_results(Path(args.output_dir), output_name, {}, [])
+        save_manifest(Path(args.output_dir), output_name, manifest)
+        raise SystemExit(
+            "No DSBM streams selected. Check --root, --batch-suffix, --regimes, "
+            "and --max-changes. The empty result file was written only as a "
+            "failure marker."
+        )
+
+    print(
+        json.dumps(
+            {
+                "root": str(root),
+                "selected_streams": len(streams),
+                "methods": args.methods,
+                "modes": args.modes,
+                "output": manifest["output"],
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
     machine = os.getenv("PARENT_HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
     db: dict[str, Any] = {}
@@ -180,6 +245,7 @@ def main() -> None:
                     args.smart_radius,
                     args.use_gpu,
                 )
+                manifest["attempted_runs"] += 1
                 try:
                     results = dynamic_launch(
                         ds,
@@ -198,15 +264,36 @@ def main() -> None:
                     if not args.catch_errors:
                         raise
                     errors.append([alg, ds.name, batch_strategy, str(exc)])
+                    manifest["errors"] = len(errors)
+                    print(f"Error on {alg}, {ds.name}, {batch_strategy}: {exc}")
+                    save_results(Path(args.output_dir), output_name, db, errors)
+                    save_manifest(Path(args.output_dir), output_name, manifest)
                     continue
 
                 db.setdefault(alg, {}).setdefault(ds.name, {}).setdefault(machine, {})[
                     batch_strategy
                 ] = results
+                manifest["successful_runs"] += 1
                 save_results(Path(args.output_dir), output_name, db, errors)
+                save_manifest(Path(args.output_dir), output_name, manifest)
 
+    manifest["errors"] = len(errors)
     save_results(Path(args.output_dir), output_name, db, errors)
-    print(json.dumps({"streams": len(streams), "output": str(Path(args.output_dir) / f"{output_name}.json"), "errors": len(errors)}, indent=2))
+    save_manifest(Path(args.output_dir), output_name, manifest)
+
+    if manifest["attempted_runs"] == 0:
+        raise SystemExit(
+            "No runnable method/mode combinations were attempted. "
+            "Check --methods and --modes."
+        )
+    if manifest["successful_runs"] == 0:
+        raise SystemExit(
+            f"All {manifest['attempted_runs']} DSBM runs failed. "
+            f"See {Path(args.output_dir) / f'errors_{output_name}.json'} and "
+            f"{Path(args.output_dir) / f'manifest_{output_name}.json'}."
+        )
+
+    print(json.dumps(manifest, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

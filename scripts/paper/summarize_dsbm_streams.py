@@ -103,7 +103,7 @@ def parse_dataset_name(name: str) -> dict[str, Any]:
 
 def find_streams(root: Path, batch_suffix: str | None) -> list[Path]:
     streams = []
-    for path in root.glob("dsbm-*/*/out.*"):
+    for path in root.glob("**/out.*"):
         if not path.is_file():
             continue
         if batch_suffix is not None and not path.name.endswith(f".{batch_suffix}"):

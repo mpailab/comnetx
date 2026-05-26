@@ -206,17 +206,17 @@ def build_configs() -> dict[str, dict]:
 
 def launch_script(gpu: int, title: str, configs: list[str]) -> str:
     config_lines = "\n".join(f'  "conf/paper_icdm/cn69/{name}"' for name in configs)
+    log_prefix = f"gpu{gpu}_{title.lower().replace(' ', '_')}"
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 cd "$(dirname "$0")/../../.."
 
 export PARENT_HOSTNAME="${{PARENT_HOSTNAME:-cn69}}"
-export CUDA_VISIBLE_DEVICES="${{CUDA_VISIBLE_DEVICES:-{gpu}}}"
 export PYTHONUNBUFFERED=1
 
 PATHS_CONFIG="${{PATHS_CONFIG:-datasets-info/paths/cn69.json}}"
-LOG_DIR="${{LOG_DIR:-logs/paper_icdm/cn69}}"
+LOG_DIR="${{LOG_DIR:-output}}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
 
@@ -226,8 +226,8 @@ CONFIGS=(
 
 for config in "${{CONFIGS[@]}}"; do
   name="$(basename "$config" .json)"
-  echo "[{title}] $(date -Is) running $config on CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
-  python scripts/launch.py "$config" --paths-config "$PATHS_CONFIG" 2>&1 | tee "$LOG_DIR/gpu{gpu}_${{name}}_${{STAMP}}.log"
+  echo "[{title}] $(date -Is) running $config on CUDA_VISIBLE_DEVICES=${{CUDA_VISIBLE_DEVICES:-container-bound}}"
+  python scripts/launch.py "$config" --paths-config "$PATHS_CONFIG" 2>&1 | tee "$LOG_DIR/{log_prefix}_${{name}}_${{STAMP}}.log"
 done
 """
 
@@ -250,16 +250,23 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
 export PARENT_HOSTNAME="${{PARENT_HOSTNAME:-cn69}}"
-export CUDA_VISIBLE_DEVICES="${{CUDA_VISIBLE_DEVICES:-{gpu}}}"
 export PYTHONUNBUFFERED=1
 
-LOG_DIR="${{LOG_DIR:-logs/paper_icdm/cn69}}"
+DSBM_ROOT="${{DSBM_ROOT:-datasets-sbm}}"
+LOG_DIR="${{LOG_DIR:-output}}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
 mkdir -p results/paper_icdm
 
-echo "[{title}] $(date -Is) running DSBM stress on CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+if [[ ! -d "$DSBM_ROOT" ]]; then
+  echo "DSBM root not found: $DSBM_ROOT"
+  echo "Set DSBM_ROOT=/path/to/datasets-sbm or pass a valid datasets-sbm directory."
+  exit 2
+fi
+
+echo "[{title}] $(date -Is) running DSBM stress on CUDA_VISIBLE_DEVICES=${{CUDA_VISIBLE_DEVICES:-container-bound}}"
 python scripts/paper/run_dsbm_stress.py \\
+  --root "$DSBM_ROOT" \\
   --all-batches \\
   --methods {method_args} \\
   --modes {mode_args} \\
@@ -327,10 +334,11 @@ def build_scripts() -> dict[str, str]:
 
 README = """# cn69 ICDM Measurement Scripts
 
-Run these scripts inside the VS Code dev container service `app` on node cn69.
-They assume the dataset paths in `datasets-info/paths/cn69.json` and write
-standard launcher outputs under `results/` plus logs under
-`logs/paper_icdm/cn69/`.
+Run these scripts inside the cn69 Docker containers from
+`/home/dev/users/bokov/comnetx`. The containers are already bound to specific
+GPUs, so the scripts do not set `CUDA_VISIBLE_DEVICES` themselves. They assume
+the dataset paths in `datasets-info/paths/cn69.json`, write standard launcher
+outputs under `results/`, and write shell logs under `output/` by default.
 
 The eight scripts are intentionally complementary:
 
@@ -348,6 +356,13 @@ The eight scripts are intentionally complementary:
 - `gpu6_dsbm_topology_stress.sh`: random, hub-centered, and community-internal
   DSBM stress streams for Leiden and DF-Leiden.
 - `gpu7_dsbm_lago_stress.sh`: the same DSBM stress suite for LAGO.
+
+For the two DSBM scripts, set `DSBM_ROOT` if the synthetic datasets are mounted
+outside the repository checkout:
+
+```bash
+DSBM_ROOT=/path/to/datasets-sbm scripts/paper/cn69/gpu6_dsbm_topology_stress.sh
+```
 
 After all jobs finish, rebuild the registry:
 

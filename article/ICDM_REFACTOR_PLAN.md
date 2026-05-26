@@ -292,7 +292,25 @@ Generate or refresh it with:
 python3 scripts/paper/generate_cn69_measurement_scripts.py
 ```
 
-Run the generated scripts inside the dev container service `app` on cn69:
+Run the generated scripts inside the cn69 Docker containers, not through a
+single `docker compose run app` job. The working directory inside every
+container is `/home/dev/users/bokov/comnetx`. The containers are already bound
+to individual GPUs, so the generated scripts must not set `CUDA_VISIBLE_DEVICES`
+themselves. Shell logs are written to `output/` by default; standard result
+JSON files remain under `results/`.
+
+Current container pool:
+
+- `dev_bokov`
+- `dev_uporova`
+- `dev_konovalov`
+- `dev_egorov`
+- `dev_egorov2`
+- `dev_drobyshev`
+- `dev_drobyshev2`
+- `dev_drobyshev3`
+
+Generated scripts:
 
 - `scripts/paper/cn69/gpu0_real_topology_batch_sweep.sh`: Leiden/DF-Leiden
   real-data sensitivity over `9:10`, `9:50`, `9:100`, `99:10`, `99:50`,

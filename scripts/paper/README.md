@@ -50,7 +50,9 @@ is the main follow-up protocol for the ICDM revision: it replaces a single
 fractions, 50/100/200/500 update horizons, random-feature seed repeats, LAGO,
 and controlled DSBM stress streams.
 
-Run the generated scripts inside the dev container on cn69, one per GPU:
+Run the generated scripts inside the GPU-bound cn69 Docker containers from
+`/home/dev/users/bokov/comnetx`. The scripts do not set `CUDA_VISIBLE_DEVICES`;
+the container binding selects the GPU. Shell logs are written to `output/`.
 
 ```bash
 scripts/paper/cn69/gpu0_real_topology_batch_sweep.sh
@@ -109,6 +111,16 @@ Run one explicit stress-test granularity:
 
 ```bash
 python3 scripts/paper/run_dsbm_stress.py --batch-suffix 10_batches --methods leidenalg dfleiden --modes naive smart dynamic
+```
+
+The DSBM runner now fails loudly if no streams are selected or if every
+algorithm run fails under `--catch-errors`. It also writes
+`manifest_<run>.json` next to the result file with selected stream counts,
+attempted runs, successful runs, and error counts. Before a long cn69 run, check
+stream discovery:
+
+```bash
+python3 scripts/paper/run_dsbm_stress.py --root "${DSBM_ROOT:-datasets-sbm}" --all-batches --list-streams
 ```
 
 ## Rebuild the neighborhood table

@@ -1,9 +1,10 @@
 # cn69 ICDM Measurement Scripts
 
-Run these scripts inside the VS Code dev container service `app` on node cn69.
-They assume the dataset paths in `datasets-info/paths/cn69.json` and write
-standard launcher outputs under `results/` plus logs under
-`logs/paper_icdm/cn69/`.
+Run these scripts inside the cn69 Docker containers from
+`/home/dev/users/bokov/comnetx`. The containers are already bound to specific
+GPUs, so the scripts do not set `CUDA_VISIBLE_DEVICES` themselves. They assume
+the dataset paths in `datasets-info/paths/cn69.json`, write standard launcher
+outputs under `results/`, and write shell logs under `output/` by default.
 
 The eight scripts are intentionally complementary:
 
@@ -21,6 +22,13 @@ The eight scripts are intentionally complementary:
 - `gpu6_dsbm_topology_stress.sh`: random, hub-centered, and community-internal
   DSBM stress streams for Leiden and DF-Leiden.
 - `gpu7_dsbm_lago_stress.sh`: the same DSBM stress suite for LAGO.
+
+For the two DSBM scripts, set `DSBM_ROOT` if the synthetic datasets are mounted
+outside the repository checkout:
+
+```bash
+DSBM_ROOT=/path/to/datasets-sbm scripts/paper/cn69/gpu6_dsbm_topology_stress.sh
+```
 
 After all jobs finish, rebuild the registry:
 
