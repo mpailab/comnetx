@@ -1,0 +1,14 @@
+[
+    [
+        "dmon-i:10-naive-feat:dataset",
+        "arxivmath",
+        "999:10",
+        "Exception encountered when calling layer 'dense' (type Dense).\n\n{{function_node __wrapped__MatMul_device_/job:localhost/replica:0/task:0/device:GPU:0}} OOM when allocating tensor with shape[270013,270013] and type float on /job:localhost/replica:0/task:0/device:GPU:0 by allocator GPU_0_bfc [Op:MatMul] name: \n\nCall arguments received by layer 'dense' (type Dense):\n  \u2022 inputs=tf.Tensor(shape=(270013, 64), dtype=float32)"
+    ],
+    [
+        "dmon-i:10-naive-feat:random",
+        "arxivmath",
+        "999:10",
+        "Exception encountered when calling layer 'dense' (type Dense).\n\n{{function_node __wrapped__MatMul_device_/job:localhost/replica:0/task:0/device:GPU:0}} OOM when allocating tensor with shape[270013,270013] and type float on /job:localhost/replica:0/task:0/device:GPU:0 by allocator GPU_0_bfc [Op:MatMul] name: \n\nCall arguments received by layer 'dense' (type Dense):\n  \u2022 inputs=tf.Tensor(shape=(270013, 64), dtype=float32)"
+    ]
+]

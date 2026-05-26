@@ -1,0 +1,8 @@
+[
+    [
+        "s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot",
+        "dyn_pubmed",
+        "999:10",
+        "SVD did not converge"
+    ]
+]
