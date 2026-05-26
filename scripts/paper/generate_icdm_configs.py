@@ -32,6 +32,14 @@ FEATURE_ABLATION_DATASETS = [
     "dyn_pubmed",
 ]
 
+LAGO_DATASETS = [
+    "dyn_cora",
+    "dyn_acm",
+    "dyn_citeseer",
+    "patent",
+    "dyn_pubmed",
+]
+
 OPTIONAL_SCALE_DATASETS = [
     "arxivcs",
     "dyn_ogbn-arxiv",
@@ -94,6 +102,42 @@ def build_configs(include_scale: bool) -> dict[str, dict]:
         }
     )
     configs["main_gnn_feature.json"] = cfg
+
+    cfg = base_config()
+    cfg.update(
+        {
+            "DATASETS": LAGO_DATASETS,
+            "BATCHES": ["999:10"],
+            "BASELINES": ["lago"],
+            "MODES": ["dynamic", "naive", "smart"],
+            "BASELINE_ITERATIONS": [1],
+            "USE_GPU": False,
+            "SMART_PARAMS_GRID": {
+                "smart_subcoms_depth": [3],
+                "smart_neighborhood_step": [1],
+                "aggregation_mode": ["sum"],
+            },
+        }
+    )
+    configs["main_lago_temporal.json"] = cfg
+
+    cfg = base_config()
+    cfg.update(
+        {
+            "DATASETS": ["arxivmath"],
+            "BATCHES": ["999:10"],
+            "BASELINES": ["lago"],
+            "MODES": ["dynamic", "naive", "smart"],
+            "BASELINE_ITERATIONS": [1],
+            "USE_GPU": False,
+            "SMART_PARAMS_GRID": {
+                "smart_subcoms_depth": [3],
+                "smart_neighborhood_step": [1],
+                "aggregation_mode": ["sum"],
+            },
+        }
+    )
+    configs["scale_lago_temporal.json"] = cfg
 
     cfg = base_config()
     cfg.update(

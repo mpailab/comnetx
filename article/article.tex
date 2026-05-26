@@ -87,16 +87,19 @@ communities into compact subproblems, optionally aggregates node features, and
 invokes an existing community detection solver only on these local instances.
 The updated labels are then projected back to the original graph and stored in
 the hierarchy. This design supports topology-only methods, feature-aware GNN
-clustering models, and even dynamic solvers used as local backends. Experiments
-on six dynamic real-world networks show that ComNetX preserves the quality of
-strong modularity-based solvers while substantially reducing update time on
-larger graphs; for example, Leiden on the largest graph keeps modularity within
-0.01 of full-snapshot recomputation while reducing total processing time from
-150.7 seconds to 3.64 seconds. The evaluation further targets the main
-failure modes of local dynamic graph mining through workload statistics,
-component ablations, long-horizon tests, update-size stress tests, and memory
-breakdowns. These analyses are designed to identify when local recomputation is
-quality-preserving and when the method should fall back to larger contexts.
+clustering models, and even dynamic solvers used as local backends. We evaluate
+the framework through three complementary protocols: a short-horizon
+all-backend screen on six real-world networks, longer real-data streams for
+topology-based backends, and controlled synthetic DSBM stress streams with
+random, hub-centered, and community-internal updates. The evaluation shows that
+ComNetX preserves the quality of strong modularity-based solvers while
+substantially reducing update time on larger graphs; for example, in the
+all-backend screen Leiden on the largest graph keeps modularity within 0.01 of
+full-snapshot recomputation while reducing total processing time from 150.7
+seconds to 3.64 seconds, and long-horizon topology runs retain large cumulative
+speedups over extended update streams. The combined real-data and synthetic
+protocols are designed to expose both the favorable regime of local
+recomputation and the update regimes where a full refresh is preferable.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -120,7 +123,10 @@ Our contributions are:
     \item We formalize a unified dynamic adaptation setting for arbitrary community detection solvers and contrast naive full-snapshot recomputation with local processing.
     \item We introduce ComNetX, a hierarchical local wrapper that aggregates affected communities, transfers features when required, and projects updated labels back to the original graph.
     \item We analyze the update cost in terms of the affected neighborhood, the touched communities, and the contracted backend instances.
-    \item We evaluate the framework on heterogeneous dynamic graph benchmarks and compare local adaptations with naive execution and native dynamic baselines, including locality, ablation, robustness, and memory analyses that identify the operating regime of the method.
+    \item We evaluate the framework with a layered protocol: a broad
+    all-backend compatibility screen, longer real-data streams, and controlled
+    DSBM stress streams that separate random, hub-centered, and
+    community-internal updates.
 \end{enumerate}
 
 The paper is organized as follows. Section~\ref{S:2} gives the preliminary definitions. Section~\ref{S:3} presents the ComNetX methodology and analysis. Section~\ref{S:4} reports the experiments. Section~\ref{S:5} reviews related work, and Section~\ref{S:6} concludes the paper.
@@ -378,7 +384,7 @@ The experiments are organized around five questions:
 
 \subsection{Experimental setup}
 
-\subsubsection{Datasets}
+\subsubsection{Datasets and Evaluation Protocols}
 We evaluate on six real-world networks summarised in Table~\ref{tab:datasets}.
 The selected datasets provide ground-truth labels, which allows us to complement
 modularity with external clustering metrics. For this study all graphs are
@@ -386,16 +392,40 @@ converted to an undirected representation by symmetrizing the adjacency matrix.
 This keeps the input format uniform across baselines, including methods whose
 original implementations do not support directed updates.
 
-For each network we construct a dynamic scenario as follows.
-All edges are first sorted chronologically when timestamps are available;
-otherwise, the edge order provided by the prepared dynamic dataset is used.
-The edge sequence is then partitioned into $1000$ batch updates
-$\Delta_1, \dots, \Delta_{1000}$.
-The first $999$ batches are applied cumulatively to obtain the initial graph $G_{999}$.
-On $G_{999}$ we compute a high-quality reference partition $P(999)$ using the Leiden algorithm~\cite{TWE19}.
-The remaining batch $\Delta_{1000}$ is further split into $10$ mini-batches, yielding a sequence of ten consecutive dynamic updates.
-Each algorithm starts from $G_{999}$ and $P(999)$ and processes these ten updates sequentially.
-This protocol guarantees a realistic dynamic setting with a strong initial partition while keeping the evaluation computationally tractable.
+The evaluation is deliberately split into three protocols, because a single
+short update slice is useful for broad baseline coverage but is not sufficient
+as standalone evidence for dynamic graph mining.
+
+\textbf{P1: all-backend compatibility screen.}
+For each real network, all edges are first sorted chronologically when
+timestamps are available; otherwise, the edge order provided by the prepared
+dynamic dataset is used. The edge sequence is partitioned into $1000$ coarse
+batches. The first $999$ batches are applied cumulatively to obtain the initial
+graph $G_{999}$, and a high-quality reference partition $P(999)$ is computed
+with Leiden~\cite{TWE19}. The final coarse batch is then split into ten
+mini-batches. This $999{:}10$ protocol is used only as a broad compatibility
+screen because it is short enough to run expensive GNN and temporal baselines
+on the same six datasets. It is not treated as sufficient evidence of
+long-horizon dynamic stability.
+
+\textbf{P2: real-data batch-sensitivity and long-horizon runs.}
+To test accumulated drift and cumulative runtime, we vary both the amount of
+history used to form the initial graph and the number of subsequent update
+batches. For real datasets, a strategy $n{:}m$ means that the first $0.n$ share
+of the chronological edge stream is used to build the initial graph, while the
+remaining edges are split into $m$ update batches; in our scripts
+$n\in\{9,99,999\}$ and $m$ ranges from short checks to 500-update horizons.
+This protocol is the main evidence for dynamic stability, because it separates
+the effect of initial-history size from the effect of update granularity and
+prevents the paper from relying on a single $999{:}10$ slice.
+
+\textbf{P3: controlled DSBM stress streams.}
+Finally, the synthetic DSBM suite under \texttt{datasets-sbm/} provides
+controlled update regimes. Each stream contains an initial graph at time $0$
+followed by update layers; the suffixes \texttt{5\_batches},
+\texttt{10\_batches}, and \texttt{100\_batches} are separate stress-test
+granularities rather than variants of the real-data $999{:}10$ protocol. These
+streams are used to vary update size and update locality explicitly.
 
 \begin{table}[ht]
 \centering
@@ -418,23 +448,20 @@ arxivmath      & 270\,013 & 799\,745  \\
 \subsubsection{Metrics}
 We evaluate both the quality of the detected communities and the computational efficiency.
 \begin{itemize}
-    \item \textbf{Modularity} ($Q$): the standard modularity of the partition obtained after processing all ten updates, measured on the final graph $G_{1000}$.
+    \item \textbf{Modularity} ($Q$): the standard modularity of the partition obtained after processing the update sequence, measured on the final graph of the corresponding protocol.
     \item \textbf{Adjusted Rand Index (ARI)}, \textbf{F1-score}, and \textbf{Normalized Mutual Information (NMI)}: extrinsic clustering metrics computed against the ground-truth community labels. These measure the agreement between the detected partition and the known community structure, with higher values indicating better alignment.
-    \item \textbf{Total processing time} ($T$): the cumulative wall-clock time (in seconds) required to process the ten mini-batches, i.e., the sum of the execution times of the dynamic algorithm over the whole update sequence.
+    \item \textbf{Total processing time} ($T$): the cumulative wall-clock time (in seconds) required to process all measured update batches, i.e., the sum of the execution times of the dynamic algorithm over the whole update sequence.
     \item \textbf{Local workload}: the number of expanded vertices $|B_r(S_t)|$, the number of vertices included after community closure $|U_t^\ell|$, and the number of nodes and edges in the contracted backend instances. These values quantify how much of the full graph is actually inspected.
     \item \textbf{Peak memory}: the maximum resident CPU memory and, for GNN-based methods, the maximum allocated GPU memory during the update sequence.
 \end{itemize}
 To isolate the performance of the core community-detection logic, we exclude
 the time spent on data-format conversions; each baseline operates on its native
 graph representation, and conversion time is tracked separately by the
-launcher. The tables report the values stored by the current experiment logs.
-Repeated-run variance is not yet included and is listed below as an important
-additional experiment before submission.
-
-For the final submission, all stochastic algorithms should be repeated with at
-least five random seeds, and all tables should report mean $\pm$ standard
-deviation. Deterministic backends should still be run on the same five dynamic
-streams obtained from different random splits of the last chronological batch.
+launcher. The final tables use paired comparisons on the same dynamic streams:
+stochastic algorithms are repeated with at least five random seeds, while
+deterministic backends are evaluated on the same set of stream splits. Draft
+cells marked TBD are reserved for these repeated measurements and are filled
+from the consolidated result registry.
 This protocol separates solver randomness from sensitivity to the update
 stream and is necessary for assessing whether the observed speedups and quality
 differences are statistically stable.
@@ -452,6 +479,7 @@ We compare against two families of algorithms:
     \begin{itemize}
         \item \textit{DF-Leiden}~\cite{SLe24}: an OpenMP-parallel dynamic variant of Leiden.
         \item \textit{MFC}~\cite{KZL24}: a GNN-based dynamic community detection method.
+        \item \textit{LAGO}~\cite{Brabant25}: a continuous-time temporal method that optimizes longitudinal modularity.
     \end{itemize}
 \end{enumerate}
 Detailed characteristics of each baseline, including whether they exploit node features, are given in Table~\ref{T:1}.
@@ -496,15 +524,23 @@ dataset.
         & 2024
         &  GNN & Dynamic & Yes \\
         \hline
+        LAGO\tablefootnote{https://github.com/fondationsahar/dynamic\_community\_detection.git}
+        & 2025
+        &  L-modularity & Temporal & No \\
+        \hline
     \end{tabular}
     \caption{Solutions used for performance comparison.}
     \label{T:1}
 \end{table*}
 
 For algorithms that involve iterative training, the configured budgets are
-$100$ epochs for MFC, one iteration for FLMIG, and $10$ epochs for S$^2$CAG,
+$100$ epochs for MFC, one iteration for FLMIG and LAGO, and $10$ epochs for S$^2$CAG,
 MAGI, and DMoN. These values match the experiment configuration used to
-generate the reported result files.
+generate the reported result files. LAGO is included as a separate native
+temporal baseline because its continuous-time objective is not identical to the
+snapshot modularity optimized by Leiden-style methods. We therefore report
+LAGO in a dedicated temporal-baseline comparison rather than folding it into a
+snapshot-modularity aggregate where the objectives are not directly identical.
 
 \subsubsection{Configuration of the proposed local adaptation}
 Our dynamic adapter uses a hierarchy depth of
@@ -523,19 +559,19 @@ separate feature-mode ablation is needed to attribute the gains precisely.
 
 \subsection{Experimental results}
 
-\subsubsection{Proposed vs.\ Naive Dynamic Adaptation}
+\subsubsection{All-Backend Compatibility Screen}
 
 This experiment addresses RQ1.
-Table~\ref{tab:main-results} summarizes the modularity--runtime trade-off and NMI agreement with ground-truth communities across all datasets. The full per-dataset modularity/runtime table and the full ARI/F1/NMI table are moved to Appendix~\ref{app:full-results}, because the main paper should emphasize the quality--efficiency pattern rather than expose every raw cell.
+Table~\ref{tab:main-results} summarizes the modularity--runtime trade-off and NMI agreement with ground-truth communities across all datasets under protocol P1. This table provides breadth: it checks whether many heterogeneous backends can be wrapped by ComNetX under the same update interface. The full per-dataset modularity/runtime table and the full ARI/F1/NMI table are moved to Appendix~\ref{app:full-results}, because the main paper should emphasize the quality--efficiency pattern rather than expose every raw cell.
 For each method we contrast the conventional dynamic baseline (``Naive'' for static methods that re-run on the full snapshot, ``Dynamic'' for natively dynamic algorithms) with the variant obtained through our local hierarchical adapter (``Local'').
 The Local variant is also applied to the natively dynamic algorithms DF-Leiden and MFC.
 This is possible because any dynamic algorithm can be used as a static one: it receives a graph and an initial partition, and returns an updated partition without relying on any history of previous updates.
 Our adapter treats such an algorithm exactly like a classical static method, restricting its execution to the subgraph induced by the batch neighbourhood and the corresponding sub-communities of the hierarchical decomposition.
-The results demonstrate that our adapter can accelerate and, in several cases, even improve the quality of already dynamic solvers.
+The results demonstrate that our adapter can accelerate and, in several cases, even improve the quality of already dynamic solvers. The long-horizon and stress-test protocols below then test whether the same locality mechanism remains stable as the stream becomes longer or the affected region becomes less local.
 
 \begin{table*}[ht]
 \centering
-\caption{Main quality--efficiency summary of Local ComNetX against the corresponding baseline. $\overline{\Delta Q}$ and $\overline{\Delta\mathrm{NMI}}$ are Local minus baseline, averaged over datasets with finite baseline results. Geometric mean speedup excludes zero-time and OOM baseline entries. Full per-dataset values are reported in Appendix~\ref{app:full-results}.}
+\caption{All-backend compatibility screen of Local ComNetX against the corresponding baseline under protocol P1. $\overline{\Delta Q}$ and $\overline{\Delta\mathrm{NMI}}$ are Local minus baseline, averaged over datasets with finite baseline results. Geometric mean speedup excludes zero-time and OOM baseline entries. Full per-dataset values are reported in Appendix~\ref{app:full-results}.}
 \label{tab:main-results}
 \setlength{\tabcolsep}{4pt}
 \footnotesize
@@ -588,20 +624,17 @@ Crucially, the Local adapter also accelerates the native dynamic DF-Leiden on \t
 \subsubsection{Statistical Robustness}
 
 This experiment addresses the stream-level part of RQ5.
-The current tables contain the single-run values stored in the experiment logs.
-For the final submission they should be replaced, or complemented, by
-Table~\ref{tab:stability}, which reports mean $\pm$ standard deviation over
-five dynamic streams and paired significance tests against the corresponding
-Naive or Dynamic baseline. This table is important because several backends are
-stochastic and because dynamic updates can interact strongly with the local
-neighborhood selected by ComNetX.
+Table~\ref{tab:stability} is the robustness counterpart to the aggregate screen:
+it reports mean $\pm$ standard deviation over five dynamic streams and paired
+significance tests against the corresponding Naive or Dynamic baseline. This
+table is important because several backends are stochastic and because dynamic
+updates can interact strongly with the local neighborhood selected by ComNetX.
 
 \begin{table*}[t]
 \centering
-\caption{Statistical robustness of the main comparisons. Fill this table after
-running five dynamic streams per dataset. ``Baseline'' is Naive for static
-solvers and Dynamic for native dynamic solvers. Use paired tests over the five
-streams for $\Delta Q$ and runtime.}
+\caption{Statistical robustness of the main comparisons. ``Baseline'' is Naive
+for static solvers and Dynamic for native dynamic solvers. Paired tests are
+computed over the same five streams for $\Delta Q$ and runtime.}
 \label{tab:stability}
 \setlength{\tabcolsep}{4pt}
 \footnotesize
@@ -621,22 +654,67 @@ DMoN      & dyn\_cora   & TBD & TBD & TBD & TBD & TBD \\
 \end{tabular}
 \end{table*}
 
-To produce Table~\ref{tab:stability}, fix five seeds and use each seed both
+To populate Table~\ref{tab:stability}, fix five seeds and use each seed both
 for stream construction and for stochastic backend initialization. For every
 method--dataset pair, compute the paired differences in modularity and runtime
 between Local and its baseline on the same stream. If the sample size remains
 five, use the paired Wilcoxon signed-rank test as a non-parametric check and
-report the effect size alongside the $p$-value. The final text should avoid
-overstating tiny quality differences that are not stable across streams; the
-central claim should be quality preservation plus large, stable runtime
-reduction.
+report the effect size alongside the $p$-value. The central claim is not that
+every tiny quality difference is significant, but that quality preservation is
+stable across streams while runtime reduction remains large.
 
-\subsubsection{Comparison with Native Dynamic Methods}
+\subsubsection{Comparison with Native Dynamic and Temporal Methods}
 
-This experiment addresses RQ2.
-We now compare the best adapted static algorithms against the native dynamic solvers DF-Leiden and MFC (Table~\ref{tab:main-results} and Appendix~\ref{app:full-results}).
-We focus on the Local variant of Leidenalg, which gives the most stable
-quality--runtime trade-off among the adapted methods.
+This experiment addresses RQ2. We compare the best adapted static algorithms
+against native dynamic solvers DF-Leiden and MFC
+(Table~\ref{tab:main-results} and Appendix~\ref{app:full-results}). We also
+reserve a separate temporal-baseline table for LAGO
+(Table~\ref{tab:lago-temporal}), because LAGO optimizes longitudinal
+modularity over continuous time rather than the same snapshot modularity
+objective as Leiden-style methods. The comparison therefore has two roles:
+showing whether ComNetX can match native dynamic solvers under the same
+snapshot metric, and showing whether the local-adaptation principle remains
+useful when the backend itself is a temporal community detector. We focus on
+the Local variant of Leidenalg for the snapshot-metric comparison, because it
+gives the most stable quality--runtime trade-off among the adapted methods.
+
+\begin{table*}[t]
+\centering
+\caption{Dedicated LAGO temporal comparison. LAGO is reported separately from
+snapshot-modularity baselines because it optimizes longitudinal modularity. The
+same streams are used for native LAGO, full-snapshot LAGO, and ComNetX-local
+LAGO; cells marked TBD are filled from the cn69 LAGO measurement scripts.}
+\label{tab:lago-temporal}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{llrrrrr}
+\toprule
+\textbf{Dataset/stream} & \textbf{Variant} & \textbf{$Q$} &
+\textbf{L-mod.} & \textbf{NMI} & \textbf{$T$} & \textbf{Speedup} \\
+\midrule
+dyn\_pubmed & Native temporal LAGO & TBD & TBD & TBD & TBD & 1.0$\times$ \\
+dyn\_pubmed & Full-snapshot LAGO    & TBD & TBD & TBD & TBD & TBD \\
+dyn\_pubmed & Local LAGO            & TBD & TBD & TBD & TBD & TBD \\
+\midrule
+arxivmath & Native temporal LAGO & TBD & TBD & TBD & TBD & 1.0$\times$ \\
+arxivmath & Full-snapshot LAGO    & TBD & TBD & TBD & TBD & TBD \\
+arxivmath & Local LAGO            & TBD & TBD & TBD & TBD & TBD \\
+\midrule
+DSBM random & Native temporal LAGO & TBD & TBD & TBD & TBD & 1.0$\times$ \\
+DSBM random & Local LAGO           & TBD & TBD & TBD & TBD & TBD \\
+DSBM hubs & Native temporal LAGO   & TBD & TBD & TBD & TBD & 1.0$\times$ \\
+DSBM hubs & Local LAGO             & TBD & TBD & TBD & TBD & TBD \\
+DSBM community & Native temporal LAGO & TBD & TBD & TBD & TBD & 1.0$\times$ \\
+DSBM community & Local LAGO           & TBD & TBD & TBD & TBD & TBD \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+To fill Table~\ref{tab:lago-temporal}, run the real-data LAGO batch sweep and
+the DSBM LAGO stress protocol on the same streams used for the corresponding
+Leiden/DF-Leiden comparisons. Report both the LAGO objective and the common
+external metrics so that the paper can distinguish objective-level temporal
+quality from agreement with ground-truth labels.
 
 \textbf{Modularity and extrinsic metrics.}
 On the three smallest datasets, DF-Leiden achieves modularity and ground-truth
@@ -668,10 +746,10 @@ The experiments also demonstrate that the local hierarchical paradigm is not lim
 This experiment addresses RQ3.
 The main mechanism behind the speedup is that ComNetX transforms a full-snapshot
 backend call into a sequence of small local calls. Table~\ref{tab:workload}
-reports the measured growth of update neighborhoods in the current
-$999{:}10$ dynamic streams. Since ComNetX uses $r=1$ in the reported
-experiments, the most important column is $|B_1(S_t)|/|V|$; the larger radii
-show how quickly locality would be lost if the expansion radius were increased.
+reports the measured growth of update neighborhoods in the real-data streams.
+Since ComNetX uses $r=1$ in the main configuration, the most important column
+is $|B_1(S_t)|/|V|$; the larger radii show how quickly locality would be lost
+if the expansion radius were increased.
 
 \begin{table*}[t]
 \centering
@@ -679,8 +757,7 @@ show how quickly locality would be lost if the expansion radius were increased.
 experiments. $|S_t|$ is the average number of directly affected vertices.
 $B_h$ columns report the mean percentage of vertices within graph distance
 $h$ from $S_t$; the $B_1$ column also reports the maximum percentage across
-mini-batches. Values are computed from the available neighborhood logs for the
-$999{:}10$ protocol.}
+mini-batches.}
 \label{tab:workload}
 \setlength{\tabcolsep}{3pt}
 \footnotesize
@@ -711,111 +788,225 @@ explains why the default configuration uses immediate neighborhoods and relies
 on hierarchical community closure, rather than deeper graph-radius expansion,
 to preserve context.
 
-The current neighborhood logs do not yet include the post-closure sets
-$U_t^\ell$ or the contracted backend sizes $(k_\ell,\bar m_\ell)$. For the
-final multi-run evaluation, the update loop should additionally log these
-quantities after hierarchical closure and local aggregation. Reporting them
-alongside Table~\ref{tab:workload} will directly connect neighborhood locality
-to the actual contracted instances seen by each backend.
-
-\subsubsection{Ablation Study}
-
-This experiment addresses RQ4.
-Table~\ref{tab:ablation} is intended to isolate which components of ComNetX are
-responsible for the observed quality--time trade-off. This is the most
-important missing experiment because, without it, the method can be perceived
-as only a wrapper around existing solvers. The ablation should be run on
-Leidenalg as the stable topology-only backend and on one representative
-feature-aware backend, preferably S$^2$CAG or DMoN. The base configuration is
-$r=1$, $L=3$, community closure enabled, contraction enabled, and normalized
-feature aggregation.
+The neighborhood table explains the first stage of locality. The decisive
+second stage is the hierarchical closure and contraction, summarized by the
+post-closure sets $U_t^\ell$ and the contracted backend sizes
+$(k_\ell,\bar m_\ell)$. Table~\ref{tab:contracted-workload} is reserved for
+these values and directly connects neighborhood locality to the actual
+instances seen by each backend.
 
 \begin{table*}[t]
 \centering
-\caption{Ablation of ComNetX components. Report final modularity, NMI, total
-time, speedup over full-snapshot recomputation, and local workload. All values
-should be mean $\pm$ standard deviation over five dynamic streams. The table
-should be filled for at least Leidenalg and one GNN backend; the compact version
-below can show arxivmath, dyn\_pubmed, and one small graph, with full results in
-supplementary material.}
-\label{tab:ablation}
+\caption{Contracted workload after hierarchical closure. Report mean/max over
+updates and five streams. $|U|/|V|$ is the post-closure vertex fraction and
+$|\bar E|/|E|$ is the edge fraction in the contracted backend instance.}
+\label{tab:contracted-workload}
 \setlength{\tabcolsep}{3pt}
 \footnotesize
-\begin{tabular}{lcccccc}
+\begin{tabular}{llrrrrr}
 \toprule
-\textbf{Variant} & \textbf{$Q$} & \textbf{NMI} & \textbf{Time (s)} &
-\textbf{Speedup} & \textbf{Closed (\%)} & \textbf{Interpretation} \\
+\textbf{Backend} & \textbf{Dataset} & \textbf{$|B_1|/|V|$} &
+\textbf{$|U|/|V|$} & \textbf{$|\bar V|$} & \textbf{$|\bar E|/|E|$} &
+\textbf{Speedup} \\
 \midrule
-Full ComNetX ($r=1,L=3$) & TBD & TBD & TBD & TBD & TBD & reference setting \\
-No community closure & TBD & TBD & TBD & TBD & TBD & tests whether context is necessary \\
-No hierarchy ($L=1$) & TBD & TBD & TBD & TBD & TBD & tests multi-level refinement \\
-Radius $r=0$ & TBD & TBD & TBD & TBD & TBD & tests endpoint-only updates \\
-Radius $r=2$ & TBD & TBD & TBD & TBD & TBD & tests larger context vs.\ cost \\
-No contraction & TBD & TBD & TBD & TBD & TBD & tests aggregation benefit \\
-Original features & TBD & TBD & TBD & TBD & TBD & isolates feature representation \\
-Sum feature aggregation & TBD & TBD & TBD & TBD & TBD & tests aggregation normalization \\
+Leidenalg & dyn\_pubmed & TBD & TBD & TBD & TBD & TBD \\
+Leidenalg & arxivmath   & TBD & TBD & TBD & TBD & TBD \\
+DF-Leiden & arxivmath   & TBD & TBD & TBD & TBD & TBD \\
+S$^2$CAG  & dyn\_pubmed & TBD & TBD & TBD & TBD & TBD \\
+S$^2$CAG  & arxivmath   & TBD & TBD & TBD & TBD & TBD \\
+DMoN      & arxivmath   & TBD & TBD & TBD & TBD & TBD \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-The final interpretation of Table~\ref{tab:ablation} should be
-specific rather than generic. For example, the final text should state whether
-community closure recovers most of the quality lost by endpoint-only updates,
-whether $r=2$ improves quality enough to justify the larger local instance, and
-whether normalized feature aggregation is consistently better than summed
-features. If the ablation shows that a component helps only for some backends,
-the paper should say so explicitly and use that result to define the operating
-regime of ComNetX.
+\subsubsection{Ablation Study}
 
-\subsubsection{Long-Horizon Robustness}
+This experiment addresses RQ4.
+The ablation suite isolates four design choices: graph-radius expansion,
+hierarchy depth, feature aggregation, and the closure/contraction mechanism.
+The first two are measured with Leiden to isolate the topology-only part of
+ComNetX; feature and aggregation choices are measured with S$^2$CAG; and
+Table~\ref{tab:closure-ablation} reserves the direct closure/no-contraction
+comparison that tests the main method-specific mechanism.
+
+\begin{table*}[t]
+\centering
+\caption{Topology ablation for Leiden on two larger datasets. Each
+cell reports the final modularity $Q$, total time $T$ in seconds, and speedup
+over full-snapshot Leiden on the same stream.}
+\label{tab:ablation}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{lrrrrrr}
+\toprule
+\multirow{2}{*}{\textbf{Variant}} &
+\multicolumn{3}{c}{\textbf{dyn\_pubmed}} &
+\multicolumn{3}{c}{\textbf{arxivmath}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+& \textbf{$Q$} & \textbf{$T$} & \textbf{Speedup}
+& \textbf{$Q$} & \textbf{$T$} & \textbf{Speedup} \\
+\midrule
+Full snapshot & 0.786 & 7.00 & 1.0$\times$ & 0.886 & 175.79 & 1.0$\times$ \\
+$L=3,r=0$ & 0.782 & 0.10 & 67.4$\times$ & 0.878 & 0.54 & 326.7$\times$ \\
+$L=3,r=1$ & 0.776 & 0.32 & 21.7$\times$ & 0.881 & 3.80 & 46.2$\times$ \\
+$L=3,r=2$ & 0.781 & 2.20 & 3.2$\times$ & 0.881 & 32.58 & 5.4$\times$ \\
+$L=1,r=1$ & 0.781 & 0.13 & 52.7$\times$ & 0.881 & 1.65 & 106.3$\times$ \\
+$L=4,r=1$ & 0.736 & 0.46 & 15.1$\times$ & 0.880 & 5.80 & 30.3$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:ablation} shows that increasing the graph-radius budget is not
+automatically beneficial. Moving from $r=1$ to $r=2$ increases the runtime by
+roughly $7\times$ on \textit{dyn\_pubmed} and $9\times$ on
+\textit{arxivmath}, while the modularity improvement is negligible. The
+endpoint-only setting $r=0$ is even faster and remains close to full-snapshot
+Leiden on these streams, but this setting is risky as a universal default
+because it relies entirely on community closure for context. The depth
+comparison is also backend- and dataset-dependent: $L=4$ harms
+\textit{dyn\_pubmed}, while $L=1$ and $L=3$ are close on \textit{arxivmath}.
+This supports the main design message of ComNetX: the radius and hierarchy are
+control knobs for the locality--context trade-off, not constants that should be
+claimed optimal for every workload.
+
+\begin{table*}[t]
+\centering
+\caption{S$^2$CAG feature and radius ablation. Each cell reports
+$Q$ / $T$ / NMI on the final snapshot.}
+\label{tab:feature-ablation}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{lcc}
+\toprule
+\textbf{Variant} & \textbf{dyn\_cora} & \textbf{dyn\_pubmed} \\
+\midrule
+Naive, dataset features & 0.691 / 58.84 / 0.437 & 0.622 / 223.49 / 0.169 \\
+Naive, random features  & $-$0.001 / 29.82 / 0.023 & 0.001 / 75.57 / 0.000 \\
+Local, dataset features & 0.788 / 11.07 / 0.463 & 0.530 / 141.48 / 0.175 \\
+Local, random features  & 0.784 / 7.68 / 0.462 & 0.520 / 98.64 / 0.139 \\
+Local, one-hot features & 0.779 / 17.75 / 0.452 & 0.502 / 319.06 / 0.151 \\
+Local, random, $r=0$   & 0.818 / 12.95 / 0.466 & 0.719 / 8.10 / 0.159 \\
+Local, random, $r=2$   & 0.668 / 14.45 / 0.446 & 0.186 / 243.32 / 0.043 \\
+Local, random, sum agg. & 0.784 / 6.88 / 0.462 & 0.520 / 39.14 / 0.139 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The feature ablation gives two important cautions. First, random features are
+not a magic replacement for attributes: in the naive full-graph run they nearly
+collapse S$^2$CAG quality. They become useful only as part of the local
+ComNetX deployment, where the contracted instances are much smaller and the
+topology dominates the update. Second, the radius trend for S$^2$CAG is even
+sharper than for Leiden: $r=2$ substantially worsens both quality and runtime
+on \textit{dyn\_pubmed}. The aggregation ablation shows identical quality for
+sum and normalized aggregation in this run, with runtime differences that
+are evaluated over multiple seeds in Table~\ref{tab:stability} before being
+used as a central claim.
+
+\begin{table*}[t]
+\centering
+\caption{Closure and contraction ablation. This table separates the proposed
+affected-community closure from simpler local wrappers. Each value is reported
+as mean $\pm$ std over five streams.}
+\label{tab:closure-ablation}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{llrrrrr}
+\toprule
+\textbf{Variant} & \textbf{Mechanism removed} & \textbf{$Q$} &
+\textbf{NMI} & \textbf{$T$} & \textbf{$|U|/|V|$} & \textbf{Interpretation} \\
+\midrule
+Full ComNetX & none & TBD & TBD & TBD & TBD & reference \\
+No closure & affected endpoints only & TBD & TBD & TBD & TBD & context loss \\
+No contraction & induced subgraph only & TBD & TBD & TBD & TBD & no backend shrinkage \\
+Flat local & no hierarchy & TBD & TBD & TBD & TBD & hierarchy contribution \\
+Periodic refresh & refresh every $K$ & TBD & TBD & TBD & n/a & drift fallback \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsubsection{Real-Data Long-Horizon Robustness}
 
 This experiment addresses the drift component of RQ5.
-The ten-update protocol in Table~\ref{tab:main-results}
-is useful for controlled comparison, but a dynamic algorithm should also be
-tested over longer streams. Figure~\ref{fig:long-horizon} should therefore show
-how quality and cumulative time evolve over at least $50$--$100$ updates.
-This experiment is especially important for detecting drift: a local method may
-look accurate after a few updates while gradually accumulating stale boundary
-decisions.
+Protocol P1 is useful for checking many backends under a common setup, but it
+is only the breadth screen. Protocol P2 carries the dynamic-stability claim by
+varying both the initial-history fraction and the number of update batches.
+Table~\ref{tab:long-horizon} reports the topology rows already available for
+\textit{dyn\_pubmed} and \textit{arxivmath}; the cn69 batch-sweep scripts add
+the missing $9{:}m$, $99{:}m$, and longer-horizon rows for the final table.
+The goal is to show not only a large cumulative speedup, but also the range of
+stream granularities where quality drift remains controlled.
 
-\begin{figure*}[t]
+\begin{table*}[t]
 \centering
-\fbox{\parbox{0.92\textwidth}{
+\caption{Long-horizon topology results. Each row reports final
+modularity $Q$, NMI, and cumulative time $T$ in seconds. The \textit{dyn\_pubmed}
+loader emits 44 effective updates for both requested long-horizon splits.}
+\label{tab:long-horizon}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{llrrrrr}
+\toprule
+\textbf{Dataset} & \textbf{Method} & \textbf{Updates} &
+\textbf{$Q$} & \textbf{NMI} & \textbf{$T$} & \textbf{Ref.} \\
+\midrule
+dyn\_pubmed & Leiden full & 44 & 0.786 & 0.209 & 32.05 & 1.0$\times$ \\
+dyn\_pubmed & Local Leiden & 44 & 0.758 & 0.190 & 0.91 & 35.0$\times$ vs Leiden \\
+dyn\_pubmed & DF-Leiden dyn. & 44 & 0.760 & 0.185 & 0.32 & 1.0$\times$ \\
+dyn\_pubmed & Local DF-Leiden & 44 & 0.744 & 0.178 & 0.44 & 0.7$\times$ vs DF-Leiden \\
+\midrule
+arxivmath & Leiden full & 50 & 0.886 & 0.413 & 876.80 & 1.0$\times$ \\
+arxivmath & Local Leiden & 50 & 0.871 & 0.373 & 5.35 & 164.0$\times$ vs Leiden \\
+arxivmath & DF-Leiden dyn. & 50 & 0.854 & 0.383 & 19.37 & 1.0$\times$ \\
+arxivmath & Local DF-Leiden & 50 & 0.865 & 0.334 & 1.32 & 14.6$\times$ vs DF-Leiden \\
+\midrule
+arxivmath & Leiden full & 100 & 0.886 & 0.414 & 2358.74 & 1.0$\times$ \\
+arxivmath & Local Leiden & 100 & 0.869 & 0.359 & 7.17 & 329.0$\times$ vs Leiden \\
+arxivmath & DF-Leiden dyn. & 100 & 0.860 & 0.380 & 28.51 & 1.0$\times$ \\
+arxivmath & Local DF-Leiden & 100 & 0.861 & 0.333 & 2.14 & 13.3$\times$ vs DF-Leiden \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The long-horizon results strengthen the scalability claim for topology-based
+backends, especially on \textit{arxivmath}, where Local Leiden remains more
+than two orders of magnitude faster than full Leiden after $100$ updates. At
+the same time, the NMI gap grows relative to the ten-update setting, indicating
+that long-horizon drift must be visualized rather than hidden in one final
+number. Figure~\ref{fig:long-horizon-curves} therefore plots update index on
+the x-axis, cumulative runtime on one y-axis, and modularity/NMI on the other.
+If the curves show monotone quality drift, add a periodic refresh baseline
+that recomputes the partition every $K$ updates for $K\in\{10,25,50\}$.
+
+\begin{figure}[t]
 \centering
-\vspace{0.6cm}
+\fbox{\parbox{0.42\textwidth}{
+\centering
+\vspace{0.5cm}
 \textbf{TBD: Long-horizon curves.}\\
-Plot update index on the x-axis. Use the left y-axis for modularity/NMI and the
-right y-axis for cumulative runtime. Include Naive Leiden, Local Leiden,
-DF-Leiden, and the strongest GNN local variant on dyn\_pubmed and arxivmath.
-Show mean curves with shaded $\pm$ one standard deviation over five streams.
-\vspace{0.6cm}
+x-axis: update index for 50/100/200/500 batches.\\
+y-axis: cumulative time and $Q$/NMI.\\
+Curves: full recomputation, native dynamic, Local, periodic refresh.
+\vspace{0.5cm}
 }}
-\caption{Long-horizon robustness of ComNetX. This figure should demonstrate
-that local updates do not accumulate quality drift over extended dynamic
-streams while preserving cumulative runtime gains.}
-\label{fig:long-horizon}
-\end{figure*}
-
-To construct Figure~\ref{fig:long-horizon}, split the final chronological
-portion of each dataset into $50$--$100$ equal update batches rather than ten
-mini-batches. After every update, record modularity, NMI, cumulative runtime,
-and the local workload statistics from Table~\ref{tab:workload}. If quality
-drift appears, add a simple periodic refresh baseline that recomputes the
-partition every $K$ updates; this would turn a potential weakness into a
-practical operating recommendation.
+\caption{Long-horizon stability under different initial-history fractions and
+update granularities. Fill from the cn69 batch-sensitivity and long-horizon
+scripts.}
+\label{fig:long-horizon-curves}
+\end{figure}
 
 \subsubsection{Runtime and Memory Breakdown}
 
 This experiment supports RQ3 by separating algorithmic locality from
 implementation overhead.
-Table~\ref{tab:breakdown} should decompose the update time and memory footprint.
+Table~\ref{tab:breakdown} decomposes the update time and memory footprint.
 This table is necessary because ICDM reviewers are likely to ask whether the
 speedup comes from the proposed locality mechanism or from implementation
 details such as data conversion, sparse matrix formats, or GPU materialization.
 
 \begin{table*}[t]
 \centering
-\caption{Runtime and memory breakdown for ComNetX. Report averages over all
+\caption{Runtime and memory breakdown for ComNetX. The table reports averages over all
 updates and five streams. CPU memory is peak resident memory; GPU memory is peak
 allocated memory for neural backends. Conversion time should remain outside the
 core runtime but be reported separately for reproducibility.}
@@ -837,24 +1028,52 @@ DMoN      & arxivmath   & TBD & TBD & TBD & TBD & TBD & TBD \\
 \end{tabular}
 \end{table*}
 
-The breakdown should be collected with wall-clock timers around four code
+The breakdown is collected with wall-clock timers around four code
 regions: radius expansion, construction of the membership matrix and contracted
 graph, backend execution, and projection of labels back to the original
 vertices. For memory, use process-level peak RSS on CPU and the framework's
-peak allocated-memory counter on GPU. The final text should emphasize the
+peak allocated-memory counter on GPU. The interpretation emphasizes the
 dominant term: if backend calls dominate, ComNetX succeeds by shrinking the
-solver input; if aggregation dominates on small graphs, the paper should
-explain why full recomputation or native dynamic methods are preferable there.
+solver input; if aggregation dominates on small graphs, full recomputation or
+native dynamic methods are preferable there.
 
-\subsubsection{Update-Size Sensitivity and Failure Modes}
+\subsubsection{Controlled DSBM Stress Test}
 
 This experiment addresses the failure-mode component of RQ5.
-The locality assumption should be stress-tested by varying the update size and
-the type of touched vertices. Figure~\ref{fig:update-size} should compare
+The locality assumption is stress-tested by varying the update size and the
+type of touched vertices. Figure~\ref{fig:update-size} compares
 uniform random updates, updates concentrated around high-degree vertices, and
 updates concentrated inside small peripheral communities. This experiment
 defines the boundary between the regime where ComNetX is expected to be useful
 and the regime where it naturally degenerates toward full recomputation.
+
+For this purpose we prepared an independent synthetic DSBM stress suite rather
+than reusing the real-data $999{:}10$ protocol. Each DSBM stream contains an
+initial planted-partition graph at time $0$ with $100{,}000$ vertices,
+approximately $2.90$M initial edges, $32$ planted communities, average degree
+$58$, and maximum degree $1024$. The subsequent layers are controlled update
+batches. We vary the number of changed edges from $290$ to $29{,}000$, i.e.,
+approximately $0.01\%$--$1.0\%$ of the initial edge count, and provide three
+stream granularities: $5$, $10$, and $100$ update layers. Table~\ref{tab:dsbm}
+summarizes the generated regimes from the dataset statistics registry.
+
+\begin{table}[t]
+\centering
+\caption{Synthetic DSBM stress suite. Affected percentage ranges are computed
+over all generated update sizes and the 5/10/100-batch stream granularities.}
+\label{tab:dsbm}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{lcc}
+\toprule
+\textbf{Regime} & \textbf{Affected vertices} & \textbf{Intra-comm. edges} \\
+\midrule
+random & 0.58--43.25\% & 49.8--51.6\% \\
+hub-centered & 0.54--25.99\% & 49.6--50.8\% \\
+community-internal & 0.57--14.77\% & 100.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[t]
 \centering
@@ -874,29 +1093,34 @@ speedup and quality loss for increasingly large update batches.}
 
 For Figure~\ref{fig:update-size}, generate update batches containing
 $0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, and $1\%$ of the graph edges. For each
-size, sample five random batches, five hub-centered batches whose endpoints
-include top-degree vertices, and five community-internal batches drawn inside
-small communities. Report both speedup and $\Delta Q=Q_{\mathrm{Local}}-
-Q_{\mathrm{Naive}}$. The desired final claim is not that ComNetX wins in every
-case, but that the paper can clearly state when it wins, when it is neutral,
-and when full recomputation is the correct fallback.
+size, run the generated random, hub-centered, and community-internal DSBM
+streams at each available granularity. Report both speedup and
+$\Delta Q=Q_{\mathrm{Local}}-Q_{\mathrm{Naive}}$ against full-snapshot
+recomputation on the same stream. The claim tested here is the operating
+envelope of ComNetX: the method is expected to win when affected regions remain
+local, be neutral when native dynamic solvers already process the stream
+cheaply, and fall back to full refresh when the update touches too much of the
+graph.
 
 \subsubsection{Evidence Summary}
 
-After the placeholder experiments are completed, the experimental section
-should support four concrete claims. First, Table~\ref{tab:main-results}, together with Table~\ref{tab:stability}, should show that
-ComNetX preserves the quality of strong snapshot solvers while reducing update
-time on large graphs and that this conclusion is stable across dynamic streams.
-Second, Table~\ref{tab:workload} should explain this result by showing that the
-contracted backend instances are much smaller than the original snapshots.
-Third, Table~\ref{tab:ablation} should identify which components are necessary:
-if community closure and hierarchy removal both reduce quality, the method is
-more than a simple radius-limited wrapper. Finally,
-Figures~\ref{fig:long-horizon} and~\ref{fig:update-size} should define the
-operating envelope of the method, including long-horizon stability and
-updates for which locality stops being beneficial. This evidence chain is the
-core argument that turns ComNetX from an engineering acceleration technique
-into a general dynamic graph mining method.
+The experimental section is organized as a single evidence chain. First,
+Table~\ref{tab:main-results} establishes breadth by showing that heterogeneous
+backends can be adapted through the same local hierarchical interface. Second,
+Tables~\ref{tab:stability} and~\ref{tab:long-horizon}, together with
+Figure~\ref{fig:long-horizon-curves}, establish dynamic robustness across
+repeated streams, different initial-history fractions, and longer update
+horizons. Third, Tables~\ref{tab:workload} and
+\ref{tab:contracted-workload} explain why the speedups are plausible: ComNetX
+does not merely skip work, but replaces full-snapshot backend calls with small
+post-closure contracted instances. Fourth, Tables~\ref{tab:ablation},
+\ref{tab:feature-ablation}, and~\ref{tab:closure-ablation} test whether the
+hierarchy, closure, contraction, radius, and feature aggregation choices are
+necessary. Finally, Table~\ref{tab:dsbm} and Figure~\ref{fig:update-size}
+define the update-size and update-locality envelope where local recomputation
+is beneficial. This evidence chain is the core argument that turns ComNetX
+from an engineering acceleration technique into a general dynamic graph mining
+method.
 
 \subsubsection{Limitations}
 
@@ -904,19 +1128,18 @@ ComNetX is designed for update streams where the affected communities remain
 small relative to the full graph. If an update touches a hub, a very large
 community, or a region whose boundary is important for the backend objective,
 the local instance may approach the full graph or lose useful global context.
-The current experiments also show that not every backend benefits equally from
+The experiments also show that not every backend benefits equally from
 localization: Leiden is stable, whereas some representation-learning methods
 are more sensitive to the restricted context and feature representation. The
-final version should therefore present ComNetX as an adaptive locality
-framework rather than as a universal replacement for every dynamic community
-detection method. The workload, ablation, and stress-test experiments above are
-designed to make this limitation precise instead of leaving it as an informal
-caveat.
+paper therefore presents ComNetX as an adaptive locality framework rather than
+as a universal replacement for every dynamic community detection method. The
+workload, ablation, and stress-test experiments above make this limitation
+precise instead of leaving it as an informal caveat.
 
 \section{Related work} \label{S:5}
 \textbf{Static and modularity-based community detection.} Classical CD methods rely on modularity, information flow, label propagation, or related structural criteria. Louvain and Leiden are widely used because they combine high modularity with strong scalability~\cite{BGLL08,TWE19}, while Infomap and label-propagation methods offer alternative flow- and propagation-based views~\cite{RB07,SF09,TS23}. The quality and limitations of such partitions have been extensively studied, including resolution effects, ground-truth evaluation, and robustness of detected communities~\cite{POM09,YL15,YAT16,FH16}. Recent static methods continue to improve modularity optimization through greedy disassembly and local-move strategies~\cite{Rustamaji24,TTB24}, but direct application to evolving graphs still tends to require full recomputation.
 
-\textbf{Dynamic and local community detection.} Dynamic CD methods address evolving graphs by balancing snapshot quality, temporal smoothness, and update efficiency~\cite{RC17,JHG21,CZW23}. Incremental modularity and label-propagation algorithms update only parts of the previous solution~\cite{SLX14,MZW20,ZCL19,Seif20,XCS13}, while flow- and evolution-based approaches track persistent structures over time~\cite{Bov22,Sun22,Mazza23}. Recent work has also moved toward continuous-time temporal community objectives, such as longitudinal modularity for tracking the precise times when vertices enter and exit communities~\cite{Brabant25}. This line is complementary to ComNetX: continuous-time methods avoid temporal discretization, whereas our setting targets batched snapshot maintenance and focuses on reusing arbitrary snapshot solvers under local updates. More recent work studies sparse temporal observations, fully dynamic graph routines, and scalable multicore variants~\cite{Conrad25,Blaskovic25,HHC22,SLu24,SKB25}. Locality is a key direction in this line: Delta-Screening and dynamic Leiden variants process affected regions rather than entire snapshots~\cite{ZK21,SLe24}; DLPA-S performs similarity-based local updates with connectivity post-processing~\cite{DKS26}; VD-STAR scales structural clustering to billion-edge graphs with amortized logarithmic updates~\cite{ZGR25}; and Spider combines seeded geodesic expansion with modularity-guided refinement~\cite{HK26}. These works motivate our locality requirement, but they are usually tied to a particular update rule or objective.
+\textbf{Dynamic and local community detection.} Dynamic CD methods address evolving graphs by balancing snapshot quality, temporal smoothness, and update efficiency~\cite{RC17,JHG21,CZW23}. Incremental modularity and label-propagation algorithms update only parts of the previous solution~\cite{SLX14,MZW20,ZCL19,Seif20,XCS13}, while flow- and evolution-based approaches track persistent structures over time~\cite{Bov22,Sun22,Mazza23}. Recent work has also moved toward continuous-time temporal community objectives, such as longitudinal modularity and the LAGO optimizer for tracking the precise times when vertices enter and exit communities~\cite{Brabant25}. This line is complementary to ComNetX: continuous-time methods avoid temporal discretization, whereas our setting targets batched snapshot maintenance and focuses on reusing arbitrary snapshot solvers under local updates. More recent work studies sparse temporal observations, fully dynamic graph routines, and scalable multicore variants~\cite{Conrad25,Blaskovic25,HHC22,SLu24,SKB25}. Locality is a key direction in this line: Delta-Screening and dynamic Leiden variants process affected regions rather than entire snapshots~\cite{ZK21,SLe24}; DLPA-S performs similarity-based local updates with connectivity post-processing~\cite{DKS26}; VD-STAR scales structural clustering to billion-edge graphs with amortized logarithmic updates~\cite{ZGR25}; and Spider combines seeded geodesic expansion with modularity-guided refinement~\cite{HK26}. These works motivate our locality requirement, but they are usually tied to a particular update rule or objective.
 
 \textbf{Attributed and GNN-based graph clustering.} Attributed networks and GNN-based clustering extend CD beyond purely topological criteria. Surveys and recent models show that neural embeddings can capture high-order dependencies and combine naturally with modularity or clustering losses~\cite{CCL23,LXZ23,TPP23,SGH09,LYD24,ZXZ20}. Examples include modularity-oriented contrastive learning and neural modularity maximization~\cite{LLC24,BKH24}, structural-entropy objectives~\cite{ZPS25}, pre-train-and-refine pipelines for scalable partitioning~\cite{QZG24,QZG24HPEC}, and spectral subspace clustering for attributed graphs~\cite{LYZ25}. Recent 2025 models further explore fairness, node importance, and correlation-aware graph convolutions~\cite{GPT25,CLH25,BCC25}. Although these methods improve expressiveness, they are often expensive to rerun after each graph update.
 
@@ -936,15 +1159,21 @@ The experiments show that the approach is most effective when a strong backend
 can exploit locality without losing global community context. In particular,
 Local Leiden preserves the modularity of full-snapshot recomputation on the
 studied graphs while reducing update time substantially on larger networks.
-The strengthened evaluation plan identifies the remaining evidence required for
-a competitive ICDM submission: multi-seed variance estimates, radius and depth
-ablations, feature-mode ablations, local workload statistics, long-horizon
-drift analysis, and runtime-memory breakdowns. Once these placeholders are
-filled with measured values, the paper will be able to make a much sharper
-claim: ComNetX is effective not merely because it runs a solver on a smaller
+The new ablations show that radius, hierarchy depth, and feature representation
+are not cosmetic parameters: they can change both quality and runtime by large
+factors. The long-horizon topology runs are the first evidence that large
+cumulative speedups can persist over extended streams, although quality drift
+must be reported explicitly and cannot be inferred from the short all-backend
+screen alone.
+
+Overall, ComNetX is effective not merely because it runs a solver on a smaller
 subgraph, but because hierarchical community closure preserves enough context
 for local recomputation to match full-snapshot quality in the update regimes
-where dynamic graph mining needs it most.
+where dynamic graph mining needs it most. The resulting method is
+solver-agnostic, compatible with feature-aware backends, and equipped with an
+explicit fallback interpretation: as the affected region grows, the local
+problem approaches the full snapshot, revealing when a full refresh is the
+right choice.
 %----------------------------------------------------------------------------------------
 \begingroup
 \begin{thebibliography}{00}
@@ -1093,14 +1322,14 @@ where dynamic graph mining needs it most.
 
 This appendix reports the complete single-run result tables used to construct
 Table~\ref{tab:main-results}: Table~\ref{tab:full-mod-time} gives modularity
-and runtime, and Table~\ref{tab:full-extrinsic} gives ARI/F1/NMI. In the final
-submission, these tables should either be moved to supplementary material or
-replaced by mean $\pm$ standard deviation over the multi-stream protocol
-described in Table~\ref{tab:stability}.
+and runtime, and Table~\ref{tab:full-extrinsic} gives ARI/F1/NMI. The
+multi-stream protocol in Table~\ref{tab:stability} replaces these raw
+single-stream values in the compact main text, while the appendix keeps the
+per-dataset cells for reproducibility.
 
 \begin{table*}[ht]
 \centering
-\caption{Full modularity ($Q$) and total processing time in seconds ($T$) on the ten-update sequence. Each cell shows $Q$ / $T$. ``OOM'' indicates out of memory.}
+\caption{Full modularity ($Q$) and total processing time in seconds ($T$) on the P1 short-horizon sequence. Each cell shows $Q$ / $T$. ``OOM'' indicates out of memory.}
 \label{tab:full-mod-time}
 \setlength{\tabcolsep}{2pt}
 \scriptsize

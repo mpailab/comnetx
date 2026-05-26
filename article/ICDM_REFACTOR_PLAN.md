@@ -2,7 +2,49 @@
 
 Дата начала: 2026-05-25
 
-Цель: довести статью о ComNetX до уровня сильной ICDM Research Track submission. Рабочий ориентир по шансам принятия после выполнения плана: 70-80% как целевой уровень убедительности, а не гарантия результата. Главное правило: не подставлять непроверенные цифры; все численные claims должны происходить из логов, воспроизводимых скриптов или явно помечаться как TODO.
+Цель: довести статью о ComNetX до уровня сильной ICDM Research Track
+submission. Рабочий ориентир: добиться такого качества постановки,
+экспериментальной базы, анализа и подачи, чтобы внутренняя оценка шансов
+принятия была около 80%. Это не гарантия результата, а целевой уровень
+убедительности, под который должна строиться вся итеративная работа.
+
+## 0. North Star and Operating Contract
+
+This plan is the persistent memory for the ICDM submission effort. Every future
+article edit, experiment script, result-registry update, and reviewer-risk pass
+must be checked against this section first.
+
+Core objective:
+
+- Raise the paper to an ICDM-competitive evidence standard with an internal
+  target acceptance likelihood of roughly 80%.
+- Do not reduce the ambition of the paper merely because the current registry is
+  incomplete. If the paper needs stronger evidence, design and run the missing
+  measurements.
+- Do not invent or silently approximate evidence. All numerical claims in the
+  abstract, introduction, main tables, discussion, and conclusion must come from
+  result logs, reproducible scripts, or explicitly marked placeholders awaiting
+  a measurement round.
+
+Iterative rule:
+
+1. Start from the article's strongest ICDM-level story and identify which claims
+   require evidence.
+2. Check `results/registry/` first. If the registry already supports the claim,
+   update the article and cite the exact table/figure source.
+3. If evidence is missing or too weak, prepare a targeted measurement batch
+   rather than weakening the article to fit incomplete data.
+4. After the user runs measurements, rebuild `results/registry/`, analyze
+   quality, runtime, variance, failures, and reviewer risk.
+5. If the new data still leaves a serious weakness, prepare the next experiment
+   round and repeat.
+6. Stop iterating only when the Definition of Done below is satisfied and the
+   remaining risks are acceptable for an 80%-target submission.
+
+Important constraint: `999:10` is only a compatibility/smoke-like screen for
+many backends. The main dynamic evidence must come from broader batch sweeps,
+long-horizon runs, seed/split variance, workload analysis, DSBM stress tests,
+and native-temporal LAGO comparisons.
 
 ## 1. Что показывает анализ ICDM 2021-2025
 
@@ -60,7 +102,9 @@ Main paper:
 
 ### E1. Main rerun with variance
 
-Purpose: replace single-run tables with mean ± std.
+Purpose: replace single-run tables with mean ± std and avoid presenting the
+`999:10` run as the main dynamic evidence. Treat `999:10` as an all-backend
+compatibility screen only.
 
 Datasets:
 
@@ -70,6 +114,9 @@ Datasets:
 Methods:
 
 - Core: Leidenalg naive/local, DF-Leiden dynamic/local, S2CAG naive/local, DMoN naive/local if feasible.
+- Native temporal baseline: LAGO dynamic/local, reported separately because it
+  optimizes continuous-time L-modularity rather than the same snapshot
+  modularity objective.
 - Secondary/appendix: FLMIG, PRGPT variants, MAGI, MFC.
 
 Runs:
@@ -143,17 +190,30 @@ Measure:
 
 ### E5. Long-horizon robustness
 
-Purpose: test drift.
+Purpose: test drift. This is the real-data dynamic-stability protocol and must
+carry the stronger runtime/quality claims, not the short `999:10` screen.
 
 Protocol:
 
-- 50 and 100 mini-batches from the last chronological segment.
+- 50 and 100 mini-batches from the last chronological segment for the broad
+  batch-sensitivity sweep.
+- 200 and 500 mini-batches on the larger real datasets for long-horizon drift.
+- Run the same `m` values under `9:m`, `99:m`, and `999:m` when feasible, so
+  the paper can separate the effect of initial-history size from the effect of
+  update granularity.
 - Track Q, NMI, cumulative time, workload after each update.
 - Add periodic-refresh baseline if local drift is visible: recompute every K in {10, 25, 50}.
 
 ### E6. Update-size/failure-mode stress test
 
 Purpose: define operating envelope.
+
+Use the synthetic streams under `datasets-sbm/` for this block. They are not
+`999:10` real-data streams: each file contains an initial graph at time `0`
+followed by controlled update layers, and the suffixes `5_batches`,
+`10_batches`, and `100_batches` represent different stress-test granularities.
+This block should become the main evidence for random, hub-centered, and
+community-internal update regimes.
 
 Variants:
 
@@ -218,6 +278,46 @@ Create scripts under scripts/paper/.
    - generates temporal SBM scenarios for stress testing.
    - output should be loadable by Dataset or convertible to the existing dynamic format.
 
+6. generate_cn69_measurement_scripts.py
+   - emits the high-value cn69 configs under conf/paper_icdm/cn69/.
+   - emits exactly eight GPU-oriented launch scripts under scripts/paper/cn69/.
+   - these scripts are the current main measurement plan for closing the
+     remaining ICDM evidence gaps.
+
+## 5a. cn69 measurement package
+
+Generate or refresh it with:
+
+```bash
+python3 scripts/paper/generate_cn69_measurement_scripts.py
+```
+
+Run the generated scripts inside the dev container service `app` on cn69:
+
+- `scripts/paper/cn69/gpu0_real_topology_batch_sweep.sh`: Leiden/DF-Leiden
+  real-data sensitivity over `9:10`, `9:50`, `9:100`, `99:10`, `99:50`,
+  `99:100`, `999:10`, `999:50`, and `999:100`.
+- `scripts/paper/cn69/gpu1_real_topology_long_horizon.sh`: 200/500-update
+  long-horizon runs on `dyn_pubmed` and `arxivmath`.
+- `scripts/paper/cn69/gpu2_s2cag_batch_sweep.sh`: S2CAG dataset features plus
+  five random-feature seeds over `9:*`, `99:*`, and `999:*` with 50/100 updates.
+- `scripts/paper/cn69/gpu3_dmon_batch_sweep.sh`: the DMoN counterpart to the
+  S2CAG sweep.
+- `scripts/paper/cn69/gpu4_feature_ablation_radius_aggregation.sh`: feature
+  mode, radius, and aggregation ablation on representative attributed graphs.
+- `scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh`: native temporal
+  LAGO, full-snapshot LAGO, and ComNetX-local LAGO.
+- `scripts/paper/cn69/gpu6_dsbm_topology_stress.sh`: DSBM random,
+  hub-centered, and community-internal stress streams for Leiden and DF-Leiden.
+- `scripts/paper/cn69/gpu7_dsbm_lago_stress.sh`: the same DSBM stress suite
+  for LAGO.
+
+After the scripts finish, regenerate the registry:
+
+```bash
+python3 scripts/paper/collect_results_registry.py
+```
+
 ## 6. Current result registry
 
 Canonical consolidated results registry:
@@ -250,12 +350,24 @@ near-identical after tolerance rounding. Therefore `summary_by_run_key.*` is the
 starting point for paper tables, while `all_results_with_series.json` is the
 source of truth for detailed curves and reproducibility checks.
 
+Current LAGO status: the codebase and general configs contain the LAGO backend,
+but the consolidated registry currently has zero `lago` result rows. Before
+claiming anything about LAGO in the paper, run
+`scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh` and
+`scripts/paper/cn69/gpu7_dsbm_lago_stress.sh`, then regenerate
+`results/registry/`.
+
 ## 7. Iterative workflow
+
+This workflow is cyclic, not one-pass. After each result batch, return to the
+top-level objective: if the current evidence package is not yet strong enough
+for the 80% target, prepare the next measurement round.
 
 Iteration A: Paper structure and claims
 
 - Make article internally consistent.
-- Remove unsupported claims.
+- Keep the strong target narrative, but mark unsupported numerical claims as
+  placeholders until measured.
 - Keep compact main tables and move raw details to appendix.
 
 Iteration B: Config/script preparation
@@ -263,12 +375,18 @@ Iteration B: Config/script preparation
 - Add scripts/paper/.
 - Generate configs.
 - User runs expensive measurements.
+- Prefer targeted scripts that close concrete paper weaknesses over broad
+  exploratory sweeps.
 
 Iteration C: Result ingestion
 
 - User places result JSONs under results/paper/.
 - Run summarizers.
 - Replace TBD values in article.
+- If results are weak, diagnose whether the issue is a method limitation,
+  parameter choice, dataset split, missing baseline, or missing statistic.
+- When more evidence is needed, return to Iteration B instead of weakening the
+  article prematurely.
 
 Iteration D: Reviewer-risk pass
 
@@ -276,6 +394,8 @@ Iteration D: Reviewer-risk pass
 - Check all claims have tables/figures.
 - Check baselines are fair.
 - Check known limitations are explicit but not self-defeating.
+- Re-estimate acceptance risk after every major result-ingestion round and list
+  the remaining blockers.
 
 Iteration E: Final format pass
 
