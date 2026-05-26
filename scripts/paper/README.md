@@ -50,6 +50,12 @@ is the main follow-up protocol for the ICDM revision: it replaces a single
 fractions, 50/100/200/500 update horizons, random-feature seed repeats, LAGO,
 and controlled DSBM stress streams.
 
+With the current 10-day paper sprint, treat these scripts as a candidate suite,
+not as an immediate all-at-once schedule. Ingest the latest available results
+first, rebuild `results/registry/`, run short pilots that finish in hours or
+within one day, and schedule final multi-day runs only after the registry shows
+which evidence is still missing.
+
 Run the generated scripts inside the GPU-bound cn69 Docker containers from
 `/home/dev/users/bokov/comnetx`. The scripts do not set `CUDA_VISIBLE_DEVICES`;
 the container binding selects the GPU. Start long measurements in background
@@ -94,6 +100,20 @@ This scans `results/**/*.json` and writes a consolidated, searchable registry to
 stability analysis, while collapsing exact or near-exact duplicate series into
 `deduplicated_sources.*`.
 
+## Import text measurement logs
+
+If only launcher stdout summaries are available, convert them into ordinary
+result JSON files before rebuilding the registry:
+
+```bash
+python3 scripts/paper/import_text_measurement_logs.py smart.txt experiment.txt leidenalg.txt --stamp 20260526
+python3 scripts/paper/collect_results_registry.py
+```
+
+The importer writes to `results/imported_logs/`. It skips rows that are already
+near-identical to records in `results/registry/`, but keeps repeated runs with
+the same launch parameters when their measured values differ.
+
 ## Summarize and run DSBM stress streams
 
 The synthetic DSBM datasets in `datasets-sbm/` do not use the real-data
@@ -117,7 +137,11 @@ python3 scripts/paper/run_dsbm_stress.py --batch-suffix 10_batches --methods lei
 The DSBM runner now fails loudly if no streams are selected or if every
 algorithm run fails under `--catch-errors`. It also writes
 `manifest_<run>.json` next to the result file with selected stream counts,
-attempted runs, successful runs, and error counts. Before a long cn69 run, check
+attempted runs, successful runs, error counts, and the current attempt. It
+creates a checkpoint before the first algorithm call and after each successful
+or failed attempt, using atomic JSON replacement so completed measurements
+survive interrupted jobs. Streams are ordered from smaller update budgets to
+larger ones so early checkpoints are useful. Before a long cn69 run, check
 stream discovery:
 
 ```bash

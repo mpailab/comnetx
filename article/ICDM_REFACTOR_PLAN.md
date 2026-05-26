@@ -46,6 +46,25 @@ many backends. The main dynamic evidence must come from broader batch sweeps,
 long-horizon runs, seed/split variance, workload analysis, DSBM stress tests,
 and native-temporal LAGO comparisons.
 
+Ten-day writing constraint:
+
+- We have only 10 calendar days for the current article-writing sprint.
+  Measurement planning must therefore be staged, not scheduled as one
+  all-or-nothing wall-clock-critical batch.
+- First ingest all currently available result JSONs into `results/registry/`.
+  The registry is the decision point for every next run.
+- Before launching week-long jobs, run short pilot batches that finish in hours
+  or within one day. Use them to identify which claims, datasets, baselines, and
+  update regimes actually strengthen the paper.
+- Reserve the final 5-7 days for targeted long runs selected after registry
+  analysis. Do not spend the whole remaining budget on broad exploratory sweeps.
+- Treat the eight cn69 scripts as the maximal candidate suite. They are not a
+  mandatory immediate launch plan; shorten, split, or skip them when the updated
+  registry shows a better value/time tradeoff.
+- Every long-running script must checkpoint results as soon as individual
+  method/dataset/batch attempts complete. A stopped job must preserve completed
+  measurements and enough manifest metadata to resume or redesign the run.
+
 ## 1. Что показывает анализ ICDM 2021-2025
 
 Использованные источники для навигации по принятым работам:
@@ -301,6 +320,21 @@ JSON files remain under `results/`. Long measurements are always started in
 background mode from the host with `docker exec -d`; do not use interactive
 `docker exec -it` for the paper measurement batch.
 
+Because the current sprint has a strict 10-day budget, do not launch the full
+eight-script package blindly. The operating sequence is:
+
+1. user places all already completed measurements under `results/`;
+2. rebuild `results/registry/`;
+3. inspect gaps, variance, failures, and time/quality tradeoffs;
+4. run short pilots selected from the cn69 scripts or smaller configs;
+5. only then schedule final multi-day jobs for the strongest missing evidence.
+
+DSBM runs are especially interruption-sensitive. `run_dsbm_stress.py` must
+write `results/paper_icdm/<run>.json`, `errors_<run>.json` when needed, and
+`manifest_<run>.json` before the first algorithm call and after every completed
+or failed attempt. Streams are ordered from smaller update budgets to larger
+ones so early checkpoints contain usable evidence.
+
 Current container pool:
 
 - `dev_bokov`
@@ -397,6 +431,8 @@ Iteration B: Config/script preparation
 - User runs expensive measurements.
 - Prefer targeted scripts that close concrete paper weaknesses over broad
   exploratory sweeps.
+- Under the 10-day constraint, start with short pilots and postpone week-long
+  runs until after the updated registry shows exactly which evidence is missing.
 
 Iteration C: Result ingestion
 

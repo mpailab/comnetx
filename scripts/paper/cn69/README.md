@@ -8,6 +8,12 @@ outputs under `results/`, and write shell logs under `output/` by default.
 Start long measurements from the host in background mode with `docker exec -d`;
 do not use interactive `docker exec -it` for the paper measurement batch.
 
+With the current 10-day paper sprint, treat this package as a maximal candidate
+suite, not as an immediate all-at-once schedule. First ingest the latest
+available result JSONs, rebuild `results/registry/`, run short pilots that
+finish in hours or within one day, and only then schedule final multi-day jobs
+for the strongest remaining evidence gaps.
+
 The eight scripts are intentionally complementary:
 
 - `gpu0_real_topology_batch_sweep.sh`: real-data sensitivity over `9:*`,
@@ -31,6 +37,11 @@ outside the repository checkout:
 ```bash
 DSBM_ROOT=/path/to/datasets-sbm scripts/paper/cn69/gpu6_dsbm_topology_stress.sh
 ```
+
+The DSBM runner checkpoints before the first algorithm call and after every
+completed or failed method/dataset attempt. It writes `manifest_<run>.json`
+alongside the result JSON so interrupted jobs preserve completed measurements
+and expose the current attempt.
 
 After all jobs finish, rebuild the registry:
 

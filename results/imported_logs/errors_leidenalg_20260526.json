@@ -1,0 +1,74 @@
+[
+  [
+    "leidenalg-L:1-r:0-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:1-r:1-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:2-r:0-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:2-r:1-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:3-r:0-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:3-r:1-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:4-r:0-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:4-r:1-gpu",
+    "arxivmath",
+    "10",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:1-r:1-gpu",
+    "arxivmath",
+    "100",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:2-r:1-gpu",
+    "arxivmath",
+    "100",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:3-r:1-gpu",
+    "arxivmath",
+    "100",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ],
+  [
+    "leidenalg-L:4-r:1-gpu",
+    "arxivmath",
+    "100",
+    "CUDA error: insufficient resources when calling `cusparseSpGEMM_compute( handle, opA, opB, &alpha, matA, matB, &beta, matC, computeType, CUSPARSE_SPGEMM_DEFAULT, spgemmDesc, &bufferSize2, dBuffer2)`"
+  ]
+]

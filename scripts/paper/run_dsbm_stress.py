@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import re
+import signal
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +40,7 @@ METHOD_SUPPORTS_DYNAMIC = {"dfleiden", "ldleiden", "mfc", "lago"}
 METHOD_ITER_DEFAULTS = {"flmig": 1, "s2cag": 10, "dmon": 10, "magi": 10, "mfc": 100, "lago": 1}
 SMART_ABBR = {"smart_subcoms_depth": "L", "smart_neighborhood_step": "r"}
 DATASET_RE = re.compile(r"^dsbm-(?P<regime>random|hubs|community)-.*-mc(?P<max_changes>\d+)-(?P<seed>\d+)$")
+BATCH_SUFFIX_RE = re.compile(r"^(?P<updates>\d+)_batches$")
 
 
 def algorithm_name(
@@ -116,22 +118,40 @@ def selected_streams(root: Path, batch_suffix: str | None, regimes: set[str], ma
         if max_changes and int(match.group("max_changes")) not in max_changes:
             continue
         streams.append(path)
-    return streams
+    return sorted(streams, key=stream_sort_key)
+
+
+def stream_sort_key(path: Path) -> tuple[Any, ...]:
+    dataset = path.parent.name
+    dataset_match = DATASET_RE.match(dataset)
+    suffix_match = BATCH_SUFFIX_RE.match(stream_batch_suffix(path))
+    max_changes = int(dataset_match.group("max_changes")) if dataset_match else sys.maxsize
+    updates = int(suffix_match.group("updates")) if suffix_match else sys.maxsize
+    regime = dataset_match.group("regime") if dataset_match else ""
+    seed = int(dataset_match.group("seed")) if dataset_match else sys.maxsize
+    return (max_changes, updates, regime, seed, str(path))
+
+
+def write_json_atomic(path: Path, payload: Any, ensure_ascii: bool = True) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    tmp_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=ensure_ascii),
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
 
 
 def save_results(output_dir: Path, name: str, db: dict[str, Any], errors: list[Any]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{name}.json").write_text(json.dumps(db, indent=2), encoding="utf-8")
+    write_json_atomic(output_dir / f"{name}.json", db)
     if errors:
-        (output_dir / f"errors_{name}.json").write_text(json.dumps(errors, indent=2), encoding="utf-8")
+        write_json_atomic(output_dir / f"errors_{name}.json", errors)
 
 
 def save_manifest(output_dir: Path, name: str, manifest: dict[str, Any]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"manifest_{name}.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    write_json_atomic(output_dir / f"manifest_{name}.json", manifest, ensure_ascii=False)
 
 
 def main() -> None:
@@ -192,6 +212,10 @@ def main() -> None:
         "attempted_runs": 0,
         "successful_runs": 0,
         "errors": 0,
+        "status": "selected",
+        "started_at": datetime.now().isoformat(),
+        "updated_at": None,
+        "current_attempt": None,
         "output": str(Path(args.output_dir) / f"{output_name}.json"),
     }
 
@@ -227,6 +251,25 @@ def main() -> None:
     machine = os.getenv("PARENT_HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
     db: dict[str, Any] = {}
     errors: list[Any] = []
+    output_dir = Path(args.output_dir)
+
+    def checkpoint(status: str | None = None) -> None:
+        if status is not None:
+            manifest["status"] = status
+        manifest["errors"] = len(errors)
+        manifest["updated_at"] = datetime.now().isoformat()
+        save_results(output_dir, output_name, db, errors)
+        save_manifest(output_dir, output_name, manifest)
+
+    def handle_signal(signum: int, _frame: Any) -> None:
+        signal_name = signal.Signals(signum).name
+        manifest["interrupted_by_signal"] = signal_name
+        checkpoint("interrupted")
+        raise SystemExit(f"Interrupted by {signal_name}; checkpoint was written.")
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    checkpoint("started")
 
     for out_path in streams:
         ds = load_stream_as_dataset(out_path)
@@ -246,6 +289,14 @@ def main() -> None:
                     args.use_gpu,
                 )
                 manifest["attempted_runs"] += 1
+                manifest["current_attempt"] = {
+                    "algorithm": alg,
+                    "dataset": ds.name,
+                    "stream": str(out_path),
+                    "batch_strategy": batch_strategy,
+                    "attempt_index": manifest["attempted_runs"],
+                }
+                checkpoint("running")
                 try:
                     results = dynamic_launch(
                         ds,
@@ -261,32 +312,34 @@ def main() -> None:
                         ground_truth_metrics=True,
                     )
                 except Exception as exc:
+                    error_record = [alg, ds.name, batch_strategy, str(exc)]
+                    errors.append(error_record)
+                    manifest["last_failed_attempt"] = manifest["current_attempt"]
+                    manifest["current_attempt"] = None
+                    print(f"Error on {alg}, {ds.name}, {batch_strategy}: {exc}")
+                    checkpoint("running")
                     if not args.catch_errors:
                         raise
-                    errors.append([alg, ds.name, batch_strategy, str(exc)])
-                    manifest["errors"] = len(errors)
-                    print(f"Error on {alg}, {ds.name}, {batch_strategy}: {exc}")
-                    save_results(Path(args.output_dir), output_name, db, errors)
-                    save_manifest(Path(args.output_dir), output_name, manifest)
                     continue
 
                 db.setdefault(alg, {}).setdefault(ds.name, {}).setdefault(machine, {})[
                     batch_strategy
                 ] = results
                 manifest["successful_runs"] += 1
-                save_results(Path(args.output_dir), output_name, db, errors)
-                save_manifest(Path(args.output_dir), output_name, manifest)
+                manifest["current_attempt"] = None
+                checkpoint("running")
 
-    manifest["errors"] = len(errors)
-    save_results(Path(args.output_dir), output_name, db, errors)
-    save_manifest(Path(args.output_dir), output_name, manifest)
+    manifest["current_attempt"] = None
+    checkpoint("completed")
 
     if manifest["attempted_runs"] == 0:
+        checkpoint("failed")
         raise SystemExit(
             "No runnable method/mode combinations were attempted. "
             "Check --methods and --modes."
         )
     if manifest["successful_runs"] == 0:
+        checkpoint("failed")
         raise SystemExit(
             f"All {manifest['attempted_runs']} DSBM runs failed. "
             f"See {Path(args.output_dir) / f'errors_{output_name}.json'} and "
