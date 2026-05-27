@@ -76,6 +76,7 @@ class Optimizer:
         mode = mode.lower().strip()
         aliases = {
             "sum": "sum",
+            "norm": "normalized",
             "normalize": "normalized",
             "normalized": "normalized",
         }

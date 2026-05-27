@@ -25,11 +25,12 @@ The eight scripts are intentionally complementary:
 - `gpu3_dmon_batch_sweep.sh`: DMoN counterpart to the S2CAG sweep.
 - `gpu4_feature_ablation_radius_aggregation.sh`: feature mode, radius, and
   aggregation ablation on representative attributed graphs.
-- `gpu5_lago_temporal_batch_sweep.sh`: native temporal LAGO, full-snapshot
-  LAGO, and ComNetX-local LAGO.
+- `gpu5_lago_temporal_batch_sweep.sh`: parked optional LAGO script from an
+  earlier plan; do not run it for the current main paper evidence chain.
 - `gpu6_dsbm_topology_stress.sh`: random, hub-centered, and community-internal
   DSBM stress streams for Leiden and DF-Leiden.
-- `gpu7_dsbm_lago_stress.sh`: the same DSBM stress suite for LAGO.
+- `gpu7_dsbm_lago_stress.sh`: parked optional LAGO stress script from an
+  earlier plan; do not run it for the current main paper evidence chain.
 
 For the two DSBM scripts, set `DSBM_ROOT` if the synthetic datasets are mounted
 outside the repository checkout:

@@ -24,10 +24,9 @@ The configs are split by paper claim:
 - `main_topology.json`: the main fast topology-only comparison.
 - `ablation_topology_radius_depth.json`: structural ablation with `leidenalg`.
 - `main_gnn_feature.json`: feature-aware feasibility and quality comparison.
-- `main_lago_temporal.json`: LAGO native-temporal, full-snapshot, and local
-  ComNetX comparison on primary datasets except the largest one.
-- `scale_lago_temporal.json`: the same LAGO protocol on `arxivmath`, separated
-  because continuous-time temporal optimization can be much heavier.
+- `main_lago_temporal.json` and `scale_lago_temporal.json`: parked optional
+  LAGO configs from an earlier plan. Do not run them for the current main paper
+  evidence chain; LAGO is now handled in Related Work only.
 - `ablation_feature_modes.json`: dataset/random/onehot feature ablation.
 - `ablation_feature_aggregation.json`: `norm` vs `sum` feature aggregation.
 - `ablation_gnn_radius_light.json`: small GNN-only radius check.
@@ -47,8 +46,9 @@ This writes the high-value measurement configs to `conf/paper_icdm/cn69/` and
 the eight GPU-oriented launch scripts to `scripts/paper/cn69/`. The cn69 package
 is the main follow-up protocol for the ICDM revision: it replaces a single
 `999:10` dependence with sweeps over `9:*`, `99:*`, and `999:*` initial
-fractions, 50/100/200/500 update horizons, random-feature seed repeats, LAGO,
-and controlled DSBM stress streams.
+fractions, 50/100/200/500 update horizons, random-feature seed repeats, and
+controlled DSBM stress streams. LAGO scripts remain in the tree for
+traceability but are parked for the current submission scope.
 
 With the current 10-day paper sprint, treat these scripts as a candidate suite,
 not as an immediate all-at-once schedule. Ingest the latest available results
@@ -67,13 +67,42 @@ scripts/paper/cn69/gpu1_real_topology_long_horizon.sh
 scripts/paper/cn69/gpu2_s2cag_batch_sweep.sh
 scripts/paper/cn69/gpu3_dmon_batch_sweep.sh
 scripts/paper/cn69/gpu4_feature_ablation_radius_aggregation.sh
-scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh
+scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh  # parked; do not run for main paper
 scripts/paper/cn69/gpu6_dsbm_topology_stress.sh
-scripts/paper/cn69/gpu7_dsbm_lago_stress.sh
+scripts/paper/cn69/gpu7_dsbm_lago_stress.sh          # parked; do not run for main paper
 ```
 
 After the jobs finish, rebuild `results/registry/` with
 `python3 scripts/paper/collect_results_registry.py`.
+
+## Generate the next cn69 pilot batch
+
+```bash
+python3 scripts/paper/generate_cn69_pilot_20260526.py
+```
+
+This writes a narrower eight-launch pilot package to
+`conf/paper_icdm/cn69_pilot_20260526/` and
+`scripts/paper/cn69_pilot_20260526/`. Use it after the current registry has
+been rebuilt from `results/paper_icdm/1` and `results/paper_icdm/2`. The pilot
+batch targets GPU workload/memory breakdown, incomplete S2CAG/DMoN
+high-history rows, repeated topology stability, and bounded DSBM checks.
+The old LAGO pilot is parked; use available GPU time for the core evidence
+chain instead.
+
+Generate the 2026-05-27 mixed pilot/final batch:
+
+```bash
+python3 scripts/paper/generate_cn69_pilot_20260527.py
+```
+
+This writes `conf/paper_icdm/cn69_pilot_20260527/` and
+`scripts/paper/cn69_pilot_20260527/`. The batch restores the direct
+closure/no-contraction ablation through `profile_smart_workload.py --variants`
+and uses the remaining GPU slots for focused topology, S2CAG, workload/memory,
+and DSBM measurements. See
+`scripts/paper/cn69_pilot_20260527/README.md` for background Docker launch
+lines.
 
 ## Summarize result JSONs
 

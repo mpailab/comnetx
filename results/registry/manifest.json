@@ -3,6 +3,7 @@
   "output_dir": "results/registry",
   "experiment_records": 2467,
   "neighborhood_records": 536,
+  "profile_records": 0,
   "error_records": 23,
   "deduplicated_sources": 21,
   "unreadable_files": 0,

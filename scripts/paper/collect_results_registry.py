@@ -44,6 +44,14 @@ def is_neighborhood_file(data: Any) -> bool:
     )
 
 
+def is_profile_file(data: Any) -> bool:
+    return (
+        isinstance(data, dict)
+        and data.get("profile_schema") == "comnetx_smart_workload_v1"
+        and isinstance(data.get("profiles"), list)
+    )
+
+
 def parse_algorithm(algorithm: str) -> dict[str, Any]:
     tokens = algorithm.split("-")
     method = tokens[0]
@@ -291,6 +299,99 @@ def flatten_neighborhood(path: Path, data: dict[str, Any], root: Path) -> list[d
     return records
 
 
+def flatten_profiles(path: Path, data: dict[str, Any], root: Path) -> list[dict[str, Any]]:
+    records = []
+    owner = source_owner(path, root)
+
+    for profile in data.get("profiles", []):
+        if not isinstance(profile, dict):
+            continue
+        rows = profile.get("rows", [])
+        if not isinstance(rows, list):
+            rows = []
+
+        def values(key: str) -> list[float]:
+            out = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                value = numeric(row.get(key))
+                if value is not None:
+                    out.append(value)
+            return out
+
+        def nested_values(key: str) -> list[float]:
+            out = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                for level in row.get("levels", []):
+                    if not isinstance(level, dict):
+                        continue
+                    value = numeric(level.get(key))
+                    if value is not None:
+                        out.append(value)
+            return out
+
+        metrics = profile.get("metrics", {})
+        record = {
+            "measurement_type": "workload_profile",
+            "source_file": str(path),
+            "source_owner": owner,
+            "algorithm": profile.get("algorithm"),
+            "variant": profile.get("variant", "full"),
+            "method": profile.get("method"),
+            "mode": profile.get("mode"),
+            "dataset": profile.get("dataset"),
+            "base_dataset": profile.get("base_dataset") or profile.get("dataset"),
+            "batch_strategy": str(profile.get("batch_strategy")),
+            "feature_mode": profile.get("feature_mode"),
+            "iterations": profile.get("baseline_iter"),
+            "subcoms_depth": profile.get("smart_depth"),
+            "radius": profile.get("smart_radius"),
+            "aggregation": profile.get("aggregation_mode"),
+            "device": profile.get("device"),
+            "updates_profiled": profile.get("updates_profiled"),
+            "total_profiled_time": profile.get("total_profiled_time"),
+            "peak_cuda_allocated_mb": profile.get("peak_cuda_allocated_mb"),
+            "peak_rss_mb": profile.get("peak_rss_mb"),
+            "final_modularity": numeric(metrics.get("Final modularity")),
+            "final_nmi": numeric(metrics.get("NMI")),
+            "profile_series": rows,
+        }
+
+        for key in [
+            "affected_vertices",
+            "radius_vertices",
+            "update_time",
+            "radius_time",
+            "closure_time",
+            "reset_time",
+            "aggregation_time",
+            "backend_time",
+            "backend_conversion_time",
+            "projection_time",
+            "cut_time",
+            "total_profiled_time",
+            "rss_max_mb",
+            "cuda_peak_allocated_mb",
+        ]:
+            vals = values(key)
+            if vals:
+                record[f"{key}_mean"] = mean(vals)
+                record[f"{key}_max"] = max(vals)
+
+        for key in ["closure_vertices", "contracted_nodes", "contracted_edges"]:
+            vals = nested_values(key)
+            if vals:
+                record[f"{key}_mean"] = mean(vals)
+                record[f"{key}_max"] = max(vals)
+
+        records.append(record)
+
+    return records
+
+
 def dedupe_experiments(records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     seen: dict[tuple[str, str], dict[str, Any]] = {}
     deduped: list[dict[str, Any]] = []
@@ -322,7 +423,7 @@ def dedupe_experiments(records: list[dict[str, Any]]) -> tuple[list[dict[str, An
 
 
 def compact_record(record: dict[str, Any]) -> dict[str, Any]:
-    skip = {"series", "neighborhood_series"}
+    skip = {"series", "neighborhood_series", "profile_series"}
     return {key: value for key, value in record.items() if key not in skip}
 
 
@@ -400,6 +501,7 @@ def collect(input_dir: Path, output_dir: Path) -> dict[str, Any]:
     experiment_records: list[dict[str, Any]] = []
     error_records: list[dict[str, Any]] = []
     neighborhood_records: list[dict[str, Any]] = []
+    profile_records: list[dict[str, Any]] = []
     unreadable = []
 
     for path in sorted(input_dir.rglob("*.json")):
@@ -413,6 +515,8 @@ def collect(input_dir: Path, output_dir: Path) -> dict[str, Any]:
 
         if is_error_file(path, data):
             error_records.extend(flatten_errors(path, data, input_dir.parent))
+        elif is_profile_file(data):
+            profile_records.extend(flatten_profiles(path, data, input_dir.parent))
         elif is_neighborhood_file(data):
             neighborhood_records.extend(flatten_neighborhood(path, data, input_dir.parent))
         elif isinstance(data, dict):
@@ -421,7 +525,7 @@ def collect(input_dir: Path, output_dir: Path) -> dict[str, Any]:
             unreadable.append({"source_file": str(path), "error": f"Unsupported JSON root: {type(data).__name__}"})
 
     experiment_records, duplicates = dedupe_experiments(experiment_records)
-    all_records = experiment_records + neighborhood_records
+    all_records = experiment_records + neighborhood_records + profile_records
     summary = summarize_groups(experiment_records)
 
     write_json(output_dir / "all_results.json", [compact_record(item) for item in all_records])
@@ -440,6 +544,7 @@ def collect(input_dir: Path, output_dir: Path) -> dict[str, Any]:
         "output_dir": str(output_dir),
         "experiment_records": len(experiment_records),
         "neighborhood_records": len(neighborhood_records),
+        "profile_records": len(profile_records),
         "error_records": len(error_records),
         "deduplicated_sources": len(duplicates),
         "unreadable_files": len(unreadable),

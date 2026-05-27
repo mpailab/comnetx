@@ -43,8 +43,9 @@ Iterative rule:
 
 Important constraint: `999:10` is only a compatibility/smoke-like screen for
 many backends. The main dynamic evidence must come from broader batch sweeps,
-long-horizon runs, seed/split variance, workload analysis, DSBM stress tests,
-and native-temporal LAGO comparisons.
+long-horizon runs, seed/split variance, workload analysis, and DSBM stress
+tests. Continuous-time temporal methods such as LAGO are related work only in
+the current submission scope.
 
 Ten-day writing constraint:
 
@@ -133,9 +134,6 @@ Datasets:
 Methods:
 
 - Core: Leidenalg naive/local, DF-Leiden dynamic/local, S2CAG naive/local, DMoN naive/local if feasible.
-- Native temporal baseline: LAGO dynamic/local, reported separately because it
-  optimizes continuous-time L-modularity rather than the same snapshot
-  modularity objective.
 - Secondary/appendix: FLMIG, PRGPT variants, MAGI, MFC.
 
 Runs:
@@ -143,6 +141,18 @@ Runs:
 - 5 seeds or 5 stream splits.
 - Report mean ± std for Q, NMI, total time.
 - Use paired comparisons Local vs baseline on the same stream.
+
+LAGO scope rule:
+
+- Do not spend the current experimental budget on LAGO comparisons. LAGO solves
+  a related continuous-time link-stream problem, while this paper must stay
+  focused on batched snapshot maintenance.
+- Mention LAGO/Longitudinal Modularity in Related Work to show awareness of
+  the temporal-community line and to clarify that it is complementary rather
+  than a like-for-like baseline.
+- Revisit LAGO only in a future extension with a genuine local-temporal adapter
+  that extracts affected link streams across time. Until then, LAGO should not
+  appear in the main experiment tables.
 
 ### E2. Ablation
 
@@ -155,6 +165,7 @@ Minimum variants:
 - L=1, L=2, L=3, L=4.
 - feature mode: dataset, random, onehot where feasible.
 - aggregation mode: norm vs sum for feature-aware backends.
+- closure/contraction variants: full, no_closure, no_contraction.
 
 Datasets:
 
@@ -172,6 +183,13 @@ Execution split:
 - Use `leidenalg` for the full structural radius/depth grid. It is fast and isolates the topology-only ComNetX mechanism.
 - Use a feature-aware backend only for feature-mode and feature-aggregation ablations. `leidenalg` cannot test these because it ignores node features.
 - Keep GNN ablations light: run them first on `dyn_cora` and `dyn_pubmed`; add `arxivmath` only after the lightweight evidence is stable.
+- Direct closure/no-contraction ablation is important for acceptance because it
+  proves that ComNetX is not merely running the backend on a small induced
+  subgraph. It is now measured through
+  `scripts/paper/profile_smart_workload.py --variants full no_closure no_contraction`.
+  Keep the main-paper table only if the pilot completes on both `dyn_pubmed`
+  and `arxivmath`; otherwise move it to appendix or remove the table before
+  final submission.
 
 ### E3. Locality/workload instrumentation
 
@@ -191,6 +209,8 @@ Needed output:
 - mean/max across updates;
 - percentages relative to full graph;
 - table linking B1, closure, contracted size, and speedup.
+- mechanism figure linking contracted workload fraction to end-to-end speedup
+  for the focused 3 x 2 method--dataset grid.
 
 ### E4. Runtime and memory breakdown
 
@@ -221,7 +241,9 @@ Protocol:
   the paper can separate the effect of initial-history size from the effect of
   update granularity.
 - Track Q, NMI, cumulative time, workload after each update.
-- Add periodic-refresh baseline if local drift is visible: recompute every K in {10, 25, 50}.
+- Add a periodic-refresh baseline only if local drift is visible and there is
+  time to implement it cleanly; otherwise discuss full refresh as the natural
+  fallback regime without adding an unmeasured table row.
 
 ### E6. Update-size/failure-mode stress test
 
@@ -359,18 +381,159 @@ Generated scripts:
   S2CAG sweep.
 - `scripts/paper/cn69/gpu4_feature_ablation_radius_aggregation.sh`: feature
   mode, radius, and aggregation ablation on representative attributed graphs.
-- `scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh`: native temporal
-  LAGO, full-snapshot LAGO, and ComNetX-local LAGO.
+- `scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh`: parked optional
+  LAGO script from the earlier plan. Do not run it for the current main paper
+  evidence chain.
 - `scripts/paper/cn69/gpu6_dsbm_topology_stress.sh`: DSBM random,
   hub-centered, and community-internal stress streams for Leiden and DF-Leiden.
-- `scripts/paper/cn69/gpu7_dsbm_lago_stress.sh`: the same DSBM stress suite
-  for LAGO.
+- `scripts/paper/cn69/gpu7_dsbm_lago_stress.sh`: parked optional LAGO stress
+  script from the earlier plan. Do not run it for the current main paper
+  evidence chain.
 
 After the scripts finish, regenerate the registry:
 
 ```bash
 python3 scripts/paper/collect_results_registry.py
 ```
+
+## 5b. Next short pilot batch: 2026-05-26
+
+After ingesting the reorganized measurements under `results/paper_icdm/1` and
+`results/paper_icdm/2`, the registry contains 2467 experiment records, 536
+neighborhood records, 23 error records, and no unreadable JSON files. The next
+batch must remain a pilot batch: it should close high-value gaps and test
+feasibility before scheduling any week-long final run.
+
+Main registry observations:
+
+- Topology sweeps are now broad enough for real-data batch sensitivity, but
+  additional repeated rows on the larger datasets are useful for stability.
+- `dyn_pubmed` long-horizon topology is covered; `arxivmath` still has missing
+  long-horizon cells caused by GPU sparse-kernel failures. Do not switch the
+  main evidence to CPU; treat these failures as GPU engineering/limitation
+  signals unless a GPU-safe workaround is identified.
+- The article still lacks the strongest scalability evidence: GPU memory,
+  local workload size, contracted backend size, and timing breakdown for
+  auxiliary transformations. This must be measured before the final paper pass.
+- S2CAG is complete on `dyn_cora`, partial on `dyn_acm`, and mostly missing on
+  `dyn_pubmed` for high-history non-`999:10` settings.
+- DMoN is complete for small/medium non-PubMed datasets but missing on
+  `dyn_pubmed`.
+- DSBM evidence is still feasibility-level only and should be expanded because
+  it directly supports the operating-envelope claim. LAGO evidence is no longer
+  part of the main experimental plan; keep existing LAGO rows in the registry
+  but do not use them in the main paper tables.
+
+Generate the pilot package with:
+
+```bash
+python3 scripts/paper/generate_cn69_pilot_20260526.py
+```
+
+Generated locations:
+
+- Configs: `conf/paper_icdm/cn69_pilot_20260526/`.
+- Scripts: `scripts/paper/cn69_pilot_20260526/`.
+- Runbook: `scripts/paper/cn69_pilot_20260526/README.md`.
+
+The active pilot launches are:
+
+- `gpu0_topology_variance_core.sh`: repeat key topology smart/dynamic rows on
+  `dyn_pubmed` and `arxivmath`.
+- `gpu1_workload_memory_profile.sh`: GPU-only profiling of affected vertices,
+  post-closure sets, contracted backend sizes, auxiliary transformation time,
+  backend time, CPU RSS, and CUDA peak memory.
+- `gpu2_s2cag_acm_completion.sh`: finish the most informative missing S2CAG
+  `dyn_acm` high-history rows without rerunning the full sweep.
+- `gpu3_s2cag_pubmed_high_history.sh`: probe whether S2CAG becomes usable on
+  `dyn_pubmed` when the initial history is large.
+- `gpu4_dmon_pubmed_high_history.sh`: the DMoN counterpart for `dyn_pubmed`.
+- `gpu5_dmon_feature_radius_cora.sh`: quick DMoN feature/radius check to see
+  whether S2CAG feature-ablation conclusions generalize.
+- `gpu6_dsbm_topology_micro.sh`: bounded DSBM topology pilot on the smallest
+  update budget and all three update regimes.
+- Parked legacy entry: `gpu7_lago_bridge_micro.sh`. Do not launch it for the
+  current article campaign; use the GPU budget for workload, variance, GNN
+  feasibility, or DSBM topology evidence instead.
+
+Each active script has a default timeout and writes shell logs to `output/`.
+DSBM and profiling scripts write checkpoint-style JSON files under
+`results/paper_icdm/`.
+After these pilots, rebuild `results/registry/` and decide whether to expand
+only the winning directions into final multi-day runs.
+
+## 5c. Mixed pilot/final batch: 2026-05-27
+
+The article now keeps all acceptance-critical placeholders that have a runnable
+measurement path. The direct closure/no-contraction ablation is restored because
+it addresses the likely reviewer question: whether ComNetX is more than a small
+induced-subgraph wrapper. It is measured by the workload profiler with
+`--variants full no_closure no_contraction`.
+
+Top-down article pass on 2026-05-27 fixed the main experimental visual set.
+Do not add more main-paper tables or figures unless the registry reveals a
+reviewer-critical gap that cannot be handled in prose or appendix. The main
+figures are:
+
+- method diagram: already present as `article/method.jpg`;
+- quality--runtime Pareto summary: filled from `results/registry/` after the
+  final registry rebuild, using the broad compatibility screen and focused
+  repeated runs;
+- workload-to-speedup mechanism plot: filled from `gpu1_workload_memory_pilot`
+  and the consolidated registry;
+- long-horizon curves: filled from the topology long-horizon run;
+- DSBM update-size sensitivity: filled from the synthetic stress scripts.
+
+Optional scale-out rows on `arxivcs`, `dyn_ogbn-arxiv`, or `arxivphy` are
+appendix-only backup material. Do not spend the next week on them unless all
+mandatory figures and tables above are already populated.
+
+Generate the batch with:
+
+```bash
+python3 scripts/paper/generate_cn69_pilot_20260527.py
+```
+
+Generated locations:
+
+- Configs: `conf/paper_icdm/cn69_pilot_20260527/`.
+- Scripts: `scripts/paper/cn69_pilot_20260527/`.
+- Runbook: `scripts/paper/cn69_pilot_20260527/README.md`.
+
+This is an eight-launch package, but only the genuinely uncertain runs are
+pilots:
+
+- Pilot `gpu0_closure_contraction_pilot.sh`: short direct
+  closure/contraction ablation on `dyn_pubmed` and `arxivmath`; fills or
+  de-risks `tab:closure-ablation`.
+- Pilot `gpu1_workload_memory_pilot.sh`: focused workload, timing, CPU RSS, and
+  CUDA-memory profiling for the main 3 x 2 focused grid; fills
+  `tab:contracted-workload`, `tab:breakdown`, and
+  `fig:workload-speedup`. It profiles `999:10` plus a bounded prefix of
+  `999:50`, so the mechanism plot is not based only on the short compatibility
+  stream.
+- Pilot `gpu2_dsbm_update_size_pilot.sh`: bounded synthetic update-size check
+  on the smallest two update budgets; de-risks `fig:update-size`.
+- Final `gpu3_topology_variance_final.sh`: repeated topology focused-grid
+  measurements; fills `tab:stability` and contributes to
+  `fig:quality-runtime-pareto`.
+- Final `gpu4_topology_long_horizon_final.sh`: longer real-data topology
+  horizons; fills `fig:long-horizon-curves`.
+- Final `gpu5_s2cag_focused_final.sh`: focused S2CAG baseline/local rows.
+  It contributes to `tab:stability`, `tab:breakdown`, and
+  `fig:quality-runtime-pareto`.
+- Conditional final `gpu6_closure_contraction_final.sh`: run after the gpu0
+  pilot looks healthy; otherwise keep only the pilot result and remove or move
+  the table before final submission.
+- Final `gpu7_dsbm_update_size_final.sh`: larger DSBM update-size sweep with
+  checkpointed JSON output; fills `fig:update-size`.
+
+All launches are container-native background commands documented in the
+runbook. Shell logs go to `output/`; checkpointed profiling/DSBM JSONs go to
+`results/paper_icdm/`; ordinary launcher JSONs go to `results/`.
+Monitor completion from the host with
+`scripts/paper/cn69_pilot_20260527/monitor_cn69_jobs.sh`; use
+`--watch 60 --tail 3` for a live one-minute dashboard with short log tails.
 
 ## 6. Current result registry
 
@@ -405,11 +568,70 @@ starting point for paper tables, while `all_results_with_series.json` is the
 source of truth for detailed curves and reproducibility checks.
 
 Current LAGO status: the codebase and general configs contain the LAGO backend,
-but the consolidated registry currently has zero `lago` result rows. Before
-claiming anything about LAGO in the paper, run
-`scripts/paper/cn69/gpu5_lago_temporal_batch_sweep.sh` and
-`scripts/paper/cn69/gpu7_dsbm_lago_stress.sh`, then regenerate
-`results/registry/`.
+and the consolidated registry has pilot `lago` rows from
+`results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json`. These rows
+are preserved in the registry for traceability but are not part of the current
+submission story. The article should cite LAGO only in Related Work as a
+continuous-time temporal-community method that is complementary to ComNetX's
+batched snapshot maintenance setting.
+
+## 6a. Table and baseline selection policy
+
+When updating the article, keep the tables aligned with the paper's evidence
+chain rather than filling rows opportunistically:
+
+- Breadth screen: `tab:main-results` and Appendix A use all six real datasets
+  and every implemented baseline with comparable output. This is the only place
+  where FLMIG, PRGPT, MAGI, DMoN, and MFC need to appear by default unless a
+  focused reviewer claim requires a complete additional matrix.
+- Focused real-data tables: use the complete 3 x 2 grid
+  `{Leidenalg, DF-Leiden, S2CAG} x {dyn_pubmed, arxivmath}` whenever the table
+  is about direct method comparison, statistical robustness, contracted
+  workload, or runtime/memory breakdown. Avoid singleton rows even when a
+  single row is technically interesting; move such evidence to prose,
+  appendix, or a dedicated table.
+- Topology/locality claim: Leidenalg on `dyn_pubmed` and `arxivmath` tests the
+  strongest topology-only full-recomputation baseline in medium/large regimes
+  where local contraction should matter.
+- Native dynamic claim: DF-Leiden on the same two datasets tests where native
+  dynamic topology methods are already fast (`dyn_pubmed`) and where local
+  restriction becomes valuable (`arxivmath`).
+- Feature-aware/GPU claim: S2CAG on the same two datasets connects locality,
+  memory pressure, and GPU execution.
+- DMoN/MAGI/MFC large-graph rows should be used for feasibility, memory, or
+  OOM-avoidance discussion only after a complete table-specific comparison is
+  available; do not insert them as lone focused-table rows.
+- DSBM streams belong only to the operating-envelope/failure-mode block. Do not
+  mix synthetic DSBM rows into real-data quality tables.
+- LAGO remains Related Work only unless we build a genuine continuous-time
+  local adapter and a like-for-like temporal-community evaluation.
+
+Placeholder rule for the draft:
+
+- Keep TBD placeholders only for measurements that already have a runnable
+  path in the repository: workload/profile columns, runtime/memory breakdown,
+  closure/contraction variants, quality--runtime Pareto, workload-to-speedup
+  mechanism plot, long-horizon curves, and DSBM update-size sensitivity.
+- Remove incomplete main-paper tables that require new algorithmic variants or
+  a new evaluation protocol unless we explicitly schedule and implement those
+  measurements.
+
+Frozen main-paper evidence package after the 2026-05-27 pass:
+
+- `tab:main-results` plus `fig:quality-runtime-pareto`: breadth and
+  quality--runtime frontier.
+- `tab:stability`: repeated focused-grid robustness.
+- `tab:workload`, `tab:contracted-workload`, `fig:workload-speedup`, and
+  `tab:breakdown`: mechanism, contracted workload, runtime decomposition, and
+  memory.
+- `tab:ablation`, `tab:feature-ablation`, and `tab:closure-ablation`: component
+  necessity.
+- `tab:long-horizon` plus `fig:long-horizon-curves`: drift and cumulative
+  runtime under longer streams.
+- `tab:dsbm` plus `fig:update-size`: operating envelope and failure modes.
+
+This set is sufficient for the planned ICDM story. Further additions should go
+to appendix unless they replace a weak mandatory artifact.
 
 ## 7. Iterative workflow
 
@@ -467,10 +689,16 @@ The article is ready for serious ICDM submission only when:
 
 - no result in abstract/introduction/conclusion depends on a single run;
 - main table has mean ± std or is explicitly marked as current single-run preliminary;
+- quality--runtime Pareto figure shows the frontier across supported backends
+  and datasets;
 - Table 6 has radius-neighborhood and contracted-workload evidence;
-- ablation answers why hierarchy and closure matter;
+- ablation answers why radius, hierarchy depth, feature handling, closure, and
+  contraction matter;
+- workload/profile evidence quantifies post-closure and contracted instance sizes;
+- workload-to-speedup figure links the measured contraction mechanism to
+  observed runtime gains;
 - feature-mode ablation separates locality from random-feature effects;
-- long-horizon plot shows no hidden drift or explains refresh fallback;
+- long-horizon plot shows no hidden drift across the measured streams;
 - memory table supports OOM/scalability claims;
 - all related-work claims have checked references;
 - no TODO/TBD remains in the main paper.
