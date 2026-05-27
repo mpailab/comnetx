@@ -47,6 +47,13 @@ eight are launched:
   DF-Leiden with radius 2 on `arxivmath`.
 - `extra20_dmon_closure_contraction_pubmed.sh`: short direct
   closure/contraction ablation for DMoN random features on `dyn_pubmed`.
+- `extra21_leiden_closure_contraction_arxivmath_long.sh`: longer direct
+  closure/contraction ablation for Leiden on `arxivmath`, using `99:100`.
+- `extra22_dfleiden_closure_contraction_arxivmath_long.sh`: longer direct
+  closure/contraction ablation for DF-Leiden on `arxivmath`, using `99:100`.
+- `extra23_s2cag_closure_contraction_arxivmath_long.sh`: longer direct
+  closure/contraction ablation for S2CAG random features on `arxivmath`, using
+  `9:500`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -95,6 +102,19 @@ docker exec -d <free_container_5> bash -lc 'cd /home/dev/users/bokov/comnetx && 
 docker exec -d <free_container_6> bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra20_dmon_closure_contraction_pubmed.sh'
 ```
 
+Run the three longer follow-up scripts on freed containers. They use a 9h
+timeout and checkpoint after every completed update/profile, so SIGTERM keeps
+the latest completed partial results:
+
+```bash
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra21_leiden_closure_contraction_arxivmath_long.sh'
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra22_dfleiden_closure_contraction_arxivmath_long.sh'
+docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra23_s2cag_closure_contraction_arxivmath_long.sh'
+```
+
+These long scripts intentionally avoid the earlier `999:50` closure/profile
+combinations: topology runs use `99:100`, and the S2CAG run uses `9:500`.
+
 After jobs finish or time out, rebuild the registry:
 
 ```bash
@@ -123,6 +143,8 @@ done
 
 If a process ignores SIGTERM, repeat with
 `pkill -KILL -f '[c]n69_after3_20260527|[a]fter3_'`.
+Use SIGTERM first for checkpointed long jobs; SIGKILL cannot write a final
+checkpoint, but the previous completed-update checkpoint remains on disk.
 
 All shell logs go to `output/`. Standard launcher results go to `results/`;
 profile JSON files go to `results/paper_icdm/`.

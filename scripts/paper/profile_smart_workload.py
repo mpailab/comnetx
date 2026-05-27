@@ -21,11 +21,12 @@ import argparse
 import json
 import os
 import resource
+import signal
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 PROJECT_PATH = Path(__file__).resolve().parents[2]
@@ -337,7 +338,15 @@ def load_dataset(
     return ds
 
 
-def profile_run(args, dataset: str, batch_strategy: str, method: str, feature_mode: str, variant: str) -> dict[str, Any]:
+def profile_run(
+    args,
+    dataset: str,
+    batch_strategy: str,
+    method: str,
+    feature_mode: str,
+    variant: str,
+    checkpoint: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     baseline_iter = args.baseline_iter if args.baseline_iter is not None else ITER_DEFAULTS.get(method)
     ds = load_dataset(
         dataset,
@@ -364,6 +373,59 @@ def profile_run(args, dataset: str, batch_strategy: str, method: str, feature_mo
     rows = []
     opt = None
     device_name = "unknown"
+    profile = {
+        "algorithm": alg,
+        "variant": variant,
+        "method": method,
+        "mode": "smart",
+        "dataset": ds.name,
+        "base_dataset": dataset,
+        "batch_strategy": str(batch_strategy),
+        "feature_mode": feature_mode if method in FEATURE_METHODS else None,
+        "baseline_iter": baseline_iter,
+        "smart_depth": args.smart_depth,
+        "smart_radius": args.smart_radius,
+        "aggregation_mode": args.aggregation_mode,
+        "device": device_name,
+        "use_gpu": use_gpu,
+        "updates_profiled": 0,
+        "total_profiled_time": 0.0,
+        "peak_cuda_allocated_mb": None,
+        "peak_rss_mb": None,
+        "metrics": {},
+        "rows": rows,
+        "incomplete": True,
+        "updated_at": datetime.now().isoformat(),
+    }
+
+    def refresh_profile(metrics: dict[str, Any] | None = None, completed: bool = False) -> dict[str, Any]:
+        peak_cuda = max(
+            [row.get("cuda_peak_allocated_mb") for row in rows if row.get("cuda_peak_allocated_mb") is not None],
+            default=None,
+        )
+        peak_rss = max([float(row.get("rss_max_mb", 0.0)) for row in rows], default=None)
+        profile.update(
+            {
+                "device": device_name,
+                "updates_profiled": len(rows),
+                "total_profiled_time": sum(
+                    float(row.get("total_profiled_time", 0.0))
+                    + float(row.get("update_time", 0.0))
+                    for row in rows
+                ),
+                "peak_cuda_allocated_mb": peak_cuda,
+                "peak_rss_mb": peak_rss,
+                "incomplete": not completed,
+                "updated_at": datetime.now().isoformat(),
+            }
+        )
+        if metrics is not None:
+            profile["metrics"] = metrics
+        return profile
+
+    if checkpoint is not None:
+        checkpoint(refresh_profile())
+
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
@@ -423,6 +485,8 @@ def profile_run(args, dataset: str, batch_strategy: str, method: str, feature_mo
         row["batch_idx"] = batch_idx
         row["update_time"] = update_time
         rows.append(row)
+        if checkpoint is not None:
+            checkpoint(refresh_profile())
 
     full_adj = _compute_full_adj(ds.adj)
     final_partition = opt.coms[0].detach().cpu()
@@ -432,40 +496,14 @@ def profile_run(args, dataset: str, batch_strategy: str, method: str, feature_mo
         metrics.update(calculate_ground_truth_metrics(ds.label, final_partition))
         metrics["Labels modularity"] = Metrics.modularity(full_adj, ds.label, directed=ds.is_directed)
 
-    total_profiled_time = sum(float(row.get("total_profiled_time", 0.0)) + float(row.get("update_time", 0.0)) for row in rows)
-    peak_cuda = max(
-        [row.get("cuda_peak_allocated_mb") for row in rows if row.get("cuda_peak_allocated_mb") is not None],
-        default=None,
-    )
-    peak_rss = max([float(row.get("rss_max_mb", 0.0)) for row in rows], default=None)
-
-    return {
-        "algorithm": alg,
-        "variant": variant,
-        "method": method,
-        "mode": "smart",
-        "dataset": ds.name,
-        "base_dataset": dataset,
-        "batch_strategy": str(batch_strategy),
-        "feature_mode": feature_mode if method in FEATURE_METHODS else None,
-        "baseline_iter": baseline_iter,
-        "smart_depth": args.smart_depth,
-        "smart_radius": args.smart_radius,
-        "aggregation_mode": args.aggregation_mode,
-        "device": device_name,
-        "use_gpu": use_gpu,
-        "updates_profiled": len(rows),
-        "total_profiled_time": total_profiled_time,
-        "peak_cuda_allocated_mb": peak_cuda,
-        "peak_rss_mb": peak_rss,
-        "metrics": metrics,
-        "rows": rows,
-    }
+    return refresh_profile(metrics, completed=True)
 
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def main() -> None:
@@ -503,6 +541,46 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     errors = []
     profiles = []
+    active_profile = None
+    interrupted_by_signal = None
+    output_path = output_dir / f"{output_name}.json"
+
+    def payload(status: str) -> dict[str, Any]:
+        current_profiles = list(profiles)
+        if active_profile is not None:
+            current_profiles.append(active_profile)
+        result = {
+            "generated_at": datetime.now().isoformat(),
+            "profile_schema": "comnetx_smart_workload_v1",
+            "status": status,
+            "checkpointed": True,
+            "parameters": vars(args),
+            "profiles": current_profiles,
+            "errors": errors,
+        }
+        if interrupted_by_signal is not None:
+            result["interrupted_by_signal"] = interrupted_by_signal
+        return result
+
+    def checkpoint(status: str = "running") -> None:
+        write_json(output_path, payload(status))
+        if errors:
+            write_json(output_dir / f"errors_{output_name}.json", errors)
+
+    def profile_checkpoint(profile: dict[str, Any]) -> None:
+        nonlocal active_profile
+        active_profile = profile
+        checkpoint("running")
+
+    def handle_signal(signum: int, _frame: Any) -> None:
+        nonlocal interrupted_by_signal
+        interrupted_by_signal = signal.Signals(signum).name
+        checkpoint("interrupted")
+        raise SystemExit(f"Interrupted by {interrupted_by_signal}; checkpoint was written to {output_path}.")
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    checkpoint("started")
 
     for dataset in args.datasets:
         for batch_strategy in args.batches:
@@ -511,8 +589,21 @@ def main() -> None:
                 for feature_mode in feature_modes:
                     for variant in args.variants:
                         try:
-                            profile = profile_run(args, dataset, batch_strategy, method, feature_mode, variant)
+                            profile = profile_run(
+                                args,
+                                dataset,
+                                batch_strategy,
+                                method,
+                                feature_mode,
+                                variant,
+                                checkpoint=profile_checkpoint,
+                            )
                         except Exception as exc:
+                            if active_profile is not None and active_profile.get("rows"):
+                                active_profile["failed"] = True
+                                active_profile["error"] = str(exc)
+                                profiles.append(active_profile)
+                                active_profile = None
                             if not args.catch_errors:
                                 raise
                             errors.append(
@@ -526,28 +617,14 @@ def main() -> None:
                                 }
                             )
                             print(f"Error on {dataset} {batch_strategy} {method} {feature_mode} {variant}: {exc}")
+                            checkpoint("running")
                             continue
+                        active_profile = None
                         profiles.append(profile)
-                        payload = {
-                            "generated_at": datetime.now().isoformat(),
-                            "profile_schema": "comnetx_smart_workload_v1",
-                            "parameters": vars(args),
-                            "profiles": profiles,
-                            "errors": errors,
-                        }
-                        write_json(output_dir / f"{output_name}.json", payload)
+                        checkpoint("running")
 
-    payload = {
-        "generated_at": datetime.now().isoformat(),
-        "profile_schema": "comnetx_smart_workload_v1",
-        "parameters": vars(args),
-        "profiles": profiles,
-        "errors": errors,
-    }
-    write_json(output_dir / f"{output_name}.json", payload)
-    if errors:
-        write_json(output_dir / f"errors_{output_name}.json", errors)
-    print(json.dumps({"output": str(output_dir / f"{output_name}.json"), "profiles": len(profiles), "errors": len(errors)}, indent=2))
+    checkpoint("completed")
+    print(json.dumps({"output": str(output_path), "profiles": len(profiles), "errors": len(errors)}, indent=2))
 
 
 if __name__ == "__main__":
