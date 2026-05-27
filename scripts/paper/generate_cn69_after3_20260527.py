@@ -2,9 +2,11 @@
 
 This package assumes that ``results/paper_icdm/3`` has already been ingested.
 It avoids rerunning the completed cn69 topology, DSBM, LAGO, S2CAG dataset, and
-feature-ablation sweeps. The eight scripts target the remaining paper gaps:
-workload/profile evidence, direct closure/contraction ablation, and repeated
-GNN random-feature runs.
+feature-ablation sweeps. The core eight scripts target the remaining paper
+gaps: workload/profile evidence, direct closure/contraction ablation, and
+repeated GNN random-feature runs. The two extra follow-up scripts add
+DF-Leiden and S2CAG closure/contraction checks without repeating the core
+batch.
 """
 
 from __future__ import annotations
@@ -114,7 +116,7 @@ exit "$FAILED"
 
 def profile_script(
     *,
-    gpu: int,
+    gpu: int | str,
     title: str,
     name: str,
     datasets: list[str],
@@ -128,6 +130,7 @@ def profile_script(
     max_updates: int,
     timeout: str,
 ) -> str:
+    log_prefix = f"gpu{gpu}" if isinstance(gpu, int) else str(gpu)
     feature_args = ""
     if feature_modes:
         feature_args = f" \\\n  --feature-modes {' '.join(feature_modes)}"
@@ -154,7 +157,7 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
 mkdir -p results/paper_icdm
 
-log="$LOG_DIR/gpu{gpu}_{name}_${{STAMP}}.log"
+log="$LOG_DIR/{log_prefix}_{name}_${{STAMP}}.log"
 echo "[{title}] $(date -Is) running workload/profile job with timeout=$TIMEOUT on CUDA_VISIBLE_DEVICES=${{CUDA_VISIBLE_DEVICES:-container-bound}}"
 timeout --kill-after=2m "$TIMEOUT" python scripts/paper/profile_smart_workload.py \\
   --datasets {' '.join(datasets)} \\
@@ -282,6 +285,36 @@ def build_scripts() -> dict[str, str]:
             max_updates=50,
             timeout="24h",
         ),
+        "extra8_dfleiden_closure_contraction.sh": profile_script(
+            gpu="extra8",
+            title="DF-Leiden closure/contraction",
+            name="after3_dfleiden_closure_contraction_extra8",
+            datasets=FOCUSED_DATASETS,
+            batches=["999:50"],
+            methods=["dfleiden"],
+            variants=["full", "no_closure", "no_contraction"],
+            feature_modes=None,
+            aggregation_mode="sum",
+            baseline_iter=None,
+            random_seed=None,
+            max_updates=50,
+            timeout="24h",
+        ),
+        "extra9_s2cag_closure_contraction.sh": profile_script(
+            gpu="extra9",
+            title="S2CAG closure/contraction",
+            name="after3_s2cag_closure_contraction_extra9",
+            datasets=FOCUSED_DATASETS,
+            batches=["999:50"],
+            methods=["s2cag"],
+            variants=["full", "no_closure", "no_contraction"],
+            feature_modes=["random"],
+            aggregation_mode="norm",
+            baseline_iter=10,
+            random_seed=42,
+            max_updates=10,
+            timeout="24h",
+        ),
     }
 
 
@@ -291,7 +324,7 @@ This package is prepared after ingesting `results/paper_icdm/3` into
 `results/registry/`. It avoids the already completed topology, DSBM, LAGO,
 S2CAG dataset-feature, and S2CAG feature-ablation cn69 sweeps.
 
-The eight GPU scripts target the remaining paper measurements:
+The core eight GPU scripts target the remaining paper measurements:
 
 - `gpu0_closure_contraction_pubmed.sh`: direct closure/contraction ablation for
   `dyn_pubmed`.
@@ -304,6 +337,14 @@ The eight GPU scripts target the remaining paper measurements:
 - `gpu6_dmon_random_seeds_3_5.sh`: DMoN smart random-feature seeds 3-5.
 - `gpu7_closure_contraction_arxivmath.sh`: direct closure/contraction ablation
   for `arxivmath`.
+
+Two optional follow-up scripts add non-duplicate ablation evidence after the
+core eight are launched:
+
+- `extra8_dfleiden_closure_contraction.sh`: direct closure/contraction ablation
+  for DF-Leiden on `dyn_pubmed` and `arxivmath`.
+- `extra9_s2cag_closure_contraction.sh`: direct closure/contraction ablation
+  for S2CAG random features on `dyn_pubmed` and `arxivmath`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -318,11 +359,41 @@ docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scri
 docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/gpu7_closure_contraction_arxivmath.sh'
 ```
 
+Run the two follow-up scripts on any freed GPU-bound containers, for example:
+
+```bash
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra8_dfleiden_closure_contraction.sh'
+docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra9_s2cag_closure_contraction.sh'
+```
+
 After jobs finish or time out, rebuild the registry:
 
 ```bash
 python3 scripts/paper/collect_results_registry.py
 ```
+
+Check whether the after-3 jobs are still running:
+
+```bash
+for c in dev_bokov dev_uporova dev_konovalov dev_egorov dev_egorov2 dev_drobyshev dev_drobyshev2 dev_drobyshev3; do
+  echo "== $c =="
+  docker exec "$c" bash -lc "pgrep -af '[c]n69_after3_20260527|[a]fter3_|[p]rofile_smart_workload.py|[s]cripts/launch.py' || true"
+done
+```
+
+If this only prints container headers and no PID lines, the after-3 jobs are no
+longer running.
+
+Stop the after-3 jobs without stopping the containers:
+
+```bash
+for c in dev_bokov dev_uporova dev_konovalov dev_egorov dev_egorov2 dev_drobyshev dev_drobyshev2 dev_drobyshev3; do
+  docker exec "$c" bash -lc "pkill -TERM -f '[c]n69_after3_20260527|[a]fter3_' || true"
+done
+```
+
+If a process ignores SIGTERM, repeat with
+`pkill -KILL -f '[c]n69_after3_20260527|[a]fter3_'`.
 
 All shell logs go to `output/`. Standard launcher results go to `results/`;
 profile JSON files go to `results/paper_icdm/`.

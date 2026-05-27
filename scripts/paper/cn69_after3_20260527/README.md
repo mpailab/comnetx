@@ -4,7 +4,7 @@ This package is prepared after ingesting `results/paper_icdm/3` into
 `results/registry/`. It avoids the already completed topology, DSBM, LAGO,
 S2CAG dataset-feature, and S2CAG feature-ablation cn69 sweeps.
 
-The eight GPU scripts target the remaining paper measurements:
+The core eight GPU scripts target the remaining paper measurements:
 
 - `gpu0_closure_contraction_pubmed.sh`: direct closure/contraction ablation for
   `dyn_pubmed`.
@@ -17,6 +17,14 @@ The eight GPU scripts target the remaining paper measurements:
 - `gpu6_dmon_random_seeds_3_5.sh`: DMoN smart random-feature seeds 3-5.
 - `gpu7_closure_contraction_arxivmath.sh`: direct closure/contraction ablation
   for `arxivmath`.
+
+Two optional follow-up scripts add non-duplicate ablation evidence after the
+core eight are launched:
+
+- `extra8_dfleiden_closure_contraction.sh`: direct closure/contraction ablation
+  for DF-Leiden on `dyn_pubmed` and `arxivmath`.
+- `extra9_s2cag_closure_contraction.sh`: direct closure/contraction ablation
+  for S2CAG random features on `dyn_pubmed` and `arxivmath`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -31,13 +39,20 @@ docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scri
 docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/gpu7_closure_contraction_arxivmath.sh'
 ```
 
+Run the two follow-up scripts on any freed GPU-bound containers, for example:
+
+```bash
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra8_dfleiden_closure_contraction.sh'
+docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra9_s2cag_closure_contraction.sh'
+```
+
 After jobs finish or time out, rebuild the registry:
 
 ```bash
 python3 scripts/paper/collect_results_registry.py
 ```
 
-Check whether the eight jobs are still running:
+Check whether the after-3 jobs are still running:
 
 ```bash
 for c in dev_bokov dev_uporova dev_konovalov dev_egorov dev_egorov2 dev_drobyshev dev_drobyshev2 dev_drobyshev3; do

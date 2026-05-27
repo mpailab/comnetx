@@ -549,11 +549,12 @@ Generated locations:
 - Scripts: `scripts/paper/cn69_after3_20260527/`.
 - Runbook: `scripts/paper/cn69_after3_20260527/README.md`.
 
-The after-3 package spends the eight GPU slots on workload/profile evidence,
-direct closure/contraction ablation, and S2CAG/DMoN random-seed high-history
-rows. It deliberately avoids repeating the topology, DSBM, LAGO, S2CAG
-dataset-feature, and feature-ablation sweeps already represented in the
-registry.
+The after-3 package spends the core eight GPU slots on workload/profile
+evidence, direct closure/contraction ablation, and S2CAG/DMoN random-seed
+high-history rows. Two optional `extra*` scripts add DF-Leiden and S2CAG
+closure/contraction checks after containers free up. The package deliberately
+avoids repeating the topology, DSBM, LAGO, S2CAG dataset-feature, and
+feature-ablation sweeps already represented in the registry.
 
 ## 6. Current result registry
 
