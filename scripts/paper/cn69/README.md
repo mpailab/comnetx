@@ -16,6 +16,12 @@ for the strongest remaining evidence gaps.
 
 The eight scripts are intentionally complementary:
 
+After ingesting `results/paper_icdm/3`, the scripts skip cn69 configs that are
+already represented in `results/registry/`. Use
+`RERUN_COMPLETED_CN69=1 <script>` only when intentionally repeating a completed
+measurement; otherwise schedule the remaining seed/profile scripts or create a
+narrow follow-up config.
+
 - `gpu0_real_topology_batch_sweep.sh`: real-data sensitivity over `9:*`,
   `99:*`, and `999:*` starts with 10/50/100 update batches.
 - `gpu1_real_topology_long_horizon.sh`: 200/500-update long-horizon runs on

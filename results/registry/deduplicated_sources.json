@@ -124,5 +124,2657 @@
     "duplicate_source": "results/paper_icdm/1/main_topology_20260525_1848.json",
     "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|999:10|cn69",
     "series_digest": "0ea1475fd7bf9753821cb0e9f7f552c4ad03fb96"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "c297625b377a12d05b58436adc5421c788d8eac2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "a7ab286901f71a53fbb13b252e96370638a15010"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "34e78bcdc16e6aa91c5241e939507430f71fe1f1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "752c15e5973a9ccf69810314b9e511db90432e4f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "c66e3146f813d04e1917a10a88d45e6e0fe47c41"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "58324d11225c364a34c10b2f40627498e479d8ad"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "9c093ed9932fc6b29af42f3ffff906e9b6ec1c0f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "5fa019c3ec4cf37ba216bdfe60ecc524771c29ce"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "96d1ebb3827ff455ec96155b1803c5eb1b4c6181"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "f9ae9c10040dee6bf26495fa37fcc8051f2a70be"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "1afa2580d3d2d442caa39b0db41d2b817341a3fc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "c70fc31538697dffb81f2db36a156141e070ec7d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "bd8630c65560738afa425f258d186212543d855a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "9487f91bb98a24dbe9a95623fc88c6b04d6c155c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "847e0dbc22fb517bd52c009a749f894137e2bc8e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "ceedbf1980dc9b7bc03867eb97914e939eb09288"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "baba9deb8cb5aa8fa0d88b17fc83549b8e8858dd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "30b373e33e2943a0f7609cd0d962d9fdfe5bbdc9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|patent|True|9:50|cn69",
+    "series_digest": "9566292ae63b1eea9a998e8f95c962348bcdf821"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|patent|True|99:50|cn69",
+    "series_digest": "4e9a7defda87d8107318d2d6a37217ddcc45c6c1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|patent|True|999:50|cn69",
+    "series_digest": "096cfc6cd8cbac7643abbf7c612cfae6a13e6237"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|patent|True|9:100|cn69",
+    "series_digest": "6bc79e18c30bf303a55a8567f021df71f315f4b7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|patent|True|99:100|cn69",
+    "series_digest": "a4d8e3ec9bc2fe32b1d84f5a88f678ba248cf843"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-naive-feat:dataset|dmon|naive|10|None|None|None|None|dataset|None|None|patent|True|999:100|cn69",
+    "series_digest": "4a2e8b29300586a19972b946441e068523d6a4fb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "33af98e8d3462a835a12b86fa188c5b6942895d7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "03c648e01a6cdf3e13eee7ce521feed98c6f46f1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "3ae4c7364f1ebdd932cb8d5af68e4dc600432007"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "e6dbe1803d1e77e09dcae3b78c1f85409ecc3eea"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "1f7a4bf0ec35d06dcad0a0fd656cd80b02a63914"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "35f683151a266b61563a0689aa4af465feeae75a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "8bf7b82c1dc89340b562806937b6706db548a851"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "6720c00ccd7f5f3fc5c58fe5517ec25c8ba444ca"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "50b991e9e34b209074412fb5dbc1fddf008ba304"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "e4e927135d3372ed8411abe16674bd22f3350a0c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "2c0a4682dc5bed63e5382c57c28e8edd6c09811b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "f5932f6d7297ee2073df0ea02dcd990176deb5b6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "f1324f17736e4848055245608bf6b8876be98e66"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "5ca75c479e7ae53ec20f6cf50eb2f8a82e8407be"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "fcc1e95a3ce4698d8cf8f5cf19c5714c852186d3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "375af5a5bb3f3fb09ac4cb2bd21ef560308c8616"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "2e13746dc53715a184b9d998b4317d1a3c8b8445"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "806ecefaa3a9bd0e1fe98f6d015a5b2f12f7029f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|patent|True|9:50|cn69",
+    "series_digest": "8e771ae2cdf7a53db2c1a8262a09404725f9843a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|patent|True|99:50|cn69",
+    "series_digest": "ec77c58a9a18641ccd00d57d984fc74e9567cd02"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|patent|True|999:50|cn69",
+    "series_digest": "169fee35069a2968547f490d3e2448d2693dbac0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|patent|True|9:100|cn69",
+    "series_digest": "e80c231afd20fa5808a1f6a11847628b748299f1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|patent|True|99:100|cn69",
+    "series_digest": "d81b8232a02700d93b7f7c39e3d6edc6f81c08bb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dmon_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/dmon_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dmon-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|dmon|smart|10|3|1|norm|gpu|dataset|None|None|patent|True|999:100|cn69",
+    "series_digest": "cef90d15be169e024078885f71454a3a05025b9f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dsbm_topology_stress_gpu6_20260526_135230.json",
+    "duplicate_source": "results/paper_icdm/3/dsbm_topology_stress_gpu6_20260526_135230.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dsbm-community-1024-58-mc1450-42|False|0:99|cn69",
+    "series_digest": "697db34401dfb56945190fdb423184871acd8cc8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/dsbm_topology_stress_gpu6_20260526_135230.json",
+    "duplicate_source": "results/paper_icdm/3/dsbm_topology_stress_gpu6_20260526_135230.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dsbm-community-1024-58-mc1450-42|False|0:99|cn69",
+    "series_digest": "11ac554049b87e98e05dde7ba3f70ab03272946d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "0663a6cbf634fed54357148ce0cb95efa9e00ec4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "2ca07555737f6bcd17f9d18178aaba2ee0f1aac6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "6647e566b7c7d8ab9518a14138f3e57c9fbe1cb2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|0|norm|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "d5850a8fcd64cbbf708f9b5cd1d3c4e234489ed2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|0|norm|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "e0879e5706b07cf55897440f862f6b948f462aba"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|0|norm|gpu|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "6183fc750c6d80bc7981688caf924329ef8036d7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|0|sum|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "fb434decd39b93ba282cf33d05f799c4a85926e2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|0|sum|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "a15d86bff1357d91d0fd08e7918cfef942cfd24f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|0|sum|gpu|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "2e331883fa06a37dd5107e821f457d15665a8264"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "c70b9703c4162358c57def687efe01de8084f2ca"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "31587cade87dac06fdf359916630989dbd58a441"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "9d6d992e990985d824165eb1efd97fbd4b3e65a5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|1|sum|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "539b6f050dd880677f5055607639f7c635391e89"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|1|sum|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "a5798a968f139f23c447c84c2b2b1dc991c1bfb0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|1|sum|gpu|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "386ab22e7f063e99619f3fcf4b776b24bdb28ac6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|2|norm|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "9dc59b22d8c3e404dd48b7885d734465ed7a0dd1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|2|norm|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "0d95da4b479f3bd123e27cd4ecd79e4c03cf15f9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|2|norm|gpu|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "d2f9ece09722e621e26a58eb7a99ee7a1a30872f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|2|sum|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "6139d05d46372fc5fa4e814f4223dd5d809708d2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|2|sum|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "bbdf6590a96c27c1a9b4324f91dc2003e033c1d6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:dataset|s2cag|smart|10|3|2|sum|gpu|dataset|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "840221bf93f4e61c6b05ca0146f55d1497872489"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:random|s2cag|naive|10|None|None|None|None|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "926c5147ebeb91eb64aa4acffdcb18623f33b337"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:random|s2cag|naive|10|None|None|None|None|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "cefba1e95b2fba164e563a1ac1edcad5b89f431f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:random|s2cag|naive|10|None|None|None|None|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "e0e3503b0e5c79ddee4faf618166cab2dc71056d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:random|s2cag|smart|10|3|0|norm|gpu|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "b8ab09ce255790831cf3f402009dae0ff5eda732"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:random|s2cag|smart|10|3|0|norm|gpu|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "20f1297f2170092e1a9704644bf9b5e4433ed121"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:random|s2cag|smart|10|3|0|norm|gpu|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "ae3381e404acb196ca89e44392d86bb99f588c5b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:random|s2cag|smart|10|3|0|sum|gpu|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "b3f7dfcb03e5c9168a2faeed82e588cbe27b387f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:random|s2cag|smart|10|3|0|sum|gpu|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "7adbf143acf93a4dc0dd228334048e44c4483703"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:random|s2cag|smart|10|3|0|sum|gpu|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "1334870442e745c43a718a1805827941c7bdd9c3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:random|s2cag|smart|10|3|1|norm|gpu|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "28cedefe447d66b542fdaf3ce8a57ad32feacd99"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:random|s2cag|smart|10|3|1|norm|gpu|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "f2b3e5a3714b93440d9976a18f1b97c15a3e8f8f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:random|s2cag|smart|10|3|1|norm|gpu|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "5c2562a52191d33d13477ab42307f7e6eb290825"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:random|s2cag|smart|10|3|1|sum|gpu|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "15407a0f0a4873dd34a5884bba064536e03f66d9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:random|s2cag|smart|10|3|1|sum|gpu|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "11c6621f871890c89f0dfbd7e94e73a4176984dc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:random|s2cag|smart|10|3|1|sum|gpu|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "bddec206856eda413c6872efa46fb0ddacf988d5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:random|s2cag|smart|10|3|2|norm|gpu|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "d57b956247ad1a744eae0d329fe950f4f234926b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:random|s2cag|smart|10|3|2|norm|gpu|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "8980096718da0b62afbc4ccb2450c376e6a84095"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:random|s2cag|smart|10|3|2|norm|gpu|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "f88311ee99461aad7751ba0d25daef124eca460f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:random|s2cag|smart|10|3|2|sum|gpu|random|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "9b9c4edcc8e6a34fa1ae0364a7b472e6da0e2d8a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:random|s2cag|smart|10|3|2|sum|gpu|random|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "092a96c480a1f7efeb10d0ee251d510bc47fb431"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:random|s2cag|smart|10|3|2|sum|gpu|random|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "4273db3929ab8b0c6ecd09422ef616c267d79358"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:onehot|s2cag|naive|10|None|None|None|None|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "9a603c3feebe5f9844c908363a9c8dc0b8722109"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:onehot|s2cag|naive|10|None|None|None|None|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "3b86e22dae922f3692f05fb9b0adcdd58f93abe4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:onehot|s2cag|smart|10|3|0|norm|gpu|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "aaa76181d4bd22c77ff1b70602bc1ed25adc1727"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:norm-gpu-feat:onehot|s2cag|smart|10|3|0|norm|gpu|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "c7fcaa676880ba0e2e83eaa98cc3097478f86ef1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:onehot|s2cag|smart|10|3|0|sum|gpu|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "4c5c35c3146cd6a7ccd8a4d8e70a617fdf1a157c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:0-agg:sum-gpu-feat:onehot|s2cag|smart|10|3|0|sum|gpu|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "f88d262f6ce885aeced032bc342a8f20ea4d1cd1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:onehot|s2cag|smart|10|3|1|norm|gpu|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "02a5fd0680132cffd24d2d366b7a64251c6887c6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:onehot|s2cag|smart|10|3|1|norm|gpu|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "ca6429f18132a625ffa3f65596dce2284869eaf0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:onehot|s2cag|smart|10|3|1|sum|gpu|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "e5e027d953084aeb989ac0381a3b4fc6e5ffe294"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:onehot|s2cag|smart|10|3|1|sum|gpu|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "af3b560542cf7acd2850d0fc7f57232e304d8016"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:onehot|s2cag|smart|10|3|2|norm|gpu|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "6c3f288a2d35155b3431d39f95de8c3c495c4513"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:onehot|s2cag|smart|10|3|2|norm|gpu|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "90acb37337a6e5ef2ee4c2f46a46842e9d0ca871"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot|s2cag|smart|10|3|2|sum|gpu|onehot|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "b795f793cf4560d647b83e198ad4f4e19b215efb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/feature_ablation_radius_aggregation_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/feature_ablation_radius_aggregation_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot|s2cag|smart|10|3|2|sum|gpu|onehot|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "439028f612b5425903988a5c66c4d53968841563"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-dynamic|lago|dynamic|1|None|None|None|None|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "21c6bf36fca0c9e626ecdbf38c0c1b2c1b3125d0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-dynamic|lago|dynamic|1|None|None|None|None|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "71d778e169d2cc0b6d64c89cd1b87710ff7c0fcf"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-dynamic|lago|dynamic|1|None|None|None|None|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "2c3c52db1bff24360e3b13a20d40bfdb2e83fc56"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-dynamic|lago|dynamic|1|None|None|None|None|None|None|None|dyn_acm|False|9:10|cn69",
+    "series_digest": "1ad405df0ce35d2d3d69413218c00346e778aea2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-naive|lago|naive|1|None|None|None|None|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "a49822fc0c8175f76c8b3647dcce95de396d82ba"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-naive|lago|naive|1|None|None|None|None|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "b6310d16e709decdf09b18a77769c36fc887c31f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-naive|lago|naive|1|None|None|None|None|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "9ad05e9685bf5989839d52c5d0bce5f0b6a4ee1b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-L:3-r:1-cpu|lago|smart|1|3|1|None|cpu|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "7ea3099e39fe26aca2b8188a65ae57c0c9d40280"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-L:3-r:1-cpu|lago|smart|1|3|1|None|cpu|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "ab060d7cf3ca5fbdc8b471eae8e4442af8f52dfe"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/lago_temporal_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|lago-i:1-L:3-r:1-cpu|lago|smart|1|3|1|None|cpu|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "e088da4c0f1c04e39319ebc8c99faeeede939743"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "80559b400faa23c9e409d0aa3c5ca010a75fd92f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "367c479ea7f19c152f95771e54505bdff36deed0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "d1cef1b692503d42e65902ea9c3347208267e6b7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|99:10|cn69",
+    "series_digest": "7d0d57a563a6195ee603dfc6ec0481cc5b2ba5bc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "0f44d051159835b214d32666237a5dba46fdaa57"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "cf82b9c0363f640615012486055e6d5bc55fa3a3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|999:10|cn69",
+    "series_digest": "011fdf92e8ef1ddc09982ebe59cc44e47aeed21a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "46ea19ee16bd3f6fedc4b39ebbe96fd3fba88c9c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "71350846ca1c2d2b5a6eacf7db69ca74a0097e78"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|9:10|cn69",
+    "series_digest": "3d77ccd0be63cbdc881e3ecb5a60ed6a4ae9ef9d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "b077c45c02c23d0f69aa2ef94a1ebe2538365de9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "df1c256f699fee04badbef86e0a0792d32421b95"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|99:10|cn69",
+    "series_digest": "0b10849a8641169bef7e42de8f05a8c32ae63247"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "4d3a72093f662247cb7709956906bdfe2f91f4bd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "66f0894a701a123de22ccbce54443c4f0b8b1e6c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|999:10|cn69",
+    "series_digest": "1442a28bd161349f77f2e9fe2334100a0c0c1136"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "cebede866e91797a195f266cf404fbbbde564894"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "effb7bdccacd5c2a62cf69109abb1feb18161686"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:10|cn69",
+    "series_digest": "67f67f729b0429c6de569bc5fddf83a360339cc4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "58b90d6766681eb81caa750b4a82e47e73a69ddd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "c3d9eef0e0e0b9883366b44ae0f3b8234304305d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:10|cn69",
+    "series_digest": "b374530ed171508651917f5272b5accd0e1b779a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "02bc3f55f1943c0ef81293701084bc794357c039"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "0415663c6fa65ad43e91959af167747762379796"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:10|cn69",
+    "series_digest": "27e97ddfd1e17822a17eec087a74ae415fae503c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "33678717d3c772626f878d647005fcb4760e1727"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "595bd9f4c3d517e394e2a73a86cf8c530e0e7192"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|9:10|cn69",
+    "series_digest": "c3dae0ddb4ce728fd00c5bb0baaf8539fa47f2e5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|9:50|cn69",
+    "series_digest": "fb17b5abc608a0905caa0047b2dcabf1b90b2b1d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|9:100|cn69",
+    "series_digest": "c1a3805284555250ab7fdaa6ce671bab3f7b7995"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|99:10|cn69",
+    "series_digest": "cc4e6fc2c8772f193b969171027960bd99bf6296"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|99:50|cn69",
+    "series_digest": "9b170eaf92bb3e3f3f79ccfc3a320041dc92a44a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|99:100|cn69",
+    "series_digest": "f89359c4269d76a6a4cf5b7105e865a54c8915e5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|999:10|cn69",
+    "series_digest": "d3a6caa9889cb8eeba1a9af2fd0ae36478ad1cb9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|999:50|cn69",
+    "series_digest": "a1ca72eb078155dcf085a2e5bb639488f7ce7f44"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|patent|True|999:100|cn69",
+    "series_digest": "039b850550fdd34ba33655d0617f3dfade42c863"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:10|cn69",
+    "series_digest": "fa511cc7f2344e5885e6b0413a87fe3a2b2c755a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:50|cn69",
+    "series_digest": "920acc61ffd76261687805a175ee5b48ef5eb391"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:100|cn69",
+    "series_digest": "ee30cd79ab7c9e3710daf02962a448a457a47a94"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:10|cn69",
+    "series_digest": "ea43c5b057645c2efdc7e844c2dc5d1677412d1b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "f5a55700252654941f48f18c64304e5b6396271e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:100|cn69",
+    "series_digest": "9ac6befea7701a5aed9bbd1845832e14675fe7dc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:10|cn69",
+    "series_digest": "e2bc6cc40cb1cd438faf5e65e2b57f2335c8d06b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:50|cn69",
+    "series_digest": "eff092ffb166ae4401b197f8abe8cbff715ff7ac"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:100|cn69",
+    "series_digest": "bd34302be91a77bdc46ff6a9040bf64a5eaadd67"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:10|cn69",
+    "series_digest": "29abeeffd6099b1943682ca8c40da576cec37a2f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:50|cn69",
+    "series_digest": "5d70f4edba1d0c3b17647edb1649bcdc8a61e725"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:100|cn69",
+    "series_digest": "0c5e3d65fb4bda579b9ca778e8f5ce0cf6a00fcb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:10|cn69",
+    "series_digest": "16dd27ca02edd80dd583a16550025c693871310c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:50|cn69",
+    "series_digest": "963177098d34375d1a2774e97b1d8310107ec149"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:100|cn69",
+    "series_digest": "9d218b5cdc07df0e6c1f4c281942280d3949134e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|999:10|cn69",
+    "series_digest": "36aafec39b1727ff4a6af5fe4c75785dac9b852c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|999:50|cn69",
+    "series_digest": "ee1f253a1206cfd99584d9112898e379b5597759"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "d596a47ced794d3ca37442b66f949379f965894b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "8b92e94f08454b7857ba9df444406957fdb26721"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "199aafbbf3ecb9dcd98b1d1397ff31cf86a4ef36"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|99:10|cn69",
+    "series_digest": "92ddfd71f68da61d90e3863ba94c53b97d563112"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "a530460e82d9f0f671e54791fd1f661ca2f88069"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "8676b90902a4ba16802308222c5ad625048ce60e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|999:10|cn69",
+    "series_digest": "3ce08000764f20b6f24dd2f500a2677575df44a9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "fbf45eff5bab070210585f3f0e59c57c69193363"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "28cd85e3318e2ef0c436c5e686df5d4e5dad0107"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|9:10|cn69",
+    "series_digest": "abd9319070daf6747c9c4ef5d4895b1e4c1e9200"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "1b8acc3ae0d3e134c5e6128499715fd7b46ca69b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "122a4923400d05eea772eddcc3a904532c13f08a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|99:10|cn69",
+    "series_digest": "1988ee894b957f65cdff549b218de39bb757ad45"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "ed2f380b0e84bf79ebb3ee3c2f14b0166a22770f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "3a2706e9e7ffeb01890c35b2d3238fddc080efda"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|999:10|cn69",
+    "series_digest": "ea0b88e3553f31cc1da941084d7078c08bd5faaf"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "f6d4136c6813553cd1874a8b82eec2e285273c9d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "bc9f2105264a6ffbcb8ef5b1141c3f596852108b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|9:10|cn69",
+    "series_digest": "db5f45b0da2f7c5bb03493afa62e0eb454f98ce8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "318911961120938cd740d6e47240408e35feb6e6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "454fd3351342938afa501a9897c0fd5da40a55da"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|99:10|cn69",
+    "series_digest": "27bfa1c8873e32eadc0841ceca2c6614e4740695"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "84773281cbd270438569f42925a5a20c4c291256"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "86d7eb6b8b53380a77bc8db19bf478e239958e7f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:10|cn69",
+    "series_digest": "beefd6ef560b3f33099a0e9a7e1423f085fe39c0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "2debebc700d67c070a63bf893d968672767831e2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "394a2a5fdb0c7423cd63b8641e44092545058adc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|9:10|cn69",
+    "series_digest": "678fa87b28324fc3dc69d0cedd9ea515a8f178e2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|9:50|cn69",
+    "series_digest": "6ab07e950db97df7af00355a5907951e0d9c3a87"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|9:100|cn69",
+    "series_digest": "e4c25b571ce550e18f10e2b17087e29dbadf01c0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|99:10|cn69",
+    "series_digest": "c6418646c5ee8837efe2ceec0a68b1a4ebde74e1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|99:50|cn69",
+    "series_digest": "e594cbb73c68089cae5b67879e5e7c7a22f61270"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|99:100|cn69",
+    "series_digest": "3c6565c9745bb9b695a497f8a2776223579125e0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|999:10|cn69",
+    "series_digest": "896e2822eaab78d9f988f25168eb7d1525e737f4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|999:50|cn69",
+    "series_digest": "b35222fce5484bd537261fd2a0182593d459f373"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|patent|True|999:100|cn69",
+    "series_digest": "1ccfc8ba67bb663320384b9e972ab8c5c52a2fb5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:10|cn69",
+    "series_digest": "8bc3e5988b0a9d760646eb5aff36c028b6f9af72"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:50|cn69",
+    "series_digest": "41b4460eef5e298097650d1561f9c0a31813a1a0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:100|cn69",
+    "series_digest": "43b26353b9be22377e887e850177331db3f37c42"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:10|cn69",
+    "series_digest": "71fc8dc80329df8217f69a5da095a5a5bc8160ca"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "50d9720961f8646be3e82e4b9481c055f3cc9a5b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:100|cn69",
+    "series_digest": "8aa28173cefa7bcb6c260a061a03f0cc5706728a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:10|cn69",
+    "series_digest": "1e79f3af41dffd2f98b17444908cf07f4d4f1ffa"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:50|cn69",
+    "series_digest": "e18d665fc9dbbfcfb87a38084952ce0ddcd4f9fb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:100|cn69",
+    "series_digest": "7f6a75146d88453e655b63c47dd2222dfed0d543"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:10|cn69",
+    "series_digest": "f2ed3a31953239cf8a1d55ff49a79a6d8ffe9483"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:50|cn69",
+    "series_digest": "d36286c24db159868412aa8df0253876c26601f9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:100|cn69",
+    "series_digest": "f4b3ca41ce386fc410c2f53fc1d2c8f26e26b773"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:10|cn69",
+    "series_digest": "305642e3434e80565bf2f7c36d2e2572524871e7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:50|cn69",
+    "series_digest": "90ebb20899cab7dc9755327ecdd0c1d9983daa0f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:100|cn69",
+    "series_digest": "f8d2193f0933a5249cfaed2e4bbb64417cf4afad"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|999:10|cn69",
+    "series_digest": "10c91c35175ec82ae540cdeca3282801f16dc70a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|999:50|cn69",
+    "series_digest": "769b1c530090a742e66c1431f81b4263226863a9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "125835a37b8b423c39dad7401a29b937efd1844d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "b73b0cd7602822c3d41f1aec4f7fc96c5cb8f048"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "e77a0c490c0f73634ed55bb43a14c34d341ecefd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|99:10|cn69",
+    "series_digest": "b320dcac3504e5cdec3dc9c9c6ac27b96ad3ce26"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "25a66629873b9a050a66983907d893851c40f0c1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "05c5dd9a9dd23a567f2dae8bf1f5dddb640f6d27"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|999:10|cn69",
+    "series_digest": "27bf4b7b053c65b6e9f93adc70c83a15b03c5332"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "7c95254323e46d60cf9e2cde7e78e17beaf0973d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "b4418064c1a3fb93288ded6cbf15cd3a8a5a399b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|9:10|cn69",
+    "series_digest": "210145716148741fb3f2979397fa294d83cf6727"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "8ff3d63142566c1bd0006acd11b56a13c81c0118"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "32dfb956989e08ad46caaef7e0c29f9f225ea451"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|99:10|cn69",
+    "series_digest": "e55a268ef22135b272e2bbe9f945f75e0237a313"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "a13ee5b667e33271b0fc7261a3392dd7d68044a9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "080095671f661602990dbfc55e90a555d3df55cb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|999:10|cn69",
+    "series_digest": "d1fcedab47b793f45c8e304569330761433f877d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "7b999f8464c0deae4301600db7b003b9ec48a8bc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "b41a8ffb5362a0bd48f5423eabbc90ecbd4dd880"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:10|cn69",
+    "series_digest": "37ced45e75659863be06245cbead01de55969b53"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "ffbf18c6565e18fdd1bff093d564f89fe13fa6db"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "2d838fc99b2117075869d278f9bf7ec3ec45a4e6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:10|cn69",
+    "series_digest": "bf3f1d59b3ef193bf5e6af757189631f7295e076"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "7da9817fb809a1fff740ec4b4428a3b06290c41b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "f5767171b632d153fc1469e539f3f99bf7097b68"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:10|cn69",
+    "series_digest": "11e78eb2030bfb06d5260e3b10334f06b63103dd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "a6713464fc158b84fb689c50e51c90bc1892817e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "f29440cd2096238f421fc0f2a590e41f056b4118"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|9:10|cn69",
+    "series_digest": "ee914819d620d3923ef4b27e0ba53edd5fdef0fd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|9:50|cn69",
+    "series_digest": "5b65155f3b8ffdb25714cddef64d46d4e6c70142"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|9:100|cn69",
+    "series_digest": "d2c310e2084dc69a10ddd89313926f67674fbaec"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|99:10|cn69",
+    "series_digest": "2c3b24326adfde59a833c8b6a974f2f66ebb82b1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|99:50|cn69",
+    "series_digest": "f295eab54f3b861bd0d3bbf482a2840ea3d93c7d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|99:100|cn69",
+    "series_digest": "dd3d4d38257c2d25e143b6ad19e221684aa9ed23"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|999:10|cn69",
+    "series_digest": "a136031b2a369c4a20c51088580543e4f365ede6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|999:50|cn69",
+    "series_digest": "9f23acef942350084f410b87da3855c2a9a2b7b6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|patent|True|999:100|cn69",
+    "series_digest": "022c924f650f46c053dde50e01f1e1fd53d50fbe"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:10|cn69",
+    "series_digest": "bc2be18b89cb0a640275c81bc76f065bff8cbcba"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:50|cn69",
+    "series_digest": "107eb3892a1141f6dd61be60b0d31933dc2e98dc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:100|cn69",
+    "series_digest": "dd393403ee3fcc2573d1ac4a85d0d51890b14f9d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:10|cn69",
+    "series_digest": "94368d3d8b082fa2c8ea70936518438910578446"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "43d2057603fa3849e545d5870d532af8380f74ff"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:100|cn69",
+    "series_digest": "a08e3fd66dc773e84183609fad7ad33a07492a1b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:10|cn69",
+    "series_digest": "709627447e78fa823f69a0f44b919a60268a3bd0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:50|cn69",
+    "series_digest": "3c89a55257a9ffbd8a24e121c046d89b605b46e9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:100|cn69",
+    "series_digest": "23af11a03b4d5e30375b3996c0a9cdfeb4794ad7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:10|cn69",
+    "series_digest": "cfa922e80ff7acd2117b20db0c01d8bc6d59f41e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:50|cn69",
+    "series_digest": "566836aea89163fd5cac7ccace2c2e4364ae8463"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:100|cn69",
+    "series_digest": "d04d9436d786e107d8d081beefe269edd92c96e8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:10|cn69",
+    "series_digest": "c5fb32dfeeba470ca0b75167c94189bcb147ab25"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:50|cn69",
+    "series_digest": "df5ed914403dbbe0d07101769c063f2c8b8931bd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:100|cn69",
+    "series_digest": "90c5179dc5d2249e7923460edfe212d0131da8f6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|999:10|cn69",
+    "series_digest": "d565921704a5da5eb289cb512e54bbd8401faf0e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|999:50|cn69",
+    "series_digest": "b1ccc7ed55718a58d5edc378d8e67c29a0d706f1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "2b13032abaf6acce5049095beca6b445d9162988"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "3df5238b6485c740f4cee7a786ad938b77de8988"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "8f8da32e7ce4bcf0917029a9a39a284630234c56"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|99:10|cn69",
+    "series_digest": "8d570c6271b4f6fed35b1d2c6ffe97b952c439fa"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "cb6c54c78d034e559f39e8b46fc3af03958ddff1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "c5f4e571a5c17430258da2dea290f501c67889b4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|999:10|cn69",
+    "series_digest": "a25fa8083d1c4bf71e8d36977eaffb32d9f79993"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "505d401edb8527d3d19fce5ec8ad46d16a9542f8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "a0bdff9415e94f7e5becf5fe7d83f499c23cc189"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|9:10|cn69",
+    "series_digest": "820b0b6433c61bc289add30e83e05ed03c5fd374"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "efa7278a3cbb77fac05979c211a1a8f07c270643"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "6c382182618b2cd10be309013192c1f04a8de9dc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|99:10|cn69",
+    "series_digest": "eca1f1f62687ace4cc68fc4cebe366b8c6a7f49a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "5a30c6a9c21483291f53d98a5003b32637130c73"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "a12df404be62fa20e8a446ad5b530a4f18275dfe"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|999:10|cn69",
+    "series_digest": "7cef8bb8a82621b95db0d500418e5c4a604e1285"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "7ce0b645aeffa6759e83d966afd90d57f09c5192"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "7ce0b645aeffa6759e83d966afd90d57f09c5192"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:10|cn69",
+    "series_digest": "177681429ad69539d4f115e7f108b61b6175cc92"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "5092a4fa9b15c4ed770a09360549cc0da7919dc6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "e7a55e71af8c244572c7323ad71265ec5a564847"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:10|cn69",
+    "series_digest": "f6ee744a4d06486991a17ebaa1b907cff1f802ab"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "6590cfb40f80db0c56c1656a52fda4b71eabfee6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "89169d33f6c6d205a52fbdb064c8369bc30a4085"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:10|cn69",
+    "series_digest": "a5743f7a3740e164de9a3c7ef00c150eb2e8beb5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "a5743f7a3740e164de9a3c7ef00c150eb2e8beb5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "a9d3b86e84bf273b7d6c0421da344f1caea7fcfe"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|9:10|cn69",
+    "series_digest": "d96e2bdfa35994bfd7815bb77a13611063b3ff06"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|9:50|cn69",
+    "series_digest": "68189a55a6ed64f0f7330fff70ab9a62fabc0466"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|9:100|cn69",
+    "series_digest": "974ddd5ced335a50889fbb67352c41fac8d1f247"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|99:10|cn69",
+    "series_digest": "d5985d5b358aa530318dd8f48923f8af1a491cbf"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|99:50|cn69",
+    "series_digest": "139bafb7ba5654d88d7edce78ff7f311723076c2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|99:100|cn69",
+    "series_digest": "f6a85f2415f75e8fd6c1451a55688d3ea0848da5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|999:10|cn69",
+    "series_digest": "0a30375c8731f6aeb8be4bbfb0c99d55269b2536"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|999:50|cn69",
+    "series_digest": "0d5badb4f4408277ff5c5f30903683478985b605"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|patent|True|999:100|cn69",
+    "series_digest": "2c5dbbea68dc5fd87febdf0ff6e2e2d48a7b9e83"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:10|cn69",
+    "series_digest": "d97540026645a16333f36677b7ab3bcd913b6a45"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:50|cn69",
+    "series_digest": "b6720131316d84820800402bc8624dfcdd7b1beb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:100|cn69",
+    "series_digest": "68c0d4d1e43a9ea7cd5e4cec49afda5b6d20ad1d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:10|cn69",
+    "series_digest": "137d95a446f9dc4b487cbe1b0468801bee8ca0b7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "b8ea2df38b0a3a7db880aa7424fe6934dfd7b885"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:100|cn69",
+    "series_digest": "5259447d9b4b37754ba09f23f39970747772951d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:10|cn69",
+    "series_digest": "842b3e7f874e396ae79eb1e89c658f535a19a55e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:50|cn69",
+    "series_digest": "67ec792fdb469e10fc995efad13c150cad805cfb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:100|cn69",
+    "series_digest": "e7e2ead4cb74d8074c8ffb858d4143af12adfea4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|9:10|cn69",
+    "series_digest": "aeceaeae37fee88451b12eadcee686e39245cc52"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|9:50|cn69",
+    "series_digest": "749cd5725f998721312cc6a37883c4fc18b04f74"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|9:100|cn69",
+    "series_digest": "b06c3dfc582bc9bb7c6d0e6c244c2bf276623d99"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|99:10|cn69",
+    "series_digest": "22d823c1a9997e80a57d059fb1d488656f4f7494"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|99:50|cn69",
+    "series_digest": "d1e702fa9e96a567be9a49d936e97df0d1766ead"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|99:100|cn69",
+    "series_digest": "afc01686de1bba9c90cdcd7bcd39f8bcf234ab01"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|999:10|cn69",
+    "series_digest": "474b79b3c18d532f4cbd74ef3573bb01dc8c9b72"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|999:50|cn69",
+    "series_digest": "75130671cf8889d9902d52477d7c56eeb1407e11"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|9:10|cn69",
+    "series_digest": "09424c1021bb536803d1c7c1ad300b8fd5f5f08c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "270b40c98a343786c2bb302467262ac4b15c7357"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "421dc8bace93669827d6f36f9aa9bc0de2363b99"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|99:10|cn69",
+    "series_digest": "e1544098627d8ed0d0c4bb2dab35b86177eb8232"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "7f017400a4ecf0a253642fe100bc3b0dacf50978"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "4c923997bc2d16a32a1dbf5b52f194c677f45cbb"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|999:10|cn69",
+    "series_digest": "51e48c3111f1351d8bc0781a96b29aa2872e8c16"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "e1067fd66e1e4db3a79ddd8dd8e37a4bc4a12273"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "30464c76aaea58f5eaaba4308c3e95df948eac9e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|9:10|cn69",
+    "series_digest": "1064af826b0b5f00c18ff87a262c114f76224afd"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "7570a964a903c414289585a871919cd9355b54a3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "29eab5bcee9dee8d6518e186a78888f996205714"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|99:10|cn69",
+    "series_digest": "75e66f9db16190ffdca590a7f2693c0f4b5389e3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "42376550f87030f694910c38a885f7ad0db01ff1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "b588a9ecc4c42480ee614af8c018fe7fb536dfe7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|999:10|cn69",
+    "series_digest": "76847c58b8808a98d661c4e4599731e6da13673a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "b0edd68ef20013bef063631ad790bfade3f83bc4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_acm|False|999:100|cn69",
+    "series_digest": "1202e220ae2ae1075c32bcafb77f5da0d2f3f773"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|9:10|cn69",
+    "series_digest": "32e0001aa6614e9507757ca9eeff38f8744490ce"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|9:50|cn69",
+    "series_digest": "5a771cdec9116ad63a3f17daf7a40c9738ea7ce9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|9:100|cn69",
+    "series_digest": "2b0bab931346a671e9eebcad58b7576af0a7113d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|99:10|cn69",
+    "series_digest": "45abf184c5990150530d6d5ba81691e56c32f45d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|99:50|cn69",
+    "series_digest": "40f77249243f9a149076d54f2fbfb12c0a00a3d3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|99:100|cn69",
+    "series_digest": "061aba5497ad3df4ad13df8d9d4e59184f1da0c8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:10|cn69",
+    "series_digest": "f4c2267be4651375020d7f05af91def7f39cfb8e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:50|cn69",
+    "series_digest": "654b1efb90208a86a841ddde3f3076f4553ce1a5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_citeseer|False|999:100|cn69",
+    "series_digest": "de30c47e73dd820677e194cb7d551ec9959bf958"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|9:10|cn69",
+    "series_digest": "68c8a668cd74932371d4002a30cde5413038d42f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|9:50|cn69",
+    "series_digest": "0b490dea0ab22fb8a5eac0de09b445535f933f66"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|9:100|cn69",
+    "series_digest": "dd7309ac7a7b0e3a08c532756a4f0cde55a07db1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|99:10|cn69",
+    "series_digest": "221925512415314b9823fc52acf79237ec7581dc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|99:50|cn69",
+    "series_digest": "780b21e69a6bf678d8215fdc608fed1fa5333b22"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|99:100|cn69",
+    "series_digest": "4cda82716ca0d5e163efad9ca6550392d9f6ed22"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|999:10|cn69",
+    "series_digest": "be910769c9605057536d5356b36992db231e938c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|999:50|cn69",
+    "series_digest": "08bac41a8396d9066cc7877f8cc62756621f2a8a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|patent|True|999:100|cn69",
+    "series_digest": "923e1c47f995dc82e313ebec47b91dc603a76c4d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:10|cn69",
+    "series_digest": "b139058f2a748f7b019e91d7315f35d59f0fdfb3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:50|cn69",
+    "series_digest": "a5995a0a4978d6274e34a833f5274c299a507d86"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:100|cn69",
+    "series_digest": "f1f8ce264c670c93bb729bb2a089207ff82d22b3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:10|cn69",
+    "series_digest": "e044b1e41fa2aa3f1be101503f9461b04edd60b1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:50|cn69",
+    "series_digest": "89122f66afe981949722d016696cbed2fbcb2e75"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:100|cn69",
+    "series_digest": "2ec3cb50819b1f50c87d17cd5b173c774283056c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:10|cn69",
+    "series_digest": "92d2aac3940551faace692067d224f97c053ec14"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:50|cn69",
+    "series_digest": "3ae5e080d57bc4161da23aaaf564d5544cba5ab4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:100|cn69",
+    "series_digest": "c72b8c6dd32c5bb13810b1b29ab6246f586ad308"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:10|cn69",
+    "series_digest": "bf9f2efdcc57dda3f546673c0673ceb7bd8631fe"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:50|cn69",
+    "series_digest": "0477f127388dfc1427a4b9f2a95fa1f8983c950b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:100|cn69",
+    "series_digest": "3adc31927a0a3049fc9042b26f44006d17981e4b"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:10|cn69",
+    "series_digest": "1a38821fc14ca3ce82983a71b789d049865dd578"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:50|cn69",
+    "series_digest": "b4e0a92d74ed8648fd4916303cefba0c6423f1a2"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:100|cn69",
+    "series_digest": "35a13d91d4734ee6c65aaf9a2a53ee3a5b5070f8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|999:10|cn69",
+    "series_digest": "9f3569d20f3f493d140b7e4ab361c9f279c553c0"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|999:50|cn69",
+    "series_digest": "bed6676fec62f9f4572dab85be31bae1fac5642f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:200|cn69",
+    "series_digest": "d4f5925a8a479646d072dc9bed82cff5ba3bccf3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:200|cn69",
+    "series_digest": "c63a6b46cd1d20276f59c23339667235d8ee21be"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:200|cn69",
+    "series_digest": "c88be2b8608670a9c227658dfcbc25dcb75150d9"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:500|cn69",
+    "series_digest": "7964f8c098427ed620048692888577b267863a22"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:500|cn69",
+    "series_digest": "9f83808a426a7880907e6f5170cb3c6b6296e07c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:500|cn69",
+    "series_digest": "fecc9e2f9beb768c58d8bccc7eb63b01023e4122"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:200|cn69",
+    "series_digest": "fc2654987dc0142fb71055835d96915aa5e9d043"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:200|cn69",
+    "series_digest": "f5475f7365e7a7902c41a55ccb008ad2fa159640"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:200|cn69",
+    "series_digest": "a152f52e0af2c2ec04ed21a370de3dd0d391bcb1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:200|cn69",
+    "series_digest": "c2f26c426a7fb6359dd81551d064f23d502ca069"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:200|cn69",
+    "series_digest": "7ffb1f3247124779b0b1b417e07e7a517f02a292"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:500|cn69",
+    "series_digest": "70d11de86cb4b2e080b4a184ca98783fea6b522c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:500|cn69",
+    "series_digest": "3e430faa5b02b7d2c5c0c61ab1ca0d191a7e1050"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:500|cn69",
+    "series_digest": "28f70991bd994beb2bb4a370a2f2021a9e7c3fb7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:200|cn69",
+    "series_digest": "28763f4368e261599e057080816ba59e28f995f5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|leidenalg-L:3-r:1-gpu|leidenalg|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:200|cn69",
+    "series_digest": "5aa8d8ac871e012655fdf0cfe56eb8595a444a10"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:200|cn69",
+    "series_digest": "e68934f4462a883857563ad8ff24efd6a231e661"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:200|cn69",
+    "series_digest": "5342bbe92049410df7ac4a9202df95fe764e3be1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:200|cn69",
+    "series_digest": "e3903af22a06304a4b866823978d38f84be16214"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:500|cn69",
+    "series_digest": "48bf265047cce960187d734dbeacd91b186d8b64"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:500|cn69",
+    "series_digest": "581c62be64e8da7517b7b38d102968542c23a2ef"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:500|cn69",
+    "series_digest": "c63ec8266e4f3ed804c42d7c986034bc7b4a4f6a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|9:200|cn69",
+    "series_digest": "5a30b82dff5164b651cf75774aefa49343a817de"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-naive|dfleiden|naive|None|None|None|None|None|None|None|None|arxivmath|True|99:200|cn69",
+    "series_digest": "4371d7dbf3ba662ce458471479a04f0772ad3959"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:200|cn69",
+    "series_digest": "1193c7419facdbdc8acbf84eae8dfb38d319611e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:200|cn69",
+    "series_digest": "44170c1bf641bb2094ae8143609bcfa17b3d05ef"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:200|cn69",
+    "series_digest": "c05dc64b502fd785aef0a451503b7c43915bc04f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|9:500|cn69",
+    "series_digest": "bb1d3c338c0be938014d5074041d6ccab2a2b9ec"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|99:500|cn69",
+    "series_digest": "17d0620660705fca7f989a54ce092ad8d2e0cfa7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|dyn_pubmed|True|999:500|cn69",
+    "series_digest": "6b20276dd065b1f2440122c7d0ab861896d28f1c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|9:200|cn69",
+    "series_digest": "3cfafb2c23868169cbf6995253e722b624ffcc81"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-dynamic|dfleiden|dynamic|None|None|None|None|None|None|None|None|arxivmath|True|99:200|cn69",
+    "series_digest": "5e3a7c2bb6de71a41d239dfc0eb8f5b24d9ab3d5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:200|cn69",
+    "series_digest": "ee9f7dda734473037a891f25a540bc448cddc64e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:200|cn69",
+    "series_digest": "8dfde2663102d44884d1b3df3894b180c9bd3d3f"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:200|cn69",
+    "series_digest": "3a51e8beea967acfd8e9c1733f033a884da026cc"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|9:500|cn69",
+    "series_digest": "4c7ee5ce90051352009706d5f257703c4f994069"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|99:500|cn69",
+    "series_digest": "8e8478a3e6a4e93d6e4ab1eeea9a257058d5bb53"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|dyn_pubmed|True|999:500|cn69",
+    "series_digest": "e781283eecd4876cc639ef8c2e58142bbd7464a1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|9:200|cn69",
+    "series_digest": "4cdf8358f07f59ef6b35c6296ce711b20c9d1336"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/real_topology_long_horizon_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/real_topology_long_horizon_20260526_1339.json",
+    "run_key_with_machine": "experiment|dfleiden-L:3-r:1-gpu|dfleiden|smart|None|3|1|None|gpu|None|None|None|arxivmath|True|99:200|cn69",
+    "series_digest": "006dcddf8758b7a1173f6b869de26f37eca5e452"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "8d58079908c1312b5cfe78ca801e129135314114"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "db41d54e139c13c945b5f77e70a4c51bdd8ceb97"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "e17d187a47d93d1c5093d0b92f7a083463c0ea51"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "51dc3d855f139e3a429423d9f00fed57afdd1e6d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "4d306f956963a0ac7671c58ebf4dffbce4392984"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "d494cf47f2c954c33dd9e7eda2e23f7f9013844d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "7f686314022fa6f2ba4cc70156e0458225425dd5"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "5fa904777c15888e6702b257ed6caac3d05783d6"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "13a8ef2e1f588f5075ea4642a4aeb4f7027c3ca8"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "0843c4a78c497a5c27c42ca947caa9dddb26e31d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-naive-feat:dataset|s2cag|naive|10|None|None|None|None|dataset|None|None|dyn_acm|False|99:100|cn69",
+    "series_digest": "616444e62d7fb7ef6c438aee50e493b4300cf4c1"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|9:50|cn69",
+    "series_digest": "be54b17efc66eec208501d4221aa9cd5a7172b2e"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|99:50|cn69",
+    "series_digest": "ffcbdccfe0c3a68c56f37f23c27fd0872a692390"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|999:50|cn69",
+    "series_digest": "a5562addf476301bd7b60c7a9bebed9ed3922bc7"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|9:100|cn69",
+    "series_digest": "d0c78c98e4fb85725eaaaa378b1c43fd7c5e441d"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|99:100|cn69",
+    "series_digest": "ec5a66ee938ce33ec4541de39865bfbdd2da8411"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_cora|False|999:100|cn69",
+    "series_digest": "3e57b60c6c5cf2fae909e292a2f601e1390a719c"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|9:50|cn69",
+    "series_digest": "6a8fc1478be8255a841455852dcbb506f36ca00a"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|99:50|cn69",
+    "series_digest": "37bb07d639ab4389f3f5ecbd0a46fc15ee4e4e10"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|999:50|cn69",
+    "series_digest": "5da7c7560745c0030aa7d039496c3ce4ff635ab3"
+  },
+  {
+    "canonical_source": "results/paper_icdm/2/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
+    "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|9:100|cn69",
+    "series_digest": "440a4e077f485980acbd0353c9763ef749b658d4"
   }
 ]

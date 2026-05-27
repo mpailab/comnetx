@@ -398,31 +398,32 @@ python3 scripts/paper/collect_results_registry.py
 
 ## 5b. Next short pilot batch: 2026-05-26
 
-After ingesting the reorganized measurements under `results/paper_icdm/1` and
-`results/paper_icdm/2`, the registry contains 2467 experiment records, 536
-neighborhood records, 23 error records, and no unreadable JSON files. The next
-batch must remain a pilot batch: it should close high-value gaps and test
-feasibility before scheduling any week-long final run.
+After ingesting the reorganized measurements under `results/paper_icdm/1`,
+`results/paper_icdm/2`, and `results/paper_icdm/3`, the registry contains 2648
+experiment records, 536 neighborhood records, 26 error records, 463
+deduplicated sources, and no unreadable JSON files. The next batch must remain
+a pilot batch: it should close high-value gaps and test feasibility before
+scheduling any week-long final run.
 
 Main registry observations:
 
-- Topology sweeps are now broad enough for real-data batch sensitivity, but
-  additional repeated rows on the larger datasets are useful for stability.
-- `dyn_pubmed` long-horizon topology is covered; `arxivmath` still has missing
-  long-horizon cells caused by GPU sparse-kernel failures. Do not switch the
-  main evidence to CPU; treat these failures as GPU engineering/limitation
-  signals unless a GPU-safe workaround is identified.
+- Topology sweeps are now broad enough for real-data batch sensitivity, and
+  `results/paper_icdm/3` adds 200/500-update long-horizon rows for both
+  `dyn_pubmed` and `arxivmath`. Additional repeated rows on the larger datasets
+  are still useful for stability.
 - The article still lacks the strongest scalability evidence: GPU memory,
   local workload size, contracted backend size, and timing breakdown for
   auxiliary transformations. This must be measured before the final paper pass.
-- S2CAG is complete on `dyn_cora`, partial on `dyn_acm`, and mostly missing on
-  `dyn_pubmed` for high-history non-`999:10` settings.
-- DMoN is complete for small/medium non-PubMed datasets but missing on
-  `dyn_pubmed`.
-- DSBM evidence is still feasibility-level only and should be expanded because
-  it directly supports the operating-envelope claim. LAGO evidence is no longer
-  part of the main experimental plan; keep existing LAGO rows in the registry
-  but do not use them in the main paper tables.
+- S2CAG dataset-feature high-history rows are now represented for the cn69
+  batch sweep; the random-seed batch sweeps remain the main missing repeated
+  GNN evidence.
+- DMoN's dataset-feature sweep mostly deduplicates against earlier results; the
+  random-seed/high-history rows remain the useful follow-up target.
+- DSBM topology stress is now represented by the all-batches GPU6 run in
+  `results/paper_icdm/3`; the next paper task is summarizing it into the
+  update-size figure rather than rerunning the same stress script. LAGO evidence
+  is no longer part of the main experimental plan; keep existing LAGO rows in
+  the registry but do not use them in the main paper tables.
 
 Generate the pilot package with:
 
@@ -535,6 +536,25 @@ Monitor completion from the host with
 `scripts/paper/cn69_pilot_20260527/monitor_cn69_jobs.sh`; use
 `--watch 60 --tail 3` for a live one-minute dashboard with short log tails.
 
+After ingesting `results/paper_icdm/3`, use the narrower eight-script follow-up
+package instead of rerunning the now-completed broad cn69 sweeps:
+
+```bash
+python3 scripts/paper/generate_cn69_after3_20260527.py
+```
+
+Generated locations:
+
+- Configs: `conf/paper_icdm/cn69_after3_20260527/`.
+- Scripts: `scripts/paper/cn69_after3_20260527/`.
+- Runbook: `scripts/paper/cn69_after3_20260527/README.md`.
+
+The after-3 package spends the eight GPU slots on workload/profile evidence,
+direct closure/contraction ablation, and S2CAG/DMoN random-seed high-history
+rows. It deliberately avoids repeating the topology, DSBM, LAGO, S2CAG
+dataset-feature, and feature-ablation sweeps already represented in the
+registry.
+
 ## 6. Current result registry
 
 Canonical consolidated results registry:
@@ -568,12 +588,13 @@ starting point for paper tables, while `all_results_with_series.json` is the
 source of truth for detailed curves and reproducibility checks.
 
 Current LAGO status: the codebase and general configs contain the LAGO backend,
-and the consolidated registry has pilot `lago` rows from
-`results/paper_icdm/2/lago_temporal_batch_sweep_20260526_1339.json`. These rows
-are preserved in the registry for traceability but are not part of the current
-submission story. The article should cite LAGO only in Related Work as a
-continuous-time temporal-community method that is complementary to ComNetX's
-batched snapshot maintenance setting.
+and the consolidated registry has pilot `lago` rows from the
+`lago_temporal_batch_sweep_20260526_1339.json` files under
+`results/paper_icdm/2` and `results/paper_icdm/3`. These rows are preserved in
+the registry for traceability but are not part of the current submission story.
+The article should cite LAGO only in Related Work as a continuous-time
+temporal-community method that is complementary to ComNetX's batched snapshot
+maintenance setting.
 
 ## 6a. Table and baseline selection policy
 

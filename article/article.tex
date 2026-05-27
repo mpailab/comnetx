@@ -912,8 +912,9 @@ claimed optimal for every workload.
 
 \begin{table*}[t]
 \centering
-\caption{S$^2$CAG feature and radius ablation. Each cell reports
-$Q$ / $T$ / NMI on the final snapshot.}
+\caption{S$^2$CAG feature and radius ablation on the cn69
+\texttt{999:100} stream from \texttt{results/paper\_icdm/3}. Each cell
+reports $Q$ / $T$ / NMI on the final snapshot.}
 \label{tab:feature-ablation}
 \setlength{\tabcolsep}{3pt}
 \footnotesize
@@ -921,14 +922,14 @@ $Q$ / $T$ / NMI on the final snapshot.}
 \toprule
 \textbf{Variant} & \textbf{dyn\_cora} & \textbf{dyn\_pubmed} \\
 \midrule
-Naive, dataset features & 0.691 / 58.84 / 0.437 & 0.622 / 223.49 / 0.169 \\
-Naive, random features  & $-$0.001 / 29.82 / 0.023 & 0.001 / 75.57 / 0.000 \\
-Local, dataset features & 0.788 / 11.07 / 0.463 & 0.530 / 141.48 / 0.175 \\
-Local, random features  & 0.784 / 7.68 / 0.462 & 0.520 / 98.64 / 0.139 \\
-Local, one-hot features & 0.779 / 17.75 / 0.452 & 0.502 / 319.06 / 0.151 \\
-Local, random, $r=0$   & 0.818 / 12.95 / 0.466 & 0.719 / 8.10 / 0.159 \\
-Local, random, $r=2$   & 0.668 / 14.45 / 0.446 & 0.186 / 243.32 / 0.043 \\
-Local, random, sum agg. & 0.784 / 6.88 / 0.462 & 0.520 / 39.14 / 0.139 \\
+Naive, dataset features & 0.691 / 37.87 / 0.437 & 0.624 / 394.13 / 0.202 \\
+Naive, random features  & $-$0.001 / 14.64 / 0.023 & $-$0.002 / 97.50 / 0.000 \\
+Local, dataset features & 0.788 / 8.20 / 0.463 & 0.532 / 39.02 / 0.180 \\
+Local, random features  & 0.784 / 4.86 / 0.462 & 0.534 / 27.61 / 0.186 \\
+Local, one-hot features & 0.779 / 10.65 / 0.452 & 0.518 / 203.13 / 0.182 \\
+Local, random, $r=0$   & 0.818 / 5.01 / 0.466 & 0.756 / 20.63 / 0.198 \\
+Local, random, $r=2$   & 0.668 / 7.05 / 0.446 & 0.161 / 118.31 / 0.041 \\
+Local, random, sum agg. & 0.784 / 4.89 / 0.462 & 0.534 / 27.40 / 0.186 \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -978,20 +979,19 @@ Protocol P1 is useful for checking many backends under a common setup, but it
 is only the breadth screen. Protocol P2 carries the dynamic-stability claim by
 varying both the initial-history fraction and the number of update batches.
 Table~\ref{tab:long-horizon} reports a balanced topology snapshot for
-\textit{dyn\_pubmed} and \textit{arxivmath} at approximately the same
-50-update horizon; the \textit{dyn\_pubmed} loader emits 44 effective updates
-for this split. Longer and denser $9{:}m$, $99{:}m$, and $999{:}m$ runs are
-reserved for Figure~\ref{fig:long-horizon-curves}, where different horizons
-can be compared without making the compact table visually uneven. The goal is
-to show not only a large cumulative speedup, but also the range of stream
-granularities where quality drift remains controlled.
+\textit{dyn\_pubmed} and \textit{arxivmath} at the same 500-update horizon
+using the new cn69 long-horizon measurements. Denser $99{:}m$ and
+$999{:}m$ starts are reserved for Figure~\ref{fig:long-horizon-curves}, where
+different initial-history fractions can be compared without making the compact
+table visually uneven. The goal is to show not only a large cumulative
+speedup, but also the range of stream granularities where quality drift remains
+controlled.
 
 \begin{table*}[t]
 \centering
-\caption{Balanced long-horizon topology snapshot. Each row reports final
-modularity $Q$, NMI, and cumulative time $T$ in seconds. The compact table uses
-one medium-length stream per dataset; longer horizons are reserved for
-Figure~\ref{fig:long-horizon-curves}.}
+\caption{Balanced long-horizon topology snapshot from the cn69 \texttt{9:500}
+measurements in \texttt{results/paper\_icdm/3}. Each row reports final
+modularity $Q$, NMI, and cumulative time $T$ in seconds.}
 \label{tab:long-horizon}
 \setlength{\tabcolsep}{3pt}
 \footnotesize
@@ -1000,27 +1000,27 @@ Figure~\ref{fig:long-horizon-curves}.}
 \textbf{Dataset} & \textbf{Method} & \textbf{Updates} &
 \textbf{$Q$} & \textbf{NMI} & \textbf{$T$} & \textbf{Ref.} \\
 \midrule
-dyn\_pubmed & Leiden full & 44 & 0.786 & 0.209 & 32.05 & 1.0$\times$ \\
-dyn\_pubmed & Local Leiden & 44 & 0.758 & 0.190 & 0.91 & 35.0$\times$ vs Leiden \\
-dyn\_pubmed & DF-Leiden dyn. & 44 & 0.760 & 0.185 & 0.32 & 1.0$\times$ \\
-dyn\_pubmed & Local DF-Leiden & 44 & 0.744 & 0.178 & 0.44 & 0.7$\times$ vs DF-Leiden \\
+dyn\_pubmed & Leiden full & 500 & 0.784 & 0.208 & 427.50 & 1.0$\times$ \\
+dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 25.06 & 17.1$\times$ vs Leiden \\
+dyn\_pubmed & DF-Leiden dyn. & 500 & 0.762 & 0.195 & 8.06 & 1.0$\times$ \\
+dyn\_pubmed & Local DF-Leiden & 500 & 0.715 & 0.138 & 7.35 & 1.1$\times$ vs DF-Leiden \\
 \midrule
-arxivmath & Leiden full & 50 & 0.886 & 0.413 & 876.80 & 1.0$\times$ \\
-arxivmath & Local Leiden & 50 & 0.871 & 0.373 & 5.35 & 164.0$\times$ vs Leiden \\
-arxivmath & DF-Leiden dyn. & 50 & 0.854 & 0.383 & 19.37 & 1.0$\times$ \\
-arxivmath & Local DF-Leiden & 50 & 0.865 & 0.334 & 1.32 & 14.6$\times$ vs DF-Leiden \\
+arxivmath & Leiden full & 500 & 0.887 & 0.427 & 8421.63 & 1.0$\times$ \\
+arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 289.27 & 29.1$\times$ vs Leiden \\
+arxivmath & DF-Leiden dyn. & 500 & 0.855 & 0.388 & 243.29 & 1.0$\times$ \\
+arxivmath & Local DF-Leiden & 500 & 0.869 & 0.335 & 32.99 & 7.4$\times$ vs DF-Leiden \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
 The long-horizon results strengthen the scalability claim for topology-based
-backends: Local Leiden is about $35\times$ faster than full Leiden on
-\textit{dyn\_pubmed} and about $164\times$ faster on \textit{arxivmath} at the
-balanced horizon. At the same time, the NMI gap grows relative to the
-ten-update setting, indicating that long-horizon drift must be visualized
-rather than hidden in one final number. Figure~\ref{fig:long-horizon-curves}
-therefore plots update index on the x-axis, cumulative runtime on one y-axis,
-and modularity/NMI on the other.
+backends: Local Leiden is about $17\times$ faster than full Leiden on
+\textit{dyn\_pubmed} and about $29\times$ faster on \textit{arxivmath} at the
+500-update horizon. At the same time, the NMI gap grows relative to the
+ten-update setting, especially on \textit{dyn\_pubmed}, indicating that
+long-horizon drift must be visualized rather than hidden in one final number.
+Figure~\ref{fig:long-horizon-curves} therefore plots update index on the
+x-axis, cumulative runtime on one y-axis, and modularity/NMI on the other.
 
 \begin{figure}[t]
 \centering

@@ -20,7 +20,19 @@ CONFIGS=(
   "conf/paper_icdm/cn69/s2cag_random_batch_sweep_seed_5.json"
 )
 
+COMPLETED_CONFIGS=(
+  "conf/paper_icdm/cn69/s2cag_dataset_batch_sweep.json"
+)
+
 for config in "${CONFIGS[@]}"; do
+  if [[ "${RERUN_COMPLETED_CN69:-0}" != "1" ]]; then
+    for completed in "${COMPLETED_CONFIGS[@]}"; do
+      if [[ "$config" == "$completed" ]]; then
+        echo "[S2CAG batch and seed sweep] skipping already ingested $config from results/paper_icdm/3; set RERUN_COMPLETED_CN69=1 to rerun"
+        continue 2
+      fi
+    done
+  fi
   name="$(basename "$config" .json)"
   echo "[S2CAG batch and seed sweep] $(date -Is) running $config on CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-container-bound}"
   python scripts/launch.py "$config" --paths-config "$PATHS_CONFIG" 2>&1 | tee "$LOG_DIR/gpu2_s2cag_batch_and_seed_sweep_${name}_${STAMP}.log"

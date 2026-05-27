@@ -12,6 +12,12 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
 mkdir -p results/paper_icdm
 
+
+if [[ "${RERUN_COMPLETED_CN69:-0}" != "1" ]]; then
+  echo "[DSBM topology stress] skipping already ingested stress run from results/paper_icdm/3; set RERUN_COMPLETED_CN69=1 to rerun"
+  exit 0
+fi
+
 if [[ ! -d "$DSBM_ROOT" ]]; then
   echo "DSBM root not found: $DSBM_ROOT"
   echo "Set DSBM_ROOT=/path/to/datasets-sbm or pass a valid datasets-sbm directory."

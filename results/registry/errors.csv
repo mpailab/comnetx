@@ -32,3 +32,6 @@ Call arguments received by layer 'dense' (type Dense):
 
 Call arguments received by layer 'dense' (type Dense):
   • inputs=tf.Tensor(shape=(270013, 64), dtype=float32)",random,False,10,error,dmon,,naive,,,results/paper_icdm/1/errors_main_gnn_feature_20260525_1852.json,paper_icdm,
+sum,s2cag-i:10-L:3-r:1-agg:sum-gpu-feat:onehot,dyn_pubmed,99:50,dyn_pubmed,gpu,0,SVD did not converge,onehot,False,10,error,s2cag,,smart,1,,results/paper_icdm/3/errors_feature_ablation_radius_aggregation_20260526_1339.json,paper_icdm,3
+norm,s2cag-i:10-L:3-r:2-agg:norm-gpu-feat:onehot,dyn_pubmed,99:50,dyn_pubmed,gpu,1,SVD did not converge,onehot,False,10,error,s2cag,,smart,2,,results/paper_icdm/3/errors_feature_ablation_radius_aggregation_20260526_1339.json,paper_icdm,3
+sum,s2cag-i:10-L:3-r:2-agg:sum-gpu-feat:onehot,dyn_pubmed,99:50,dyn_pubmed,gpu,2,SVD did not converge,onehot,False,10,error,s2cag,,smart,2,,results/paper_icdm/3/errors_feature_ablation_radius_aggregation_20260526_1339.json,paper_icdm,3

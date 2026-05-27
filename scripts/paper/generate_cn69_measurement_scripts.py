@@ -204,8 +204,15 @@ def build_configs() -> dict[str, dict]:
     return configs
 
 
-def launch_script(gpu: int, title: str, configs: list[str]) -> str:
+def launch_script(
+    gpu: int,
+    title: str,
+    configs: list[str],
+    completed_configs: list[str] | None = None,
+) -> str:
     config_lines = "\n".join(f'  "conf/paper_icdm/cn69/{name}"' for name in configs)
+    completed_configs = completed_configs or []
+    completed_lines = "\n".join(f'  "conf/paper_icdm/cn69/{name}"' for name in completed_configs)
     log_prefix = f"gpu{gpu}_{title.lower().replace(' ', '_')}"
     return f"""#!/usr/bin/env bash
 set -euo pipefail
@@ -224,7 +231,19 @@ CONFIGS=(
 {config_lines}
 )
 
+COMPLETED_CONFIGS=(
+{completed_lines}
+)
+
 for config in "${{CONFIGS[@]}}"; do
+  if [[ "${{RERUN_COMPLETED_CN69:-0}}" != "1" ]]; then
+    for completed in "${{COMPLETED_CONFIGS[@]}}"; do
+      if [[ "$config" == "$completed" ]]; then
+        echo "[{title}] skipping already ingested $config from results/paper_icdm/3; set RERUN_COMPLETED_CN69=1 to rerun"
+        continue 2
+      fi
+    done
+  fi
   name="$(basename "$config" .json)"
   echo "[{title}] $(date -Is) running $config on CUDA_VISIBLE_DEVICES=${{CUDA_VISIBLE_DEVICES:-container-bound}}"
   python scripts/launch.py "$config" --paths-config "$PATHS_CONFIG" 2>&1 | tee "$LOG_DIR/{log_prefix}_${{name}}_${{STAMP}}.log"
@@ -240,10 +259,20 @@ def dsbm_script(
     methods: list[str],
     modes: list[str],
     use_gpu: bool,
+    completed: bool = False,
 ) -> str:
     method_args = " ".join(methods)
     mode_args = " ".join(modes)
     gpu_arg = " --use-gpu" if use_gpu else ""
+    completed_guard = ""
+    if completed:
+        completed_guard = f"""
+if [[ "${{RERUN_COMPLETED_CN69:-0}}" != "1" ]]; then
+  echo "[{title}] skipping already ingested stress run from results/paper_icdm/3; set RERUN_COMPLETED_CN69=1 to rerun"
+  exit 0
+fi
+
+"""
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
@@ -258,7 +287,7 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOG_DIR"
 mkdir -p results/paper_icdm
 
-if [[ ! -d "$DSBM_ROOT" ]]; then
+{completed_guard}if [[ ! -d "$DSBM_ROOT" ]]; then
   echo "DSBM root not found: $DSBM_ROOT"
   echo "Set DSBM_ROOT=/path/to/datasets-sbm or pass a valid datasets-sbm directory."
   exit 2
@@ -285,33 +314,39 @@ def build_scripts() -> dict[str, str]:
             0,
             "real topology batch sweep",
             ["real_topology_batch_sweep.json"],
+            completed_configs=["real_topology_batch_sweep.json"],
         ),
         "gpu1_real_topology_long_horizon.sh": launch_script(
             1,
             "real topology long horizon",
             ["real_topology_long_horizon.json"],
+            completed_configs=["real_topology_long_horizon.json"],
         ),
         "gpu2_s2cag_batch_sweep.sh": launch_script(
             2,
             "S2CAG batch and seed sweep",
             ["s2cag_dataset_batch_sweep.json"]
             + [f"s2cag_random_batch_sweep_seed_{seed}.json" for seed in [1, 2, 3, 4, 5]],
+            completed_configs=["s2cag_dataset_batch_sweep.json"],
         ),
         "gpu3_dmon_batch_sweep.sh": launch_script(
             3,
             "DMoN batch and seed sweep",
             ["dmon_dataset_batch_sweep.json"]
             + [f"dmon_random_batch_sweep_seed_{seed}.json" for seed in [1, 2, 3, 4, 5]],
+            completed_configs=["dmon_dataset_batch_sweep.json"],
         ),
         "gpu4_feature_ablation_radius_aggregation.sh": launch_script(
             4,
             "feature radius and aggregation ablation",
             ["feature_ablation_radius_aggregation.json"],
+            completed_configs=["feature_ablation_radius_aggregation.json"],
         ),
         "gpu5_lago_temporal_batch_sweep.sh": launch_script(
             5,
             "LAGO temporal batch sweep",
             ["lago_temporal_batch_sweep.json"],
+            completed_configs=["lago_temporal_batch_sweep.json"],
         ),
         "gpu6_dsbm_topology_stress.sh": dsbm_script(
             gpu=6,
@@ -320,6 +355,7 @@ def build_scripts() -> dict[str, str]:
             methods=["leidenalg", "dfleiden"],
             modes=["naive", "smart", "dynamic"],
             use_gpu=True,
+            completed=True,
         ),
         "gpu7_dsbm_lago_stress.sh": dsbm_script(
             gpu=7,
@@ -349,6 +385,12 @@ finish in hours or within one day, and only then schedule final multi-day jobs
 for the strongest remaining evidence gaps.
 
 The eight scripts are intentionally complementary:
+
+After ingesting `results/paper_icdm/3`, the scripts skip cn69 configs that are
+already represented in `results/registry/`. Use
+`RERUN_COMPLETED_CN69=1 <script>` only when intentionally repeating a completed
+measurement; otherwise schedule the remaining seed/profile scripts or create a
+narrow follow-up config.
 
 - `gpu0_real_topology_batch_sweep.sh`: real-data sensitivity over `9:*`,
   `99:*`, and `999:*` starts with 10/50/100 update batches.

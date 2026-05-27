@@ -104,6 +104,17 @@ and DSBM measurements. See
 `scripts/paper/cn69_pilot_20260527/README.md` for background Docker launch
 lines.
 
+After ingesting `results/paper_icdm/3`, generate the narrower follow-up batch
+that avoids completed cn69 sweeps and uses the eight GPU slots for
+workload/profile and GNN seed measurements:
+
+```bash
+python3 scripts/paper/generate_cn69_after3_20260527.py
+```
+
+This writes `conf/paper_icdm/cn69_after3_20260527/` and
+`scripts/paper/cn69_after3_20260527/`.
+
 ## Summarize result JSONs
 
 Flatten one or more result files:
