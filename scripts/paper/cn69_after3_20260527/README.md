@@ -37,5 +37,28 @@ After jobs finish or time out, rebuild the registry:
 python3 scripts/paper/collect_results_registry.py
 ```
 
+Check whether the eight jobs are still running:
+
+```bash
+for c in dev_bokov dev_uporova dev_konovalov dev_egorov dev_egorov2 dev_drobyshev dev_drobyshev2 dev_drobyshev3; do
+  echo "== $c =="
+  docker exec "$c" bash -lc "pgrep -af '[c]n69_after3_20260527|[a]fter3_|[p]rofile_smart_workload.py|[s]cripts/launch.py' || true"
+done
+```
+
+If this only prints container headers and no PID lines, the after-3 jobs are no
+longer running.
+
+Stop the after-3 jobs without stopping the containers:
+
+```bash
+for c in dev_bokov dev_uporova dev_konovalov dev_egorov dev_egorov2 dev_drobyshev dev_drobyshev2 dev_drobyshev3; do
+  docker exec "$c" bash -lc "pkill -TERM -f '[c]n69_after3_20260527|[a]fter3_' || true"
+done
+```
+
+If a process ignores SIGTERM, repeat with
+`pkill -KILL -f '[c]n69_after3_20260527|[a]fter3_'`.
+
 All shell logs go to `output/`. Standard launcher results go to `results/`;
 profile JSON files go to `results/paper_icdm/`.

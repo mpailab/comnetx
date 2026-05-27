@@ -507,7 +507,7 @@ def main() -> None:
     for dataset in args.datasets:
         for batch_strategy in args.batches:
             for method in args.methods:
-                feature_modes = args.feature_modes if method in FEATURE_METHODS else ["none"]
+                feature_modes = args.feature_modes if method in FEATURE_METHODS else ["dataset"]
                 for feature_mode in feature_modes:
                     for variant in args.variants:
                         try:
