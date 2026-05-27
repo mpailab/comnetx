@@ -551,10 +551,10 @@ Generated locations:
 
 The after-3 package spends the core eight GPU slots on workload/profile
 evidence, direct closure/contraction ablation, and S2CAG/DMoN random-seed
-high-history rows. Two optional `extra*` scripts add DF-Leiden and S2CAG
-closure/contraction checks after containers free up. The package deliberately
-avoids repeating the topology, DSBM, LAGO, S2CAG dataset-feature, and
-feature-ablation sweeps already represented in the registry.
+high-history rows. Optional `extra*` scripts add focused closure/contraction,
+radius, and feature-mode checks after containers free up. The package
+deliberately avoids repeating the topology, DSBM, LAGO, S2CAG dataset-feature,
+and feature-ablation sweeps already represented in the registry.
 
 ## 6. Current result registry
 

@@ -106,9 +106,9 @@ lines.
 
 After ingesting `results/paper_icdm/3`, generate the narrower follow-up batch
 that avoids completed cn69 sweeps. The core eight scripts use the GPU slots for
-workload/profile and GNN seed measurements; the two `extra*` scripts add
-optional DF-Leiden and S2CAG closure/contraction checks after any containers
-free up:
+workload/profile and GNN seed measurements; the `extra*` scripts add optional
+focused closure/contraction, radius, and feature-mode checks after any
+containers free up:
 
 ```bash
 python3 scripts/paper/generate_cn69_after3_20260527.py

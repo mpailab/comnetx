@@ -18,13 +18,19 @@ The core eight GPU scripts target the remaining paper measurements:
 - `gpu7_closure_contraction_arxivmath.sh`: direct closure/contraction ablation
   for `arxivmath`.
 
-Two optional follow-up scripts add non-duplicate ablation evidence after the
-core eight are launched:
+Optional follow-up scripts add non-duplicate ablation evidence after the core
+eight are launched:
 
 - `extra8_dfleiden_closure_contraction.sh`: direct closure/contraction ablation
   for DF-Leiden on `dyn_pubmed` and `arxivmath`.
 - `extra9_s2cag_closure_contraction.sh`: direct closure/contraction ablation
   for S2CAG random features on `dyn_pubmed` and `arxivmath`.
+- `extra10_leiden_radius0_pubmed.sh`: short workload profile for Leiden with
+  radius 0 on `dyn_pubmed`.
+- `extra11_leiden_radius2_pubmed.sh`: short workload profile for Leiden with
+  radius 2 on `dyn_pubmed`.
+- `extra12_s2cag_feature_modes_pubmed.sh`: short workload profile for S2CAG
+  dataset, one-hot, and random features on `dyn_pubmed`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -39,11 +45,20 @@ docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scri
 docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/gpu7_closure_contraction_arxivmath.sh'
 ```
 
-Run the two follow-up scripts on any freed GPU-bound containers, for example:
+Run the first two follow-up scripts on any freed GPU-bound containers, for
+example:
 
 ```bash
 docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra8_dfleiden_closure_contraction.sh'
 docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra9_s2cag_closure_contraction.sh'
+```
+
+Run the three small follow-up scripts on the requested containers:
+
+```bash
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra10_leiden_radius0_pubmed.sh'
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra11_leiden_radius2_pubmed.sh'
+docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra12_s2cag_feature_modes_pubmed.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:

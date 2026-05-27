@@ -4,9 +4,8 @@ This package assumes that ``results/paper_icdm/3`` has already been ingested.
 It avoids rerunning the completed cn69 topology, DSBM, LAGO, S2CAG dataset, and
 feature-ablation sweeps. The core eight scripts target the remaining paper
 gaps: workload/profile evidence, direct closure/contraction ablation, and
-repeated GNN random-feature runs. The two extra follow-up scripts add
-DF-Leiden and S2CAG closure/contraction checks without repeating the core
-batch.
+repeated GNN random-feature runs. The extra follow-up scripts add focused
+ablation and workload checks without repeating the core batch.
 """
 
 from __future__ import annotations
@@ -129,6 +128,8 @@ def profile_script(
     random_seed: int | None,
     max_updates: int,
     timeout: str,
+    smart_depth: int = 3,
+    smart_radius: int = 1,
 ) -> str:
     log_prefix = f"gpu{gpu}" if isinstance(gpu, int) else str(gpu)
     feature_args = ""
@@ -164,8 +165,8 @@ timeout --kill-after=2m "$TIMEOUT" python scripts/paper/profile_smart_workload.p
   --batches {' '.join(batches)} \\
   --methods {' '.join(methods)}{feature_args}{iter_arg}{seed_arg} \\
   --variants {' '.join(variants)} \\
-  --smart-depth 3 \\
-  --smart-radius 1 \\
+  --smart-depth {smart_depth} \\
+  --smart-radius {smart_radius} \\
   --aggregation-mode {aggregation_mode} \\
   --max-updates {max_updates} \\
   --use-gpu \\
@@ -315,6 +316,53 @@ def build_scripts() -> dict[str, str]:
             max_updates=10,
             timeout="24h",
         ),
+        "extra10_leiden_radius0_pubmed.sh": profile_script(
+            gpu="extra10",
+            title="Leiden radius-0 dyn_pubmed workload",
+            name="after3_leiden_radius0_pubmed_extra10",
+            datasets=["dyn_pubmed"],
+            batches=["999:50"],
+            methods=["leidenalg"],
+            variants=["full"],
+            feature_modes=None,
+            aggregation_mode="sum",
+            baseline_iter=None,
+            random_seed=None,
+            max_updates=20,
+            timeout="12h",
+            smart_radius=0,
+        ),
+        "extra11_leiden_radius2_pubmed.sh": profile_script(
+            gpu="extra11",
+            title="Leiden radius-2 dyn_pubmed workload",
+            name="after3_leiden_radius2_pubmed_extra11",
+            datasets=["dyn_pubmed"],
+            batches=["999:50"],
+            methods=["leidenalg"],
+            variants=["full"],
+            feature_modes=None,
+            aggregation_mode="sum",
+            baseline_iter=None,
+            random_seed=None,
+            max_updates=20,
+            timeout="12h",
+            smart_radius=2,
+        ),
+        "extra12_s2cag_feature_modes_pubmed.sh": profile_script(
+            gpu="extra12",
+            title="S2CAG feature modes dyn_pubmed",
+            name="after3_s2cag_feature_modes_pubmed_extra12",
+            datasets=["dyn_pubmed"],
+            batches=["999:50"],
+            methods=["s2cag"],
+            variants=["full"],
+            feature_modes=["dataset", "onehot", "random"],
+            aggregation_mode="norm",
+            baseline_iter=10,
+            random_seed=42,
+            max_updates=5,
+            timeout="12h",
+        ),
     }
 
 
@@ -338,13 +386,19 @@ The core eight GPU scripts target the remaining paper measurements:
 - `gpu7_closure_contraction_arxivmath.sh`: direct closure/contraction ablation
   for `arxivmath`.
 
-Two optional follow-up scripts add non-duplicate ablation evidence after the
-core eight are launched:
+Optional follow-up scripts add non-duplicate ablation evidence after the core
+eight are launched:
 
 - `extra8_dfleiden_closure_contraction.sh`: direct closure/contraction ablation
   for DF-Leiden on `dyn_pubmed` and `arxivmath`.
 - `extra9_s2cag_closure_contraction.sh`: direct closure/contraction ablation
   for S2CAG random features on `dyn_pubmed` and `arxivmath`.
+- `extra10_leiden_radius0_pubmed.sh`: short workload profile for Leiden with
+  radius 0 on `dyn_pubmed`.
+- `extra11_leiden_radius2_pubmed.sh`: short workload profile for Leiden with
+  radius 2 on `dyn_pubmed`.
+- `extra12_s2cag_feature_modes_pubmed.sh`: short workload profile for S2CAG
+  dataset, one-hot, and random features on `dyn_pubmed`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -359,11 +413,20 @@ docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scri
 docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/gpu7_closure_contraction_arxivmath.sh'
 ```
 
-Run the two follow-up scripts on any freed GPU-bound containers, for example:
+Run the first two follow-up scripts on any freed GPU-bound containers, for
+example:
 
 ```bash
 docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra8_dfleiden_closure_contraction.sh'
 docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra9_s2cag_closure_contraction.sh'
+```
+
+Run the three small follow-up scripts on the requested containers:
+
+```bash
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra10_leiden_radius0_pubmed.sh'
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra11_leiden_radius2_pubmed.sh'
+docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra12_s2cag_feature_modes_pubmed.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:
