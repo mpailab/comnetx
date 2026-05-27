@@ -110,6 +110,9 @@ workload/profile and GNN seed measurements; the `extra*` scripts add optional
 focused closure/contraction, radius, and feature-mode checks after any
 containers free up:
 
+Do not keep retrying DF-Leiden `no_contraction` on `arxivmath`: extra24 and
+extra25 recorded cuSPARSE insufficient-resource failures for this branch.
+
 ```bash
 python3 scripts/paper/generate_cn69_after3_20260527.py
 ```

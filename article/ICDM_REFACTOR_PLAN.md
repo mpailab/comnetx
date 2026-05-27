@@ -555,6 +555,11 @@ high-history rows. Optional `extra*` scripts add focused closure/contraction,
 radius, and feature-mode checks after containers free up. The package
 deliberately avoids repeating the topology, DSBM, LAGO, S2CAG dataset-feature,
 and feature-ablation sweeps already represented in the registry.
+Operational note after the extra24/extra25 runs: DF-Leiden `no_contraction` on
+`arxivmath` hit cuSPARSE insufficient-resource failures for both `9:500` and
+`9:100`. Treat these as contraction-necessity/operating-envelope evidence and
+do not schedule more DF-Leiden `no_contraction` arxivmath follow-ups without an
+implementation or hardware change.
 
 ## 6. Current result registry
 

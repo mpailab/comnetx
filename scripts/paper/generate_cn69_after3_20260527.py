@@ -564,6 +564,21 @@ def build_scripts() -> dict[str, str]:
             max_updates=100,
             timeout="9h",
         ),
+        "extra26_leiden_no_closure_arxivmath_9500_long.sh": profile_script(
+            gpu="extra26",
+            title="Leiden long no-closure arxivmath 9:500",
+            name="after3_leiden_no_closure_arxivmath_9500_long_extra26",
+            datasets=["arxivmath"],
+            batches=["9:500"],
+            methods=["leidenalg"],
+            variants=["no_closure"],
+            feature_modes=None,
+            aggregation_mode="sum",
+            baseline_iter=None,
+            random_seed=None,
+            max_updates=120,
+            timeout="9h",
+        ),
     }
 
 
@@ -629,6 +644,8 @@ eight are launched:
 - `extra25_dfleiden_closure_variants_arxivmath_9100_long.sh`: longer
   no-closure/no-contraction DF-Leiden follow-up on `arxivmath`, using `9:100`;
   this is a smaller fallback after the `9:500` no-contraction resource limit.
+- `extra26_leiden_no_closure_arxivmath_9500_long.sh`: longer no-closure Leiden
+  follow-up on `arxivmath`, using `9:500`; it avoids the no-contraction branch.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -702,6 +719,18 @@ container if the `9:500` no-contraction branch hits a resource limit:
 
 ```bash
 docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra25_dfleiden_closure_variants_arxivmath_9100_long.sh'
+```
+
+Resource-limit note: `extra24` and `extra25` both showed that DF-Leiden
+`no_contraction` on `arxivmath` can hit cuSPARSE insufficient resources. Keep
+those results as contraction-necessity evidence and avoid scheduling more
+DF-Leiden `no_contraction` arxivmath follow-ups unless the implementation or
+GPU resource profile changes.
+
+Run the next non-overlapping follow-up on the freed `dev_konovalov` container:
+
+```bash
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra26_leiden_no_closure_arxivmath_9500_long.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:
