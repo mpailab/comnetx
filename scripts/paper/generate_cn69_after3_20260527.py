@@ -549,6 +549,21 @@ def build_scripts() -> dict[str, str]:
             max_updates=120,
             timeout="9h",
         ),
+        "extra25_dfleiden_closure_variants_arxivmath_9100_long.sh": profile_script(
+            gpu="extra25",
+            title="DF-Leiden long closure variants arxivmath 9:100",
+            name="after3_dfleiden_closure_variants_arxivmath_9100_long_extra25",
+            datasets=["arxivmath"],
+            batches=["9:100"],
+            methods=["dfleiden"],
+            variants=["no_closure", "no_contraction"],
+            feature_modes=None,
+            aggregation_mode="sum",
+            baseline_iter=None,
+            random_seed=None,
+            max_updates=100,
+            timeout="9h",
+        ),
     }
 
 
@@ -611,6 +626,9 @@ eight are launched:
 - `extra24_dfleiden_closure_variants_arxivmath_9500_long.sh`: longer
   no-closure/no-contraction DF-Leiden follow-up on `arxivmath`, using `9:500`;
   it reuses the existing full-profile baseline instead of rerunning it.
+- `extra25_dfleiden_closure_variants_arxivmath_9100_long.sh`: longer
+  no-closure/no-contraction DF-Leiden follow-up on `arxivmath`, using `9:100`;
+  this is a smaller fallback after the `9:500` no-contraction resource limit.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -677,6 +695,13 @@ container:
 
 ```bash
 docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra24_dfleiden_closure_variants_arxivmath_9500_long.sh'
+```
+
+Run the smaller non-overlapping fallback on the freed `dev_konovalov`
+container if the `9:500` no-contraction branch hits a resource limit:
+
+```bash
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra25_dfleiden_closure_variants_arxivmath_9100_long.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:
