@@ -1,0 +1,10 @@
+[
+  {
+    "dataset": "dyn_pubmed",
+    "batch_strategy": "999:50",
+    "method": "dmon",
+    "feature_mode": "onehot",
+    "variant": "full",
+    "error": "CUDA out of memory. Tried to allocate 416.00 MiB. GPU "
+  }
+]
