@@ -855,16 +855,18 @@ The neighborhood table explains the first stage of locality. The decisive
 second stage is the hierarchical closure and contraction, summarized by the
 post-closure sets $U_t^\ell$ and the contracted backend sizes
 $(k_\ell,\bar m_\ell)$. Table~\ref{tab:contracted-workload} uses the same
-complete method--dataset grid as Table~\ref{tab:stability}. The latest
-workload-profile records fill the post-closure and contracted-backend columns
-for the focused grid, so the table can be read together with the runtime and
-memory breakdown below.
+complete method--dataset grid as Table~\ref{tab:stability} and adds
+\textit{dyn\_cora} as a small-graph control. The latest workload-profile
+records fill the post-closure and contracted-backend columns for the focused
+grid, so the table can be read together with the runtime and memory breakdown
+below.
 
 \begin{table}[t]
 \centering
 \caption{Contracted workload after hierarchical closure. The table mirrors the
-complete focused comparison grid from Table~\ref{tab:stability}. $|U|/|V|$ is
-the post-closure vertex fraction, $|\bar V|$ is the mean contracted backend
+complete focused comparison grid from Table~\ref{tab:stability} and includes
+\textit{dyn\_cora} as a small-control row for each backend family. $|U|/|V|$
+is the post-closure vertex fraction, $|\bar V|$ is the mean contracted backend
 node count, and $|\bar E|/|E|$ is the edge fraction in the contracted backend
 instance.}
 \label{tab:contracted-workload}
@@ -877,14 +879,17 @@ instance.}
 \textbf{B/L} \\
 \midrule
 \multicolumn{7}{l}{\textit{Topology-only full-recomputation baseline}} \\
+Leidenalg & dyn\_cora   & 0.07 / 0.35 & 11.5\% & 11 & 0.40\% & 9.6$\times$ \\
 Leidenalg & dyn\_pubmed & 0.79 / 1.80 & 19.9\% & 40 & 0.64\% & 22.0$\times$ \\
 Leidenalg & arxivmath   & 0.95 / 1.11 & 43.7\% & 637 & 0.79\% & 43.9$\times$ \\
 \addlinespace
 \multicolumn{7}{l}{\textit{Native dynamic topology baseline}} \\
+DF-Leiden & dyn\_cora   & 0.07 / 0.35 & 11.4\% & 11 & 0.39\% & 0.78$\times$ \\
 DF-Leiden & dyn\_pubmed & 0.79 / 1.80 & 20.8\% & 40 & 0.64\% & 0.95$\times$ \\
 DF-Leiden & arxivmath   & 0.95 / 1.11 & 48.2\% & 638 & 0.77\% & 8.4$\times$ \\
 \addlinespace
 \multicolumn{7}{l}{\textit{Feature-aware GNN baseline}} \\
+S$^2$CAG  & dyn\_cora   & 0.07 / 0.35 & 9.7\% & 11 & 0.35\% & 3.0$\times$ \\
 S$^2$CAG  & dyn\_pubmed & 0.79 / 1.80 & 26.7\% & 64 & 1.04\% & 3.4$\times$ \\
 S$^2$CAG  & arxivmath   & 0.95 / 1.11 & 62.8\% & 690 & 1.08\% & 4.3$\times$ \\
 \bottomrule
@@ -894,37 +899,43 @@ S$^2$CAG  & arxivmath   & 0.95 / 1.11 & 62.8\% & 690 & 1.08\% & 4.3$\times$ \\
 \begin{figure}[t]
 \centering
 \begin{tikzpicture}[x=7.0cm,y=0.055cm]
-\draw[->] (0,0) -- (0.6,0)
+\draw[->] (-0.22,0) -- (0.6,0)
     node[below,font=\scriptsize] {$|\bar E|/|E|$ (\%)};
-\draw[->] (0,0) -- (0,47)
+\draw[->] (-0.22,0) -- (-0.22,47)
     node[above,font=\scriptsize] {Base/Local};
-\foreach \x/\lab in {0.05/0.6,0.25/0.8,0.45/1.0}
+\foreach \x/\lab in {-0.15/0.4,0.05/0.6,0.25/0.8,0.45/1.0}
   \draw (\x,0) -- ++(0,-1.0) node[below,font=\scriptsize] {\lab};
 \foreach \y in {10,20,30,40}
-  \draw (0,\y) -- ++(-0.012,0) node[left,font=\scriptsize] {\y};
-\draw[densely dotted,gray] (0,1) -- (0.6,1);
+  \draw (-0.22,\y) -- ++(-0.012,0) node[left,font=\scriptsize] {\y};
+\draw[densely dotted,gray] (-0.22,1) -- (0.6,1);
+\fill[blue] (-0.15,9.6) circle (1.5pt)
+    node[above right,font=\scriptsize] {L-Cora};
 \fill[blue] (0.09,22.0) circle (1.5pt)
     node[above left,font=\scriptsize] {L-Pub};
 \fill[blue] (0.24,43.9) circle (1.5pt)
     node[above right,font=\scriptsize] {L-Arx};
-\draw[blue,thick] (0.09,22.0) -- (0.24,43.9);
+\draw[blue,thick] (-0.15,9.6) -- (0.09,22.0) -- (0.24,43.9);
+\fill[dkgreen] (-0.17,0.25) rectangle (-0.152,1.31);
+\node[above right,font=\scriptsize] at (-0.152,1.31) {DF-Cora};
 \fill[dkgreen] (0.09,0.95) rectangle (0.108,2.35);
 \node[above right,font=\scriptsize] at (0.108,2.35) {DF-Pub};
 \fill[dkgreen] (0.22,8.4) rectangle (0.238,9.8);
 \node[above right,font=\scriptsize] at (0.238,9.8) {DF-Arx};
-\draw[dkgreen,thick] (0.10,1.6) -- (0.23,9.1);
+\draw[dkgreen,thick] (-0.16,0.78) -- (0.10,1.6) -- (0.23,9.1);
+\fill[mauve] (-0.20,3.0) circle (1.5pt)
+    node[above right,font=\scriptsize] {S2-Cora};
 \fill[mauve] (0.49,3.4) circle (1.5pt)
     node[above left,font=\scriptsize] {S2-Pub};
 \fill[mauve] (0.53,4.3) circle (1.5pt)
     node[above right,font=\scriptsize] {S2-Arx};
-\draw[mauve,thick] (0.49,3.4) -- (0.53,4.3);
+\draw[mauve,thick] (-0.20,3.0) -- (0.49,3.4) -- (0.53,4.3);
 \end{tikzpicture}
 \caption{Mechanism plot connecting measured contracted backend size to
-end-to-end speedup on the focused $3\times2$ grid. The pattern is monotone only
-within each backend family: topology-only Leiden benefits most from the
-sub-percent contracted edge fraction, DF-Leiden is limited when the native
-dynamic baseline is already local, and S$^2$CAG additionally pays GPU
-materialization and feature-aggregation overhead.}
+end-to-end speedup on the focused grid plus a \textit{dyn\_cora} small-control
+point. The pattern is monotone only within each backend family: topology-only
+Leiden benefits most from the sub-percent contracted edge fraction, DF-Leiden
+is limited when the native dynamic baseline is already local, and S$^2$CAG
+additionally pays GPU materialization and feature-aggregation overhead.}
 \label{fig:workload-speedup}
 \end{figure}
 
@@ -1018,10 +1029,10 @@ used as a central claim.
 \begin{table}[t]
 \centering
 \caption{Direct closure/contraction ablation for Leiden. The pilot measures
-the same two focused datasets as the main comparison. ``No closure'' keeps only
-the radius-expanded vertices, while ``No contraction'' gives the backend the
-post-closure induced subgraph without community contraction. $T$ is the total
-profiled time in seconds.}
+the focused datasets from the main comparison and adds \textit{dyn\_cora} as a
+small-graph control. ``No closure'' keeps only the radius-expanded vertices,
+while ``No contraction'' gives the backend the post-closure induced subgraph
+without community contraction. $T$ is the total profiled time in seconds.}
 \label{tab:closure-ablation}
 \setlength{\tabcolsep}{2pt}
 \scriptsize
@@ -1030,23 +1041,29 @@ profiled time in seconds.}
 \textbf{Variant} & \textbf{Dataset} & \textbf{$Q$} & \textbf{$T$} &
 \textbf{$|\bar V|/|V|$} \\
 \midrule
+Full ComNetX & dyn\_cora & 0.808 & 0.75 & 0.41\% \\
 Full ComNetX & dyn\_pubmed & 0.758 & 2.36 & 0.20\% \\
 Full ComNetX & arxivmath & 0.871 & 8.90 & 0.24\% \\
+No closure & dyn\_cora & 0.797 & 0.11 & 0.35\% \\
 No closure & dyn\_pubmed & 0.563 & 0.82 & 0.18\% \\
 No closure & arxivmath & 0.732 & 7.60 & 0.22\% \\
+No contraction & dyn\_cora & 0.763 & 0.35 & 7.26\% \\
 No contraction & dyn\_pubmed & 0.671 & 16.07 & 8.81\% \\
 No contraction & arxivmath & 0.874 & 1520.57 & 32.56\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The direct ablation separates the two roles of the hierarchy. Removing closure
-is fastest, but it loses substantial modularity on both larger graphs because
-the backend sees only the radius-one boundary. Removing contraction preserves or
-improves quality on \textit{arxivmath}, but the backend instance grows by two
-orders of magnitude and the run becomes impractically slow; contraction is
-therefore the mechanism that turns closure from context recovery into a
-scalable update.
+The direct ablation separates the two roles of the hierarchy. The
+\textit{dyn\_cora} control shows the expected small-graph regime: removing
+closure or contraction can reduce wall-clock time when overhead dominates, but
+the no-contraction instance is about $18\times$ larger than the full contracted
+instance and loses modularity. On the larger graphs, removing closure is fastest
+but loses substantial modularity because the backend sees only the radius-one
+boundary. Removing contraction preserves or improves quality on
+\textit{arxivmath}, but the backend instance grows by two orders of magnitude
+and the run becomes impractically slow; contraction is therefore the mechanism
+that turns closure from context recovery into a scalable update.
 
 \subsubsection{Real-Data Long-Horizon Robustness}
 
@@ -1166,7 +1183,8 @@ Its rows deliberately mirror the complete focused grid in
 Table~\ref{tab:contracted-workload}: topology and native-dynamic rows test
 whether contraction reduces solver work, while S$^2$CAG rows test whether
 local materialization controls the memory footprint of a feature-aware GPU
-backend. The latest workload-profile records now fill this focused grid.
+backend. The latest workload-profile records now fill this focused grid and add
+\textit{dyn\_cora} as a small-control row for each backend family.
 
 \begin{table}[t]
 \centering
@@ -1184,12 +1202,15 @@ memory is peak allocated memory for neural backends.}
 \textbf{Solve} & \textbf{Proj.} & \textbf{CPU} & \textbf{GPU} \\
 \midrule
 \multicolumn{8}{l}{\textit{Topology-only and native dynamic baselines}} \\
+Leidenalg & dyn\_cora   & 16.24 & 5.25 & 42.15 & 0.40 & 845 & n/a \\
 Leidenalg & dyn\_pubmed & 3.56 & 5.07 & 7.76 & 0.48 & 848 & n/a \\
 Leidenalg & arxivmath   & 8.37 & 6.67 & 141.48 & 0.55 & 1190 & n/a \\
+DF-Leiden & dyn\_cora   & 2.42 & 3.78 & 1.12 & 0.37 & 848 & n/a \\
 DF-Leiden & dyn\_pubmed & 3.23 & 5.19 & 1.71 & 0.46 & 850 & n/a \\
 DF-Leiden & arxivmath   & 7.27 & 6.33 & 10.88 & 0.49 & 1190 & n/a \\
 \addlinespace
 \multicolumn{8}{l}{\textit{Feature-aware GPU baseline}} \\
+S$^2$CAG  & dyn\_cora   & 16.94 & 6.39 & 715.37 & 0.53 & 1171 & 2.0 \\
 S$^2$CAG  & dyn\_pubmed & 4.11 & 7.09 & 1190.28 & 1.01 & 4109 & 16.1 \\
 S$^2$CAG  & arxivmath   & 10.49 & 11.98 & 6313.82 & 1.70 & 4893 & 277.4 \\
 \bottomrule
@@ -1199,11 +1220,14 @@ S$^2$CAG  & arxivmath   & 10.49 & 11.98 & 6313.82 & 1.70 & 4893 & 277.4 \\
 The breakdown is collected with wall-clock timers around four code regions:
 radius expansion plus closure, construction of the membership matrix and
 contracted graph, backend execution, and projection of labels back to the
-original vertices. The topology rows show that expansion and aggregation stay in
-single-digit milliseconds, while backend execution becomes the dominant term on
-\textit{arxivmath}. For S$^2$CAG, backend execution dominates even after
-contraction, explaining why the GNN speedups in Figure~\ref{fig:workload-speedup}
-are smaller despite sub-percent contracted edge fractions.
+original vertices. The topology rows show that expansion and aggregation stay
+in single-digit milliseconds on the large focused graphs, while backend
+execution becomes the dominant term on \textit{arxivmath}. The
+\textit{dyn\_cora} rows confirm that contracted instances remain tiny, but also
+show the small-graph regime where backend and framework overhead can dominate
+absolute time. For S$^2$CAG, backend execution dominates even after contraction,
+explaining why the GNN speedups in Figure~\ref{fig:workload-speedup} are
+smaller despite sub-percent contracted edge fractions.
 
 \subsubsection{Controlled DSBM Stress Test}
 

@@ -111,6 +111,31 @@ Recommended priority order for freed containers:
 24. `extra24_badloc_brain_s2cag_random.sh`: last-resort dense feature-aware
     stress probe.
 
+Recovery after the first core run:
+
+`results/paper_icdm/5` contains complete `dyn_cora` workload-profile JSONs and
+partial five-batch DSBM output, but the long-horizon LD-Leiden NMI cells failed
+on an older `dynamic_graphs_communities` `apply()` API and the `100_batches`
+DSBM jobs produced no useful measurements. Use the retry scripts below after
+updating `src/baselines/dgc.py` on cn69:
+
+```bash
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry00_long_horizon_ldleiden_nmi.sh'
+docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry01_dsbm_random_5b_mc1450.sh'
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry02_dsbm_random_5b_mc2900.sh'
+docker exec -d dev_egorov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry03_dsbm_random_5b_mc14500.sh'
+docker exec -d dev_egorov2 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry04_dsbm_random_5b_mc29000.sh'
+docker exec -d dev_drobyshev bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry05_dsbm_hubs_5b_mc290_1450.sh'
+docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry06_dsbm_hubs_5b_mc2900.sh'
+docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry07_dsbm_hubs_5b_mc14500.sh'
+```
+
+Run `retry08_dsbm_hubs_5b_mc29000.sh` on the first freed container:
+
+```bash
+docker exec -d CT bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry08_dsbm_hubs_5b_mc29000.sh'
+```
+
 After jobs finish or time out, rebuild the registry:
 
 ```bash

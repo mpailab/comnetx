@@ -14,6 +14,23 @@ ALG_CLASS = {
     "ldleiden": LDLeiden,
     "dfleiden": DFLeiden
 }
+
+
+def _apply_ldleiden(algo, timing_info=None):
+    try:
+        update_ms, run_ms = algo.apply(with_update_timing=True)
+    except TypeError as exc:
+        if "with_update_timing" not in str(exc):
+            raise
+        run_ms = algo.apply()
+        update_ms = None
+
+    if timing_info is not None:
+        timing_info["algorithm_time"] = timing_info.get("algorithm_time", 0.0) + run_ms / 1000
+        if update_ms is not None:
+            timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + update_ms / 1000
+
+
 def create_leiden(method: str, adj, options=None, partition=None):
     if method not in ALG_CLASS:
         raise ValueError(f"Unknown method: {method}")
@@ -60,10 +77,7 @@ def _run_leiden(
 
     # Run the Leiden algorithm
     if method == "ldleiden":
-        update_ms, run_ms = algo.apply(with_update_timing=True)
-        if timing_info is not None:
-            timing_info["algorithm_time"] = timing_info.get("algorithm_time", 0.0) + run_ms / 1000
-            timing_info["conversion_time"] = timing_info.get("conversion_time", 0.0) + update_ms / 1000
+        _apply_ldleiden(algo, timing_info=timing_info)
     else:
         time_s = time.time()
         run_ms = algo.apply()

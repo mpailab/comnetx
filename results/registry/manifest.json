@@ -1,9 +1,9 @@
 {
   "input_dir": "results",
   "output_dir": "results/registry",
-  "experiment_records": 2723,
+  "experiment_records": 2727,
   "neighborhood_records": 536,
-  "profile_records": 67,
+  "profile_records": 73,
   "error_records": 35,
   "deduplicated_sources": 463,
   "unreadable_files": 0,
