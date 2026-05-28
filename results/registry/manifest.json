@@ -1,11 +1,11 @@
 {
   "input_dir": "results",
   "output_dir": "results/registry",
-  "experiment_records": 2727,
+  "experiment_records": 2749,
   "neighborhood_records": 536,
   "profile_records": 73,
   "error_records": 35,
-  "deduplicated_sources": 463,
+  "deduplicated_sources": 464,
   "unreadable_files": 0,
   "outputs": {
     "compact_json": "results/registry/all_results.json",

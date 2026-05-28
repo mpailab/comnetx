@@ -157,11 +157,17 @@ if conf.get("USE_TIMESTAMP_SUFFIX", True):
 else:
     DATE_SUFFIX = "now"
 def save(db, errors):
-    os.makedirs(os.path.join(PROJECT_PATH, "results"), exist_ok = True)
-    with open(os.path.join(PROJECT_PATH, "results", f"{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
+    results_dir = os.getenv("RESULTS_DIR")
+    if results_dir:
+        if not os.path.isabs(results_dir):
+            results_dir = os.path.join(PROJECT_PATH, results_dir)
+    else:
+        results_dir = os.path.join(PROJECT_PATH, "results")
+    os.makedirs(results_dir, exist_ok = True)
+    with open(os.path.join(results_dir, f"{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
         json.dump(db, _, indent=4)
     if errors:
-        with open(os.path.join(PROJECT_PATH, "results", f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
+        with open(os.path.join(results_dir, f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
             json.dump(errors, _, indent=4)
 
 def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None, feature_mode="dataset"):

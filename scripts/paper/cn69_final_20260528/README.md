@@ -42,18 +42,24 @@ The split uses the completed community-internal DSBM timings as a rough guide:
 GPU0/GPU1 combine short mandatory completion blocks with the short DSBM
 granularities, while GPU2-GPU7 split the longer `100_batches` slices.
 
+All scripts in this series write to `results/paper_icdm/7` by default. The
+series directory is controlled by `PAPER_ICDM_SERIES`; for the next measurement
+wave, set `PAPER_ICDM_SERIES=8` (or another fresh number) instead of reusing
+the same subdirectory. `RESULTS_DIR` can override the full output path when a
+custom location is needed.
+
 Run from cn69 after rebuilding the registry from any newly copied results:
 
 ```bash
 python3 scripts/paper/collect_results_registry.py
-docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu0_long_nmi_and_dsbm_random_small.sh'
-docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu1_dyn_cora_and_dsbm_hubs_small.sh'
-docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu2_dsbm_random_100_mc290.sh'
-docker exec -d dev_egorov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu3_dsbm_hubs_100_mc290.sh'
-docker exec -d dev_egorov2 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu4_dsbm_random_100_mc1450.sh'
-docker exec -d dev_drobyshev bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu5_dsbm_hubs_100_mc1450.sh'
-docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu6_dsbm_random_100_mid_high.sh'
-docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/gpu7_dsbm_hubs_100_mid_high.sh'
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu0_long_nmi_and_dsbm_random_small.sh'
+docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu1_dyn_cora_and_dsbm_hubs_small.sh'
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu2_dsbm_random_100_mc290.sh'
+docker exec -d dev_egorov bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu3_dsbm_hubs_100_mc290.sh'
+docker exec -d dev_egorov2 bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu4_dsbm_random_100_mc1450.sh'
+docker exec -d dev_drobyshev bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu5_dsbm_hubs_100_mc1450.sh'
+docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu6_dsbm_random_100_mid_high.sh'
+docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/gpu7_dsbm_hubs_100_mid_high.sh'
 ```
 
 Optional bad-locality follow-ups:
@@ -62,7 +68,8 @@ The 24 `extra*.sh` scripts are deliberately not part of the core paper-facing
 queue. They probe whether the method remains admissible when locality is poor
 on `dyn_blogcatalog`, `dyn_wikics`, and `brain`. Run them only on containers
 that finish the core queue early. Each script is a small workload-profile
-probe over `999:10` and writes checkpointed JSON under `results/paper_icdm/`.
+probe over `999:10` and writes checkpointed JSON under the same series
+directory, `results/paper_icdm/7` by default.
 
 Recommended priority order for freed containers:
 
@@ -120,20 +127,20 @@ DSBM jobs produced no useful measurements. Use the retry scripts below after
 updating `src/baselines/dgc.py` on cn69:
 
 ```bash
-docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry00_long_horizon_ldleiden_nmi.sh'
-docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry01_dsbm_random_5b_mc1450.sh'
-docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry02_dsbm_random_5b_mc2900.sh'
-docker exec -d dev_egorov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry03_dsbm_random_5b_mc14500.sh'
-docker exec -d dev_egorov2 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry04_dsbm_random_5b_mc29000.sh'
-docker exec -d dev_drobyshev bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry05_dsbm_hubs_5b_mc290_1450.sh'
-docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry06_dsbm_hubs_5b_mc2900.sh'
-docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry07_dsbm_hubs_5b_mc14500.sh'
+docker exec -d dev_bokov bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry00_long_horizon_ldleiden_nmi.sh'
+docker exec -d dev_uporova bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry01_dsbm_random_5b_mc1450.sh'
+docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry02_dsbm_random_5b_mc2900.sh'
+docker exec -d dev_egorov bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry03_dsbm_random_5b_mc14500.sh'
+docker exec -d dev_egorov2 bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry04_dsbm_random_5b_mc29000.sh'
+docker exec -d dev_drobyshev bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry05_dsbm_hubs_5b_mc290_1450.sh'
+docker exec -d dev_drobyshev2 bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry06_dsbm_hubs_5b_mc2900.sh'
+docker exec -d dev_drobyshev3 bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry07_dsbm_hubs_5b_mc14500.sh'
 ```
 
 Run `retry08_dsbm_hubs_5b_mc29000.sh` on the first freed container:
 
 ```bash
-docker exec -d CT bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_final_20260528/retry08_dsbm_hubs_5b_mc29000.sh'
+docker exec -d CT bash -lc 'cd /home/dev/users/bokov/comnetx && PAPER_ICDM_SERIES=7 scripts/paper/cn69_final_20260528/retry08_dsbm_hubs_5b_mc29000.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:

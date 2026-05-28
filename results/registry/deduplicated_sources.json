@@ -2776,5 +2776,11 @@
     "duplicate_source": "results/paper_icdm/3/s2cag_dataset_batch_sweep_20260526_1339.json",
     "run_key_with_machine": "experiment|s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:dataset|s2cag|smart|10|3|1|norm|gpu|dataset|None|None|dyn_acm|False|9:100|cn69",
     "series_digest": "440a4e077f485980acbd0353c9763ef749b658d4"
+  },
+  {
+    "canonical_source": "results/paper_icdm/5/gpu1_dsbm_hubs_5_batches_20260528_122507.json",
+    "duplicate_source": "results/paper_icdm/6/gpu1_dsbm_hubs_5_batches_20260528_122507.json",
+    "run_key_with_machine": "experiment|leidenalg-naive|leidenalg|naive|None|None|None|None|None|None|None|None|dsbm-hubs-1024-58-mc290-42|False|0:4|cn69",
+    "series_digest": "64a51bddadf705d1dc65e32920a4c120fb909347"
   }
 ]

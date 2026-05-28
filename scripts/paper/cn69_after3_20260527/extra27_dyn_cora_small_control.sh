@@ -9,23 +9,25 @@ export PYTHONUNBUFFERED=1
 PATHS_CONFIG="${PATHS_CONFIG:-datasets-info/paths/cn69.json}"
 CACHE_DIR="${CACHE_DIR:-/home/dev/communities}"
 LOG_DIR="${LOG_DIR:-output}"
-TIMEOUT="${TIMEOUT:-2h}"
+JOB_TIMEOUT="${CN69_JOB_TIMEOUT:-2h}"
+PAPER_ICDM_SERIES="${PAPER_ICDM_SERIES:-7}"
+RESULTS_DIR="${RESULTS_DIR:-results/paper_icdm/$PAPER_ICDM_SERIES}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 FAILED=0
 mkdir -p "$LOG_DIR"
-mkdir -p results/paper_icdm
+mkdir -p "$RESULTS_DIR"
 
 run_profile() {
   local title="$1"
   local name="$2"
   shift 2
   local log="$LOG_DIR/extra27_${name}_${STAMP}.log"
-  echo "[dyn_cora small control] $(date -Is) running ${title} with timeout=$TIMEOUT on CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-container-bound}"
-  timeout --kill-after=2m "$TIMEOUT" python scripts/paper/profile_smart_workload.py \
+  echo "[dyn_cora small control] $(date -Is) running ${title} with timeout=$JOB_TIMEOUT on CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-container-bound}"
+  timeout --kill-after=2m "$JOB_TIMEOUT" python scripts/paper/profile_smart_workload.py \
     "$@" \
     --paths-config "$PATHS_CONFIG" \
     --cache-dir "$CACHE_DIR" \
-    --output-dir results/paper_icdm \
+    --output-dir "$RESULTS_DIR" \
     --name "${name}_${STAMP}" \
     2>&1 | tee "$log"
   status="${PIPESTATUS[0]}"
