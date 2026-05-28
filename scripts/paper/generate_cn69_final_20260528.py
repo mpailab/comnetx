@@ -502,6 +502,53 @@ on `dyn_blogcatalog`, `dyn_wikics`, and `brain`. Run them only on containers
 that finish the core queue early. Each script is a small workload-profile
 probe over `999:10` and writes checkpointed JSON under `results/paper_icdm/`.
 
+Recommended priority order for freed containers:
+
+1. `extra09_badloc_dyn_wikics_leiden_r1.sh`: default Local Leiden on a
+   bad-locality graph that is not fully saturated at radius 1.
+2. `extra10_badloc_dyn_wikics_dfleiden_r1.sh`: paired DF-Leiden check for the
+   same graph.
+3. `extra01_badloc_dyn_blogcatalog_leiden_r1.sh`: default Local Leiden on a
+   smaller but more saturated bad-locality graph.
+4. `extra02_badloc_dyn_blogcatalog_dfleiden_r1.sh`: paired DF-Leiden check for
+   the same graph.
+5. `extra17_badloc_brain_leiden_r1.sh`: extreme dense-graph boundary check for
+   Local Leiden.
+6. `extra18_badloc_brain_dfleiden_r1.sh`: paired DF-Leiden dense-graph
+   boundary check.
+7. `extra11_badloc_dyn_wikics_leiden_r0.sh`: conservative radius-0 fallback on
+   the most informative bad-locality graph.
+8. `extra12_badloc_dyn_wikics_dfleiden_r0.sh`: paired DF-Leiden radius-0
+   fallback.
+9. `extra03_badloc_dyn_blogcatalog_leiden_r0.sh`: radius-0 fallback on the
+   smaller saturated graph.
+10. `extra04_badloc_dyn_blogcatalog_dfleiden_r0.sh`: paired DF-Leiden radius-0
+    fallback.
+11. `extra19_badloc_brain_leiden_r0.sh`: radius-0 fallback on the dense graph.
+12. `extra20_badloc_brain_dfleiden_r0.sh`: paired DF-Leiden radius-0 fallback
+    on the dense graph.
+13. `extra15_badloc_dyn_wikics_leiden_closure_variants.sh`: closure and
+    contraction diagnostic where radius 1 still leaves some signal.
+14. `extra07_badloc_dyn_blogcatalog_leiden_closure_variants.sh`: closure and
+    contraction diagnostic on the smaller saturated graph.
+15. `extra23_badloc_brain_leiden_closure_variants.sh`: highest-risk closure and
+    contraction diagnostic; run only after cheaper topology probes.
+16. `extra13_badloc_dyn_wikics_leiden_r2.sh`: radius-2 blow-up check.
+17. `extra14_badloc_dyn_wikics_dfleiden_r2.sh`: paired DF-Leiden radius-2
+    blow-up check.
+18. `extra05_badloc_dyn_blogcatalog_leiden_r2.sh`: radius-2 saturation check.
+19. `extra06_badloc_dyn_blogcatalog_dfleiden_r2.sh`: paired DF-Leiden
+    radius-2 saturation check.
+20. `extra21_badloc_brain_leiden_r2.sh`: dense-graph radius-2 stress.
+21. `extra22_badloc_brain_dfleiden_r2.sh`: paired DF-Leiden dense-graph
+    radius-2 stress.
+22. `extra16_badloc_dyn_wikics_s2cag_random.sh`: feature-aware probe after the
+    topology envelope is known.
+23. `extra08_badloc_dyn_blogcatalog_s2cag_random.sh`: feature-aware probe on
+    the smaller saturated graph.
+24. `extra24_badloc_brain_s2cag_random.sh`: last-resort dense feature-aware
+    stress probe.
+
 After jobs finish or time out, rebuild the registry:
 
 ```bash
