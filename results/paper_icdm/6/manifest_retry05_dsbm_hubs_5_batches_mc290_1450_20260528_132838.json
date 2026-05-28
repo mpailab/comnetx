@@ -1,0 +1,39 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "5_batches",
+  "all_batches": false,
+  "regimes": [
+    "hubs"
+  ],
+  "max_changes": [
+    290,
+    1450
+  ],
+  "methods": [
+    "leidenalg"
+  ],
+  "modes": [
+    "smart",
+    "naive"
+  ],
+  "selected_streams": 2,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-42/out.dsbm-hubs-1024-58-mc290-42.5_batches",
+    "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-42/out.dsbm-hubs-1024-58-mc1450-42.5_batches"
+  ],
+  "attempted_runs": 2,
+  "successful_runs": 1,
+  "skipped_existing": 1,
+  "errors": 0,
+  "status": "running",
+  "started_at": "2026-05-28T13:28:41.160782",
+  "updated_at": "2026-05-28T13:32:01.043128",
+  "current_attempt": {
+    "algorithm": "leidenalg-L:3-r:1-gpu",
+    "dataset": "dsbm-hubs-1024-58-mc1450-42",
+    "stream": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-42/out.dsbm-hubs-1024-58-mc1450-42.5_batches",
+    "batch_strategy": "0:4",
+    "attempt_index": 2
+  },
+  "output": "results/paper_icdm/retry05_dsbm_hubs_5_batches_mc290_1450_20260528_132838.json"
+}
