@@ -43,6 +43,33 @@ DATASET_RE = re.compile(r"^dsbm-(?P<regime>random|hubs|community)-.*-mc(?P<max_c
 BATCH_SUFFIX_RE = re.compile(r"^(?P<updates>\d+)_batches$")
 
 
+def load_existing_registry(path: str | None) -> set[tuple[str, str, str, str]]:
+    if not path:
+        return set()
+    registry_path = Path(path)
+    if not registry_path.exists():
+        raise SystemExit(f"Skip registry does not exist: {registry_path}")
+
+    with registry_path.open("r", encoding="utf-8") as handle:
+        rows = json.load(handle)
+
+    existing: set[tuple[str, str, str, str]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("measurement_type") != "experiment":
+            continue
+        dataset = str(row.get("base_dataset") or row.get("dataset") or "")
+        if not DATASET_RE.match(dataset):
+            continue
+        method = row.get("method")
+        mode = row.get("mode")
+        batch_strategy = row.get("batch_strategy")
+        if method and mode and batch_strategy:
+            existing.add((dataset, str(batch_strategy), str(method), str(mode)))
+    return existing
+
+
 def algorithm_name(
     method: str,
     mode: str,
@@ -177,6 +204,14 @@ def main() -> None:
     parser.add_argument("--output-dir", default="results/paper_icdm")
     parser.add_argument("--name", default=None)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--skip-registry",
+        default=None,
+        help=(
+            "Path to results/registry/all_results.json. Existing DSBM "
+            "dataset/batch/method/mode rows are skipped instead of rerun."
+        ),
+    )
     parser.add_argument("--catch-errors", action="store_true")
     parser.add_argument(
         "--list-streams",
@@ -188,6 +223,7 @@ def main() -> None:
     root = Path(args.root)
     output_name = args.name or f"dsbm_stress_{datetime.now().strftime('%Y%m%d_%H%M')}"
     batch_suffix = None if args.all_batches else args.batch_suffix
+    existing_registry = load_existing_registry(args.skip_registry)
 
     if not root.exists():
         raise SystemExit(
@@ -211,6 +247,7 @@ def main() -> None:
         "selected_stream_paths": [str(path) for path in streams],
         "attempted_runs": 0,
         "successful_runs": 0,
+        "skipped_existing": 0,
         "errors": 0,
         "status": "selected",
         "started_at": datetime.now().isoformat(),
@@ -279,6 +316,12 @@ def main() -> None:
             for mode in args.modes:
                 if mode == "dynamic" and method not in METHOD_SUPPORTS_DYNAMIC:
                     continue
+                registry_key = (ds.name, batch_strategy, method, mode)
+                if registry_key in existing_registry:
+                    manifest["skipped_existing"] += 1
+                    print(f"Skip existing DSBM run: {registry_key}")
+                    checkpoint("running")
+                    continue
                 baseline_iter = METHOD_ITER_DEFAULTS.get(method)
                 alg = algorithm_name(
                     method,
@@ -333,6 +376,10 @@ def main() -> None:
     checkpoint("completed")
 
     if manifest["attempted_runs"] == 0:
+        if manifest["skipped_existing"] > 0:
+            checkpoint("completed")
+            print(json.dumps(manifest, indent=2, ensure_ascii=False))
+            return
         checkpoint("failed")
         raise SystemExit(
             "No runnable method/mode combinations were attempted. "

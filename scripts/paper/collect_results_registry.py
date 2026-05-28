@@ -150,6 +150,23 @@ def series_digest(entries: list[dict[str, Any]]) -> str:
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
 
+def stable_digest(parts: list[Any], length: int = 16) -> str:
+    payload = json.dumps([str(part) for part in parts], sort_keys=False, ensure_ascii=False)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:length]
+
+
+def stream_key(record: dict[str, Any]) -> str:
+    fields = [
+        "source_file",
+        "machine",
+        "base_dataset",
+        "force_undirected",
+        "batch_strategy",
+        "updates",
+    ]
+    return "|".join(str(record.get(field)) for field in fields)
+
+
 def run_key(record: dict[str, Any], include_machine: bool = False) -> str:
     fields = [
         "measurement_type",
@@ -218,6 +235,18 @@ def flatten_launch_result(path: Path, data: dict[str, Any], root: Path) -> list[
                     }
                     record.update(alg)
                     record.update(ds)
+                    record["stream_key"] = stream_key(record)
+                    record["stream_id"] = stable_digest(record["stream_key"].split("|"))
+                    record["measurement_id"] = stable_digest(
+                        [
+                            record["source_file"],
+                            record["machine"],
+                            record["base_dataset"],
+                            record["force_undirected"],
+                            record["batch_strategy"],
+                            record["series_digest"],
+                        ]
+                    )
 
                     for key, value in final.items():
                         if key in {"modularity", "time"}:
@@ -437,6 +466,12 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     if not rows:
         path.write_text("", encoding="utf-8")
         return
+
+    def csv_value(value: Any) -> Any:
+        if isinstance(value, str):
+            return "\n".join(line.rstrip() for line in value.splitlines())
+        return value
+
     fieldnames = sorted({key for row in rows for key in row.keys()})
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
@@ -447,7 +482,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         )
         writer.writeheader()
         for row in rows:
-            writer.writerow(row)
+            writer.writerow({key: csv_value(value) for key, value in row.items()})
 
 
 def summarize_groups(records: list[dict[str, Any]]) -> list[dict[str, Any]]:

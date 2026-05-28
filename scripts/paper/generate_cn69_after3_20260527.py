@@ -186,6 +186,92 @@ exit "$status"
 """
 
 
+def dyn_cora_small_control_script() -> str:
+    return r"""#!/usr/bin/env bash
+set -uo pipefail
+
+cd "$(dirname "$0")/../../.."
+
+export PARENT_HOSTNAME="${PARENT_HOSTNAME:-cn69}"
+export PYTHONUNBUFFERED=1
+
+PATHS_CONFIG="${PATHS_CONFIG:-datasets-info/paths/cn69.json}"
+CACHE_DIR="${CACHE_DIR:-/home/dev/communities}"
+LOG_DIR="${LOG_DIR:-output}"
+TIMEOUT="${TIMEOUT:-2h}"
+STAMP="$(date +%Y%m%d_%H%M%S)"
+FAILED=0
+mkdir -p "$LOG_DIR"
+mkdir -p results/paper_icdm
+
+run_profile() {
+  local title="$1"
+  local name="$2"
+  shift 2
+  local log="$LOG_DIR/extra27_${name}_${STAMP}.log"
+  echo "[dyn_cora small control] $(date -Is) running ${title} with timeout=$TIMEOUT on CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-container-bound}"
+  timeout --kill-after=2m "$TIMEOUT" python scripts/paper/profile_smart_workload.py \
+    "$@" \
+    --paths-config "$PATHS_CONFIG" \
+    --cache-dir "$CACHE_DIR" \
+    --output-dir results/paper_icdm \
+    --name "${name}_${STAMP}" \
+    2>&1 | tee "$log"
+  status="${PIPESTATUS[0]}"
+  if [[ "$status" -ne 0 ]]; then
+    echo "[dyn_cora small control] ${title} exited with status $status; see $log"
+    FAILED=1
+  fi
+}
+
+run_profile "topology full profiles" "dyn_cora_workload_topology_extra27" \
+  --datasets dyn_cora \
+  --batches 999:50 \
+  --methods leidenalg dfleiden \
+  --variants full \
+  --smart-depth 3 \
+  --smart-radius 1 \
+  --aggregation-mode sum \
+  --max-updates 50 \
+  --use-gpu \
+  --force-undirected \
+  --ground-truth-metrics \
+  --catch-errors
+
+run_profile "S2CAG full profile" "dyn_cora_workload_s2cag_extra27" \
+  --datasets dyn_cora \
+  --batches 999:50 \
+  --methods s2cag \
+  --feature-modes random \
+  --baseline-iter 10 \
+  --variants full \
+  --smart-depth 3 \
+  --smart-radius 1 \
+  --aggregation-mode norm \
+  --max-updates 10 \
+  --use-gpu \
+  --force-undirected \
+  --ground-truth-metrics \
+  --catch-errors
+
+run_profile "Leiden closure/contraction ablation" "dyn_cora_closure_contraction_extra27" \
+  --datasets dyn_cora \
+  --batches 999:50 \
+  --methods leidenalg \
+  --variants full no_closure no_contraction \
+  --smart-depth 3 \
+  --smart-radius 1 \
+  --aggregation-mode sum \
+  --max-updates 50 \
+  --use-gpu \
+  --force-undirected \
+  --ground-truth-metrics \
+  --catch-errors
+
+exit "$FAILED"
+"""
+
+
 def build_scripts() -> dict[str, str]:
     return {
         "gpu0_closure_contraction_pubmed.sh": profile_script(
@@ -579,6 +665,7 @@ def build_scripts() -> dict[str, str]:
             max_updates=120,
             timeout="9h",
         ),
+        "extra27_dyn_cora_small_control.sh": dyn_cora_small_control_script(),
     }
 
 
@@ -646,6 +733,10 @@ eight are launched:
   this is a smaller fallback after the `9:500` no-contraction resource limit.
 - `extra26_leiden_no_closure_arxivmath_9500_long.sh`: longer no-closure Leiden
   follow-up on `arxivmath`, using `9:500`; it avoids the no-contraction branch.
+- `extra27_dyn_cora_small_control.sh`: required small-graph control profile on
+  `dyn_cora`. It fills the missing `dyn_cora` rows needed before adding the
+  small graph to `tab:contracted-workload`, `fig:workload-speedup`,
+  `tab:closure-ablation`, and `tab:breakdown`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -731,6 +822,14 @@ Run the next non-overlapping follow-up on the freed `dev_konovalov` container:
 
 ```bash
 docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra26_leiden_no_closure_arxivmath_9500_long.sh'
+```
+
+Run the required small-control profile on any freed GPU-bound container. This
+is intentionally short and should be completed before inserting `dyn_cora`
+into the main workload/profile tables:
+
+```bash
+docker exec -d <free_container> bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra27_dyn_cora_small_control.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:

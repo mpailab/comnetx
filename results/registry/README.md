@@ -35,6 +35,13 @@ listed in `deduplicated_sources.*`.
   parsed from the algorithm string when present.
 - `base_dataset`, `force_undirected`, `batch_strategy`, `machine`: launch
   parameters used to identify overlapping runs.
+- `stream_key`: derived launch-stream key combining source file, machine,
+  dataset, directedness, batch strategy, and completed update count. It is used
+  to pair baseline/local algorithms measured on the same dynamic stream.
+- `stream_id`: compact hash of `stream_key`, suitable for paired analyses.
+- `measurement_id`: compact hash of the source context plus `series_digest`,
+  suitable for identifying the exact measured algorithm-output series without
+  merging different algorithms in the same stream.
 - `run_key`: grouping key without machine, useful for comparing repeated runs
   of the same original algorithm string and launch parameters.
 - `run_key_with_machine`: stricter key used for duplicate detection.

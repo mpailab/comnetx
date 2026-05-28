@@ -120,6 +120,30 @@ python3 scripts/paper/generate_cn69_after3_20260527.py
 This writes `conf/paper_icdm/cn69_after3_20260527/` and
 `scripts/paper/cn69_after3_20260527/`.
 
+The `dyn_cora` small-graph control is intentionally kept out of the current
+main workload/profile tables until its profile rows exist in the registry.
+Run `scripts/paper/cn69_after3_20260527/extra27_dyn_cora_small_control.sh`
+on any freed cn69 GPU-bound container, then rebuild the registry. That block is
+the required input before adding `dyn_cora` to `tab:contracted-workload`,
+`fig:workload-speedup`, `tab:closure-ablation`, and `tab:breakdown`.
+
+Generate the 2026-05-28 full-picture queue after rebuilding the registry from
+`results/paper_icdm/4`:
+
+```bash
+python3 scripts/paper/generate_cn69_final_20260528.py
+```
+
+This writes `conf/paper_icdm/cn69_final_20260528/` and
+`scripts/paper/cn69_final_20260528/`. The core eight scripts avoid already
+ingested PubMed/Arxiv workload and closure/contraction runs, include the
+required `dyn_cora` small-control block, rerun only the two `dyn_pubmed`
+`999:100` LD-Leiden long-horizon rows that still lack final NMI, and complete
+the missing random/hub DSBM solver curves for `fig:update-size`. The 24 optional
+`extra*.sh` scripts are bad-locality probes on `dyn_blogcatalog`, `dyn_wikics`,
+and `brain`; keep them as follow-ups for freed containers, not as core
+main-paper measurements.
+
 ## Summarize result JSONs
 
 Flatten one or more result files:

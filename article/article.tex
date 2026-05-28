@@ -465,8 +465,14 @@ graph representation, and conversion time is tracked separately by the
 launcher. The final tables use paired comparisons on the same dynamic streams:
 stochastic algorithms are repeated with at least five random seeds, while
 deterministic backends are evaluated on the same set of stream splits. Draft
-cells still marked TBD are reserved for measurements that are not yet present
-in the consolidated result registry.
+cells or curves still marked as pending are reserved for measurements that are
+not yet present in the consolidated result registry.
+For paired analysis, the registry derives a stream identifier from the source
+result file, machine, dataset, directedness, batch strategy, and completed
+update count. The per-algorithm \texttt{series\_digest} is retained as part of
+an exact measurement identifier, but it is not used alone as the pairing key
+because different algorithms on the same update stream produce different
+metric series.
 This protocol separates solver randomness from sensitivity to the update
 stream and is necessary for assessing whether the observed speedups and quality
 differences are statistically stable.
@@ -490,48 +496,42 @@ Detailed characteristics of each baseline, including whether they exploit node f
 All methods are evaluated on the same symmetrized graph sequence for each
 dataset.
 
-\begin{table*}[t]
+\begin{table}[t]
     \centering
-    \begin{tabular}{|c|c|C{0.14\linewidth}|c|c|}
-        \hline
-        Solution & Year & Base algorithm & Type & Uses node features \\
-        \hline
+    \setlength{\tabcolsep}{2pt}
+    \scriptsize
+    \begin{tabular}{@{}lcp{0.18\linewidth}cc@{}}
+        \toprule
+        Solution & Year & Base & Type & Features \\
+        \midrule
         Leidenalg\tablefootnote{https://github.com/vtraag/libleidenalg} & 2023
         &  Leiden & Static & No \\
-        \hline
         FLMIG\tablefootnote{https://github.com/salahinfo/FLMIG\_algorithm}
         & 2023
         &  Louvain (prune) & Static & No \\
-        \hline
         DMON\tablefootnote{https://github.com/google-research/google-research/tree/master/graph\_embedding/dmon}
         & 2020
         &  GNN & Static & Yes \\
-        \hline
         MAGI\tablefootnote{https://github.com/EdisonLeeeee/MAGI.git} & 2024
         &  GNN & Static & Yes \\
-        \hline
         PRGPT-Infomap\tablefootnote{https://github.com/KuroginQin/PRGPT} & 2024
         &  GNN & Static & No \\
-        \hline
         PRGPT-Locale\tablefootnote{https://github.com/KuroginQin/PRGPT} & 2024
         &  GNN & Static & No \\
-        \hline
         S$^2$CAG\tablefootnote{https://github.com/HKBU-LAGAS/S2CAG}
         & 2025
         &  GNN & Static & Yes \\
-        \hline
         DF-Leiden\tablefootnote{https://github.com/puzzlef/leiden-communities-openmp-dynamic}
         & 2024
         &  Leiden & Dynamic & No \\
-        \hline
         MFC\tablefootnote{https://github.com/kundtx/MFC-TopoReg}
         & 2024
         &  GNN & Dynamic & Yes \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Solutions used for performance comparison.}
     \label{T:1}
-\end{table*}
+\end{table}
 
 For algorithms that involve iterative training, the configured budgets are
 $100$ epochs for MFC, one iteration for FLMIG, and $10$ epochs for S$^2$CAG,
@@ -617,25 +617,77 @@ DMoN           & Naive   & +0.484 & +0.112 & 1.4$\times$  & OOM$\rightarrow$65.1
 \end{tabular}
 \end{table*}
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\fbox{\parbox{0.86\textwidth}{
-\centering
-\vspace{0.55cm}
-\textbf{TBD: Quality--runtime Pareto summary.}\\
-Two panels: $\Delta Q$ vs.\ Base/Local runtime ratio and
-$\Delta\mathrm{NMI}$ vs.\ Base/Local runtime ratio.\\
-x-axis: geometric speedup on a log scale.\\
-Markers: backend family; colors: dataset size group.
-\vspace{0.55cm}
-}}
+\begin{tikzpicture}[x=2.05cm,y=4.0cm]
+\node[font=\footnotesize] at (0.55,0.57) {(a) Modularity};
+\draw[->] (-0.6,-0.30) -- (1.90,-0.30)
+    node[below right,font=\scriptsize,yshift=-5pt] {speedup};
+\draw[->] (-0.6,-0.30) -- (-0.6,0.55)
+    node[above,font=\scriptsize] {$\Delta Q$};
+\draw[densely dotted,gray] (-0.6,0) -- (1.90,0);
+\foreach \x/\lab in {-0.52/0.3,0/1,1/10,1.78/60}
+  \draw (\x,-0.30) -- ++(0,-0.018) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {-0.25/-0.25,0/0,0.25/0.25,0.50/0.50}
+  \draw (-0.6,\y) -- ++(-0.025,0) node[left,font=\scriptsize] {\lab};
+\fill[dkgreen] (-0.22,-0.012) rectangle (-0.185,0.013);
+\node[above right,font=\scriptsize] at (-0.185,0.013) {DF};
+\fill[mauve] (1.65,0.048) circle (1.4pt)
+  node[above,font=\scriptsize] {MFC};
+\fill[blue] (0.86,-0.013) circle (1.4pt)
+  node[above,font=\scriptsize] {Leid};
+\fill[gray] (1.78,-0.250) circle (1.4pt)
+  node[right,font=\scriptsize] {FLMIG};
+\fill[gray] (0.88,-0.165) circle (1.4pt)
+  node[above right,font=\scriptsize] {PI};
+\fill[gray] (0.95,-0.242) circle (1.4pt)
+  node[below right,font=\scriptsize] {PL};
+\fill[mauve] (0.94,0.230) circle (1.4pt)
+  node[above,font=\scriptsize] {S2};
+\fill[mauve] (-0.52,0.082) circle (1.4pt)
+  node[above right,font=\scriptsize] {MAGI};
+\fill[mauve] (0.15,0.484) circle (1.4pt)
+  node[right,font=\scriptsize] {DMoN};
+\end{tikzpicture}
+
+\vspace{0.35em}
+
+\begin{tikzpicture}[x=2.05cm,y=12.0cm]
+\node[font=\footnotesize] at (0.55,0.15) {(b) NMI};
+\draw[->] (-0.6,-0.09) -- (1.90,-0.09)
+    node[below right,font=\scriptsize,yshift=-5pt] {speedup};
+\draw[->] (-0.6,-0.09) -- (-0.6,0.13)
+    node[above,font=\scriptsize] {$\Delta$NMI};
+\draw[densely dotted,gray] (-0.6,0) -- (1.90,0);
+\foreach \x/\lab in {-0.52/0.3,0/1,1/10,1.78/60}
+  \draw (\x,-0.09) -- ++(0,-0.006) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {-0.05/-0.05,0/0,0.10/0.10}
+  \draw (-0.6,\y) -- ++(-0.025,0) node[left,font=\scriptsize] {\lab};
+\fill[dkgreen] (-0.22,0.002) rectangle (-0.185,0.008);
+\node[above right,font=\scriptsize] at (-0.185,0.008) {DF};
+\fill[mauve] (1.65,0.126) circle (1.4pt)
+  node[above,font=\scriptsize] {MFC};
+\fill[blue] (0.86,-0.010) circle (1.4pt)
+  node[above,font=\scriptsize] {Leid};
+\fill[gray] (1.78,-0.042) circle (1.4pt)
+  node[right,font=\scriptsize] {FLMIG};
+\fill[gray] (0.88,-0.073) circle (1.4pt)
+  node[below,font=\scriptsize] {PI};
+\fill[gray] (0.95,-0.073) circle (1.4pt)
+  node[below right,font=\scriptsize] {PL};
+\fill[mauve] (0.94,0.112) circle (1.4pt)
+  node[above,font=\scriptsize] {S2};
+\fill[mauve] (-0.52,-0.034) circle (1.4pt)
+  node[below right,font=\scriptsize] {MAGI};
+\fill[mauve] (0.15,0.112) circle (1.4pt)
+  node[above,font=\scriptsize] {DMoN};
+\end{tikzpicture}
 \caption{Pareto view of quality preservation versus runtime reduction for the
-all-backend compatibility screen. Fill directly from
-\texttt{results/registry/all\_results\_with\_series.json} after the final
-registry rebuild. This figure should show whether ComNetX forms a clear
-quality--efficiency frontier rather than only winning in isolated table cells.}
+all-backend compatibility screen. Points are backend-level aggregates from
+Table~\ref{tab:main-results}; the x-axis is geometric speedup on a log scale,
+and the y-axes report Local minus baseline quality.}
 \label{fig:quality-runtime-pareto}
-\end{figure*}
+\end{figure}
 
 \textbf{Modularity and extrinsic quality preservation.}
 For Leidenalg, the Local adapter closely tracks the Naive modularity, with
@@ -667,54 +719,56 @@ Crucially, the Local adapter also accelerates the native dynamic DF-Leiden on \t
 
 This experiment addresses the stream-level part of RQ5.
 Table~\ref{tab:stability} is the robustness counterpart to the aggregate screen:
-it reports mean $\pm$ standard deviation over the non-duplicate registry runs
-currently available for each comparison. The rows follow the focused comparison
+it reports mean $\pm$ standard deviation over the paired non-duplicate P2
+streams currently available for each comparison. The rows follow the focused comparison
 design above: each of the three central backends is reported on both
 \textit{dyn\_pubmed} and \textit{arxivmath}. This makes the table a complete
 medium/large comparison rather than a collection of individually convenient
 rows. The table is important because several backends are stochastic and
 because dynamic updates can interact strongly with the local neighborhood
-selected by ComNetX. Paired significance tests remain a final-pass item
-because the current registry does not yet carry explicit stream identifiers
-for all baseline/local pairs.
+selected by ComNetX. The registry-derived stream identifiers let us match
+baseline and Local rows directly, so the robustness table reports paired
+coverage and Wilcoxon tests instead of falling back to unpaired summaries.
 
 \begin{table*}[t]
 \centering
 \caption{Statistical robustness available in the current result registry.
 ``Baseline'' is Naive for static solvers and Dynamic for native dynamic
-solvers. Values are mean $\pm$ standard deviation over non-duplicate registry
-runs with matching launch parameters.}
+solvers. Values are mean $\pm$ standard deviation over paired non-duplicate P2
+streams where the baseline and Local records share the same derived
+\texttt{stream\_id}. The last column reports two-sided Wilcoxon signed-rank
+tests for paired $\Delta Q$ and paired runtime difference.}
 \label{tab:stability}
 \setlength{\tabcolsep}{4pt}
 \footnotesize
-\begin{tabular}{llccccc}
+\begin{tabular}{llcccccc}
 \toprule
 \textbf{Backend} & \textbf{Dataset} & \textbf{$Q_{\mathrm{Local}}$} &
 \textbf{$Q_{\mathrm{base}}$} & \textbf{$T_{\mathrm{Local}}$} &
-\textbf{$T_{\mathrm{base}}$} & \textbf{Runs L/base} \\
+\textbf{$T_{\mathrm{base}}$} & \textbf{Pairs} & \textbf{$p_Q/p_T$} \\
 \midrule
-\multicolumn{7}{l}{\textit{Topology-only full-recomputation baseline}} \\
-Leidenalg & dyn\_pubmed & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.32 $\pm$ 0.05 & 6.96 $\pm$ 1.13 & 5 / 6 \\
-Leidenalg & arxivmath   & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 3.80 $\pm$ 0.43 & 166.98 $\pm$ 25.62 & 6 / 7 \\
+\multicolumn{8}{l}{\textit{Topology-only full-recomputation baseline}} \\
+Leidenalg & dyn\_pubmed & 0.760 $\pm$ 0.024 & 0.785 $\pm$ 0.001 & 6.44 $\pm$ 8.44 & 86.72 $\pm$ 119.38 & 19 & $<$0.001 / $<$0.001 \\
+Leidenalg & arxivmath   & 0.875 $\pm$ 0.007 & 0.886 $\pm$ 0.000 & 80.33 $\pm$ 106.83 & 2757.04 $\pm$ 3310.63 & 19 & $<$0.001 / $<$0.001 \\
 \addlinespace
-\multicolumn{7}{l}{\textit{Native dynamic topology baseline}} \\
-DF-Leiden & dyn\_pubmed & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.11 $\pm$ 0.01 & 0.11 $\pm$ 0.01 & 5 / 4 \\
-DF-Leiden & arxivmath   & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.47 $\pm$ 0.04 & 3.95 $\pm$ 0.49 & 5 / 5 \\
+\multicolumn{8}{l}{\textit{Native dynamic topology baseline}} \\
+DF-Leiden & dyn\_pubmed & 0.745 $\pm$ 0.049 & 0.758 $\pm$ 0.005 & 1.61 $\pm$ 1.94 & 1.46 $\pm$ 2.04 & 18 & 0.727 / 0.027 \\
+DF-Leiden & arxivmath   & 0.866 $\pm$ 0.018 & 0.850 $\pm$ 0.008 & 9.48 $\pm$ 10.12 & 55.60 $\pm$ 62.26 & 18 & 0.012 / $<$0.001 \\
 \addlinespace
-\multicolumn{7}{l}{\textit{Feature-aware GNN baseline}} \\
-S$^2$CAG  & dyn\_pubmed & 0.507 $\pm$ 0.023 & 0.622 $\pm$ 0.000 & 45.77 $\pm$ 30.60 & 154.94 $\pm$ 54.93 & 12 / 4 \\
-S$^2$CAG  & arxivmath   & 0.570 $\pm$ 0.024 & 0.001 $\pm$ 0.000 & 613.53 $\pm$ 339.51 & 2612.57 $\pm$ 561.42 & 8 / 3 \\
+\multicolumn{8}{l}{\textit{Feature-aware GNN baseline}} \\
+S$^2$CAG  & dyn\_pubmed & 0.445 $\pm$ 0.175 & 0.623 $\pm$ 0.001 & 54.96 $\pm$ 45.35 & 280.42 $\pm$ 160.74 & 5 & 0.062 / 0.062 \\
+S$^2$CAG  & arxivmath   & 0.545 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 261.01 $\pm$ 0.00 & 3260.78 $\pm$ 0.00 & 1 & -- / -- \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-The registry now supports mean--standard deviation reporting for the main
-rows, but it does not yet store explicit stream identifiers for all baseline
-pairs. The final statistical pass should therefore add paired stream IDs and
-compute Wilcoxon signed-rank tests for $\Delta Q$ and runtime on exactly the
-same update streams. The central claim is not that every tiny quality
-difference is significant, but that quality preservation is stable across
-streams while runtime reduction remains large.
+The paired stream identifiers close the topology-only part of the statistical
+pass: Leidenalg is consistently faster with a small modularity loss, and
+DF-Leiden shows a significant speedup on \textit{arxivmath}; on
+\textit{dyn\_pubmed} it is near parity, though slightly slower. The
+feature-aware S$^2$CAG rows remain more limited because fewer baseline/local
+records were produced by the same source files, but they are now reported with
+explicit paired-stream coverage rather than an unpaired placeholder.
 
 \subsubsection{Comparison with Native Dynamic Methods}
 
@@ -761,7 +815,7 @@ Since ComNetX uses $r=1$ in the main configuration, the most important column
 is $|B_1(S_t)|/|V|$; the larger radii show how quickly locality would be lost
 if the expansion radius were increased.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Empirical neighborhood growth for the update streams used in the
 experiments. $|S_t|$ is the average number of directly affected vertices.
@@ -769,13 +823,12 @@ $B_h$ columns report the mean percentage of vertices within graph distance
 $h$ from $S_t$; the $B_1$ column also reports the maximum percentage across
 mini-batches.}
 \label{tab:workload}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{lrrrrrr}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-\textbf{Dataset} & \textbf{Updates} & \textbf{$|S_t|$} &
-\textbf{$B_1$ mean/max (\%)} & \textbf{$B_2$ (\%)} &
-\textbf{$B_3$ (\%)} & \textbf{$B_5$ (\%)} \\
+\textbf{Dataset} & \textbf{Upd.} & \textbf{$|S_t|$} &
+\textbf{$B_1$} & \textbf{$B_2$} & \textbf{$B_3$} & \textbf{$B_5$} \\
 \midrule
 dyn\_cora     & 10 & 2.0   & 0.35 / 0.41 & 1.75 & 7.77  & 48.63 \\
 dyn\_acm      & 10 & 5.2   & 2.04 / 3.11 & 8.11 & 21.61 & 54.40 \\
@@ -785,7 +838,7 @@ dyn\_pubmed   & 10 & 8.8   & 0.79 / 1.80 & 7.28 & 30.58 & 86.95 \\
 arxivmath     & 10 & 145.6 & 0.95 / 1.11 & 7.01 & 27.36 & 76.84 \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 The measured neighborhoods support the choice $r=1$: the average inspected
 radius-one region is below $5\%$ of the graph for all six datasets and below
@@ -802,59 +855,76 @@ The neighborhood table explains the first stage of locality. The decisive
 second stage is the hierarchical closure and contraction, summarized by the
 post-closure sets $U_t^\ell$ and the contracted backend sizes
 $(k_\ell,\bar m_\ell)$. Table~\ref{tab:contracted-workload} uses the same
-complete method--dataset grid as Table~\ref{tab:stability}. The current
-registry fills the neighborhood and baseline/local runtime-ratio columns; the
-remaining columns are reserved for the workload-profile runs that directly
-measure the actual instances seen by each backend.
+complete method--dataset grid as Table~\ref{tab:stability}. The latest
+workload-profile records fill the post-closure and contracted-backend columns
+for the focused grid, so the table can be read together with the runtime and
+memory breakdown below.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Contracted workload after hierarchical closure. The table mirrors the
-complete focused comparison grid from Table~\ref{tab:stability}. The current
-registry already supports the radius-one neighborhood fraction and end-to-end
-baseline/local runtime ratio; post-closure and contracted-instance columns
-require workload-profile records. $|U|/|V|$ is the post-closure vertex fraction
-and $|\bar E|/|E|$ is the edge fraction in the contracted backend instance.}
+complete focused comparison grid from Table~\ref{tab:stability}. $|U|/|V|$ is
+the post-closure vertex fraction, $|\bar V|$ is the mean contracted backend
+node count, and $|\bar E|/|E|$ is the edge fraction in the contracted backend
+instance.}
 \label{tab:contracted-workload}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{llrrrrr}
+\setlength{\tabcolsep}{1.6pt}
+\scriptsize
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-\textbf{Backend} & \textbf{Dataset} & \textbf{$B_1$ mean/max (\%)} &
-\textbf{$|U|/|V|$} & \textbf{$|\bar V|$} & \textbf{$|\bar E|/|E|$} &
-\textbf{Base/Local} \\
+\textbf{Backend} & \textbf{Dataset} & \textbf{$B_1$} &
+\textbf{$U/V$} & \textbf{$|\bar V|$} & \textbf{$\bar E/E$} &
+\textbf{B/L} \\
 \midrule
 \multicolumn{7}{l}{\textit{Topology-only full-recomputation baseline}} \\
-Leidenalg & dyn\_pubmed & 0.79 / 1.80 & TBD & TBD & TBD & 22.0$\times$ \\
-Leidenalg & arxivmath   & 0.95 / 1.11 & TBD & TBD & TBD & 43.9$\times$ \\
+Leidenalg & dyn\_pubmed & 0.79 / 1.80 & 19.9\% & 40 & 0.64\% & 22.0$\times$ \\
+Leidenalg & arxivmath   & 0.95 / 1.11 & 43.7\% & 637 & 0.79\% & 43.9$\times$ \\
 \addlinespace
 \multicolumn{7}{l}{\textit{Native dynamic topology baseline}} \\
-DF-Leiden & dyn\_pubmed & 0.79 / 1.80 & TBD & TBD & TBD & 0.95$\times$ \\
-DF-Leiden & arxivmath   & 0.95 / 1.11 & TBD & TBD & TBD & 8.4$\times$ \\
+DF-Leiden & dyn\_pubmed & 0.79 / 1.80 & 20.8\% & 40 & 0.64\% & 0.95$\times$ \\
+DF-Leiden & arxivmath   & 0.95 / 1.11 & 48.2\% & 638 & 0.77\% & 8.4$\times$ \\
 \addlinespace
 \multicolumn{7}{l}{\textit{Feature-aware GNN baseline}} \\
-S$^2$CAG  & dyn\_pubmed & 0.79 / 1.80 & TBD & TBD & TBD & 3.4$\times$ \\
-S$^2$CAG  & arxivmath   & 0.95 / 1.11 & TBD & TBD & TBD & 4.3$\times$ \\
+S$^2$CAG  & dyn\_pubmed & 0.79 / 1.80 & 26.7\% & 64 & 1.04\% & 3.4$\times$ \\
+S$^2$CAG  & arxivmath   & 0.95 / 1.11 & 62.8\% & 690 & 1.08\% & 4.3$\times$ \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.42\textwidth}{
-\centering
-\vspace{0.5cm}
-\textbf{TBD: Workload-to-speedup link.}\\
-x-axis: contracted workload fraction, $|\bar E|/|E|$ or $|\bar V|/|V|$.\\
-y-axis: Base/Local runtime ratio.\\
-Points: focused $3\times2$ method--dataset grid.
-\vspace{0.5cm}
-}}
+\begin{tikzpicture}[x=7.0cm,y=0.055cm]
+\draw[->] (0,0) -- (0.6,0)
+    node[below,font=\scriptsize] {$|\bar E|/|E|$ (\%)};
+\draw[->] (0,0) -- (0,47)
+    node[above,font=\scriptsize] {Base/Local};
+\foreach \x/\lab in {0.05/0.6,0.25/0.8,0.45/1.0}
+  \draw (\x,0) -- ++(0,-1.0) node[below,font=\scriptsize] {\lab};
+\foreach \y in {10,20,30,40}
+  \draw (0,\y) -- ++(-0.012,0) node[left,font=\scriptsize] {\y};
+\draw[densely dotted,gray] (0,1) -- (0.6,1);
+\fill[blue] (0.09,22.0) circle (1.5pt)
+    node[above left,font=\scriptsize] {L-Pub};
+\fill[blue] (0.24,43.9) circle (1.5pt)
+    node[above right,font=\scriptsize] {L-Arx};
+\draw[blue,thick] (0.09,22.0) -- (0.24,43.9);
+\fill[dkgreen] (0.09,0.95) rectangle (0.108,2.35);
+\node[above right,font=\scriptsize] at (0.108,2.35) {DF-Pub};
+\fill[dkgreen] (0.22,8.4) rectangle (0.238,9.8);
+\node[above right,font=\scriptsize] at (0.238,9.8) {DF-Arx};
+\draw[dkgreen,thick] (0.10,1.6) -- (0.23,9.1);
+\fill[mauve] (0.49,3.4) circle (1.5pt)
+    node[above left,font=\scriptsize] {S2-Pub};
+\fill[mauve] (0.53,4.3) circle (1.5pt)
+    node[above right,font=\scriptsize] {S2-Arx};
+\draw[mauve,thick] (0.49,3.4) -- (0.53,4.3);
+\end{tikzpicture}
 \caption{Mechanism plot connecting measured contracted backend size to
-end-to-end speedup. Fill from the workload profiler and the consolidated
-registry. The expected pattern is monotone but not exact: topology solvers
-should mostly follow contracted graph size, while S$^2$CAG additionally depends
-on GPU materialization and feature aggregation overhead.}
+end-to-end speedup on the focused $3\times2$ grid. The pattern is monotone only
+within each backend family: topology-only Leiden benefits most from the
+sub-percent contracted edge fraction, DF-Leiden is limited when the native
+dynamic baseline is already local, and S$^2$CAG additionally pays GPU
+materialization and feature-aggregation overhead.}
 \label{fig:workload-speedup}
 \end{figure}
 
@@ -870,15 +940,15 @@ The closure and contraction mechanism is first quantified through
 Tables~\ref{tab:workload} and~\ref{tab:contracted-workload}, and then tested
 directly in Table~\ref{tab:closure-ablation}.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Topology ablation for Leiden on two larger datasets. Each
 cell reports the final modularity $Q$, total time $T$ in seconds, and speedup
 over full-snapshot Leiden on the same stream.}
 \label{tab:ablation}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{lrrrrrr}
+\setlength{\tabcolsep}{1.8pt}
+\scriptsize
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
 \multirow{2}{*}{\textbf{Variant}} &
 \multicolumn{3}{c}{\textbf{dyn\_pubmed}} &
@@ -895,7 +965,7 @@ $L=1,r=1$ & 0.781 & 0.13 & 52.7$\times$ & 0.881 & 1.65 & 106.3$\times$ \\
 $L=4,r=1$ & 0.736 & 0.46 & 15.1$\times$ & 0.880 & 5.80 & 30.3$\times$ \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 Table~\ref{tab:ablation} shows that increasing the graph-radius budget is not
 automatically beneficial. Moving from $r=1$ to $r=2$ increases the runtime by
@@ -910,15 +980,15 @@ This supports the main design message of ComNetX: the radius and hierarchy are
 control knobs for the locality--context trade-off, not constants that should be
 claimed optimal for every workload.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{S$^2$CAG feature and radius ablation on the cn69
 \texttt{999:100} stream from \texttt{results/paper\_icdm/3}. Each cell
 reports $Q$ / $T$ / NMI on the final snapshot.}
 \label{tab:feature-ablation}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{lcc}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{@{}lcc@{}}
 \toprule
 \textbf{Variant} & \textbf{dyn\_cora} & \textbf{dyn\_pubmed} \\
 \midrule
@@ -932,7 +1002,7 @@ Local, random, $r=2$   & 0.668 / 7.05 / 0.446 & 0.161 / 118.31 / 0.041 \\
 Local, random, sum agg. & 0.784 / 4.89 / 0.462 & 0.534 / 27.40 / 0.186 \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 The feature ablation gives two important cautions. First, random features are
 not a magic replacement for attributes: in the naive full-graph run they nearly
@@ -945,32 +1015,38 @@ sum and normalized aggregation in this run, with runtime differences that
 are evaluated over multiple seeds in Table~\ref{tab:stability} before being
 used as a central claim.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Direct closure/contraction ablation for Leiden. The pilot measures
 the same two focused datasets as the main comparison. ``No closure'' keeps only
 the radius-expanded vertices, while ``No contraction'' gives the backend the
-post-closure induced subgraph without community contraction. Fill from
-\texttt{profile\_smart\_workload.py --variants full no\_closure no\_contraction}.}
+post-closure induced subgraph without community contraction. $T$ is the total
+profiled time in seconds.}
 \label{tab:closure-ablation}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{llcccccc}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{@{}llrrr@{}}
 \toprule
-\multirow{2}{*}{\textbf{Variant}} &
-\multirow{2}{*}{\textbf{Mechanism}} &
-\multicolumn{3}{c}{\textbf{dyn\_pubmed}} &
-\multicolumn{3}{c}{\textbf{arxivmath}} \\
-\cmidrule(lr){3-5}\cmidrule(lr){6-8}
-& & \textbf{$Q$} & \textbf{$T$} & \textbf{$|\bar V|/|V|$}
-& \textbf{$Q$} & \textbf{$T$} & \textbf{$|\bar V|/|V|$} \\
+\textbf{Variant} & \textbf{Dataset} & \textbf{$Q$} & \textbf{$T$} &
+\textbf{$|\bar V|/|V|$} \\
 \midrule
-Full ComNetX & closure + contraction & TBD & TBD & TBD & TBD & TBD & TBD \\
-No closure & radius subgraph only & TBD & TBD & TBD & TBD & TBD & TBD \\
-No contraction & post-closure induced graph & TBD & TBD & TBD & TBD & TBD & TBD \\
+Full ComNetX & dyn\_pubmed & 0.758 & 2.36 & 0.20\% \\
+Full ComNetX & arxivmath & 0.871 & 8.90 & 0.24\% \\
+No closure & dyn\_pubmed & 0.563 & 0.82 & 0.18\% \\
+No closure & arxivmath & 0.732 & 7.60 & 0.22\% \\
+No contraction & dyn\_pubmed & 0.671 & 16.07 & 8.81\% \\
+No contraction & arxivmath & 0.874 & 1520.57 & 32.56\% \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
+
+The direct ablation separates the two roles of the hierarchy. Removing closure
+is fastest, but it loses substantial modularity on both larger graphs because
+the backend sees only the radius-one boundary. Removing contraction preserves or
+improves quality on \textit{arxivmath}, but the backend instance grows by two
+orders of magnitude and the run becomes impractically slow; contraction is
+therefore the mechanism that turns closure from context recovery into a
+scalable update.
 
 \subsubsection{Real-Data Long-Horizon Robustness}
 
@@ -987,31 +1063,32 @@ table visually uneven. The goal is to show not only a large cumulative
 speedup, but also the range of stream granularities where quality drift remains
 controlled.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Balanced long-horizon topology snapshot from the cn69 \texttt{9:500}
 measurements in \texttt{results/paper\_icdm/3}. Each row reports final
-modularity $Q$, NMI, and cumulative time $T$ in seconds.}
+modularity $Q$, NMI, and cumulative time $T$ in seconds; Local speedups are
+relative to the corresponding non-local backend.}
 \label{tab:long-horizon}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{llrrrrr}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
 \textbf{Dataset} & \textbf{Method} & \textbf{Updates} &
-\textbf{$Q$} & \textbf{NMI} & \textbf{$T$} & \textbf{Ref.} \\
+\textbf{$Q$} & \textbf{NMI} & \textbf{$T$} & \textbf{Speedup} \\
 \midrule
-dyn\_pubmed & Leiden full & 500 & 0.784 & 0.208 & 427.50 & 1.0$\times$ \\
-dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 25.06 & 17.1$\times$ vs Leiden \\
-dyn\_pubmed & DF-Leiden dyn. & 500 & 0.762 & 0.195 & 8.06 & 1.0$\times$ \\
-dyn\_pubmed & Local DF-Leiden & 500 & 0.715 & 0.138 & 7.35 & 1.1$\times$ vs DF-Leiden \\
+dyn\_pubmed & Leiden & 500 & 0.784 & 0.208 & 427.50 & 1.0$\times$ \\
+dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 25.06 & 17.1$\times$ \\
+dyn\_pubmed & DF-Leiden & 500 & 0.762 & 0.195 & 8.06 & 1.0$\times$ \\
+dyn\_pubmed & Local DF & 500 & 0.715 & 0.138 & 7.35 & 1.1$\times$ \\
 \midrule
-arxivmath & Leiden full & 500 & 0.887 & 0.427 & 8421.63 & 1.0$\times$ \\
-arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 289.27 & 29.1$\times$ vs Leiden \\
-arxivmath & DF-Leiden dyn. & 500 & 0.855 & 0.388 & 243.29 & 1.0$\times$ \\
-arxivmath & Local DF-Leiden & 500 & 0.869 & 0.335 & 32.99 & 7.4$\times$ vs DF-Leiden \\
+arxivmath & Leiden & 500 & 0.887 & 0.427 & 8421.63 & 1.0$\times$ \\
+arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 289.27 & 29.1$\times$ \\
+arxivmath & DF-Leiden & 500 & 0.855 & 0.388 & 243.29 & 1.0$\times$ \\
+arxivmath & Local DF & 500 & 0.869 & 0.335 & 32.99 & 7.4$\times$ \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 The long-horizon results strengthen the scalability claim for topology-based
 backends: Local Leiden is about $17\times$ faster than full Leiden on
@@ -1019,23 +1096,61 @@ backends: Local Leiden is about $17\times$ faster than full Leiden on
 500-update horizon. At the same time, the NMI gap grows relative to the
 ten-update setting, especially on \textit{dyn\_pubmed}, indicating that
 long-horizon drift must be visualized rather than hidden in one final number.
-Figure~\ref{fig:long-horizon-curves} therefore plots update index on the
-x-axis, cumulative runtime on one y-axis, and modularity/NMI on the other.
+The registry stores per-update runtime and modularity for these streams, while
+NMI is available at the final snapshot and is reported in
+Table~\ref{tab:long-horizon}. Figure~\ref{fig:long-horizon-curves} therefore
+plots the largest real graph, \textit{arxivmath}, across the 500-update
+$9{:}500$ stream.
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.42\textwidth}{
-\centering
-\vspace{0.5cm}
-\textbf{TBD: Long-horizon curves.}\\
-x-axis: update index for 50/100/200/500 batches.\\
-y-axis: cumulative time and $Q$/NMI.\\
-Curves: full recomputation, native dynamic, Local.
-\vspace{0.5cm}
-}}
-\caption{Long-horizon stability under different initial-history fractions and
-update granularities. Fill from the cn69 batch-sensitivity and long-horizon
-scripts.}
+\begin{tikzpicture}[x=0.72cm,y=0.62cm]
+\node[font=\footnotesize] at (3.1,4.35) {(a) Cumulative time};
+\draw[->] (1,0.8) -- (5.35,0.8)
+    node[below,font=\scriptsize] {updates};
+\draw[->] (1,0.8) -- (1,4.10)
+    node[above,font=\scriptsize] {seconds, log$_{10}$};
+\foreach \x/\lab in {1/100,2/200,3/300,4/400,5/500}
+  \draw (\x,0.8) -- ++(0,-0.08) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {1/10,2/100,3/1k,4/10k}
+  \draw (1,\y) -- ++(-0.08,0) node[left,font=\scriptsize] {\lab};
+\draw[blue,thick] plot coordinates {(1,3.20) (2,3.50) (3,3.68) (4,3.81) (5,3.93)}
+  node[right,font=\scriptsize] {Leiden};
+\draw[blue,dashed,thick] plot coordinates {(1,1.81) (2,2.13) (3,2.30) (4,2.39) (5,2.46)}
+  node[right,font=\scriptsize] {Local Leiden};
+\draw[dkgreen,thick] plot coordinates {(1,1.66) (2,1.98) (3,2.17) (4,2.29) (5,2.39)}
+  node[right,font=\scriptsize] {DF};
+\draw[dkgreen,dashed,thick] plot coordinates {(1,0.85) (2,1.17) (3,1.34) (4,1.43) (5,1.52)}
+  node[right,font=\scriptsize] {Local DF};
+\end{tikzpicture}
+
+\vspace{0.45em}
+
+\begin{tikzpicture}[x=0.72cm,y=37cm]
+\node[font=\footnotesize] at (3.1,0.069) {(b) Modularity};
+\draw[->] (1,0) -- (5.35,0)
+    node[below,font=\scriptsize] {updates};
+\draw[->] (1,0) -- (1,0.062)
+    node[above,font=\scriptsize] {$Q$};
+\foreach \x/\lab in {1/100,2/200,3/300,4/400,5/500}
+  \draw (\x,0) -- ++(0,-0.0015) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {0.01/0.85,0.03/0.87,0.05/0.89}
+  \draw (1,\y) -- ++(-0.08,0) node[left,font=\scriptsize] {\lab};
+\draw[densely dotted,gray] (1,0.03) -- (5.35,0.03);
+\draw[blue,thick] plot coordinates {(1,0.0498) (2,0.0485) (3,0.0476) (4,0.0472) (5,0.0468)}
+  node[right,font=\scriptsize] {Leiden};
+\draw[blue,dashed,thick] plot coordinates {(1,0.0428) (2,0.0411) (3,0.0375) (4,0.0342) (5,0.0337)}
+  node[right,font=\scriptsize] {Local Leiden};
+\draw[dkgreen,thick] plot coordinates {(1,0.0131) (2,0.0082) (3,0.0070) (4,0.0057) (5,0.0151)}
+  node[right,font=\scriptsize] {DF};
+\draw[dkgreen,dashed,thick] plot coordinates {(1,0.0418) (2,0.0384) (3,0.0363) (4,0.0346) (5,0.0295)}
+  node[right,font=\scriptsize] {Local DF};
+\end{tikzpicture}
+\caption{Long-horizon curves for \textit{arxivmath} on the cn69
+\texttt{9:500} stream. Runtime is cumulative over updates and shown on a
+logarithmic scale; modularity is plotted from the same per-update registry
+series. Final NMI is endpoint-only in the current logs and is reported in
+Table~\ref{tab:long-horizon}.}
 \label{fig:long-horizon-curves}
 \end{figure}
 
@@ -1051,64 +1166,110 @@ Its rows deliberately mirror the complete focused grid in
 Table~\ref{tab:contracted-workload}: topology and native-dynamic rows test
 whether contraction reduces solver work, while S$^2$CAG rows test whether
 local materialization controls the memory footprint of a feature-aware GPU
-backend. The current registry has no workload-profile records, so this table
-remains the main unfilled scalability table after the present registry pass.
+backend. The latest workload-profile records now fill this focused grid.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
-\caption{Runtime and memory breakdown for ComNetX. The table reports averages over all
-profiled updates and stream configurations. CPU memory is peak resident memory;
-GPU memory is peak allocated memory for neural backends. Conversion time should
-remain outside the core runtime but be reported separately for reproducibility.}
+\caption{Runtime and memory breakdown for ComNetX on the focused
+\texttt{999:50} streams. Timing columns are mean milliseconds per profiled
+update. Expand includes radius expansion, closure, and reset; Aggregate
+includes contraction and cut. CPU memory is peak resident memory in MB; GPU
+memory is peak allocated memory for neural backends.}
 \label{tab:breakdown}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{lccccccc}
+\setlength{\tabcolsep}{1.6pt}
+\scriptsize
+\begin{tabular}{@{}lccccccc@{}}
 \toprule
-\textbf{Backend} & \textbf{Dataset} & \textbf{Expand} & \textbf{Aggregate} &
-\textbf{Backend call} & \textbf{Project} & \textbf{CPU mem.} & \textbf{GPU mem.} \\
+\textbf{Backend} & \textbf{Dataset} & \textbf{Exp.} & \textbf{Aggr.} &
+\textbf{Solve} & \textbf{Proj.} & \textbf{CPU} & \textbf{GPU} \\
 \midrule
 \multicolumn{8}{l}{\textit{Topology-only and native dynamic baselines}} \\
-Leidenalg & dyn\_pubmed & TBD & TBD & TBD & TBD & TBD & n/a \\
-Leidenalg & arxivmath   & TBD & TBD & TBD & TBD & TBD & n/a \\
-DF-Leiden & dyn\_pubmed & TBD & TBD & TBD & TBD & TBD & n/a \\
-DF-Leiden & arxivmath   & TBD & TBD & TBD & TBD & TBD & n/a \\
+Leidenalg & dyn\_pubmed & 3.56 & 5.07 & 7.76 & 0.48 & 848 & n/a \\
+Leidenalg & arxivmath   & 8.37 & 6.67 & 141.48 & 0.55 & 1190 & n/a \\
+DF-Leiden & dyn\_pubmed & 3.23 & 5.19 & 1.71 & 0.46 & 850 & n/a \\
+DF-Leiden & arxivmath   & 7.27 & 6.33 & 10.88 & 0.49 & 1190 & n/a \\
 \addlinespace
 \multicolumn{8}{l}{\textit{Feature-aware GPU baseline}} \\
-S$^2$CAG  & dyn\_pubmed & TBD & TBD & TBD & TBD & TBD & TBD \\
-S$^2$CAG  & arxivmath   & TBD & TBD & TBD & TBD & TBD & TBD \\
+S$^2$CAG  & dyn\_pubmed & 4.11 & 7.09 & 1190.28 & 1.01 & 4109 & 16.1 \\
+S$^2$CAG  & arxivmath   & 10.49 & 11.98 & 6313.82 & 1.70 & 4893 & 277.4 \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
-The breakdown is collected with wall-clock timers around four code
-regions: radius expansion, construction of the membership matrix and contracted
-graph, backend execution, and projection of labels back to the original
-vertices. For memory, use process-level peak RSS on CPU and the framework's
-peak allocated-memory counter on GPU. The interpretation emphasizes the
-dominant term: if backend calls dominate, ComNetX succeeds by shrinking the
-solver input; if aggregation dominates on small graphs, full recomputation or
-native dynamic methods are preferable there.
+The breakdown is collected with wall-clock timers around four code regions:
+radius expansion plus closure, construction of the membership matrix and
+contracted graph, backend execution, and projection of labels back to the
+original vertices. The topology rows show that expansion and aggregation stay in
+single-digit milliseconds, while backend execution becomes the dominant term on
+\textit{arxivmath}. For S$^2$CAG, backend execution dominates even after
+contraction, explaining why the GNN speedups in Figure~\ref{fig:workload-speedup}
+are smaller despite sub-percent contracted edge fractions.
 
 \subsubsection{Controlled DSBM Stress Test}
 
 This experiment addresses the failure-mode component of RQ5.
 The locality assumption is stress-tested by varying the update size and the
-type of touched vertices. Figure~\ref{fig:update-size} compares
-uniform random updates, updates concentrated around high-degree vertices, and
-updates concentrated inside small peripheral communities. This experiment
-defines the boundary between the regime where ComNetX is expected to be useful
-and the regime where it naturally degenerates toward full recomputation.
+type of touched vertices. Figure~\ref{fig:update-size} reports the currently
+measured community-internal solver slice and marks the random and hub-centered
+solver curves that remain to be completed. This experiment defines the boundary
+between the regime where ComNetX is expected to be useful and the regime where
+it naturally degenerates toward full recomputation.
 
 For this purpose we prepared an independent synthetic DSBM stress suite rather
-than reusing the real-data $999{:}10$ protocol. Each DSBM stream contains an
-initial planted-partition graph at time $0$ with $100{,}000$ vertices,
-approximately $2.90$M initial edges, $32$ planted communities, average degree
-$58$, and maximum degree $1024$. The subsequent layers are controlled update
-batches. We vary the number of changed edges from $290$ to $29{,}000$, i.e.,
-approximately $0.01\%$--$1.0\%$ of the initial edge count, and provide three
-stream granularities: $5$, $10$, and $100$ update layers. Table~\ref{tab:dsbm}
-summarizes the generated regimes from the dataset statistics registry.
+than reusing the real-data $999{:}10$ protocol.
+
+\paragraph{Synthetic dynamic graph generation.}
+We generate synthetic dynamic undirected graphs inspired by the stochastic
+block model with planted community structure. Each graph contains
+$n=100{,}000$ vertices partitioned uniformly into $k=32$ communities. Edges are
+generated with strong assortativity: with probability $p_{\mathrm{in}}=0.97$,
+a sampled endpoint is required to belong to the same community as the source
+vertex; otherwise it is sampled from a different community. The target average
+degree is $d_{\mathrm{avg}}=58$, and the maximum degree is capped at
+$d_{\max}=1024$. To obtain a realistic heavy-tailed component, we designate
+$1\%$ of vertices as hubs with expected degree $512$; the remaining vertices
+receive a lower expected degree chosen so that the overall average remains
+$58$.
+
+For each generated graph, we construct dynamic update batches of five relative
+sizes: $0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, and $1\%$ of the expected number
+of graph edges. Since $|E|\approx n d_{\mathrm{avg}}/2=2.9\cdot10^6$, these
+correspond to $290$, $1{,}450$, $2{,}900$, $14{,}500$, and $29{,}000$ changed
+edges. We evaluate three update regimes. In the \textsc{Random} regime, update
+edges are sampled uniformly from all generated edges. In the \textsc{Hubs}
+regime, every update edge is required to be incident to one of the top-degree
+vertices. In the \textsc{Community} regime, update edges are restricted to lie
+inside the smallest communities. We generate sequences with
+$T\in\{5,10,100\}$ time steps.
+
+\begin{table}[t]
+\centering
+\caption{Parameters of the synthetic dynamic graph generator.}
+\label{tab:synthetic-generation}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+\begin{tabular}{@{}p{0.53\linewidth}p{0.38\linewidth}@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Number of vertices, $n$ & $100{,}000$ \\
+Number of communities, $k$ & $32$ \\
+Time steps, $T$ & $5$, $10$, $100$ \\
+Target average degree, $d_{\mathrm{avg}}$ & $58$ \\
+Maximum degree, $d_{\max}$ & $1024$ \\
+Intra-community probability, $p_{\mathrm{in}}$ & $0.97$ \\
+Hub vertex fraction & $1\%$ \\
+Hub expected degree & $512$ \\
+Expected edges, $|E|\approx n d_{\mathrm{avg}}/2$ & $2.9\cdot10^6$ \\
+Update batch sizes & $290$, $1{,}450$, $2{,}900$, $14{,}500$, $29{,}000$ \\
+Update fractions & $0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, $1\%$ of $|E|$ \\
+Update regimes & Random, hub-centered, community-internal \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:dsbm} summarizes the generated regimes from the dataset
+statistics registry.
 
 \begin{table}[t]
 \centering
@@ -1130,30 +1291,54 @@ community-internal & 0.57--14.77\% & 100.0\% \\
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.42\textwidth}{
-\centering
-\vspace{0.5cm}
-\textbf{TBD: Update-size sensitivity.}\\
-x-axis: update size as \% of edges.\\
-y-axis: speedup and $\Delta Q$ vs.\ Naive.\\
-Curves: random, hub-centered, community-internal.
-\vspace{0.5cm}
-}}
-\caption{Sensitivity to update size and update locality. Fill with measured
-speedup and quality loss for increasingly large update batches.}
+\begin{tikzpicture}[x=1.52cm,y=0.46cm]
+\node[font=\footnotesize] at (-1.0,5.35) {(a) Speedup};
+\draw[->] (-2.10,0.45) -- (0.20,0.45)
+    node[below,font=\scriptsize] {changed edges (\%)};
+\draw[->] (-2.10,0.45) -- (-2.10,5.05)
+    node[above,font=\scriptsize] {Naive/Local};
+\foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
+  \draw (\x,0.45) -- ++(0,-0.12) node[below,font=\scriptsize] {\lab};
+\foreach \y in {1,2,3,4,5}
+  \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\y};
+\draw[densely dotted,gray] (-2.10,1) -- (0.20,1);
+\draw[mauve,thick] plot coordinates {(-2,3.50) (-1.3,1.08) (-1,0.81) (-0.3,0.56) (0,0.59)}
+  node[right,font=\scriptsize] {community};
+\node[gray,font=\scriptsize] at (-0.85,4.45) {random/hub pending};
+\end{tikzpicture}
+
+\vspace{0.45em}
+
+\begin{tikzpicture}[x=1.52cm,y=140cm]
+\node[font=\footnotesize] at (-1.0,0.0070) {(b) Quality change};
+\draw[->] (-2.10,-0.0085) -- (0.20,-0.0085)
+    node[below,font=\scriptsize] {changed edges (\%)};
+\draw[->] (-2.10,-0.0085) -- (-2.10,0.0060)
+    node[above,font=\scriptsize] {$\Delta Q$};
+\foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
+  \draw (\x,-0.0085) -- ++(0,-0.00035) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {-0.008/-0.008,-0.004/-0.004,0/0,0.004/0.004}
+  \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\lab};
+\draw[densely dotted,gray] (-2.10,0) -- (0.20,0);
+\draw[mauve,thick] plot coordinates {(-2,-0.0016) (-1.3,-0.0076) (-1,0.0016) (-0.3,-0.0062) (0,-0.0056)}
+  node[right,font=\scriptsize] {community};
+\node[gray,font=\scriptsize] at (-0.85,0.0048) {random/hub pending};
+\end{tikzpicture}
+\caption{Measured update-size sensitivity for the currently complete
+five-batch community-internal DSBM slice. The x-axis is the changed-edge
+fraction on a log scale; speedup and $\Delta Q$ compare Local Leiden with
+full-snapshot Leiden on the same stream. Random and hub-centered solver curves
+are generated as stream statistics in Table~\ref{tab:dsbm} but are not yet
+present as paired algorithm measurements in the registry.}
 \label{fig:update-size}
 \end{figure}
 
-For Figure~\ref{fig:update-size}, generate update batches containing
-$0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, and $1\%$ of the graph edges. For each
-size, run the generated random, hub-centered, and community-internal DSBM
-streams at each available granularity. Report both speedup and
-$\Delta Q=Q_{\mathrm{Local}}-Q_{\mathrm{Naive}}$ against full-snapshot
-recomputation on the same stream. The claim tested here is the operating
-envelope of ComNetX: the method is expected to win when affected regions remain
-local, be neutral when native dynamic solvers already process the stream
-cheaply, and fall back to full refresh when the update touches too much of the
-graph.
+The measured community-internal slice gives the expected operating-envelope
+shape. At the smallest update size, Local Leiden is $3.5\times$ faster with
+negligible quality loss; once the changed-edge fraction reaches roughly
+$0.1\%$--$1.0\%$, the local update becomes neutral or slower than full
+recomputation. Completing the random and hub-centered solver curves remains the
+main missing piece for this stress-test figure.
 
 \subsubsection{Evidence Summary}
 

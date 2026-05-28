@@ -62,6 +62,10 @@ eight are launched:
   this is a smaller fallback after the `9:500` no-contraction resource limit.
 - `extra26_leiden_no_closure_arxivmath_9500_long.sh`: longer no-closure Leiden
   follow-up on `arxivmath`, using `9:500`; it avoids the no-contraction branch.
+- `extra27_dyn_cora_small_control.sh`: required small-graph control profile on
+  `dyn_cora`. It fills the missing `dyn_cora` rows needed before adding the
+  small graph to `tab:contracted-workload`, `fig:workload-speedup`,
+  `tab:closure-ablation`, and `tab:breakdown`.
 
 Run from the cn69 host with the existing GPU-bound containers:
 
@@ -147,6 +151,14 @@ Run the next non-overlapping follow-up on the freed `dev_konovalov` container:
 
 ```bash
 docker exec -d dev_konovalov bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra26_leiden_no_closure_arxivmath_9500_long.sh'
+```
+
+Run the required small-control profile on any freed GPU-bound container. This
+is intentionally short and should be completed before inserting `dyn_cora`
+into the main workload/profile tables:
+
+```bash
+docker exec -d <free_container> bash -lc 'cd /home/dev/users/bokov/comnetx && scripts/paper/cn69_after3_20260527/extra27_dyn_cora_small_control.sh'
 ```
 
 After jobs finish or time out, rebuild the registry:
