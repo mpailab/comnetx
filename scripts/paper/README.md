@@ -169,6 +169,17 @@ This scans `results/**/*.json` and writes a consolidated, searchable registry to
 stability analysis, while collapsing exact or near-exact duplicate series into
 `deduplicated_sources.*`.
 
+## Rebuild the stream-id robustness table
+
+```bash
+python3 scripts/paper/summarize_stream_robustness.py
+python3 scripts/paper/summarize_stream_robustness.py --nmi-deltas
+```
+
+This prints the LaTeX body for the non-random paired-stream robustness table
+from `results/registry/all_results.json`. Use `--format csv` for a raw
+machine-readable summary.
+
 ## Import text measurement logs
 
 If only launcher stdout summaries are available, convert them into ordinary
