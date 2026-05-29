@@ -1,0 +1,32 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  "GROUND_TRUTH_METRICS": true,
+  "FORCE_UNDIRECTED": true,
+  "USE_GPU": true,
+  "DATASETS": [
+    "dyn_pubmed"
+  ],
+  "BATCHES": [
+    "999:10"
+  ],
+  "BASELINES": [
+    "dfleiden"
+  ],
+  "MODES": [
+    "dynamic",
+    "smart"
+  ],
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [
+      3
+    ],
+    "smart_neighborhood_step": [
+      1
+    ],
+    "aggregation_mode": [
+      "sum"
+    ]
+  }
+}
