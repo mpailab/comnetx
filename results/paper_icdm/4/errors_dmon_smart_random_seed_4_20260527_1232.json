@@ -1,8 +1,0 @@
-[
-    [
-        "dmon-i:10-L:3-r:1-agg:norm-gpu-feat:random",
-        "arxivmath",
-        "99:50",
-        "Exception encountered when calling layer 'd_mo_n_768' (type DMoN).\n\n{{function_node __wrapped__SparseTensorDenseMatMul_device_/job:localhost/replica:0/task:0/device:GPU:0}} Cannot use GPU when output.shape[1] * nnz(a) > 2^31\n\t [[{{node SparseTensorDenseMatMul}}]] [Op:SparseTensorDenseMatMul] name: \n\nCall arguments received by layer 'd_mo_n_768' (type DMoN):\n  \u2022 inputs=['tf.Tensor(shape=(11430, 64), dtype=float32)', 'SparseTensor(indices=tf.Tensor(\\n[[    0   609]\\n [    0   943]\\n [    0   952]\\n ...\\n [11429  8446]\\n [11429  9510]\\n [11429 11345]], shape=(233637, 2), dtype=int64), values=tf.Tensor([1. 1. 1. ... 1. 1. 1.], shape=(233637,), dtype=float32), dense_shape=tf.Tensor([11430 11430], shape=(2,), dtype=int64))']"
-    ]
-]
