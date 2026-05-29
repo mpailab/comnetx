@@ -20,18 +20,12 @@
     "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-42/out.dsbm-random-1024-58-mc1450-42.5_batches"
   ],
   "attempted_runs": 2,
-  "successful_runs": 1,
+  "successful_runs": 2,
   "skipped_existing": 0,
   "errors": 0,
-  "status": "running",
+  "status": "completed",
   "started_at": "2026-05-28T13:28:41.029083",
-  "updated_at": "2026-05-28T13:33:34.893911",
-  "current_attempt": {
-    "algorithm": "leidenalg-naive",
-    "dataset": "dsbm-random-1024-58-mc1450-42",
-    "stream": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-42/out.dsbm-random-1024-58-mc1450-42.5_batches",
-    "batch_strategy": "0:4",
-    "attempt_index": 2
-  },
+  "updated_at": "2026-05-28T13:37:18.919527",
+  "current_attempt": null,
   "output": "results/paper_icdm/retry01_dsbm_random_5_batches_mc1450_20260528_132838.json"
 }

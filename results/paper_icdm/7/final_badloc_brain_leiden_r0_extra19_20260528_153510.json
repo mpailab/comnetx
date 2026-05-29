@@ -1,0 +1,292 @@
+{
+  "generated_at": "2026-05-28T15:35:15.486670",
+  "profile_schema": "comnetx_smart_workload_v1",
+  "status": "completed",
+  "checkpointed": true,
+  "parameters": {
+    "datasets": [
+      "brain"
+    ],
+    "batches": [
+      "999:10"
+    ],
+    "methods": [
+      "leidenalg"
+    ],
+    "feature_modes": [
+      "dataset"
+    ],
+    "paths_config": "datasets-info/paths/cn69.json",
+    "cache_dir": "/home/dev/communities",
+    "output_dir": "results/paper_icdm/7",
+    "name": "final_badloc_brain_leiden_r0_extra19_20260528_153510",
+    "smart_depth": 3,
+    "smart_radius": 0,
+    "aggregation_mode": "sum",
+    "variants": [
+      "full"
+    ],
+    "baseline_iter": null,
+    "random_feature_dim": 64,
+    "random_feature_seed": 42,
+    "max_updates": 3,
+    "use_gpu": true,
+    "force_undirected": true,
+    "ground_truth_metrics": true,
+    "catch_errors": true,
+    "verbose": 1
+  },
+  "profiles": [
+    {
+      "algorithm": "leidenalg-L:3-r:0-gpu",
+      "variant": "full",
+      "method": "leidenalg",
+      "mode": "smart",
+      "dataset": "brain",
+      "base_dataset": "brain",
+      "batch_strategy": "999:10",
+      "feature_mode": null,
+      "baseline_iter": null,
+      "smart_depth": 3,
+      "smart_radius": 0,
+      "aggregation_mode": "sum",
+      "device": "cuda",
+      "use_gpu": true,
+      "updates_profiled": 3,
+      "total_profiled_time": 0.75144362449646,
+      "peak_cuda_allocated_mb": 209.22607421875,
+      "peak_rss_mb": 913.08203125,
+      "metrics": {
+        "Final modularity": 0.2697182893753052,
+        "ARI": 0.22688747413425717,
+        "F1": 0.03720111033719167,
+        "NMI": 0.42724013217930945,
+        "Labels modularity": 0.1389087289571762
+      },
+      "rows": [
+        {
+          "affected_vertices": 167,
+          "variant": "full",
+          "radius_vertices": 167,
+          "closure_vertices_by_level": [
+            5000,
+            5000,
+            5000
+          ],
+          "radius_time": 9.926408529281616e-05,
+          "closure_time": 0.05404442548751831,
+          "reset_time": 0.021023638546466827,
+          "level_0_prepare_time": 0.0003927946090698242,
+          "level_1_prepare_time": 0.000466272234916687,
+          "level_2_prepare_time": 0.0003430172801017761,
+          "aggregation_time": 0.02652668207883835,
+          "backend_time": 0.3767590746283531,
+          "backend_conversion_time": 0.005796194076538086,
+          "projection_time": 0.0004631727933883667,
+          "cut_time": 0.02034083753824234,
+          "total_profiled_time": 0.5012645125389099,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 5000,
+              "contracted_nodes": 171,
+              "contracted_edges": 5789,
+              "aggregation_time": 0.023218996822834015,
+              "backend_time": 0.34532253444194794,
+              "projection_time": 0.00020422786474227905,
+              "cut_time": 0.019963398575782776
+            },
+            {
+              "level": 1,
+              "closure_vertices": 5000,
+              "contracted_nodes": 171,
+              "contracted_edges": 5789,
+              "aggregation_time": 0.001743599772453308,
+              "backend_time": 0.015918366611003876,
+              "projection_time": 0.000135764479637146,
+              "cut_time": 0.0001956447958946228
+            },
+            {
+              "level": 2,
+              "closure_vertices": 5000,
+              "contracted_nodes": 171,
+              "contracted_edges": 5789,
+              "aggregation_time": 0.0015640854835510254,
+              "backend_time": 0.015518173575401306,
+              "projection_time": 0.00012318044900894165,
+              "cut_time": 0.0001817941665649414
+            }
+          ],
+          "contracted_nodes_by_level": [
+            171,
+            171,
+            171
+          ],
+          "contracted_edges_by_level": [
+            5789,
+            5789,
+            5789
+          ],
+          "modularity": 0.26967155933380127,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 70.20263671875,
+          "cuda_reserved_mb": 274.0,
+          "cuda_peak_allocated_mb": 209.22607421875,
+          "cuda_peak_reserved_mb": 274.0,
+          "rss_max_mb": 912.828125,
+          "batch_idx": 1,
+          "update_time": 0.027165547013282776
+        },
+        {
+          "affected_vertices": 177,
+          "variant": "full",
+          "radius_vertices": 177,
+          "closure_vertices_by_level": [
+            5000,
+            5000,
+            5000
+          ],
+          "radius_time": 4.010647535324097e-05,
+          "closure_time": 0.0008570626378059387,
+          "reset_time": 0.005923941731452942,
+          "level_0_prepare_time": 0.00035424530506134033,
+          "level_1_prepare_time": 0.00034668296575546265,
+          "level_2_prepare_time": 0.00034634023904800415,
+          "aggregation_time": 0.004955969750881195,
+          "backend_time": 0.14880623668432236,
+          "backend_conversion_time": 0.09958457946777344,
+          "projection_time": 0.00048432499170303345,
+          "cut_time": 0.0005972906947135925,
+          "total_profiled_time": 0.16343364864587784,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 5000,
+              "contracted_nodes": 181,
+              "contracted_edges": 6339,
+              "aggregation_time": 0.0016134455800056458,
+              "backend_time": 0.020391598343849182,
+              "projection_time": 0.00012215226888656616,
+              "cut_time": 0.0001924261450767517
+            },
+            {
+              "level": 1,
+              "closure_vertices": 5000,
+              "contracted_nodes": 181,
+              "contracted_edges": 6339,
+              "aggregation_time": 0.0015482008457183838,
+              "backend_time": 0.016886882483959198,
+              "projection_time": 0.00012267380952835083,
+              "cut_time": 0.00018101930618286133
+            },
+            {
+              "level": 2,
+              "closure_vertices": 5000,
+              "contracted_nodes": 181,
+              "contracted_edges": 6339,
+              "aggregation_time": 0.0017943233251571655,
+              "backend_time": 0.11152775585651398,
+              "projection_time": 0.00023949891328811646,
+              "cut_time": 0.0002238452434539795
+            }
+          ],
+          "contracted_nodes_by_level": [
+            181,
+            181,
+            181
+          ],
+          "contracted_edges_by_level": [
+            6339,
+            6339,
+            6339
+          ],
+          "modularity": 0.26979580521583557,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 70.220703125,
+          "cuda_reserved_mb": 276.0,
+          "cuda_peak_allocated_mb": 209.22607421875,
+          "cuda_peak_reserved_mb": 276.0,
+          "rss_max_mb": 913.08203125,
+          "batch_idx": 2,
+          "update_time": 0.0006576254963874817
+        },
+        {
+          "affected_vertices": 171,
+          "variant": "full",
+          "radius_vertices": 171,
+          "closure_vertices_by_level": [
+            5000,
+            5000,
+            5000
+          ],
+          "radius_time": 3.419816493988037e-05,
+          "closure_time": 0.0008065775036811829,
+          "reset_time": 0.005699686706066132,
+          "level_0_prepare_time": 0.00033720582723617554,
+          "level_1_prepare_time": 0.0003545135259628296,
+          "level_2_prepare_time": 0.0003467947244644165,
+          "aggregation_time": 0.004648163914680481,
+          "backend_time": 0.044625021517276764,
+          "backend_conversion_time": 0.004232645034790039,
+          "projection_time": 0.00036635249853134155,
+          "cut_time": 0.0005507394671440125,
+          "total_profiled_time": 0.058411918580532074,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 5000,
+              "contracted_nodes": 175,
+              "contracted_edges": 5203,
+              "aggregation_time": 0.0016122013330459595,
+              "backend_time": 0.016789190471172333,
+              "projection_time": 0.0001247599720954895,
+              "cut_time": 0.00018350034952163696
+            },
+            {
+              "level": 1,
+              "closure_vertices": 5000,
+              "contracted_nodes": 175,
+              "contracted_edges": 5203,
+              "aggregation_time": 0.0015386641025543213,
+              "backend_time": 0.013897046446800232,
+              "projection_time": 0.00012025982141494751,
+              "cut_time": 0.00018478184938430786
+            },
+            {
+              "level": 2,
+              "closure_vertices": 5000,
+              "contracted_nodes": 175,
+              "contracted_edges": 5203,
+              "aggregation_time": 0.0014972984790802002,
+              "backend_time": 0.0139387845993042,
+              "projection_time": 0.00012133270502090454,
+              "cut_time": 0.00018245726823806763
+            }
+          ],
+          "contracted_nodes_by_level": [
+            175,
+            175,
+            175
+          ],
+          "contracted_edges_by_level": [
+            5203,
+            5203,
+            5203
+          ],
+          "modularity": 0.2697888910770416,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 70.7607421875,
+          "cuda_reserved_mb": 276.0,
+          "cuda_peak_allocated_mb": 209.22607421875,
+          "cuda_peak_reserved_mb": 276.0,
+          "rss_max_mb": 913.08203125,
+          "batch_idx": 3,
+          "update_time": 0.0005103722214698792
+        }
+      ],
+      "incomplete": false,
+      "updated_at": "2026-05-28T15:35:15.479264"
+    }
+  ],
+  "errors": []
+}

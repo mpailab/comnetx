@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-05-28T15:48:54.403800",
+  "profile_schema": "comnetx_smart_workload_v1",
+  "status": "completed",
+  "checkpointed": true,
+  "parameters": {
+    "datasets": [
+      "brain"
+    ],
+    "batches": [
+      "999:10"
+    ],
+    "methods": [
+      "s2cag"
+    ],
+    "feature_modes": [
+      "random"
+    ],
+    "paths_config": "datasets-info/paths/cn69.json",
+    "cache_dir": "/home/dev/communities",
+    "output_dir": "results/paper_icdm/7",
+    "name": "final_badloc_brain_s2cag_random_extra24_20260528_154734",
+    "smart_depth": 3,
+    "smart_radius": 1,
+    "aggregation_mode": "norm",
+    "variants": [
+      "full"
+    ],
+    "baseline_iter": 10,
+    "random_feature_dim": 64,
+    "random_feature_seed": 42,
+    "max_updates": 1,
+    "use_gpu": true,
+    "force_undirected": true,
+    "ground_truth_metrics": true,
+    "catch_errors": true,
+    "verbose": 1
+  },
+  "profiles": [
+    {
+      "algorithm": "s2cag-i:10-L:3-r:1-agg:norm-gpu-feat:random",
+      "variant": "full",
+      "method": "s2cag",
+      "mode": "smart",
+      "dataset": "brain",
+      "base_dataset": "brain",
+      "batch_strategy": "999:10",
+      "feature_mode": "random",
+      "baseline_iter": 10,
+      "smart_depth": 3,
+      "smart_radius": 1,
+      "aggregation_mode": "norm",
+      "device": "cuda",
+      "use_gpu": true,
+      "updates_profiled": 1,
+      "total_profiled_time": 75.17251335829496,
+      "peak_cuda_allocated_mb": 207.32080078125,
+      "peak_rss_mb": 1985.703125,
+      "metrics": {
+        "Final modularity": 0.029980849474668503,
+        "ARI": -3.675484791626146e-05,
+        "F1": 0.006603642289063413,
+        "NMI": 0.01692653081388847,
+        "Labels modularity": 0.1389087289571762
+      },
+      "rows": [
+        {
+          "affected_vertices": 167,
+          "variant": "full",
+          "radius_vertices": 4997,
+          "closure_vertices_by_level": [
+            5000,
+            5000,
+            5000
+          ],
+          "radius_time": 0.03323233127593994,
+          "closure_time": 0.05201726406812668,
+          "reset_time": 0.024415545165538788,
+          "level_0_prepare_time": 0.0004140585660934448,
+          "level_1_prepare_time": 0.0005800351500511169,
+          "level_2_prepare_time": 0.0005323663353919983,
+          "aggregation_time": 0.03177172690629959,
+          "backend_time": 74.99896338582039,
+          "backend_conversion_time": 0.3642101287841797,
+          "projection_time": 0.0015173479914665222,
+          "cut_time": 0.00338185578584671,
+          "total_profiled_time": 75.14811723679304,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 5000,
+              "contracted_nodes": 4997,
+              "contracted_edges": 1761183,
+              "aggregation_time": 0.024053238332271576,
+              "backend_time": 28.181818395853043,
+              "projection_time": 0.0006204396486282349,
+              "cut_time": 0.0026194974780082703
+            },
+            {
+              "level": 1,
+              "closure_vertices": 5000,
+              "contracted_nodes": 4997,
+              "contracted_edges": 1761183,
+              "aggregation_time": 0.004020422697067261,
+              "backend_time": 23.397079169750214,
+              "projection_time": 0.0004497617483139038,
+              "cut_time": 0.00038141757249832153
+            },
+            {
+              "level": 2,
+              "closure_vertices": 5000,
+              "contracted_nodes": 4997,
+              "contracted_edges": 1761183,
+              "aggregation_time": 0.0036980658769607544,
+              "backend_time": 23.420065820217133,
+              "projection_time": 0.00044714659452438354,
+              "cut_time": 0.0003809407353401184
+            }
+          ],
+          "contracted_nodes_by_level": [
+            4997,
+            4997,
+            4997
+          ],
+          "contracted_edges_by_level": [
+            1761183,
+            1761183,
+            1761183
+          ],
+          "modularity": 0.02997990883886814,
+          "aggregation_mode": "norm",
+          "cuda_allocated_mb": 105.015625,
+          "cuda_reserved_mb": 276.0,
+          "cuda_peak_allocated_mb": 207.32080078125,
+          "cuda_peak_reserved_mb": 276.0,
+          "rss_max_mb": 1985.703125,
+          "batch_idx": 1,
+          "update_time": 0.024396121501922607
+        }
+      ],
+      "incomplete": false,
+      "updated_at": "2026-05-28T15:48:54.375130"
+    }
+  ],
+  "errors": []
+}

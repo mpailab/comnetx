@@ -19,19 +19,13 @@
   "selected_stream_paths": [
     "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc14500-42/out.dsbm-hubs-1024-58-mc14500-42.5_batches"
   ],
-  "attempted_runs": 1,
-  "successful_runs": 0,
+  "attempted_runs": 2,
+  "successful_runs": 2,
   "skipped_existing": 0,
   "errors": 0,
-  "status": "running",
+  "status": "completed",
   "started_at": "2026-05-28T13:28:41.336252",
-  "updated_at": "2026-05-28T13:28:50.069134",
-  "current_attempt": {
-    "algorithm": "leidenalg-L:3-r:1-gpu",
-    "dataset": "dsbm-hubs-1024-58-mc14500-42",
-    "stream": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc14500-42/out.dsbm-hubs-1024-58-mc14500-42.5_batches",
-    "batch_strategy": "0:4",
-    "attempt_index": 1
-  },
+  "updated_at": "2026-05-28T13:45:47.476762",
+  "current_attempt": null,
   "output": "results/paper_icdm/retry07_dsbm_hubs_5_batches_mc14500_20260528_132838.json"
 }

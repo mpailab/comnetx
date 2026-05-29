@@ -1,0 +1,30 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "5_batches",
+  "all_batches": false,
+  "regimes": [
+    "hubs"
+  ],
+  "max_changes": [
+    29000
+  ],
+  "methods": [
+    "leidenalg"
+  ],
+  "modes": [
+    "naive"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc29000-42/out.dsbm-hubs-1024-58-mc29000-42.5_batches"
+  ],
+  "attempted_runs": 0,
+  "successful_runs": 0,
+  "skipped_existing": 1,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-28T17:06:17.944646",
+  "updated_at": "2026-05-28T17:06:24.766168",
+  "current_attempt": null,
+  "output": "results/paper_icdm/8/medium05_dsbm_hubs_5_mc29000_leidenalg_naive_20260528_170606.json"
+}

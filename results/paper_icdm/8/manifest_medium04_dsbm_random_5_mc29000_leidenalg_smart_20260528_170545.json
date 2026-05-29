@@ -1,0 +1,30 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "5_batches",
+  "all_batches": false,
+  "regimes": [
+    "random"
+  ],
+  "max_changes": [
+    29000
+  ],
+  "methods": [
+    "leidenalg"
+  ],
+  "modes": [
+    "smart"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.5_batches"
+  ],
+  "attempted_runs": 0,
+  "successful_runs": 0,
+  "skipped_existing": 1,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-28T17:05:48.208826",
+  "updated_at": "2026-05-28T17:05:54.889317",
+  "current_attempt": null,
+  "output": "results/paper_icdm/8/medium04_dsbm_random_5_mc29000_leidenalg_smart_20260528_170545.json"
+}

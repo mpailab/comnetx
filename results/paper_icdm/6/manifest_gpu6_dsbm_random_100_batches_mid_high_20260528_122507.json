@@ -1,0 +1,44 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "100_batches",
+  "all_batches": false,
+  "regimes": [
+    "random"
+  ],
+  "max_changes": [
+    2900,
+    14500,
+    29000
+  ],
+  "methods": [
+    "leidenalg",
+    "dfleiden"
+  ],
+  "modes": [
+    "naive",
+    "smart",
+    "dynamic"
+  ],
+  "selected_streams": 3,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc2900-42/out.dsbm-random-1024-58-mc2900-42.100_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc14500-42/out.dsbm-random-1024-58-mc14500-42.100_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.100_batches"
+  ],
+  "attempted_runs": 2,
+  "successful_runs": 1,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "interrupted",
+  "started_at": "2026-05-28T12:25:10.230346",
+  "updated_at": "2026-05-28T14:24:36.540239",
+  "current_attempt": {
+    "algorithm": "leidenalg-L:3-r:1-gpu",
+    "dataset": "dsbm-random-1024-58-mc2900-42",
+    "stream": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc2900-42/out.dsbm-random-1024-58-mc2900-42.100_batches",
+    "batch_strategy": "0:99",
+    "attempt_index": 2
+  },
+  "output": "results/paper_icdm/gpu6_dsbm_random_100_batches_mid_high_20260528_122507.json",
+  "interrupted_by_signal": "SIGTERM"
+}

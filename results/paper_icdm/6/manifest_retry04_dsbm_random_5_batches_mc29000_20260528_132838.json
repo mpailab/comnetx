@@ -19,19 +19,13 @@
   "selected_stream_paths": [
     "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.5_batches"
   ],
-  "attempted_runs": 1,
-  "successful_runs": 0,
+  "attempted_runs": 2,
+  "successful_runs": 2,
   "skipped_existing": 0,
   "errors": 0,
-  "status": "running",
+  "status": "completed",
   "started_at": "2026-05-28T13:28:41.014707",
-  "updated_at": "2026-05-28T13:28:49.587223",
-  "current_attempt": {
-    "algorithm": "leidenalg-L:3-r:1-gpu",
-    "dataset": "dsbm-random-1024-58-mc29000-42",
-    "stream": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.5_batches",
-    "batch_strategy": "0:4",
-    "attempt_index": 1
-  },
+  "updated_at": "2026-05-28T13:45:27.948333",
+  "current_attempt": null,
   "output": "results/paper_icdm/retry04_dsbm_random_5_batches_mc29000_20260528_132838.json"
 }

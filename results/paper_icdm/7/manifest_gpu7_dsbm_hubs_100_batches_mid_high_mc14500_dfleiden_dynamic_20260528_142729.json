@@ -1,0 +1,30 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "100_batches",
+  "all_batches": false,
+  "regimes": [
+    "hubs"
+  ],
+  "max_changes": [
+    14500
+  ],
+  "methods": [
+    "dfleiden"
+  ],
+  "modes": [
+    "dynamic"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc14500-42/out.dsbm-hubs-1024-58-mc14500-42.100_batches"
+  ],
+  "attempted_runs": 1,
+  "successful_runs": 1,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-28T18:56:21.909464",
+  "updated_at": "2026-05-28T18:57:53.646313",
+  "current_attempt": null,
+  "output": "results/paper_icdm/7/gpu7_dsbm_hubs_100_batches_mid_high_mc14500_dfleiden_dynamic_20260528_142729.json"
+}

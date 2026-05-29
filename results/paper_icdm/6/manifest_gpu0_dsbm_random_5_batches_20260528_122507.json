@@ -1,0 +1,41 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "5_batches",
+  "all_batches": false,
+  "regimes": [
+    "random"
+  ],
+  "max_changes": [
+    290,
+    1450,
+    2900,
+    14500,
+    29000
+  ],
+  "methods": [
+    "leidenalg",
+    "dfleiden"
+  ],
+  "modes": [
+    "naive",
+    "smart",
+    "dynamic"
+  ],
+  "selected_streams": 5,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-42/out.dsbm-random-1024-58-mc290-42.5_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-42/out.dsbm-random-1024-58-mc1450-42.5_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc2900-42/out.dsbm-random-1024-58-mc2900-42.5_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc14500-42/out.dsbm-random-1024-58-mc14500-42.5_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.5_batches"
+  ],
+  "attempted_runs": 25,
+  "successful_runs": 25,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-28T12:25:13.750384",
+  "updated_at": "2026-05-28T13:41:18.275534",
+  "current_attempt": null,
+  "output": "results/paper_icdm/gpu0_dsbm_random_5_batches_20260528_122507.json"
+}

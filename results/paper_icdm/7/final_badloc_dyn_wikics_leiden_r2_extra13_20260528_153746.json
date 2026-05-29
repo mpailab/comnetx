@@ -1,0 +1,438 @@
+{
+  "generated_at": "2026-05-28T15:38:28.002417",
+  "profile_schema": "comnetx_smart_workload_v1",
+  "status": "completed",
+  "checkpointed": true,
+  "parameters": {
+    "datasets": [
+      "dyn_wikics"
+    ],
+    "batches": [
+      "999:10"
+    ],
+    "methods": [
+      "leidenalg"
+    ],
+    "feature_modes": [
+      "dataset"
+    ],
+    "paths_config": "datasets-info/paths/cn69.json",
+    "cache_dir": "/home/dev/communities",
+    "output_dir": "results/paper_icdm/7",
+    "name": "final_badloc_dyn_wikics_leiden_r2_extra13_20260528_153746",
+    "smart_depth": 3,
+    "smart_radius": 2,
+    "aggregation_mode": "sum",
+    "variants": [
+      "full"
+    ],
+    "baseline_iter": null,
+    "random_feature_dim": 64,
+    "random_feature_seed": 42,
+    "max_updates": 5,
+    "use_gpu": true,
+    "force_undirected": true,
+    "ground_truth_metrics": true,
+    "catch_errors": true,
+    "verbose": 1
+  },
+  "profiles": [
+    {
+      "algorithm": "leidenalg-L:3-r:2-gpu",
+      "variant": "full",
+      "method": "leidenalg",
+      "mode": "smart",
+      "dataset": "dyn_wikics",
+      "base_dataset": "dyn_wikics",
+      "batch_strategy": "999:10",
+      "feature_mode": null,
+      "baseline_iter": null,
+      "smart_depth": 3,
+      "smart_radius": 2,
+      "aggregation_mode": "sum",
+      "device": "cuda",
+      "use_gpu": true,
+      "updates_profiled": 5,
+      "total_profiled_time": 38.34768445044756,
+      "peak_cuda_allocated_mb": 66.10107421875,
+      "peak_rss_mb": 959.21875,
+      "metrics": {
+        "Final modularity": 0.6525456309318542,
+        "ARI": 0.4029093247915391,
+        "F1": 0.002709649560284475,
+        "NMI": 0.4621018779610124,
+        "Labels modularity": 0.47639167308807373
+      },
+      "rows": [
+        {
+          "affected_vertices": 87,
+          "variant": "full",
+          "radius_vertices": 10940,
+          "closure_vertices_by_level": [
+            11311,
+            11311,
+            11311
+          ],
+          "radius_time": 0.03716780245304108,
+          "closure_time": 0.05163631588220596,
+          "reset_time": 0.019370675086975098,
+          "level_0_prepare_time": 0.0004414767026901245,
+          "level_1_prepare_time": 0.0004824995994567871,
+          "level_2_prepare_time": 0.0004496574401855469,
+          "aggregation_time": 0.020313039422035217,
+          "backend_time": 8.188153862953186,
+          "backend_conversion_time": 1.8286724090576172,
+          "projection_time": 0.001164466142654419,
+          "cut_time": 0.0016457587480545044,
+          "total_profiled_time": 8.32184536010027,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10940,
+              "contracted_edges": 430722,
+              "aggregation_time": 0.015547066926956177,
+              "backend_time": 3.151259660720825,
+              "projection_time": 0.00034921616315841675,
+              "cut_time": 0.000928245484828949
+            },
+            {
+              "level": 1,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10940,
+              "contracted_edges": 430722,
+              "aggregation_time": 0.0024104490876197815,
+              "backend_time": 2.4215830862522125,
+              "projection_time": 0.0003537312150001526,
+              "cut_time": 0.0002919882535934448
+            },
+            {
+              "level": 2,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10940,
+              "contracted_edges": 430722,
+              "aggregation_time": 0.002355523407459259,
+              "backend_time": 2.6153111159801483,
+              "projection_time": 0.0004615187644958496,
+              "cut_time": 0.0004255250096321106
+            }
+          ],
+          "contracted_nodes_by_level": [
+            10940,
+            10940,
+            10940
+          ],
+          "contracted_edges_by_level": [
+            430722,
+            430722,
+            430722
+          ],
+          "modularity": 0.6526059508323669,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 39.9375,
+          "cuda_reserved_mb": 78.0,
+          "cuda_peak_allocated_mb": 65.02294921875,
+          "cuda_peak_reserved_mb": 78.0,
+          "rss_max_mb": 931.6953125,
+          "batch_idx": 1,
+          "update_time": 0.04469934105873108
+        },
+        {
+          "affected_vertices": 88,
+          "variant": "full",
+          "radius_vertices": 10955,
+          "closure_vertices_by_level": [
+            11311,
+            11311,
+            11311
+          ],
+          "radius_time": 0.0013829320669174194,
+          "closure_time": 0.001244857907295227,
+          "reset_time": 0.0022362694144248962,
+          "level_0_prepare_time": 0.0003819316625595093,
+          "level_1_prepare_time": 0.0006257444620132446,
+          "level_2_prepare_time": 0.0004968047142028809,
+          "aggregation_time": 0.007266893982887268,
+          "backend_time": 8.131805680692196,
+          "backend_conversion_time": 1.8874804973602295,
+          "projection_time": 0.001064404845237732,
+          "cut_time": 0.0010202601552009583,
+          "total_profiled_time": 8.148450143635273,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10956,
+              "contracted_edges": 430831,
+              "aggregation_time": 0.002272211015224457,
+              "backend_time": 3.1429718732833862,
+              "projection_time": 0.00042356550693511963,
+              "cut_time": 0.0004306882619857788
+            },
+            {
+              "level": 1,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10956,
+              "contracted_edges": 430831,
+              "aggregation_time": 0.0025629624724388123,
+              "backend_time": 2.468153193593025,
+              "projection_time": 0.0003861933946609497,
+              "cut_time": 0.0003207474946975708
+            },
+            {
+              "level": 2,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10956,
+              "contracted_edges": 430831,
+              "aggregation_time": 0.002431720495223999,
+              "backend_time": 2.5206806138157845,
+              "projection_time": 0.0002546459436416626,
+              "cut_time": 0.00026882439851760864
+            }
+          ],
+          "contracted_nodes_by_level": [
+            10956,
+            10956,
+            10956
+          ],
+          "contracted_edges_by_level": [
+            430831,
+            430831,
+            430831
+          ],
+          "modularity": 0.6526422500610352,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 40.19921875,
+          "cuda_reserved_mb": 78.0,
+          "cuda_peak_allocated_mb": 65.28271484375,
+          "cuda_peak_reserved_mb": 78.0,
+          "rss_max_mb": 952.578125,
+          "batch_idx": 2,
+          "update_time": 0.0007371306419372559
+        },
+        {
+          "affected_vertices": 86,
+          "variant": "full",
+          "radius_vertices": 10837,
+          "closure_vertices_by_level": [
+            11311,
+            11311,
+            11311
+          ],
+          "radius_time": 0.0012364313006401062,
+          "closure_time": 0.0012019872665405273,
+          "reset_time": 0.0029832124710083008,
+          "level_0_prepare_time": 0.0003775879740715027,
+          "level_1_prepare_time": 0.000477716326713562,
+          "level_2_prepare_time": 0.0004449412226676941,
+          "aggregation_time": 0.006867460906505585,
+          "backend_time": 7.231575101613998,
+          "backend_conversion_time": 1.4712142944335938,
+          "projection_time": 0.0010534673929214478,
+          "cut_time": 0.0009232386946678162,
+          "total_profiled_time": 7.248039707541466,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10837,
+              "contracted_edges": 430261,
+              "aggregation_time": 0.002099074423313141,
+              "backend_time": 2.6737107187509537,
+              "projection_time": 0.000401131808757782,
+              "cut_time": 0.0003314986824989319
+            },
+            {
+              "level": 1,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10837,
+              "contracted_edges": 430261,
+              "aggregation_time": 0.0024617761373519897,
+              "backend_time": 2.288752570748329,
+              "projection_time": 0.0002419799566268921,
+              "cut_time": 0.00026385486125946045
+            },
+            {
+              "level": 2,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10837,
+              "contracted_edges": 430261,
+              "aggregation_time": 0.002306610345840454,
+              "backend_time": 2.2691118121147156,
+              "projection_time": 0.0004103556275367737,
+              "cut_time": 0.00032788515090942383
+            }
+          ],
+          "contracted_nodes_by_level": [
+            10837,
+            10837,
+            10837
+          ],
+          "contracted_edges_by_level": [
+            430261,
+            430261,
+            430261
+          ],
+          "modularity": 0.6527860760688782,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 41.03759765625,
+          "cuda_reserved_mb": 92.0,
+          "cuda_peak_allocated_mb": 65.87255859375,
+          "cuda_peak_reserved_mb": 92.0,
+          "rss_max_mb": 955.78515625,
+          "batch_idx": 3,
+          "update_time": 0.0005751550197601318
+        },
+        {
+          "affected_vertices": 85,
+          "variant": "full",
+          "radius_vertices": 10895,
+          "closure_vertices_by_level": [
+            11311,
+            11311,
+            11311
+          ],
+          "radius_time": 0.0012761205434799194,
+          "closure_time": 0.001197420060634613,
+          "reset_time": 0.0021653398871421814,
+          "level_0_prepare_time": 0.0003711283206939697,
+          "level_1_prepare_time": 0.0004335865378379822,
+          "level_2_prepare_time": 0.00044117122888565063,
+          "aggregation_time": 0.0065913572907447815,
+          "backend_time": 7.230011224746704,
+          "backend_conversion_time": 1.4371685981750488,
+          "projection_time": 0.0008916407823562622,
+          "cut_time": 0.0008561909198760986,
+          "total_profiled_time": 7.245082721114159,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10896,
+              "contracted_edges": 430877,
+              "aggregation_time": 0.0020871832966804504,
+              "backend_time": 2.8060138151049614,
+              "projection_time": 0.0002431720495223999,
+              "cut_time": 0.00027488917112350464
+            },
+            {
+              "level": 1,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10896,
+              "contracted_edges": 430877,
+              "aggregation_time": 0.002251662313938141,
+              "backend_time": 2.2574921026825905,
+              "projection_time": 0.0003001019358634949,
+              "cut_time": 0.0002875998616218567
+            },
+            {
+              "level": 2,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10896,
+              "contracted_edges": 430877,
+              "aggregation_time": 0.00225251168012619,
+              "backend_time": 2.166505306959152,
+              "projection_time": 0.00034836679697036743,
+              "cut_time": 0.0002937018871307373
+            }
+          ],
+          "contracted_nodes_by_level": [
+            10896,
+            10896,
+            10896
+          ],
+          "contracted_edges_by_level": [
+            430877,
+            430877,
+            430877
+          ],
+          "modularity": 0.6522803902626038,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 39.9638671875,
+          "cuda_reserved_mb": 92.0,
+          "cuda_peak_allocated_mb": 66.0986328125,
+          "cuda_peak_reserved_mb": 92.0,
+          "rss_max_mb": 959.17578125,
+          "batch_idx": 4,
+          "update_time": 0.0005410462617874146
+        },
+        {
+          "affected_vertices": 85,
+          "variant": "full",
+          "radius_vertices": 10984,
+          "closure_vertices_by_level": [
+            11311,
+            11311,
+            11311
+          ],
+          "radius_time": 0.0012729167938232422,
+          "closure_time": 0.001173458993434906,
+          "reset_time": 0.0021534040570259094,
+          "level_0_prepare_time": 0.0003728717565536499,
+          "level_1_prepare_time": 0.00043835490942001343,
+          "level_2_prepare_time": 0.0004228055477142334,
+          "aggregation_time": 0.006329953670501709,
+          "backend_time": 7.322691850364208,
+          "backend_conversion_time": 1.379007339477539,
+          "projection_time": 0.000750809907913208,
+          "cut_time": 0.0007757693529129028,
+          "total_profiled_time": 7.337180830538273,
+          "levels": [
+            {
+              "level": 0,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10984,
+              "contracted_edges": 431169,
+              "aggregation_time": 0.0020217373967170715,
+              "backend_time": 2.8421222269535065,
+              "projection_time": 0.00024355947971343994,
+              "cut_time": 0.0002672821283340454
+            },
+            {
+              "level": 1,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10984,
+              "contracted_edges": 431169,
+              "aggregation_time": 0.002197772264480591,
+              "backend_time": 2.223845787346363,
+              "projection_time": 0.00021942704916000366,
+              "cut_time": 0.00024052709341049194
+            },
+            {
+              "level": 2,
+              "closure_vertices": 11311,
+              "contracted_nodes": 10984,
+              "contracted_edges": 431169,
+              "aggregation_time": 0.0021104440093040466,
+              "backend_time": 2.2567238360643387,
+              "projection_time": 0.0002878233790397644,
+              "cut_time": 0.0002679601311683655
+            }
+          ],
+          "contracted_nodes_by_level": [
+            10984,
+            10984,
+            10984
+          ],
+          "contracted_edges_by_level": [
+            431169,
+            431169,
+            431169
+          ],
+          "modularity": 0.6525243520736694,
+          "aggregation_mode": "sum",
+          "cuda_allocated_mb": 41.03564453125,
+          "cuda_reserved_mb": 92.0,
+          "cuda_peak_allocated_mb": 66.10107421875,
+          "cuda_peak_reserved_mb": 92.0,
+          "rss_max_mb": 959.21875,
+          "batch_idx": 5,
+          "update_time": 0.0005330145359039307
+        }
+      ],
+      "incomplete": false,
+      "updated_at": "2026-05-28T15:38:27.997435"
+    }
+  ],
+  "errors": []
+}

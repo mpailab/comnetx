@@ -1,0 +1,30 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "10_batches",
+  "all_batches": false,
+  "regimes": [
+    "random"
+  ],
+  "max_changes": [
+    29000
+  ],
+  "methods": [
+    "dfleiden"
+  ],
+  "modes": [
+    "smart"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.10_batches"
+  ],
+  "attempted_runs": 1,
+  "successful_runs": 1,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-28T16:23:52.960418",
+  "updated_at": "2026-05-28T16:28:26.339063",
+  "current_attempt": null,
+  "output": "results/paper_icdm/7/gpu0_dsbm_random_10_batches_mc29000_dfleiden_smart_20260528_142728.json"
+}

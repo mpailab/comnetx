@@ -1,0 +1,48 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "10_batches",
+  "all_batches": false,
+  "regimes": [
+    "random"
+  ],
+  "max_changes": [
+    290,
+    1450,
+    2900,
+    14500,
+    29000
+  ],
+  "methods": [
+    "leidenalg",
+    "dfleiden"
+  ],
+  "modes": [
+    "naive",
+    "smart",
+    "dynamic"
+  ],
+  "selected_streams": 5,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-42/out.dsbm-random-1024-58-mc290-42.10_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-42/out.dsbm-random-1024-58-mc1450-42.10_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc2900-42/out.dsbm-random-1024-58-mc2900-42.10_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc14500-42/out.dsbm-random-1024-58-mc14500-42.10_batches",
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc29000-42/out.dsbm-random-1024-58-mc29000-42.10_batches"
+  ],
+  "attempted_runs": 11,
+  "successful_runs": 10,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "interrupted",
+  "started_at": "2026-05-28T13:41:21.560696",
+  "updated_at": "2026-05-28T14:24:25.393832",
+  "current_attempt": {
+    "algorithm": "leidenalg-naive",
+    "dataset": "dsbm-random-1024-58-mc2900-42",
+    "stream": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc2900-42/out.dsbm-random-1024-58-mc2900-42.10_batches",
+    "batch_strategy": "0:9",
+    "attempt_index": 11
+  },
+  "output": "results/paper_icdm/gpu0_dsbm_random_10_batches_20260528_122507.json",
+  "interrupted_by_signal": "SIGTERM"
+}

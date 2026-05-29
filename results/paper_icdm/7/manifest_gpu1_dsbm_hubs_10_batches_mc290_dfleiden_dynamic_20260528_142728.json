@@ -1,0 +1,30 @@
+{
+  "root": "datasets-sbm",
+  "batch_suffix": "10_batches",
+  "all_batches": false,
+  "regimes": [
+    "hubs"
+  ],
+  "max_changes": [
+    290
+  ],
+  "methods": [
+    "dfleiden"
+  ],
+  "modes": [
+    "dynamic"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-42/out.dsbm-hubs-1024-58-mc290-42.10_batches"
+  ],
+  "attempted_runs": 0,
+  "successful_runs": 0,
+  "skipped_existing": 1,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-28T14:32:10.320279",
+  "updated_at": "2026-05-28T14:32:16.890909",
+  "current_attempt": null,
+  "output": "results/paper_icdm/7/gpu1_dsbm_hubs_10_batches_mc290_dfleiden_dynamic_20260528_142728.json"
+}

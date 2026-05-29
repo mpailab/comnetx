@@ -596,7 +596,7 @@ The results demonstrate that our adapter can accelerate and, in several cases, e
 \centering
 \caption{All-backend compatibility screen of Local ComNetX against the corresponding baseline under protocol P1. $\overline{\Delta Q}$ and $\overline{\Delta\mathrm{NMI}}$ are Local minus baseline, averaged over datasets with finite baseline results. Geometric mean speedup excludes zero-time and OOM baseline entries. Full per-dataset values are reported in Appendix~\ref{app:full-results}.}
 \label{tab:main-results}
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \footnotesize
 \begin{tabular}{llrrrrr}
 \toprule
@@ -717,58 +717,67 @@ Crucially, the Local adapter also accelerates the native dynamic DF-Leiden on \t
 
 \subsubsection{Statistical Robustness}
 
-This experiment addresses the stream-level part of RQ5.
-Table~\ref{tab:stability} is the robustness counterpart to the aggregate screen:
-it reports mean $\pm$ standard deviation over the paired non-duplicate P2
-streams currently available for each comparison. The rows follow the focused comparison
-design above: each of the three central backends is reported on both
-\textit{dyn\_pubmed} and \textit{arxivmath}. This makes the table a complete
-medium/large comparison rather than a collection of individually convenient
-rows. The table is important because several backends are stochastic and
-because dynamic updates can interact strongly with the local neighborhood
-selected by ComNetX. The registry-derived stream identifiers let us match
-baseline and Local rows directly, so the robustness table reports paired
-coverage and Wilcoxon tests instead of falling back to unpaired summaries.
+This experiment addresses the stream-level part of RQ5 without mixing in the
+random-feature runs. Table~\ref{tab:stability} reports only non-random,
+registry measurements where Local and baseline records share the same derived
+\texttt{stream\_id}. Each row fixes all non-empty algorithm parameters, the
+dataset, directedness, batch strategy, and completed update count; the standard
+deviations therefore reflect repeated measurements of the same stream shape
+rather than a mixture of different horizons or feature draws. The Local rows use
+the fixed $L=3,r=1$ GPU configuration and are compared with the corresponding
+naive or native dynamic baseline.
 
 \begin{table*}[t]
 \centering
-\caption{Statistical robustness available in the current result registry.
-``Baseline'' is Naive for static solvers and Dynamic for native dynamic
-solvers. Values are mean $\pm$ standard deviation over paired non-duplicate P2
-streams where the baseline and Local records share the same derived
-\texttt{stream\_id}. The last column reports two-sided Wilcoxon signed-rank
-tests for paired $\Delta Q$ and paired runtime difference.}
+\caption{Stream-id robustness for non-random runs. Values are
+mean $\pm$ standard deviation over paired \texttt{stream\_id}s from all
+registry sources under \texttt{results/}. $T$ is total processing time in
+seconds; speedup is $T_{\mathrm{base}}/T_{\mathrm{Local}}$.}
 \label{tab:stability}
-\setlength{\tabcolsep}{4pt}
-\footnotesize
-\begin{tabular}{llcccccc}
+\setlength{\tabcolsep}{2pt}
+\scriptsize
+\begin{tabular}{@{}lllrccccc@{}}
 \toprule
-\textbf{Backend} & \textbf{Dataset} & \textbf{$Q_{\mathrm{Local}}$} &
-\textbf{$Q_{\mathrm{base}}$} & \textbf{$T_{\mathrm{Local}}$} &
-\textbf{$T_{\mathrm{base}}$} & \textbf{Pairs} & \textbf{$p_Q/p_T$} \\
+\textbf{Backend} & \textbf{Dataset} & \textbf{Stream} & \textbf{$n$} &
+\textbf{$Q_L$} & \textbf{$Q_B$} & \textbf{$T_L$} &
+\textbf{$T_B$} & \textbf{B/L} \\
 \midrule
-\multicolumn{8}{l}{\textit{Topology-only full-recomputation baseline}} \\
-Leidenalg & dyn\_pubmed & 0.760 $\pm$ 0.024 & 0.785 $\pm$ 0.001 & 6.44 $\pm$ 8.44 & 86.72 $\pm$ 119.38 & 19 & $<$0.001 / $<$0.001 \\
-Leidenalg & arxivmath   & 0.875 $\pm$ 0.007 & 0.886 $\pm$ 0.000 & 80.33 $\pm$ 106.83 & 2757.04 $\pm$ 3310.63 & 19 & $<$0.001 / $<$0.001 \\
+\multicolumn{9}{l}{\textit{Leiden, Local versus full recomputation}} \\
+Leiden & dyn\_pubmed & 999:10  & 4 & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.32 $\pm$ 0.05 & 7.22 $\pm$ 1.36 & 22.3 $\pm$ 0.7 \\
+Leiden & dyn\_pubmed & 999:50  & 2 & 0.758 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.86 $\pm$ 0.08 & 37.12 $\pm$ 7.17 & 43.7 $\pm$ 12.2 \\
+Leiden & dyn\_pubmed & 999:100 & 2 & 0.758 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.70 $\pm$ 0.03 & 35.15 $\pm$ 4.52 & 50.0 $\pm$ 4.6 \\
+Leiden & arxivmath   & 999:10  & 4 & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 3.90 $\pm$ 0.52 & 169.96 $\pm$ 31.29 & 43.4 $\pm$ 2.8 \\
+Leiden & arxivmath   & 999:50  & 2 & 0.871 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 5.41 $\pm$ 0.09 & 918.45 $\pm$ 58.91 & 169.8 $\pm$ 8.2 \\
+Leiden & arxivmath   & 999:100 & 2 & 0.869 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 6.78 $\pm$ 0.55 & 1981.16 $\pm$ 533.99 & 289.9 $\pm$ 55.3 \\
 \addlinespace
-\multicolumn{8}{l}{\textit{Native dynamic topology baseline}} \\
-DF-Leiden & dyn\_pubmed & 0.745 $\pm$ 0.049 & 0.758 $\pm$ 0.005 & 1.61 $\pm$ 1.94 & 1.46 $\pm$ 2.04 & 18 & 0.727 / 0.027 \\
-DF-Leiden & arxivmath   & 0.866 $\pm$ 0.018 & 0.850 $\pm$ 0.008 & 9.48 $\pm$ 10.12 & 55.60 $\pm$ 62.26 & 18 & 0.012 / $<$0.001 \\
+\multicolumn{9}{l}{\textit{DF-Leiden, Local versus native dynamic backend}} \\
+DF-Leiden & dyn\_pubmed & 999:10  & 3 & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.12 $\pm$ 0.01 & 0.11 $\pm$ 0.01 & 1.0 $\pm$ 0.0 \\
+DF-Leiden & dyn\_pubmed & 999:50  & 2 & 0.744 $\pm$ 0.000 & 0.760 $\pm$ 0.000 & 0.48 $\pm$ 0.06 & 0.35 $\pm$ 0.05 & 0.7 $\pm$ 0.0 \\
+DF-Leiden & dyn\_pubmed & 999:100 & 2 & 0.744 $\pm$ 0.000 & 0.760 $\pm$ 0.000 & 0.49 $\pm$ 0.06 & 0.35 $\pm$ 0.01 & 0.7 $\pm$ 0.1 \\
+DF-Leiden & arxivmath   & 999:10  & 4 & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.47 $\pm$ 0.04 & 4.00 $\pm$ 0.55 & 8.4 $\pm$ 0.5 \\
+DF-Leiden & arxivmath   & 999:50  & 2 & 0.865 $\pm$ 0.000 & 0.854 $\pm$ 0.000 & 1.24 $\pm$ 0.11 & 17.30 $\pm$ 2.93 & 13.9 $\pm$ 1.1 \\
+DF-Leiden & arxivmath   & 999:100 & 2 & 0.861 $\pm$ 0.000 & 0.860 $\pm$ 0.000 & 2.10 $\pm$ 0.05 & 27.03 $\pm$ 2.10 & 12.9 $\pm$ 0.7 \\
 \addlinespace
-\multicolumn{8}{l}{\textit{Feature-aware GNN baseline}} \\
-S$^2$CAG  & dyn\_pubmed & 0.445 $\pm$ 0.175 & 0.623 $\pm$ 0.001 & 54.96 $\pm$ 45.35 & 280.42 $\pm$ 160.74 & 5 & 0.062 / 0.062 \\
-S$^2$CAG  & arxivmath   & 0.545 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 261.01 $\pm$ 0.00 & 3260.78 $\pm$ 0.00 & 1 & -- / -- \\
+\multicolumn{9}{l}{\textit{S$^2$CAG, dataset features}} \\
+S$^2$CAG & dyn\_pubmed & 999:10  & 3 & 0.530 $\pm$ 0.000 & 0.622 $\pm$ 0.000 & 76.57 $\pm$ 56.95 & 169.92 $\pm$ 56.38 & 2.7 $\pm$ 1.0 \\
+S$^2$CAG & dyn\_pubmed & 999:100 & 2 & 0.532 $\pm$ 0.000 & 0.624 $\pm$ 0.000 & 38.14 $\pm$ 1.24 & 390.05 $\pm$ 5.77 & 10.2 $\pm$ 0.2 \\
+S$^2$CAG & dyn\_pubmed & 99:50   & 2 & 0.164 $\pm$ 0.000 & 0.624 $\pm$ 0.000 & 417.51 $\pm$ 14.80 & 488.72 $\pm$ 13.43 & 1.2 $\pm$ 0.0 \\
+S$^2$CAG & arxivmath   & 999:10  & 2 & 0.089 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 228.56 $\pm$ 15.45 & 2778.46 $\pm$ 682.10 & 12.1 $\pm$ 2.2 \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-The paired stream identifiers close the topology-only part of the statistical
-pass: Leidenalg is consistently faster with a small modularity loss, and
-DF-Leiden shows a significant speedup on \textit{arxivmath}; on
-\textit{dyn\_pubmed} it is near parity, though slightly slower. The
-feature-aware S$^2$CAG rows remain more limited because fewer baseline/local
-records were produced by the same source files, but they are now reported with
-explicit paired-stream coverage rather than an unpaired placeholder.
+The stream-id view is intentionally narrower than a whole-registry aggregate.
+It shows that the topology-only conclusions are stable when the stream shape is
+held fixed: Leiden keeps a small modularity gap and large speedups, while
+Local DF-Leiden is useful on \textit{arxivmath} but not on
+\textit{dyn\_pubmed}, where the native dynamic backend is already extremely
+cheap. The S$^2$CAG dataset-feature rows confirm that the Local wrapper can
+reduce runtime for this heavier backend, but with a larger quality gap and with
+less consistent speedup on the denser \textit{dyn\_pubmed} streams. The
+remaining runtime standard deviation is mostly run-to-run system variation and
+backend cost variation on the same deterministic split, not a random-feature
+effect.
 
 \subsubsection{Comparison with Native Dynamic Methods}
 
@@ -854,21 +863,19 @@ to preserve context.
 The neighborhood table explains the first stage of locality. The decisive
 second stage is the hierarchical closure and contraction, summarized by the
 post-closure sets $U_t^\ell$ and the contracted backend sizes
-$(k_\ell,\bar m_\ell)$. Table~\ref{tab:contracted-workload} uses the same
-complete method--dataset grid as Table~\ref{tab:stability} and adds
-\textit{dyn\_cora} as a small-graph control. The latest workload-profile
-records fill the post-closure and contracted-backend columns for the focused
-grid, so the table can be read together with the runtime and memory breakdown
-below.
+$(k_\ell,\bar m_\ell)$. Table~\ref{tab:contracted-workload} uses the focused
+workload-profile grid and adds \textit{dyn\_cora} as a small-graph control.
+The latest workload-profile records fill the post-closure and
+contracted-backend columns, so the table can be read together with the runtime
+and memory breakdown below.
 
 \begin{table}[t]
 \centering
-\caption{Contracted workload after hierarchical closure. The table mirrors the
-complete focused comparison grid from Table~\ref{tab:stability} and includes
-\textit{dyn\_cora} as a small-control row for each backend family. $|U|/|V|$
-is the post-closure vertex fraction, $|\bar V|$ is the mean contracted backend
-node count, and $|\bar E|/|E|$ is the edge fraction in the contracted backend
-instance.}
+\caption{Contracted workload after hierarchical closure. The table reports the
+focused workload-profile grid and includes \textit{dyn\_cora} as a
+small-control row for each backend family. $|U|/|V|$ is the post-closure vertex
+fraction, $|\bar V|$ is the mean contracted backend node count, and
+$|\bar E|/|E|$ is the edge fraction in the contracted backend instance.}
 \label{tab:contracted-workload}
 \setlength{\tabcolsep}{1.6pt}
 \scriptsize
@@ -1023,8 +1030,8 @@ topology dominates the update. Second, the radius trend for S$^2$CAG is even
 sharper than for Leiden: $r=2$ substantially worsens both quality and runtime
 on \textit{dyn\_pubmed}. The aggregation ablation shows identical quality for
 sum and normalized aggregation in this run, with runtime differences that
-are evaluated over multiple seeds in Table~\ref{tab:stability} before being
-used as a central claim.
+are kept out of the stream-id robustness table because it intentionally
+excludes random-feature runs.
 
 \begin{table}[t]
 \centering
@@ -1073,19 +1080,19 @@ is only the breadth screen. Protocol P2 carries the dynamic-stability claim by
 varying both the initial-history fraction and the number of update batches.
 Table~\ref{tab:long-horizon} reports a balanced topology snapshot for
 \textit{dyn\_pubmed} and \textit{arxivmath} at the same 500-update horizon
-using the new cn69 long-horizon measurements. Denser $99{:}m$ and
-$999{:}m$ starts are reserved for Figure~\ref{fig:long-horizon-curves}, where
-different initial-history fractions can be compared without making the compact
-table visually uneven. The goal is to show not only a large cumulative
-speedup, but also the range of stream granularities where quality drift remains
-controlled.
+using the new cn69 long-horizon measurements, and adds the completed
+\textit{dyn\_pubmed} \texttt{999:100} LD-Leiden endpoint whose NMI was missing
+from the earlier logs. Denser $99{:}m$ and $999{:}m$ starts are otherwise kept
+out of the compact table unless they fill a previously missing NMI cell. The
+goal is to show not only a large cumulative speedup, but also the range of
+stream granularities where quality drift remains controlled.
 
 \begin{table}[t]
 \centering
-\caption{Balanced long-horizon topology snapshot from the cn69 \texttt{9:500}
-measurements in \texttt{results/paper\_icdm/3}. Each row reports final
-modularity $Q$, NMI, and cumulative time $T$ in seconds; Local speedups are
-relative to the corresponding non-local backend.}
+\caption{Long-horizon topology endpoints from the cn69 \texttt{9:500}
+measurements and the \texttt{999:100} LD-Leiden NMI completion block. Each row
+reports final modularity $Q$, NMI, and cumulative time $T$ in seconds; Local
+speedups are relative to the corresponding non-local backend.}
 \label{tab:long-horizon}
 \setlength{\tabcolsep}{2pt}
 \scriptsize
@@ -1098,6 +1105,8 @@ dyn\_pubmed & Leiden & 500 & 0.784 & 0.208 & 427.50 & 1.0$\times$ \\
 dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 25.06 & 17.1$\times$ \\
 dyn\_pubmed & DF-Leiden & 500 & 0.762 & 0.195 & 8.06 & 1.0$\times$ \\
 dyn\_pubmed & Local DF & 500 & 0.715 & 0.138 & 7.35 & 1.1$\times$ \\
+dyn\_pubmed & LD-Leiden & 100 & 0.784 & 0.202 & 3.41 & 1.0$\times$ \\
+dyn\_pubmed & Local LD & 100 & 0.737 & 0.191 & 0.61 & 5.6$\times$ \\
 \midrule
 arxivmath & Leiden & 500 & 0.887 & 0.427 & 8421.63 & 1.0$\times$ \\
 arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 289.27 & 29.1$\times$ \\
@@ -1117,7 +1126,7 @@ The registry stores per-update runtime and modularity for these streams, while
 NMI is available at the final snapshot and is reported in
 Table~\ref{tab:long-horizon}. Figure~\ref{fig:long-horizon-curves} therefore
 plots the largest real graph, \textit{arxivmath}, across the 500-update
-$9{:}500$ stream.
+$9{:}500$ stream and includes final-snapshot NMI as an endpoint-only panel.
 
 \begin{figure}[t]
 \centering
@@ -1163,11 +1172,35 @@ $9{:}500$ stream.
 \draw[dkgreen,dashed,thick] plot coordinates {(1,0.0418) (2,0.0384) (3,0.0363) (4,0.0346) (5,0.0295)}
   node[right,font=\scriptsize] {Local DF};
 \end{tikzpicture}
+
+\vspace{0.45em}
+
+\begin{tikzpicture}[x=0.82cm,y=6.0cm]
+\node[font=\footnotesize] at (3.0,0.54) {(c) Final NMI};
+\draw[->] (0.6,0) -- (5.1,0)
+    node[below,font=\scriptsize] {method};
+\draw[->] (0.6,0) -- (0.6,0.50)
+    node[above,font=\scriptsize] {NMI};
+\foreach \y/\lab in {0.2/0.2,0.4/0.4}
+  \draw (0.6,\y) -- ++(-0.06,0) node[left,font=\scriptsize] {\lab};
+\fill[blue] (1.0,0) rectangle (1.35,0.427);
+\draw[blue,thick,fill=white] (1.65,0) rectangle (2.00,0.355);
+\fill[dkgreen] (2.75,0) rectangle (3.10,0.388);
+\draw[dkgreen,thick,fill=white] (3.40,0) rectangle (3.75,0.335);
+\node[above,font=\scriptsize] at (1.175,0.427) {0.427};
+\node[above,font=\scriptsize] at (1.825,0.355) {0.355};
+\node[above,font=\scriptsize] at (2.925,0.388) {0.388};
+\node[above,font=\scriptsize] at (3.575,0.335) {0.335};
+\node[below,font=\scriptsize] at (1.175,0) {L};
+\node[below,font=\scriptsize] at (1.825,0) {Loc-L};
+\node[below,font=\scriptsize] at (2.925,0) {DF};
+\node[below,font=\scriptsize] at (3.575,0) {Loc-DF};
+\end{tikzpicture}
 \caption{Long-horizon curves for \textit{arxivmath} on the cn69
 \texttt{9:500} stream. Runtime is cumulative over updates and shown on a
 logarithmic scale; modularity is plotted from the same per-update registry
-series. Final NMI is endpoint-only in the current logs and is reported in
-Table~\ref{tab:long-horizon}.}
+series. Final NMI is endpoint-only in the current logs and is therefore shown
+as endpoint bars rather than a per-update curve.}
 \label{fig:long-horizon-curves}
 \end{figure}
 
@@ -1233,11 +1266,11 @@ smaller despite sub-percent contracted edge fractions.
 
 This experiment addresses the failure-mode component of RQ5.
 The locality assumption is stress-tested by varying the update size and the
-type of touched vertices. Figure~\ref{fig:update-size} reports the currently
-measured community-internal solver slice and marks the random and hub-centered
-solver curves that remain to be completed. This experiment defines the boundary
-between the regime where ComNetX is expected to be useful and the regime where
-it naturally degenerates toward full recomputation.
+type of touched vertices. Table~\ref{tab:dsbm-leiden-results} and
+Figure~\ref{fig:update-size} report the paired Leiden measurements now
+available for all three generated update regimes. This experiment defines the
+boundary between the regime where ComNetX is expected to be useful and the
+regime where it naturally degenerates toward full recomputation.
 
 For this purpose we prepared an independent synthetic DSBM stress suite rather
 than reusing the real-data $999{:}10$ protocol.
@@ -1313,56 +1346,176 @@ community-internal & 0.57--14.77\% & 100.0\% \\
 \end{tabular}
 \end{table}
 
+\begin{table*}[t]
+\centering
+\caption{Paired DSBM Leiden stress results. The registry window \texttt{0:m}
+is reported explicitly because some high-change synthetic streams exhaust
+their available update sequence before the requested 100-step horizon. $T_N$
+and $T_L$ are cumulative naive and Local Leiden times in seconds; speedup is
+$T_N/T_L$, $\Delta Q=Q_L-Q_N$, and
+$\Delta\mathrm{NMI}=\mathrm{NMI}_L-\mathrm{NMI}_N$.}
+\label{tab:dsbm-leiden-results}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.92}
+\scriptsize
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+\textbf{Regime} & \textbf{Changed edges (\%)} & \textbf{Window} &
+\textbf{$T_N$} & \textbf{$T_L$} & \textbf{Speedup} & \textbf{$\Delta Q$} &
+\textbf{$\Delta$NMI} \\
+\midrule
+Random & 0.01 & 0:4 & 176.23 & 53.15 & 3.32 & +0.0006 & +0.006 \\
+ &  & 0:9 & 403.17 & 115.45 & 3.49 & -0.0029 & -0.019 \\
+ &  & 0:99 & 4340.87 & 1280.69 & 3.39 & -0.0003 & -0.001 \\
+ & 0.05 & 0:4 & 177.59 & 203.15 & 0.87 & -0.0008 & -0.004 \\
+ &  & 0:9 & 391.13 & 458.10 & 0.85 & -0.0003 & -0.001 \\
+ &  & 0:99 & 4322.08 & 4870.37 & 0.89 & -0.0007 & -0.004 \\
+ & 0.10 & 0:4 & 177.15 & 262.57 & 0.67 & -0.0003 & -0.001 \\
+ &  & 0:9 & 397.99 & 580.24 & 0.69 & -0.0012 & -0.007 \\
+ &  & 0:99 & 4238.51 & 6026.09 & 0.70 & -0.0027 & -0.017 \\
+ & 0.50 & 0:4 & 177.05 & 687.43 & 0.26 & -0.0036 & -0.009 \\
+ &  & 0:9 & 386.54 & 1498.01 & 0.26 & -0.0043 & -0.012 \\
+ &  & 0:99 & 3693.27 & 14913.52 & 0.25 & -0.0043 & -0.012 \\
+ & 1.00 & 0:4 & 176.94 & 684.77 & 0.26 & -0.0043 & -0.012 \\
+ &  & 0:9 & 411.59 & 1509.08 & 0.27 & -0.0043 & -0.012 \\
+ &  & 0:99 & 2732.45 & 11607.14 & 0.24 & -0.0043 & -0.012 \\
+\addlinespace
+Hub-centered & 0.01 & 0:4 & 176.52 & 121.21 & 1.46 & -0.0003 & -0.001 \\
+ &  & 0:9 & 396.98 & 269.36 & 1.47 & -0.0003 & -0.001 \\
+ &  & 0:99 & 4410.66 & 2869.38 & 1.54 & -0.0003 & -0.001 \\
+ & 0.05 & 0:4 & 176.30 & 240.78 & 0.73 & -0.0008 & -0.004 \\
+ &  & 0:9 & 399.98 & 537.79 & 0.74 & -0.0008 & -0.004 \\
+ &  & 0:99 & 6118.94 & 5422.07 & 1.13 & -0.0051 & -0.033 \\
+ & 0.10 & 0:4 & 177.47 & 294.01 & 0.60 & -0.0022 & -0.013 \\
+ &  & 0:9 & 393.27 & 642.55 & 0.61 & -0.0014 & -0.007 \\
+ &  & 0:98 & 4659.98 & 5552.37 & 0.84 & -0.0065 & -0.037 \\
+ & 0.50 & 0:4 & 180.84 & 693.43 & 0.26 & -0.0071 & -0.035 \\
+ &  & 0:9 & 415.64 & 1657.29 & 0.25 & -0.0063 & -0.030 \\
+ &  & 0:20 & 942.10 & 3706.79 & 0.25 & -0.0229 & -0.088 \\
+ & 1.00 & 0:4 & 182.29 & 709.44 & 0.26 & -0.0024 & -0.004 \\
+ &  & 0:9 & 434.99 & 1684.83 & 0.26 & -0.0043 & -0.012 \\
+ &  & 0:10 & 486.37 & 1874.51 & 0.26 & +0.0018 & +0.003 \\
+\addlinespace
+Community & 0.01 & 0:4 & 267.79 & 76.60 & 3.50 & -0.0016 & -0.008 \\
+ &  & 0:9 & 645.36 & 131.60 & 4.90 & -0.0002 & -0.001 \\
+ &  & 0:99 & 5530.30 & 1350.46 & 4.10 & -0.0011 & -0.007 \\
+ & 0.05 & 0:4 & 189.21 & 174.54 & 1.08 & -0.0076 & -0.049 \\
+ &  & 0:9 & 437.36 & 406.79 & 1.08 & -0.0051 & -0.034 \\
+ &  & 0:99 & 5627.06 & 4714.06 & 1.19 & -0.0052 & -0.034 \\
+ & 0.10 & 0:4 & 233.27 & 287.38 & 0.81 & +0.0016 & -0.000 \\
+ &  & 0:9 & 518.28 & 656.08 & 0.79 & -0.0029 & -0.024 \\
+ &  & 0:76 & 5036.69 & 5417.29 & 0.93 & -0.0059 & -0.040 \\
+ & 0.50 & 0:4 & 206.02 & 367.96 & 0.56 & -0.0062 & -0.038 \\
+ &  & 0:9 & 454.12 & 765.42 & 0.59 & +0.0046 & -0.009 \\
+ &  & 0:16 & 773.32 & 1340.85 & 0.58 & -0.0036 & -0.037 \\
+ & 1.00 & 0:4 & 295.47 & 500.91 & 0.59 & -0.0056 & -0.032 \\
+ &  & 0:8 & 588.72 & 1082.87 & 0.54 & +0.0021 & -0.009 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}[x=1.52cm,y=0.46cm]
-\node[font=\footnotesize] at (-1.0,5.35) {(a) Speedup};
-\draw[->] (-2.10,0.45) -- (0.20,0.45)
+\begin{tikzpicture}[x=1.42cm,y=0.38cm]
+\node[font=\footnotesize] at (-1.0,5.88) {(a) Speedup};
+\draw[->] (-2.10,0) -- (0.25,0)
     node[below,font=\scriptsize] {changed edges (\%)};
-\draw[->] (-2.10,0.45) -- (-2.10,5.05)
+\draw[->] (-2.10,0) -- (-2.10,5.45)
     node[above,font=\scriptsize] {Naive/Local};
 \foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
-  \draw (\x,0.45) -- ++(0,-0.12) node[below,font=\scriptsize] {\lab};
+  \draw (\x,0) -- ++(0,-0.12) node[below,font=\scriptsize] {\lab};
 \foreach \y in {1,2,3,4,5}
   \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\y};
-\draw[densely dotted,gray] (-2.10,1) -- (0.20,1);
-\draw[mauve,thick] plot coordinates {(-2,3.50) (-1.3,1.08) (-1,0.81) (-0.3,0.56) (0,0.59)}
-  node[right,font=\scriptsize] {community};
-\node[gray,font=\scriptsize] at (-0.85,4.45) {random/hub pending};
+\draw[densely dotted,gray] (-2.10,1) -- (0.25,1);
+\draw[blue,thick] plot coordinates {(-2,3.32) (-1.3,0.87) (-1,0.67) (-0.3,0.26) (0,0.26)};
+\draw[blue,dashed,thick] plot coordinates {(-2,3.49) (-1.3,0.85) (-1,0.69) (-0.3,0.26) (0,0.27)};
+\draw[blue,densely dotted,thick] plot coordinates {(-2,3.39) (-1.3,0.89) (-1,0.70) (-0.3,0.25) (0,0.24)};
+\draw[dkgreen,thick] plot coordinates {(-2,1.46) (-1.3,0.73) (-1,0.60) (-0.3,0.26) (0,0.26)};
+\draw[dkgreen,dashed,thick] plot coordinates {(-2,1.47) (-1.3,0.74) (-1,0.61) (-0.3,0.25) (0,0.26)};
+\draw[dkgreen,densely dotted,thick] plot coordinates {(-2,1.54) (-1.3,1.13) (-1,0.84) (-0.3,0.25) (0,0.26)};
+\draw[mauve,thick] plot coordinates {(-2,3.50) (-1.3,1.08) (-1,0.81) (-0.3,0.56) (0,0.59)};
+\draw[mauve,dashed,thick] plot coordinates {(-2,4.90) (-1.3,1.08) (-1,0.79) (-0.3,0.59) (0,0.54)};
+\draw[mauve,densely dotted,thick] plot coordinates {(-2,4.10) (-1.3,1.19) (-1,0.93) (-0.3,0.58) (0,0.54)};
+\draw[blue,thick] (-2.02,5.18) -- ++(0.16,0) node[right,font=\scriptsize] {random};
+\draw[dkgreen,thick] (-1.22,5.18) -- ++(0.16,0) node[right,font=\scriptsize] {hub};
+\draw[mauve,thick] (-0.58,5.18) -- ++(0.16,0) node[right,font=\scriptsize] {community};
+\draw[black,thick] (-2.02,4.72) -- ++(0.16,0) node[right,font=\scriptsize] {0:4};
+\draw[black,dashed,thick] (-1.43,4.72) -- ++(0.16,0) node[right,font=\scriptsize] {0:9};
+\draw[black,densely dotted,thick] (-0.84,4.72) -- ++(0.16,0) node[right,font=\scriptsize] {longest};
 \end{tikzpicture}
 
 \vspace{0.45em}
 
-\begin{tikzpicture}[x=1.52cm,y=140cm]
-\node[font=\footnotesize] at (-1.0,0.0070) {(b) Quality change};
-\draw[->] (-2.10,-0.0085) -- (0.20,-0.0085)
+\begin{tikzpicture}[x=1.42cm,y=95cm]
+\node[font=\footnotesize] at (-1.0,0.0084) {(b) Quality change};
+\draw[->] (-2.10,-0.025) -- (0.25,-0.025)
     node[below,font=\scriptsize] {changed edges (\%)};
-\draw[->] (-2.10,-0.0085) -- (-2.10,0.0060)
+\draw[->] (-2.10,-0.025) -- (-2.10,0.0060)
     node[above,font=\scriptsize] {$\Delta Q$};
 \foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
-  \draw (\x,-0.0085) -- ++(0,-0.00035) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {-0.008/-0.008,-0.004/-0.004,0/0,0.004/0.004}
+  \draw (\x,-0.025) -- ++(0,-0.0007) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {-0.024/-0.024,-0.016/-0.016,-0.008/-0.008,0/0,0.004/0.004}
   \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\lab};
-\draw[densely dotted,gray] (-2.10,0) -- (0.20,0);
-\draw[mauve,thick] plot coordinates {(-2,-0.0016) (-1.3,-0.0076) (-1,0.0016) (-0.3,-0.0062) (0,-0.0056)}
-  node[right,font=\scriptsize] {community};
-\node[gray,font=\scriptsize] at (-0.85,0.0048) {random/hub pending};
+\draw[densely dotted,gray] (-2.10,0) -- (0.25,0);
+\draw[blue,thick] plot coordinates {(-2,0.0006) (-1.3,-0.0008) (-1,-0.0003) (-0.3,-0.0036) (0,-0.0043)};
+\draw[blue,dashed,thick] plot coordinates {(-2,-0.0029) (-1.3,-0.0003) (-1,-0.0012) (-0.3,-0.0043) (0,-0.0043)};
+\draw[blue,densely dotted,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0007) (-1,-0.0027) (-0.3,-0.0043) (0,-0.0043)};
+\draw[dkgreen,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0008) (-1,-0.0022) (-0.3,-0.0071) (0,-0.0024)};
+\draw[dkgreen,dashed,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0008) (-1,-0.0014) (-0.3,-0.0063) (0,-0.0043)};
+\draw[dkgreen,densely dotted,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0051) (-1,-0.0065) (-0.3,-0.0229) (0,0.0018)};
+\draw[mauve,thick] plot coordinates {(-2,-0.0016) (-1.3,-0.0076) (-1,0.0016) (-0.3,-0.0062) (0,-0.0056)};
+\draw[mauve,dashed,thick] plot coordinates {(-2,-0.0002) (-1.3,-0.0051) (-1,-0.0029) (-0.3,0.0046) (0,0.0021)};
+\draw[mauve,densely dotted,thick] plot coordinates {(-2,-0.0011) (-1.3,-0.0052) (-1,-0.0059) (-0.3,-0.0036) (0,0.0021)};
 \end{tikzpicture}
-\caption{Measured update-size sensitivity for the currently complete
-five-batch community-internal DSBM slice. The x-axis is the changed-edge
-fraction on a log scale; speedup and $\Delta Q$ compare Local Leiden with
-full-snapshot Leiden on the same stream. Random and hub-centered solver curves
-are generated as stream statistics in Table~\ref{tab:dsbm} but are not yet
-present as paired algorithm measurements in the registry.}
+
+\vspace{0.45em}
+
+\begin{tikzpicture}[x=1.42cm,y=42cm]
+\node[font=\footnotesize] at (-1.0,0.017) {(c) NMI change};
+\draw[->] (-2.10,-0.092) -- (0.25,-0.092)
+    node[below,font=\scriptsize] {changed edges (\%)};
+\draw[->] (-2.10,-0.092) -- (-2.10,0.010)
+    node[above,font=\scriptsize] {$\Delta$NMI};
+\foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
+  \draw (\x,-0.092) -- ++(0,-0.0024) node[below,font=\scriptsize] {\lab};
+\foreach \y/\lab in {-0.08/-0.08,-0.04/-0.04,0/0}
+  \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\lab};
+\draw[densely dotted,gray] (-2.10,0) -- (0.25,0);
+\draw[blue,thick] plot coordinates {(-2,0.006) (-1.3,-0.004) (-1,-0.001) (-0.3,-0.009) (0,-0.012)};
+\draw[blue,dashed,thick] plot coordinates {(-2,-0.019) (-1.3,-0.001) (-1,-0.007) (-0.3,-0.012) (0,-0.012)};
+\draw[blue,densely dotted,thick] plot coordinates {(-2,-0.001) (-1.3,-0.004) (-1,-0.017) (-0.3,-0.012) (0,-0.012)};
+\draw[dkgreen,thick] plot coordinates {(-2,-0.001) (-1.3,-0.004) (-1,-0.013) (-0.3,-0.035) (0,-0.004)};
+\draw[dkgreen,dashed,thick] plot coordinates {(-2,-0.001) (-1.3,-0.004) (-1,-0.007) (-0.3,-0.030) (0,-0.012)};
+\draw[dkgreen,densely dotted,thick] plot coordinates {(-2,-0.001) (-1.3,-0.033) (-1,-0.037) (-0.3,-0.088) (0,0.003)};
+\draw[mauve,thick] plot coordinates {(-2,-0.008) (-1.3,-0.049) (-1,0.000) (-0.3,-0.038) (0,-0.032)};
+\draw[mauve,dashed,thick] plot coordinates {(-2,-0.001) (-1.3,-0.034) (-1,-0.024) (-0.3,-0.009) (0,-0.009)};
+\draw[mauve,densely dotted,thick] plot coordinates {(-2,-0.007) (-1.3,-0.034) (-1,-0.040) (-0.3,-0.037) (0,-0.009)};
+\end{tikzpicture}
+\caption{Measured update-size sensitivity for the paired DSBM Leiden stress
+suite. The x-axis is the changed-edge fraction on a log scale; speedup,
+$\Delta Q$, and $\Delta$NMI compare Local Leiden with full-snapshot Leiden on
+the same stream.
+Solid and dashed curves show the \texttt{0:4} and \texttt{0:9} windows, while
+dotted curves show the longest available window for each changed-edge fraction
+from Table~\ref{tab:dsbm-leiden-results}.}
 \label{fig:update-size}
 \end{figure}
 
-The measured community-internal slice gives the expected operating-envelope
-shape. At the smallest update size, Local Leiden is $3.5\times$ faster with
-negligible quality loss; once the changed-edge fraction reaches roughly
-$0.1\%$--$1.0\%$, the local update becomes neutral or slower than full
-recomputation. Completing the random and hub-centered solver curves remains the
-main missing piece for this stress-test figure.
+The complete DSBM stress grid exposes the operating envelope directly. At the
+smallest update size, Local Leiden remains faster in all regimes:
+$3.3$--$3.5\times$ on the short random and community streams, $4.9\times$ on
+the \texttt{0:9} community stream, and $1.5\times$ on hub-centered updates.
+At $0.05\%$ changed edges the result becomes topology-dependent: community
+updates remain near or above break-even, hub updates are mostly slower except
+for the longest available $0.05\%$ stream, and random updates are already below
+break-even. From $0.1\%$ onward, most local runs are slower than full
+recomputation, with especially poor speedups on the $0.5\%$--$1.0\%$ random
+and hub-centered streams. Quality drift is usually small in both modularity and
+NMI, but hub-centered $0.5\%$ changes at the longest available window lose
+$0.0229$ modularity and $0.088$ NMI. The synthetic block therefore makes the
+intended boundary explicit: local
+hierarchical recomputation is useful for very small or strongly localized
+changes, while large or hub-heavy update batches should trigger a full refresh.
 
 \subsubsection{Evidence Summary}
 
@@ -1373,7 +1526,7 @@ heterogeneous backends can be adapted through the same local hierarchical
 interface and by visualizing the resulting quality--runtime frontier. Second,
 Tables~\ref{tab:stability} and~\ref{tab:long-horizon}, together with
 Figure~\ref{fig:long-horizon-curves}, establish dynamic robustness across
-repeated streams, different initial-history fractions, and longer update
+repeated non-random stream ids, different initial-history fractions, and longer update
 horizons. Third, Tables~\ref{tab:workload} and
 \ref{tab:contracted-workload}, Figure~\ref{fig:workload-speedup}, and
 Table~\ref{tab:breakdown} explain why the speedups are plausible: ComNetX does
@@ -1385,7 +1538,9 @@ radius, hierarchy depth, feature mode, feature aggregation, closure, and
 contraction choices are necessary. Finally,
 Table~\ref{tab:dsbm} and Figure~\ref{fig:update-size}
 define the update-size and update-locality envelope where local recomputation
-is beneficial. This evidence chain is the core argument that turns ComNetX
+is beneficial, with the paired solver measurements reported explicitly in
+Table~\ref{tab:dsbm-leiden-results}. This evidence chain is the core argument
+that turns ComNetX
 from an engineering acceleration technique into a general dynamic graph mining
 method.
 
@@ -1590,9 +1745,10 @@ right choice.
 This appendix reports the complete single-run result tables used to construct
 Table~\ref{tab:main-results}: Table~\ref{tab:full-mod-time} gives modularity
 and runtime, and Table~\ref{tab:full-extrinsic} gives ARI/F1/NMI. The
-multi-stream protocol in Table~\ref{tab:stability} replaces these raw
-single-stream values in the compact main text, while the appendix keeps the
-per-dataset cells for reproducibility.
+main text aggregates these single-run cells in Table~\ref{tab:main-results}
+and reports a separate non-random stream-id robustness check in
+Table~\ref{tab:stability}; the appendix keeps the per-dataset cells for
+reproducibility.
 
 \begin{table*}[ht]
 \centering
