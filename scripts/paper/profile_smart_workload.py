@@ -176,8 +176,11 @@ def profile_smart_update(
     ]
 
     start = now(device)
-    affected_nodes_lvl0 = torch.nonzero(ext_mask_work[0], as_tuple=True)[0]
-    adj_work = sparse.reset_matrix(adj_base, affected_nodes_lvl0)
+    affected_nodes_any_level = torch.nonzero(
+        ext_mask_work.any(dim=0),
+        as_tuple=True,
+    )[0]
+    adj_work = sparse.reset_matrix(adj_base, affected_nodes_any_level)
     timings["reset_time"] = elapsed(start, device)
 
     level_rows = []
@@ -277,7 +280,12 @@ def profile_smart_update(
         projection_total += projection_time
 
         start = now(device)
-        adj_work = opt.cut_by_partition(adj_work, level_ext_mask, coms_work[level])
+        adj_work = opt.cut_by_partition(
+            adj_work,
+            level_ext_mask,
+            coms_work[level],
+            preserve_outside=True,
+        )
         cut_time = elapsed(start, device)
         cut_total += cut_time
 

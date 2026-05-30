@@ -254,6 +254,44 @@ def test_run_uses_sum_pattern_for_adj_and_normalized_features(
 
 @pytest.mark.unit
 @pytest.mark.short
+def test_run_preserves_broader_level_context():
+    class RecordingOptimizer(Optimizer):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.aggregated_adjs = []
+
+        def local_algorithm(self, adj, features, limited=False, labels=None):
+            self.aggregated_adjs.append(adj.to_dense())
+            return torch.arange(adj.size(0), dtype=torch.long, device=adj.device)
+
+    adj = torch.zeros((6, 6), dtype=torch.float32)
+    for src, dst in ((0, 1), (1, 2), (2, 3), (4, 5)):
+        adj[src, dst] = 1
+        adj[dst, src] = 1
+
+    communities = torch.tensor(
+        [
+            [0, 0, 1, 1, 2, 2],
+            [0, 0, 0, 0, 1, 1],
+        ],
+        dtype=torch.long,
+    )
+    opt = RecordingOptimizer(
+        adj.to_sparse_coo(),
+        communities=communities,
+        subcoms_depth=2,
+        method="leidenalg",
+    )
+
+    opt.run(torch.tensor([True, False, False, False, False, False]))
+
+    assert len(opt.aggregated_adjs) == 2
+    assert opt.aggregated_adjs[0].sum().item() == pytest.approx(2.0)
+    assert opt.aggregated_adjs[1].sum().item() == pytest.approx(6.0)
+
+
+@pytest.mark.unit
+@pytest.mark.short
 def test_aggregation_mode_invalid():
     adj = torch.zeros((2, 2), dtype=torch.float32).to_sparse_coo()
 

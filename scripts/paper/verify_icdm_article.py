@@ -68,13 +68,17 @@ def pass_(message: str) -> None:
 def build_pdf(repo: Path, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    plot = run([sys.executable, "scripts/paper/plot_workload_speedup.py"], cwd=repo)
-    if plot.returncode != 0:
-        raise RuntimeError(
-            "failed to regenerate workload figure\n"
-            + plot.stdout
-            + plot.stderr
-        )
+    for script in (
+        "scripts/paper/plot_workload_speedup.py",
+        "scripts/paper/plot_topology_ablation_pareto.py",
+    ):
+        plot = run([sys.executable, script], cwd=repo)
+        if plot.returncode != 0:
+            raise RuntimeError(
+                f"failed to regenerate figure with {script}\n"
+                + plot.stdout
+                + plot.stderr
+            )
 
     article_dir = repo / "article"
     for index in (1, 2):

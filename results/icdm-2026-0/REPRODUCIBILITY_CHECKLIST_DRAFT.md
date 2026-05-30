@@ -39,13 +39,15 @@ anonymized and refers only to bundled measurement artifacts.
 ## Code And Figure Generation
 
 - Main measurement utilities are documented in `scripts/paper/README.md`.
-- The workload-speedup figure is regenerated with:
+- The paper figures are regenerated with:
 
 ```bash
 python3 scripts/paper/plot_workload_speedup.py
+python3 scripts/paper/plot_topology_ablation_pareto.py
 ```
 
-- The script writes `article/workload_speedup.pdf`, which is included by
+- The scripts write `article/workload_speedup.pdf` and
+  `article/topology_ablation_pareto.pdf`, which are included by
   `article/article.tex`.
 
 ## Randomness And Repetitions

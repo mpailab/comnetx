@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,6 +11,12 @@ from matplotlib.lines import Line2D
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "article" / "workload_speedup.pdf"
+PDF_METADATA = {
+    "Creator": "ComNetX ICDM figure scripts",
+    "Producer": "Matplotlib pdf backend",
+    "CreationDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
+    "ModDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
+}
 
 # Audited workload-profile summary used in the main-paper figure.
 # edge_pct is |Ebar|/|E| (%), speedup is Base/Local, and uv_pct is |U|/|V| (%).
@@ -126,7 +133,7 @@ def main() -> None:
     )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUT, bbox_inches="tight", pad_inches=0.015)
+    fig.savefig(OUT, bbox_inches="tight", pad_inches=0.015, metadata=PDF_METADATA)
 
 
 if __name__ == "__main__":

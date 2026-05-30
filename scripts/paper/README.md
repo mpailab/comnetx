@@ -63,14 +63,16 @@ NVIDIA/CUDA details, because the article reports GPU-enabled baselines.
 
 ## Plot Paper Figures
 
-Regenerate the main-paper workload-to-speedup mechanism figure:
+Regenerate the main-paper figures:
 
 ```bash
 python3 scripts/paper/plot_workload_speedup.py
+python3 scripts/paper/plot_topology_ablation_pareto.py
 ```
 
-The script writes `article/workload_speedup.pdf`, which is included by the
-ICDM paper source.
+The scripts write `article/workload_speedup.pdf` and
+`article/topology_ablation_pareto.pdf`, which are included by the ICDM paper
+source.
 
 ## Verify Article
 

@@ -415,18 +415,25 @@ class Optimizer:
         node_mask: torch.Tensor,
         node_labels: torch.Tensor,
         inplace: bool = True,
+        preserve_outside: bool = False,
     ) -> torch.Tensor:
         """
         Cut edges that violate partition constraints.
 
         If inplace=True (default), zeroes disallowed entries in-place.
         If inplace=False, rebuilds sparse tensor keeping only allowed edges.
+        If preserve_outside=True, edges outside node_mask are retained; only
+        edges with both endpoints inside node_mask are cut by node_labels.
         """
         indices = adj.indices()
         row, col = indices
 
-        keep = node_mask[row] & node_mask[col]
-        keep = keep & (node_labels[row] == node_labels[col])
+        inside = node_mask[row] & node_mask[col]
+        same_label = node_labels[row] == node_labels[col]
+        if preserve_outside:
+            keep = (~inside) | same_label
+        else:
+            keep = inside & same_label
 
         if inplace:
             adj.values().masked_fill_(~keep, 0)
@@ -483,9 +490,14 @@ class Optimizer:
             level_ext_mask = ext_mask_work[l]
             coms_work[l, level_ext_mask] = coms_work[l + 1, level_ext_mask]
 
-        # Reset adjacency matrix to the nodes of affected communities
-        affected_nodes_lvl0 = torch.nonzero(ext_mask_work[0], as_tuple=True)[0]
-        adj_work = sparse.reset_matrix(adj_base, affected_nodes_lvl0)
+        # Keep every vertex that may be used by any hierarchy level.  The first
+        # level can be a strict subset of later closures, so resetting only to
+        # level 0 would make broader levels see isolated zero-context nodes.
+        affected_nodes_any_level = torch.nonzero(
+            ext_mask_work.any(dim=0),
+            as_tuple=True,
+        )[0]
+        adj_work = sparse.reset_matrix(adj_base, affected_nodes_any_level)
 
         for l in range(self.subcoms_depth):
             # Get affected communites and all their nodes at the level l
@@ -540,4 +552,9 @@ class Optimizer:
             coms_work[l, level_ext_mask] = old_idx[coms[inverse]]
 
             # Cut off adjacency matrix
-            adj_work = self.cut_by_partition(adj_work, level_ext_mask, coms_work[l])
+            adj_work = self.cut_by_partition(
+                adj_work,
+                level_ext_mask,
+                coms_work[l],
+                preserve_outside=True,
+            )

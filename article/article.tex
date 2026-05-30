@@ -790,46 +790,33 @@ ComNetX, while feature and aggregation choices are measured with S$^2$CAG.
 The closure and contraction mechanism is first quantified through
 Table~\ref{tab:workload} and Figure~\ref{fig:workload-speedup}, and then tested
 directly in Table~\ref{tab:closure-ablation}.
-For the topology ablation, each cell reports final modularity $Q$, cumulative
-time $T$ in seconds, and speedup over full-snapshot Leiden on the same stream.
+For the topology ablation, Figure~\ref{fig:topology-ablation} plots the
+complete $L\times r$ grid measured for Leiden on the two larger
+\texttt{999:10} streams.
+Each point gives final modularity $Q$ versus speedup over full-snapshot Leiden;
+higher and farther right is better.
 
-\begin{table}[H]
+\begin{figure}[H]
 \centering
-\caption{Topology ablation for Leiden.}
-\label{tab:ablation}
-\setlength{\tabcolsep}{1.8pt}
-\scriptsize
-\begin{tabular}{@{}lrrrrrr@{}}
-\toprule
-\multirow{2}{*}{\textbf{Variant}} &
-\multicolumn{3}{c}{\textbf{dyn\_pubmed}} &
-\multicolumn{3}{c}{\textbf{arxivmath}} \\
-\cmidrule(lr){2-4}\cmidrule(lr){5-7}
-& \textbf{$Q$} & \textbf{$T$} & \textbf{Speedup}
-& \textbf{$Q$} & \textbf{$T$} & \textbf{Speedup} \\
-\midrule
-Full snapshot & 0.786 & 7.00 & 1.0$\times$ & 0.886 & 175.79 & 1.0$\times$ \\
-$L=3,r=0$ & 0.782 & 0.10 & 67.4$\times$ & 0.878 & 0.54 & 326.7$\times$ \\
-$L=3,r=1$ & 0.776 & 0.32 & 21.7$\times$ & 0.881 & 3.80 & 46.2$\times$ \\
-$L=3,r=2$ & 0.781 & 2.20 & 3.2$\times$ & 0.881 & 32.58 & 5.4$\times$ \\
-$L=1,r=1$ & 0.781 & 0.13 & 52.7$\times$ & 0.881 & 1.65 & 106.3$\times$ \\
-$L=4,r=1$ & 0.736 & 0.46 & 15.1$\times$ & 0.880 & 5.80 & 30.3$\times$ \\
-\bottomrule
-\end{tabular}
-\end{table}
+\includegraphics[width=\columnwidth]{topology_ablation_pareto.pdf}
+\caption{Quality--time frontier for the Leiden topology ablation. Marker style
+encodes the graph radius $r$, the marker number is the hierarchy depth $L$, and
+the black line marks nondominated points.}
+\label{fig:topology-ablation}
+\end{figure}
 
-Table~\ref{tab:ablation} shows that increasing the graph-radius budget is not
-automatically beneficial. Moving from $r=1$ to $r=2$ increases the runtime by
-roughly $7\times$ on \textit{dyn\_pubmed} and $9\times$ on
-\textit{arxivmath}, while the modularity improvement is negligible. The
-endpoint-only setting $r=0$ is even faster and remains close to full-snapshot
-Leiden on these streams, but this setting is risky as a universal default
-because it relies entirely on community closure for context. The depth
-comparison is also backend- and dataset-dependent: $L=4$ harms
-\textit{dyn\_pubmed}, while $L=1$ and $L=3$ are close on \textit{arxivmath}.
-This supports the main design message of ComNetX: the radius and hierarchy are
-control knobs for the locality--context trade-off, not constants that should be
-claimed optimal for every workload.
+Figure~\ref{fig:topology-ablation} shows that the topology parameters are not
+monotone quality knobs. On \textit{dyn\_pubmed}, the best local modularity in
+the grid is the shallow endpoint-only setting $L=2,r=0$ ($Q=0.783$,
+$92.1\times$), while $L=1,r=0$ is faster ($146.4\times$) with only a small
+additional quality loss; the deeper $L=4,r=1$ setting drops to $Q=0.736$. On
+\textit{arxivmath}, the $r\ge1$ rows cluster near $Q=0.881$, but the runtime
+cost grows quickly as the radius increases. Thus the default $L=3,r=1$ is not
+selected as the best point of this short ablation; it is the fixed
+configuration used across the broader compatibility, workload, and long-horizon
+evidence. Radius and hierarchy are workload-dependent locality--context
+controls, not parameters that should be claimed optimal for every graph.
+
 For the S$^2$CAG feature-mode ablation on the \texttt{999:100} streams, each
 entry is reported as final modularity $Q$, cumulative time $T$, and
 final-snapshot NMI.
@@ -1074,7 +1061,6 @@ explicit fallback interpretation: as the affected region grows, the local
 problem approaches the full snapshot, revealing when a full refresh is the
 right choice.
 %----------------------------------------------------------------------------------------
-\IEEEtriggeratref{38}
 \begingroup
 \begin{thebibliography}{00}
 \fontsize{6.2}{6.35}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}
