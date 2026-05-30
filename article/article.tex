@@ -2,18 +2,30 @@
 \documentclass[conference]{IEEEtran}
 \usepackage[utf8]{inputenc}
 
-\usepackage{amsmath, amsthm, amssymb, stmaryrd, enumitem, array, float}
+\usepackage{amsmath, amsthm, amssymb, stmaryrd, enumitem, array}
 \usepackage{tikz, tikz-network}
 \usepackage{algorithm, algpseudocode}
 \usepackage{graphicx}
-\usepackage{subcaption}
+\usepackage{float}
 \usepackage{listings}
 \usepackage{color}
-\usepackage{tablefootnote}
 \usepackage[multiple]{footmisc}
 \usepackage{multirow}
 \usepackage{booktabs}
 \usepackage{cite}
+
+\setlength{\textfloatsep}{6pt plus 1pt minus 2pt}
+\setlength{\floatsep}{6pt plus 1pt minus 2pt}
+\setlength{\dbltextfloatsep}{6pt plus 1pt minus 2pt}
+\setlength{\dblfloatsep}{6pt plus 1pt minus 2pt}
+\setlength{\intextsep}{6pt plus 1pt minus 2pt}
+\setlength{\abovecaptionskip}{2pt}
+\setlength{\belowcaptionskip}{0pt}
+\setcounter{topnumber}{1}
+\setcounter{bottomnumber}{1}
+\setcounter{totalnumber}{2}
+\setlist[itemize]{nosep}
+\setlist[enumerate]{nosep}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -76,30 +88,22 @@
 \maketitle
 
 \begin{abstract}
-Community detection in dynamic graphs is commonly handled either by
-recomputing a static partition after each update or by using a specialized
-dynamic algorithm tied to a particular objective. The former approach is
-expensive on large graphs, while the latter makes it difficult to reuse recent
-static and feature-aware graph clustering methods. We introduce ComNetX, a
-local hierarchical adaptation framework that maintains a multi-level community
-state, identifies the region affected by a batch update, contracts affected
-communities into compact subproblems, optionally aggregates node features, and
-invokes an existing community detection solver only on these local instances.
-The updated labels are then projected back to the original graph and stored in
-the hierarchy. This design supports topology-only methods, feature-aware GNN
-clustering models, and even dynamic solvers used as local backends. We evaluate
-the framework through three complementary protocols: a short-horizon
-all-backend screen on six real-world networks, longer real-data streams for
-topology-based backends, and controlled synthetic DSBM stress streams with
-random, hub-centered, and community-internal updates. The evaluation shows that
-ComNetX preserves the quality of strong modularity-based solvers while
-substantially reducing update time on larger graphs; for example, in the
-all-backend screen Leiden on the largest graph keeps modularity within 0.01 of
-full-snapshot recomputation while reducing total processing time from 150.7
-seconds to 3.64 seconds, and long-horizon topology runs retain large cumulative
-speedups over extended update streams. The combined real-data and synthetic
-protocols are designed to expose both the favorable regime of local
-recomputation and the update regimes where a full refresh is preferable.
+Community detection in dynamic graphs is commonly handled by full-snapshot
+recomputation or by specialized dynamic algorithms tied to a particular
+objective. We introduce ComNetX, a local hierarchical adaptation framework that
+maintains a multi-level community state, expands the affected region of a batch
+update, contracts affected communities into compact local subproblems, and
+invokes an existing solver only on these instances. The design supports
+topology-only methods, feature-aware GNN clustering models, and dynamic solvers
+used as local backends. We evaluate ComNetX through a multi-backend study on
+six real networks, longer real-data streams for topology-based backends, and
+controlled dynamic stochastic block model (DSBM) stress streams. The results
+show that ComNetX can preserve the quality of strong modularity-based solvers
+while reducing update time on large graphs: in paired runs on the largest real
+graph, Local Leiden keeps final modularity within 0.005 of full-snapshot
+recomputation while achieving a $47.0\pm8.1\times$ speedup. The combined
+protocols also identify regimes where locality breaks down and a full refresh
+is preferable.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -109,10 +113,10 @@ algorithms, graph neural networks
 
 %----------------------------------------------------------------------------------------
 
-\section{Introduction} \label{S:1}
-Dynamic networks model systems whose interactions change over time, including social, biological, transportation, communication, and information networks~\cite{N03,OSH07,PBV07}. Community detection (CD) is a central task in such data: it identifies groups of vertices with coherent structural or functional roles and supports monitoring, recommendation, anomaly detection, and exploratory analysis~\cite{POM09,SF09,RCC04,FL02}. Modularity remains one of the most widely used quality criteria~\cite{NG04,BDG08}, and scalable methods such as Louvain and Leiden are strong practical baselines~\cite{BGLL08,TWE19,Sah23}. However, these methods were mainly designed for static snapshots. In dynamic settings, even a small batch of edge updates may require rerunning a solver on the entire graph, which is prohibitive for large networks.
+\section{Introduction}
+Dynamic networks model systems whose interactions change over time, including social, biological, communication, and information networks~\cite{N03,OSH07,PBV07}. Community detection (CD) is a central task in such data: it identifies groups of vertices with coherent structural or functional roles and supports monitoring, recommendation, anomaly detection, and exploratory analysis~\cite{POM09,SF09,RCC04,FL02}. Modularity remains one of the most widely used quality criteria~\cite{NG04,BDG08}, and scalable methods such as Louvain and Leiden are strong practical baselines~\cite{BGLL08,TWE19,Sah23}. However, these methods were mainly designed for static snapshots. In dynamic settings, even a small batch of edge updates may require rerunning a solver on the entire graph, which is prohibitive for large networks.
 
-Existing dynamic CD methods reduce this cost by reusing previous partitions, applying incremental modularity updates, or processing affected neighborhoods~\cite{RC17,LHK14,HKT17,ZK21,SLe24}. These ideas are essential for scalability, but they are often tied to a specific objective or update rule. Meanwhile, modern graph clustering increasingly incorporates attributes and neural representations~\cite{CCL23,ZXY20,DSD24,LXZ23,JLL23}. Feature-aware and GNN-based methods can capture richer dependencies than purely topological heuristics, yet repeatedly applying them to full snapshots is even more expensive. A dynamic framework should therefore support both classical and feature-aware solvers without redesigning each solver from scratch.
+Existing dynamic CD methods reduce this cost by reusing previous partitions, applying incremental modularity updates, or processing affected neighborhoods~\cite{RC17,LHK14,HKT17,ZK21,SLe24}. These ideas are essential for scalability, but they are often tied to a specific objective or update rule. Meanwhile, modern graph clustering increasingly incorporates attributes and neural representations~\cite{CCL23,ZXY20,DSD24,LXZ23,JLL23,TPP23}. Feature-aware and GNN-based methods can capture richer dependencies than purely topological heuristics, yet repeatedly applying them to full snapshots is even more expensive. A dynamic framework should therefore support both classical and feature-aware solvers without redesigning each solver from scratch.
 Continuous-time temporal community methods address a related but different
 problem: they track communities directly in link streams and model when
 vertices enter or leave them. We discuss this line in Section~\ref{S:5}, but
@@ -128,8 +132,9 @@ Our contributions are:
     \item We introduce ComNetX, a hierarchical local wrapper that aggregates affected communities, transfers features when required, and projects updated labels back to the original graph.
     \item We analyze the update cost in terms of the affected neighborhood, the touched communities, and the contracted backend instances.
     \item We evaluate the framework with a layered protocol: a broad
-    all-backend compatibility screen, longer real-data streams, and controlled
-    DSBM stress streams that separate random, hub-centered, and
+    multi-backend compatibility study, longer real-data streams, and controlled
+    dynamic stochastic block model (DSBM) stress streams that separate random,
+    hub-centered, and
     community-internal updates.
 \end{enumerate}
 
@@ -141,7 +146,7 @@ The paper is organized as follows. Section~\ref{S:2} gives the preliminary defin
 \subsection{Dynamic Graph Model}
 
 Let $G_t=(V,E_t,\mathbf{A}_t,\mathbf{X})$ denote a graph snapshot at
-discrete time $t$. The vertex set is fixed in our implementation and has
+discrete time $t$. We assume a fixed vertex set with
 $n=|V|$ vertices; isolated vertices may appear or disappear from the edge set.
 The sparse weighted adjacency matrix is $\mathbf{A}_t\in\mathbb{R}^{n\times n}$.
 When node attributes are available, they are stored in
@@ -194,7 +199,8 @@ Q = \frac{1}{2m} \sum_{i,j}
 where $d_i=\sum_j A_{ij}$ and $\gamma$ is the resolution parameter. We use
 $\gamma=1$ in all reported experiments. Modularity is not a ground-truth
 measure and is affected by known resolution limits~\cite{G10,FH16}; therefore
-we also report ARI, F1, and NMI whenever labels are available.
+we also report NMI as a compact external-agreement measure whenever labels are
+available.
 
 \section{Methodology}\label{S:3}
 \subsection{Overview}
@@ -210,7 +216,7 @@ context around affected vertices. The maintained state consists of
     $\mathbf{C}_t[\ell,i]$ is the community label of vertex $i$ at hierarchy
     level $\ell$.
 \end{itemize}
-Figure~\ref{fig:method} summarizes the update pipeline. A new batch is first
+Figure~\ref{fig:method} summarizes the update workflow. A new batch is first
 added to the accumulated graph, its endpoints are expanded to a small graph
 neighborhood, and then ComNetX reoptimizes only the communities intersecting
 that region. At each level, these communities are contracted into supernodes,
@@ -219,12 +225,10 @@ back to the original vertices.
 
 \begin{figure*}[t]
     \centering
-    \includegraphics[width=\textwidth]{method.jpg}
-    \caption{ComNetX update workflow. The framework stores an accumulated
-    adjacency matrix, optional node features, and a community hierarchy. For
-    each incoming batch it detects affected vertices, expands them by a fixed
-    radius, builds aggregated local subproblems from affected communities, runs
-    the selected backend, and writes the updated labels back to the hierarchy.}
+    \includegraphics[width=.74\textwidth,trim=0 45 0 45,clip]{method.jpg}
+    \caption{ComNetX update workflow: affected vertices are expanded, affected
+    communities are contracted into local subproblems, the selected backend is
+    run locally, and updated labels are written back to the hierarchy.}
     \label{fig:method}
 \end{figure*}
 
@@ -235,7 +239,7 @@ $S_t$ to
 \begin{equation}
 B_r(S_t)=\{v\in V \mid \operatorname{dist}_{\mathbf{A}_t}(v,S_t)\le r\}.
 \end{equation}
-In the implementation this expansion is performed by repeated sparse
+This expansion is performed by repeated sparse
 matrix--vector multiplication on the symmetrized adjacency, which makes the
 same routine applicable to directed and undirected inputs.
 
@@ -296,7 +300,7 @@ The base solver is invoked on the aggregated instance:
 \end{equation}
 The aggregated labels are projected back to the original graph by assigning all
 vertices represented by the same supernode to the corresponding new local
-cluster. The implementation reuses existing community identifiers whenever
+cluster. ComNetX reuses existing community identifiers whenever
 possible, which avoids unnecessary relabeling of unchanged regions.
 
 After updating level $\ell$, ComNetX removes from the working adjacency all
@@ -306,8 +310,8 @@ interior of the communities produced so far. Before the level loop begins,
 vertices in the expanded affected set are opened as singletons at the deepest
 stored level, and affected higher-level communities inherit the finer labels.
 This gives the backend enough freedom to split a changed region while keeping
-the unaffected part of the hierarchy fixed.
-Algorithm~\ref{alg:comnetx} summarizes the update procedure for one batch.
+the unaffected part of the hierarchy fixed. Algorithm~\ref{alg:comnetx}
+summarizes the update procedure for one batch.
 
 \begin{algorithm}[t]
 \caption{ComNetX update for one batch}
@@ -316,7 +320,7 @@ Algorithm~\ref{alg:comnetx} summarizes the update procedure for one batch.
 \Require accumulated graph $\mathbf{A}_{t-1}$, hierarchy $\mathbf{C}_{t-1}$,
 features $\mathbf{X}$, update $\Delta_t$, radius $r$, backend $\mathcal{B}$
 \State $\mathbf{A}_t \gets \mathbf{A}_{t-1}+\Delta_t$
-\State $S_t \gets$ endpoints of non-zero entries in $\Delta_t$
+\State $S_t \gets$ endpoints of nonzero entries in $\Delta_t$
 \State $B \gets B_r(S_t)$
 \State open vertices in $B$ as singletons at the deepest hierarchy level
 \State propagate finer labels inside affected higher-level communities
@@ -401,40 +405,34 @@ The evaluation is deliberately split into three protocols, because a single
 short update slice is useful for broad baseline coverage but is not sufficient
 as standalone evidence for dynamic graph mining.
 
-\textbf{P1: all-backend compatibility screen.}
-For each real network, all edges are first sorted chronologically when
-timestamps are available; otherwise, the edge order provided by the prepared
-dynamic dataset is used. The edge sequence is partitioned into $1000$ coarse
-batches. The first $999$ batches are applied cumulatively to obtain the initial
-graph $G_{999}$, and a high-quality reference partition $P(999)$ is computed
-with Leiden~\cite{TWE19}. The final coarse batch is then split into ten
-mini-batches. This $999{:}10$ protocol is used only as a broad compatibility
-screen because it is short enough to run expensive GNN baselines and native
-dynamic methods on the same six datasets. It is not treated as sufficient evidence of
-long-horizon dynamic stability.
+\textbf{P1: multi-backend compatibility study.}
+For each real network, the edge sequence is partitioned into $1000$ coarse
+batches. The first $999$ batches form $G_{999}$, a reference partition
+$P(999)$ is computed with Leiden~\cite{TWE19}, and the final coarse batch is
+split into ten mini-batches. This short $999{:}10$ protocol is used for broad
+backend coverage, including expensive GNN baselines, but not as standalone
+evidence of long-horizon stability.
 
 \textbf{P2: real-data batch-sensitivity and long-horizon runs.}
-To test accumulated drift and cumulative runtime, we vary both the amount of
-history used to form the initial graph and the number of subsequent update
-batches. For real datasets, a strategy $n{:}m$ means that the first $0.n$ share
-of the chronological edge stream is used to build the initial graph, while the
-remaining edges are split into $m$ update batches; in our scripts
-$n\in\{9,99,999\}$ and $m$ ranges from short checks to 500-update horizons.
-This protocol is the main evidence for dynamic stability, because it separates
-the effect of initial-history size from the effect of update granularity and
-prevents the paper from relying on a single $999{:}10$ slice.
+A strategy $n{:}m$ uses the first $0.n$ share of the chronological edge stream
+as the initial graph and splits the rest into $m$ update batches. We use
+$n\in\{9,99,999\}$ and horizons up to $500$ updates. This is the main protocol
+for dynamic stability because it varies both initial history and update
+granularity.
 
 \textbf{P3: controlled DSBM stress streams.}
-Finally, the synthetic DSBM suite under \texttt{datasets-sbm/} provides
-controlled update regimes. Each stream contains an initial graph at time $0$
-followed by update layers; the suffixes \texttt{5\_batches},
-\texttt{10\_batches}, and \texttt{100\_batches} are separate stress-test
-granularities rather than variants of the real-data $999{:}10$ protocol. These
-streams are used to vary update size and update locality explicitly.
+The synthetic protocol uses a dynamic stochastic block model (DSBM) construction
+based on the stochastic block model (SBM), a standard generative model for
+graphs with block-dependent edge probabilities~\cite{HLL83}. In the dynamic
+setting, the graph is observed as a sequence of snapshots generated under a
+time-indexed block structure~\cite{XH14}. We instantiate this idea with an
+initial planted-partition graph followed by controlled update layers at $5$,
+$10$, and $100$ batch granularities. These streams vary update size and update
+locality explicitly rather than reusing the real-data $999{:}10$ protocol.
 
 \begin{table}[ht]
 \centering
-\caption{Real-world datasets used in the experiments.}
+\caption{Real-world datasets.}
 \label{tab:datasets}
 \begin{tabular}{lrr}
 \hline
@@ -450,120 +448,81 @@ arxivmath      & 270\,013 & 799\,745  \\
 \end{tabular}
 \end{table}
 
+All wall-clock measurements were collected on a Dockerized Linux server with
+two AMD EPYC 7742 64-core CPUs, 2.0 TiB RAM, and eight NVIDIA A100-SXM4 GPUs
+(80 GB each). The NVIDIA driver was 535.216.03, \texttt{nvidia-smi} reported
+CUDA 12.2, and the container used Python 3.10.13, PyTorch 2.3.1 with CUDA 11.8,
+and TensorFlow 2.14.0.
+
 \subsubsection{Metrics}
-We evaluate both the quality of the detected communities and the computational efficiency.
+We evaluate both community quality and computational efficiency.
 \begin{itemize}
     \item \textbf{Modularity} ($Q$): the standard modularity of the partition obtained after processing the update sequence, measured on the final graph of the corresponding protocol.
-    \item \textbf{Adjusted Rand Index (ARI)}, \textbf{F1-score}, and \textbf{Normalized Mutual Information (NMI)}: extrinsic clustering metrics computed against the ground-truth community labels. These measure the agreement between the detected partition and the known community structure, with higher values indicating better alignment.
+    \item \textbf{Normalized Mutual Information (NMI)}: an external clustering metric computed against the ground-truth labels and reported as the compact agreement measure in the main tables.
     \item \textbf{Total processing time} ($T$): the cumulative wall-clock time (in seconds) required to process all measured update batches, i.e., the sum of the execution times of the dynamic algorithm over the whole update sequence.
     \item \textbf{Local workload}: the number of expanded vertices $|B_r(S_t)|$, the number of vertices included after community closure $|U_t^\ell|$, and the number of nodes and edges in the contracted backend instances. These values quantify how much of the full graph is actually inspected.
-    \item \textbf{Peak memory}: the maximum resident CPU memory and, for GNN-based methods, the maximum allocated GPU memory during the update sequence.
+    \item \textbf{Peak memory}: maximum resident CPU memory and, for GNN-based methods, allocated GPU memory.
 \end{itemize}
-To isolate the performance of the core community-detection logic, we exclude
-the time spent on data-format conversions; each baseline operates on its native
-graph representation, and conversion time is tracked separately by the
-launcher. The final tables use paired comparisons on the same dynamic streams:
-stochastic algorithms are repeated with at least five random seeds, while
-deterministic backends are evaluated on the same set of stream splits. Draft
-cells or curves still marked as pending are reserved for measurements that are
-not yet present in the consolidated result registry.
-For paired analysis, the registry derives a stream identifier from the source
-result file, machine, dataset, directedness, batch strategy, and completed
-update count. The per-algorithm \texttt{series\_digest} is retained as part of
-an exact measurement identifier, but it is not used alone as the pairing key
-because different algorithms on the same update stream produce different
-metric series.
-This protocol separates solver randomness from sensitivity to the update
-stream and is necessary for assessing whether the observed speedups and quality
-differences are statistically stable.
+We exclude data-format conversion time; each baseline operates on its native
+graph representation. Whenever repeated measurements are available, comparisons
+are paired by dataset, directedness, batch strategy, initial history, and
+completed update count. The compatibility table is breadth-oriented and uses
+audited finite runs under the common P1 stream, while the robustness table
+reports the subset with at least five paired repetitions.
 
 \subsubsection{Baselines}
-We compare against two families of algorithms:
-\begin{enumerate}
-    \item \textbf{Static algorithms} that we convert into dynamic ones either through our local hierarchical approach or through the naive per-snapshot re-execution:
-    \begin{itemize}
-        \item \textit{Leidenalg}~\cite{TWE19}: the Leiden algorithm for static modularity optimisation.
-        \item \textit{FLMIG}~\cite{TTB24}: a fast local move iterated greedy method based on Louvain-style moves.
-        \item Deep graph clustering models: DMoN~\cite{TPP23}, MAGI~\cite{LLC24}, PRGPT-Infomap and PRGPT-Locale~\cite{QZG24}, and S$^2$CAG~\cite{LYZ25}.
-    \end{itemize}
-    \item \textbf{Native dynamic algorithms} designed to handle graph updates natively:
-    \begin{itemize}
-        \item \textit{DF-Leiden}~\cite{SLe24}: an OpenMP-parallel dynamic variant of Leiden.
-        \item \textit{MFC}~\cite{KZL24}: a GNN-based dynamic community detection method.
-    \end{itemize}
-\end{enumerate}
-Detailed characteristics of each baseline, including whether they exploit node features, are given in Table~\ref{T:1}.
-All methods are evaluated on the same symmetrized graph sequence for each
-dataset.
-
-\begin{table}[t]
-    \centering
-    \setlength{\tabcolsep}{2pt}
-    \scriptsize
-    \begin{tabular}{@{}lcp{0.18\linewidth}cc@{}}
-        \toprule
-        Solution & Year & Base & Type & Features \\
-        \midrule
-        Leidenalg\tablefootnote{https://github.com/vtraag/libleidenalg} & 2023
-        &  Leiden & Static & No \\
-        FLMIG\tablefootnote{https://github.com/salahinfo/FLMIG\_algorithm}
-        & 2023
-        &  Louvain (prune) & Static & No \\
-        DMON\tablefootnote{https://github.com/google-research/google-research/tree/master/graph\_embedding/dmon}
-        & 2020
-        &  GNN & Static & Yes \\
-        MAGI\tablefootnote{https://github.com/EdisonLeeeee/MAGI.git} & 2024
-        &  GNN & Static & Yes \\
-        PRGPT-Infomap\tablefootnote{https://github.com/KuroginQin/PRGPT} & 2024
-        &  GNN & Static & No \\
-        PRGPT-Locale\tablefootnote{https://github.com/KuroginQin/PRGPT} & 2024
-        &  GNN & Static & No \\
-        S$^2$CAG\tablefootnote{https://github.com/HKBU-LAGAS/S2CAG}
-        & 2025
-        &  GNN & Static & Yes \\
-        DF-Leiden\tablefootnote{https://github.com/puzzlef/leiden-communities-openmp-dynamic}
-        & 2024
-        &  Leiden & Dynamic & No \\
-        MFC\tablefootnote{https://github.com/kundtx/MFC-TopoReg}
-        & 2024
-        &  GNN & Dynamic & Yes \\
-        \bottomrule
-    \end{tabular}
-    \caption{Solutions used for performance comparison.}
-    \label{T:1}
-\end{table}
+We compare against static full-snapshot solvers, static graph-clustering
+models adapted through the same snapshot interface, and native dynamic
+baselines. All methods are evaluated on the same symmetrized graph sequence for
+each dataset. \textit{Leidenalg}~\cite{TWE19} is the main topology-only static
+baseline and represents strong modularity optimization under full
+recomputation. \textit{FLMIG}~\cite{TTB24} is included as a Louvain-style local
+move method with aggressive pruning. For representation-learning and
+feature-aware graph clustering, we include DMoN~\cite{TPP23},
+MAGI~\cite{LLC24}, S$^2$CAG~\cite{LYZ25}, and the PRGPT-Infomap and
+PRGPT-Locale variants~\cite{QZG24}; DMoN, MAGI, and S$^2$CAG use node
+features when available, whereas the PRGPT variants are evaluated through their
+topological clustering outputs. The native dynamic baselines are
+DF-Leiden~\cite{SLe24}, an OpenMP-parallel dynamic Leiden implementation, and
+MFC~\cite{KZL24}, a feature-aware GNN-based dynamic community detection method.
+Thus, Leidenalg, FLMIG, PRGPT-Infomap, PRGPT-Locale, and DF-Leiden are treated
+as topology-only baselines in our evaluation, while DMoN, MAGI, S$^2$CAG, and
+MFC are feature-aware baselines.
 
 For algorithms that involve iterative training, the configured budgets are
 $100$ epochs for MFC, one iteration for FLMIG, and $10$ epochs for S$^2$CAG,
-MAGI, and DMoN. These values match the experiment configuration used to
-generate the reported result files.
+MAGI, and DMoN. These values match the experimental configuration used for the
+reported runs. MAGI and DMoN are not given ground-truth cluster counts. For
+MAGI, after learning node embeddings, we select the number of clusters with a
+vMF-mixture elbow criterion and then apply $k$-means; when a previous partition
+is available, its number of labels is used only as a warm-start estimate. For
+DMoN, whose output dimension is fixed in advance, we set this dimension to the
+number of nodes in the current graph and compact the nonempty argmax clusters
+after inference.
 
 \textbf{Focused comparison design.}
-The main text separates breadth from focused evidence. The compatibility
-screen and Appendix~\ref{app:full-results} include all six real datasets and
-all implemented baselines with comparable outputs. The focused tables then use
-complete two-dataset blocks on \textit{dyn\_pubmed} and \textit{arxivmath}
-whenever the goal is a direct method comparison. Leidenalg represents the
-strongest topology-only full-recomputation baseline, DF-Leiden represents a
-native dynamic topology solver, and S$^2$CAG represents modern feature-aware
-graph clustering under memory and runtime pressure. FLMIG, PRGPT, MAGI, DMoN,
-and MFC are reported in the breadth screen and appendix to document
-compatibility, fragility, and feasibility across a wider method family; they
-are not repeated as singleton rows in focused tables unless a complete,
-table-specific comparison is available.
-Synthetic DSBM streams are used only for operating-envelope stress tests, not
-mixed with real-data quality tables. Continuous-time temporal-community
+The evaluation separates breadth from focused evidence. The compatibility
+study includes all six real datasets and all implemented baselines with
+comparable outputs. The focused tables then use complete two-dataset blocks on
+\textit{dyn\_pubmed} and \textit{arxivmath} whenever the goal is a direct
+method comparison. Leidenalg represents the strongest topology-only
+full-recomputation baseline, DF-Leiden represents a native dynamic topology
+solver, and S$^2$CAG represents modern feature-aware graph clustering under
+memory and runtime pressure. FLMIG, PRGPT, MAGI, DMoN, and MFC are reported in
+the breadth study to document compatibility, sensitivity, and feasibility across
+a wider method family; they are not repeated as singleton rows in focused
+tables unless a complete, table-specific comparison is available.
+Synthetic DSBM streams are used only for operating-envelope stress tests and are
+not mixed with real-data quality tables. Continuous-time temporal-community
 methods are discussed in Related Work as complementary rather than treated as
 like-for-like baselines for batched snapshot maintenance.
 
 \subsubsection{Configuration of the proposed local adaptation}
-Our dynamic adapter uses a hierarchy depth of
-$\texttt{subcoms\_depth}=3$ and radius
-$\texttt{neighborhood\_step}=1$, meaning that the endpoints of the update are
-expanded to their immediate graph neighbors before community closure is
-applied. Separate neighborhood-size logs in the repository show that larger
-radii can quickly approach the full graph on several datasets; this motivates
-the default choice $r=1$.
+Our dynamic adapter uses three hierarchy levels and a graph-neighborhood radius
+of one, meaning that the endpoints of the update are expanded to their
+immediate graph neighbors before community closure is applied. Separate
+neighborhood-size measurements show that larger radii can quickly approach the
+full graph on several datasets; this motivates the radius-one default.
 
 For feature-aware local runs, the configuration supplies random
 $64$-dimensional features and uses normalized feature aggregation. Naive runs
@@ -573,30 +532,34 @@ separate feature-mode ablation is needed to attribute the gains precisely.
 
 \subsection{Experimental results}
 
-\subsubsection{All-Backend Compatibility Screen}
+\subsubsection{Compatibility Study Across Backends}
 
 This experiment addresses RQ1.
-Table~\ref{tab:main-results} and Figure~\ref{fig:quality-runtime-pareto}
-summarize the modularity--runtime trade-off and NMI agreement with
-ground-truth communities across all datasets under protocol P1. The table
-provides breadth: it checks whether many heterogeneous backends can be wrapped
-by ComNetX under the same update interface. The figure turns the same registry
-records into a compact Pareto view, which is easier to inspect than a large
-raw-cell matrix. The full per-dataset modularity/runtime table and the full
-ARI/F1/NMI table are moved to Appendix~\ref{app:full-results}, because the
-main paper should emphasize the quality--efficiency pattern rather than expose
-every raw cell.
+Table~\ref{tab:main-results} summarizes the modularity--runtime trade-off and
+NMI agreement with ground-truth communities across all datasets under protocol
+P1. It is a breadth check over heterogeneous backends under the same update
+interface, so we report the aggregate quality--efficiency pattern
+rather than every raw per-dataset cell. The reported
+$\overline{\Delta Q}$ and $\overline{\Delta\mathrm{NMI}}$ values are Local
+minus baseline, averaged over datasets with finite baseline results. Geometric
+mean speedups exclude zero-time and out-of-memory baseline entries.
 For each method we contrast the conventional dynamic baseline (``Naive'' for static methods that re-run on the full snapshot, ``Dynamic'' for natively dynamic algorithms) with the variant obtained through our local hierarchical adapter (``Local'').
-The Local variant is also applied to the natively dynamic algorithms DF-Leiden and MFC.
-This is possible because any dynamic algorithm can be used as a static one: it receives a graph and an initial partition, and returns an updated partition without relying on any history of previous updates.
-Our adapter treats such an algorithm exactly like a classical static method, restricting its execution to the subgraph induced by the batch neighbourhood and the corresponding sub-communities of the hierarchical decomposition.
-The results demonstrate that our adapter can accelerate and, in several cases, even improve the quality of already dynamic solvers. The long-horizon and stress-test protocols below then test whether the same locality mechanism remains stable as the stream becomes longer or the affected region becomes less local.
+The Local variant is also applied to the natively dynamic algorithms DF-Leiden
+and MFC. In this setting, the backend receives the current local graph, the
+corresponding initial partition, and the current update batch, but its execution
+is restricted to the subgraph induced by the batch neighbourhood and the
+corresponding sub-communities of the hierarchical decomposition. The results
+show that this local restriction can complement native dynamic solvers on large
+graphs, although the benefit is backend- and dataset-dependent. The
+long-horizon and stress-test protocols below then test whether the same
+locality mechanism remains stable as the stream becomes longer or the affected
+region becomes less local.
 
 \begin{table*}[ht]
 \centering
-\caption{All-backend compatibility screen of Local ComNetX against the corresponding baseline under protocol P1. $\overline{\Delta Q}$ and $\overline{\Delta\mathrm{NMI}}$ are Local minus baseline, averaged over datasets with finite baseline results. Geometric mean speedup excludes zero-time and OOM baseline entries. Full per-dataset values are reported in Appendix~\ref{app:full-results}.}
+\caption{Compatibility study across backends.}
 \label{tab:main-results}
-\setlength{\tabcolsep}{3pt}
+\setlength{\tabcolsep}{4pt}
 \footnotesize
 \begin{tabular}{llrrrrr}
 \toprule
@@ -617,128 +580,69 @@ DMoN           & Naive   & +0.484 & +0.112 & 1.4$\times$  & OOM$\rightarrow$65.1
 \end{tabular}
 \end{table*}
 
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[x=2.05cm,y=4.0cm]
-\node[font=\footnotesize] at (0.55,0.57) {(a) Modularity};
-\draw[->] (-0.6,-0.30) -- (1.90,-0.30)
-    node[below right,font=\scriptsize,yshift=-5pt] {speedup};
-\draw[->] (-0.6,-0.30) -- (-0.6,0.55)
-    node[above,font=\scriptsize] {$\Delta Q$};
-\draw[densely dotted,gray] (-0.6,0) -- (1.90,0);
-\foreach \x/\lab in {-0.52/0.3,0/1,1/10,1.78/60}
-  \draw (\x,-0.30) -- ++(0,-0.018) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {-0.25/-0.25,0/0,0.25/0.25,0.50/0.50}
-  \draw (-0.6,\y) -- ++(-0.025,0) node[left,font=\scriptsize] {\lab};
-\fill[dkgreen] (-0.22,-0.012) rectangle (-0.185,0.013);
-\node[above right,font=\scriptsize] at (-0.185,0.013) {DF};
-\fill[mauve] (1.65,0.048) circle (1.4pt)
-  node[above,font=\scriptsize] {MFC};
-\fill[blue] (0.86,-0.013) circle (1.4pt)
-  node[above,font=\scriptsize] {Leid};
-\fill[gray] (1.78,-0.250) circle (1.4pt)
-  node[right,font=\scriptsize] {FLMIG};
-\fill[gray] (0.88,-0.165) circle (1.4pt)
-  node[above right,font=\scriptsize] {PI};
-\fill[gray] (0.95,-0.242) circle (1.4pt)
-  node[below right,font=\scriptsize] {PL};
-\fill[mauve] (0.94,0.230) circle (1.4pt)
-  node[above,font=\scriptsize] {S2};
-\fill[mauve] (-0.52,0.082) circle (1.4pt)
-  node[above right,font=\scriptsize] {MAGI};
-\fill[mauve] (0.15,0.484) circle (1.4pt)
-  node[right,font=\scriptsize] {DMoN};
-\end{tikzpicture}
-
-\vspace{0.35em}
-
-\begin{tikzpicture}[x=2.05cm,y=12.0cm]
-\node[font=\footnotesize] at (0.55,0.15) {(b) NMI};
-\draw[->] (-0.6,-0.09) -- (1.90,-0.09)
-    node[below right,font=\scriptsize,yshift=-5pt] {speedup};
-\draw[->] (-0.6,-0.09) -- (-0.6,0.13)
-    node[above,font=\scriptsize] {$\Delta$NMI};
-\draw[densely dotted,gray] (-0.6,0) -- (1.90,0);
-\foreach \x/\lab in {-0.52/0.3,0/1,1/10,1.78/60}
-  \draw (\x,-0.09) -- ++(0,-0.006) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {-0.05/-0.05,0/0,0.10/0.10}
-  \draw (-0.6,\y) -- ++(-0.025,0) node[left,font=\scriptsize] {\lab};
-\fill[dkgreen] (-0.22,0.002) rectangle (-0.185,0.008);
-\node[above right,font=\scriptsize] at (-0.185,0.008) {DF};
-\fill[mauve] (1.65,0.126) circle (1.4pt)
-  node[above,font=\scriptsize] {MFC};
-\fill[blue] (0.86,-0.010) circle (1.4pt)
-  node[above,font=\scriptsize] {Leid};
-\fill[gray] (1.78,-0.042) circle (1.4pt)
-  node[right,font=\scriptsize] {FLMIG};
-\fill[gray] (0.88,-0.073) circle (1.4pt)
-  node[below,font=\scriptsize] {PI};
-\fill[gray] (0.95,-0.073) circle (1.4pt)
-  node[below right,font=\scriptsize] {PL};
-\fill[mauve] (0.94,0.112) circle (1.4pt)
-  node[above,font=\scriptsize] {S2};
-\fill[mauve] (-0.52,-0.034) circle (1.4pt)
-  node[below right,font=\scriptsize] {MAGI};
-\fill[mauve] (0.15,0.112) circle (1.4pt)
-  node[above,font=\scriptsize] {DMoN};
-\end{tikzpicture}
-\caption{Pareto view of quality preservation versus runtime reduction for the
-all-backend compatibility screen. Points are backend-level aggregates from
-Table~\ref{tab:main-results}; the x-axis is geometric speedup on a log scale,
-and the y-axes report Local minus baseline quality.}
-\label{fig:quality-runtime-pareto}
-\end{figure}
-
-\textbf{Modularity and extrinsic quality preservation.}
-For Leidenalg, the Local adapter closely tracks the Naive modularity, with
-differences at most $0.04$ and below $0.02$ on five of the six graphs.
-The ARI, F1, and NMI values are likewise stable, and on \textit{dyn\_cora} Local even yields a slightly higher ARI ($0.28$ vs.\ $0.24$).
-FLMIG, whose aggressive pruning strategy is more sensitive to the restriction to a local neighbourhood, suffers a moderate drop in both modularity and extrinsic metrics, especially on the larger graphs.
-The GNN-based methods show a striking pattern: in the Naive (full-graph) setting, S$^2$CAG, DMoN, and MAGI often underfit severely or run out of memory, delivering near-zero modularity and poor ground-truth agreement.
-When switched to the Local mode with compact random features, the same models achieve substantially higher modularity (e.g., DMoN on \textit{dyn\_cora}: $0.06 \rightarrow 0.79$) and higher ARI/F1/NMI scores.
+\textbf{Modularity and external agreement.}
+For Leidenalg, Table~\ref{tab:main-results} shows that the Local adapter
+closely tracks full-snapshot recomputation, with mean changes of $-0.013$ in
+modularity and $-0.010$ in NMI.
+FLMIG, whose aggressive pruning strategy is more sensitive to the restriction
+to a local neighbourhood, obtains large speedups but loses more modularity and
+NMI.
+The GNN-based methods show a consistent pattern: in the Naive (full-graph)
+setting, S$^2$CAG, DMoN, and MAGI are often weaker or infeasible under the
+same update protocol.
+When switched to the Local mode with compact random features, S$^2$CAG and
+DMoN obtain higher mean modularity and NMI; MAGI mainly benefits through
+making the largest graph executable, with a smaller aggregate quality gain.
 Because locality and feature mode change together in these GNN runs, the
 result should be interpreted as evidence that the complete ComNetX deployment
 can make such models feasible on local updates; it does not by itself isolate
 the contribution of random features.
-The PRGPT variants exhibit a mixed behaviour: on \textit{dyn\_citeseer} and \textit{patent} the Local adapter retains or improves the Naive quality, while on the larger graphs \textit{dyn\_pubmed} and \textit{arxivmath} the quality degrades considerably, indicating that these methods rely heavily on the global context provided by the full graph.
-Notably, our Local adapter also benefits the natively dynamic DF-Leiden: on \textit{dyn\_pubmed} and \textit{arxivmath} the Local variant achieves slightly higher modularity and ARI than the original dynamic algorithm, while reducing the runtime on \textit{arxivmath} by an order of magnitude ($0.44$\,s vs.\ $3.74$\,s).
-For MFC, the Local version avoids the out-of-memory failure on the largest
-graph and improves quality on several datasets, although it remains unstable
-and its absolute quality is below that of the best topology-based methods.
+The PRGPT variants are less robust to the local restriction: their aggregate
+modularity and NMI deltas are negative despite consistent speedups, indicating
+that these methods rely more heavily on the global context provided by the full
+graph.
+The Local adapter also complements native dynamic solvers. For DF-Leiden the
+mean NMI change is nearly neutral and the large-graph speedup is substantial;
+for MFC, the Local version avoids the out-of-memory failure on the largest
+graph and improves the aggregate quality measures in
+Table~\ref{tab:main-results}, although its absolute quality remains below that
+of the best topology-based methods.
 
 \textbf{Reduction in processing time.}
 The runtime advantage of the Local adapter is substantial for the larger
 full-recomputation baselines.
-For Leidenalg on \textit{arxivmath}, $T$ drops from $150.7$\,s (Naive) to $3.64$\,s (Local), a $41\times$ speedup; on \textit{dyn\_pubmed} the factor exceeds $22\times$.
-FLMIG, which in the Naive mode requires over $28$ hours on \textit{arxivmath}, finishes in $37.9$\,s with the Local adapter -- a speedup of more than $2700\times$.
-Even the already fast PRGPT-Locale sees its time reduced by a factor of up to $59\times$ on \textit{arxivmath}.
-The GNN models profit similarly: S$^2$CAG on \textit{arxivmath} needs $2281$\,s (Naive) but only $178$\,s (Local); DMoN and MAGI, which run out of memory in the Naive setting on large graphs, become executable under the Local paradigm because only small neighbourhood graphs are ever materialised on the GPU.
-Crucially, the Local adapter also accelerates the native dynamic DF-Leiden on \textit{arxivmath} from $3.74$\,s to $0.44$\,s, demonstrating that its locality principle benefits even algorithms already designed for dynamic scenarios.
+For Leidenalg, Table~\ref{tab:main-results} reports a $41.4\times$ speedup on
+\textit{arxivmath}, and the paired robustness table reports
+$22.7\pm0.8\times$ on \textit{dyn\_pubmed} and $47.0\pm8.1\times$ on
+\textit{arxivmath}. FLMIG and the PRGPT variants obtain even larger or
+consistent large-graph speedups, but their quality deltas show that this speed
+comes from a more aggressive loss of global context. The GNN rows show a
+different benefit: S$^2$CAG becomes substantially faster, while DMoN and MAGI
+become executable on large graphs because only small neighbourhood graphs are
+materialised on the GPU. The DF-Leiden row shows that locality can also help an
+algorithm already designed for dynamic updates when the graph is large enough.
 
 \subsubsection{Statistical Robustness}
 
 This experiment addresses the stream-level part of RQ5 without mixing in the
-random-feature runs. Table~\ref{tab:stability} reports only non-random,
-registry measurements where Local and baseline records share the same derived
-\texttt{stream\_id}. Each row fixes all non-empty algorithm parameters, the
-dataset, directedness, batch strategy, and completed update count; the standard
-deviations therefore reflect repeated measurements of the same stream shape
-rather than a mixture of different horizons or feature draws. The Local rows use
-the fixed $L=3,r=1$ GPU configuration and are compared with the corresponding
-naive or native dynamic baseline.
-The focused \texttt{999:10} rows for \textit{dyn\_pubmed} and
-\textit{arxivmath} are now completed to five paired streams for each of
-Leiden, DF-Leiden, and S$^2$CAG; longer-horizon rows remain auxiliary checks
-where fewer matched stream repetitions are available.
+random-feature runs. Table~\ref{tab:stability} reports repeated non-random
+measurements where Local and baseline methods share the same dataset,
+directedness, batch strategy, and completed update count. Each row fixes the
+algorithm parameters; the standard deviations therefore reflect repeated
+measurements of the same stream shape rather than a mixture of different
+horizons or feature draws. The Local rows use the fixed three-level, radius-one
+configuration and are compared with the corresponding naive or native dynamic
+baseline. Table~\ref{tab:stability} keeps only the \texttt{999:10} rows for
+\textit{dyn\_pubmed} and \textit{arxivmath} with at least five repeated
+measurements in the audited result set. Values are reported as mean $\pm$
+standard deviation. $T$ denotes cumulative processing time in seconds, and B/L
+summarizes the observed baseline-to-Local runtime ratio.
 
 \begin{table*}[t]
 \centering
-\caption{Stream-id robustness for non-random runs. Values are
-mean $\pm$ standard deviation over paired \texttt{stream\_id}s from all
-registry sources under \texttt{results/}. $T$ is total processing time in
-seconds; speedup is $T_{\mathrm{base}}/T_{\mathrm{Local}}$.}
+\caption{Statistical robustness over repeated 999:10 runs.}
 \label{tab:stability}
-\setlength{\tabcolsep}{2pt}
+\setlength{\tabcolsep}{3pt}
 \scriptsize
 \begin{tabular}{@{}lllrccccc@{}}
 \toprule
@@ -747,79 +651,58 @@ seconds; speedup is $T_{\mathrm{base}}/T_{\mathrm{Local}}$.}
 \textbf{$T_B$} & \textbf{B/L} \\
 \midrule
 \multicolumn{9}{l}{\textit{Leiden, Local versus full recomputation}} \\
-Leiden & dyn\_pubmed & 999:10  & 5 & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.39 $\pm$ 0.17 & 8.98 $\pm$ 4.12 & 22.6 $\pm$ 0.8 \\
-Leiden & dyn\_pubmed & 999:50  & 2 & 0.758 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.86 $\pm$ 0.08 & 37.12 $\pm$ 7.17 & 43.7 $\pm$ 12.2 \\
-Leiden & dyn\_pubmed & 999:100 & 2 & 0.758 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.70 $\pm$ 0.03 & 35.15 $\pm$ 4.52 & 50.0 $\pm$ 4.6 \\
-Leiden & arxivmath   & 999:10  & 5 & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 3.86 $\pm$ 0.46 & 182.65 $\pm$ 39.22 & 47.3 $\pm$ 9.0 \\
-Leiden & arxivmath   & 999:50  & 2 & 0.871 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 5.41 $\pm$ 0.09 & 918.45 $\pm$ 58.91 & 169.8 $\pm$ 8.2 \\
-Leiden & arxivmath   & 999:100 & 2 & 0.869 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 6.78 $\pm$ 0.55 & 1981.16 $\pm$ 533.99 & 289.9 $\pm$ 55.3 \\
+Leiden & dyn\_pubmed & 999:10 & 6 & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.39 $\pm$ 0.15 & 9.02 $\pm$ 3.69 & 22.7 $\pm$ 0.8 \\
+Leiden & arxivmath   & 999:10 & 6 & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 4.00 $\pm$ 0.53 & 187.52 $\pm$ 37.06 & 47.0 $\pm$ 8.1 \\
 \addlinespace
 \multicolumn{9}{l}{\textit{DF-Leiden, Local versus native dynamic backend}} \\
-DF-Leiden & dyn\_pubmed & 999:10  & 5 & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.17 $\pm$ 0.07 & 0.11 $\pm$ 0.01 & 0.7 $\pm$ 0.3 \\
-DF-Leiden & dyn\_pubmed & 999:50  & 2 & 0.744 $\pm$ 0.000 & 0.760 $\pm$ 0.000 & 0.48 $\pm$ 0.06 & 0.35 $\pm$ 0.05 & 0.7 $\pm$ 0.0 \\
-DF-Leiden & dyn\_pubmed & 999:100 & 2 & 0.744 $\pm$ 0.000 & 0.760 $\pm$ 0.000 & 0.49 $\pm$ 0.06 & 0.35 $\pm$ 0.01 & 0.7 $\pm$ 0.1 \\
-DF-Leiden & arxivmath   & 999:10  & 5 & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.49 $\pm$ 0.05 & 4.11 $\pm$ 0.54 & 8.4 $\pm$ 0.5 \\
-DF-Leiden & arxivmath   & 999:50  & 2 & 0.865 $\pm$ 0.000 & 0.854 $\pm$ 0.000 & 1.24 $\pm$ 0.11 & 17.30 $\pm$ 2.93 & 13.9 $\pm$ 1.1 \\
-DF-Leiden & arxivmath   & 999:100 & 2 & 0.861 $\pm$ 0.000 & 0.860 $\pm$ 0.000 & 2.10 $\pm$ 0.05 & 27.03 $\pm$ 2.10 & 12.9 $\pm$ 0.7 \\
+DF-Leiden & dyn\_pubmed & 999:10 & 7 & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.15 $\pm$ 0.07 & 0.11 $\pm$ 0.01 & 0.8 $\pm$ 0.3 \\
+DF-Leiden & arxivmath   & 999:10 & 6 & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.50 $\pm$ 0.05 & 4.23 $\pm$ 0.56 & 8.5 $\pm$ 0.5 \\
 \addlinespace
 \multicolumn{9}{l}{\textit{S$^2$CAG, dataset features}} \\
-S$^2$CAG & dyn\_pubmed & 999:10  & 5 & 0.530 $\pm$ 0.000 & 0.622 $\pm$ 0.000 & 91.88 $\pm$ 45.40 & 191.26 $\pm$ 49.43 & 2.4 $\pm$ 0.8 \\
-S$^2$CAG & dyn\_pubmed & 999:100 & 2 & 0.532 $\pm$ 0.000 & 0.624 $\pm$ 0.000 & 38.14 $\pm$ 1.24 & 390.05 $\pm$ 5.77 & 10.2 $\pm$ 0.2 \\
-S$^2$CAG & dyn\_pubmed & 99:50   & 2 & 0.164 $\pm$ 0.000 & 0.624 $\pm$ 0.000 & 417.51 $\pm$ 14.80 & 488.72 $\pm$ 13.43 & 1.2 $\pm$ 0.0 \\
-S$^2$CAG & arxivmath   & 999:10  & 5 & 0.089 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 227.39 $\pm$ 12.35 & 2972.22 $\pm$ 418.59 & 13.1 $\pm$ 1.6 \\
+S$^2$CAG & dyn\_pubmed & 999:10 & 5 & 0.530 $\pm$ 0.000 & 0.622 $\pm$ 0.000 & 91.88 $\pm$ 45.40 & 191.26 $\pm$ 49.43 & 2.4 $\pm$ 0.8 \\
+S$^2$CAG & arxivmath   & 999:10 & 5 & 0.089 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 227.39 $\pm$ 12.35 & 2972.22 $\pm$ 418.59 & 13.1 $\pm$ 1.6 \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-The stream-id view is intentionally narrower than a whole-registry aggregate.
+This repeated-run view is intentionally narrower than a whole-study aggregate.
 It shows that the topology-only conclusions are stable when the stream shape is
-held fixed: Leiden keeps a small modularity gap and large speedups, while
-Local DF-Leiden is useful on \textit{arxivmath} but not on
-\textit{dyn\_pubmed}, where the native dynamic backend is already extremely
-cheap. The S$^2$CAG dataset-feature rows confirm that the Local wrapper can
-reduce runtime for this heavier backend, but with a larger quality gap and with
-less consistent speedup on the denser \textit{dyn\_pubmed} streams. The
-remaining runtime standard deviation is mostly run-to-run system variation and
-backend cost variation on the same deterministic split, not a random-feature
-effect. On the completed \texttt{999:10} rows, the mean final-NMI deltas
-(Local minus baseline) are $-0.027/-0.015$ for Leiden,
-$+0.006/+0.006$ for DF-Leiden, and $+0.007/+0.143$ for S$^2$CAG on
-\textit{dyn\_pubmed}/\textit{arxivmath}, respectively.
+held fixed: Leiden keeps a small modularity gap and large speedups, while Local
+DF-Leiden is useful on \textit{arxivmath} but not on \textit{dyn\_pubmed},
+where the native dynamic backend is already efficient. The S$^2$CAG
+dataset-feature rows confirm that the Local wrapper can reduce runtime for this
+heavier backend, but with a larger quality gap and with less consistent speedup
+on the denser \textit{dyn\_pubmed} streams. The remaining runtime standard
+deviation is mostly run-to-run system variation and backend cost variation
+under the same deterministic setting, not a random-feature effect. We keep this
+table focused on modularity and runtime; NMI is reported in the compatibility
+and long-horizon summaries.
 
 \subsubsection{Comparison with Native Dynamic Methods}
 
 This experiment addresses RQ2. We compare the best adapted static algorithms
-against native dynamic solvers DF-Leiden and MFC
-(Table~\ref{tab:main-results} and Appendix~\ref{app:full-results}). This is the
-main like-for-like comparison because all methods are evaluated on the same
-batched snapshot stream and the same final-snapshot metrics. We focus on the
-Local variant of Leidenalg for the snapshot-metric comparison, because it gives
-the most stable quality--runtime trade-off among the adapted methods.
+against native dynamic solvers DF-Leiden and MFC in the compatibility and
+robustness studies above. This is the main like-for-like comparison because all
+methods are evaluated on the same batched snapshot stream and the same
+final-snapshot modularity and NMI summaries. The comparison is deliberately
+framed as an operating-envelope result rather than a universal dominance claim.
+In the paired \texttt{999:10} rows, Local DF-Leiden improves modularity on both
+\textit{dyn\_pubmed} and \textit{arxivmath}, while
+Table~\ref{tab:main-results} shows a nearly neutral aggregate NMI change for
+DF-Leiden. At the 500-update horizon, Table~\ref{tab:long-horizon} is more
+conservative: Local DF-Leiden remains faster, but loses final NMI on both large
+datasets.
 
-\textbf{Modularity and extrinsic metrics.}
-On the three smallest datasets, DF-Leiden achieves modularity and ground-truth
-agreement scores close to those of Local Leidenalg and is stronger on
-\textit{dyn\_acm}. As the graphs grow larger, Local Leidenalg becomes more
-competitive: on \textit{dyn\_pubmed} DF-Leiden yields $Q=0.76$ vs.\ $0.78$ for
-Local Leidenalg, with ARI $0.08$ vs.\ $0.09$; on \textit{arxivmath} the
-modularity is $0.85$ against $0.88$, and ARI is $0.12$ vs.\ $0.17$. MFC is much
-slower and runs out of memory on the largest graph. Thus, ComNetX retains the
-quality of a strong static solver in a dynamic setting and is especially
-competitive on larger graphs.
-
-\textbf{Processing time.}
-DF-Leiden is extremely fast on small graphs (${\le}0.01$\,s on the first three datasets), where Local Leidenalg requires $0.10$--$0.54$\,s -- an order of magnitude slower yet still negligible in absolute terms.
-For larger graphs the speed gap narrows: on \textit{arxivmath} DF-Leiden takes $3.74$\,s whereas Local Leidenalg finishes in $3.64$\,s, i.e., it is marginally faster while delivering a better partition.
-MFC is orders of magnitude slower and runs out of memory on the largest dataset.
-
-\textbf{Summary.}
-The comparison highlights a clear trade-off: DF-Leiden excels in raw speed on
-tiny graphs, while Local Leidenalg becomes attractive on larger networks where
-full-snapshot recomputation dominates runtime.
-MFC remains substantially slower in this experimental setup and fails on the
-largest graph.
-When coupled with GNN-based static detectors, our adapter additionally provides a practical solution for deploying deep graph clustering on dynamic networks that would otherwise be computationally prohibitive.
-The experiments also demonstrate that the local hierarchical paradigm is not limited to static algorithms: applying it to the dynamic DF-Leiden further improves both its quality and its scalability, underlining the generality of the proposed approach.
+DF-Leiden is already highly optimized, so the Local wrapper is not always the
+fastest choice. On \textit{dyn\_pubmed} the paired \texttt{999:10} rows show
+that the Local wrapper is slower than native DF-Leiden, whereas on
+\textit{arxivmath} it yields an $8.5\pm0.5\times$ speedup; the same large-graph
+pattern persists at the 500-update horizon, where Local DF-Leiden is
+$7.4\times$ faster. MFC remains substantially slower and runs out of memory on
+the largest dataset under the full dynamic setting. Thus, native dynamic
+solvers remain important speed baselines, while ComNetX is most useful when the
+affected region stays small and the backend would otherwise process a much
+larger snapshot.
 
 \subsubsection{Locality and Workload Reduction}
 
@@ -830,14 +713,13 @@ reports the measured growth of update neighborhoods in the real-data streams.
 Since ComNetX uses $r=1$ in the main configuration, the most important column
 is $|B_1(S_t)|/|V|$; the larger radii show how quickly locality would be lost
 if the expansion radius were increased.
+Here $|S_t|$ is the average number of directly affected vertices. The
+$B_h$ columns report the mean percentage of vertices within graph distance $h$
+from $S_t$; for $B_1$, the table also shows the maximum mini-batch percentage.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption{Empirical neighborhood growth for the update streams used in the
-experiments. $|S_t|$ is the average number of directly affected vertices.
-$B_h$ columns report the mean percentage of vertices within graph distance
-$h$ from $S_t$; the $B_1$ column also reports the maximum percentage across
-mini-batches.}
+\caption{Empirical neighborhood growth.}
 \label{tab:workload}
 \setlength{\tabcolsep}{2pt}
 \scriptsize
@@ -870,106 +752,50 @@ to preserve context.
 The neighborhood table explains the first stage of locality. The decisive
 second stage is the hierarchical closure and contraction, summarized by the
 post-closure sets $U_t^\ell$ and the contracted backend sizes
-$(k_\ell,\bar m_\ell)$. Table~\ref{tab:contracted-workload} uses the focused
-workload-profile grid and adds \textit{dyn\_cora} as a small-graph control.
-The latest workload-profile records fill the post-closure and
-contracted-backend columns, so the table can be read together with the runtime
-and memory breakdown below.
+$(k_\ell,\bar m_\ell)$. Figure~\ref{fig:workload-speedup} uses the focused
+workload grid and adds \textit{dyn\_cora} as a small-graph control. The
+x-axis reports the contracted edge fraction $|\bar E|/|E|$, while the y-axis
+reports the corresponding Base/Local time ratio. Marker area encodes the
+post-closure vertex fraction $|U|/|V|$, and the labels C, P, and A denote
+\textit{dyn\_cora}, \textit{dyn\_pubmed}, and \textit{arxivmath}. The backend
+receives sub-percent or near-percent edge fractions even when post-closure
+sets are substantially larger; the resulting speedups remain backend-dependent,
+because DF-Leiden already performs local dynamic updates and S$^2$CAG pays
+feature-materialization overhead.
 
-\begin{table}[t]
-\centering
-\caption{Contracted workload after hierarchical closure. The table reports the
-focused workload-profile grid and includes \textit{dyn\_cora} as a
-small-control row for each backend family. $|U|/|V|$ is the post-closure vertex
-fraction, $|\bar V|$ is the mean contracted backend node count, and
-$|\bar E|/|E|$ is the edge fraction in the contracted backend instance.}
-\label{tab:contracted-workload}
-\setlength{\tabcolsep}{1.6pt}
-\scriptsize
-\begin{tabular}{@{}llrrrrr@{}}
-\toprule
-\textbf{Backend} & \textbf{Dataset} & \textbf{$B_1$} &
-\textbf{$U/V$} & \textbf{$|\bar V|$} & \textbf{$\bar E/E$} &
-\textbf{B/L} \\
-\midrule
-\multicolumn{7}{l}{\textit{Topology-only full-recomputation baseline}} \\
-Leidenalg & dyn\_cora   & 0.07 / 0.35 & 11.5\% & 11 & 0.40\% & 9.6$\times$ \\
-Leidenalg & dyn\_pubmed & 0.79 / 1.80 & 19.9\% & 40 & 0.64\% & 22.0$\times$ \\
-Leidenalg & arxivmath   & 0.95 / 1.11 & 43.7\% & 637 & 0.79\% & 43.9$\times$ \\
-\addlinespace
-\multicolumn{7}{l}{\textit{Native dynamic topology baseline}} \\
-DF-Leiden & dyn\_cora   & 0.07 / 0.35 & 11.4\% & 11 & 0.39\% & 0.78$\times$ \\
-DF-Leiden & dyn\_pubmed & 0.79 / 1.80 & 20.8\% & 40 & 0.64\% & 0.95$\times$ \\
-DF-Leiden & arxivmath   & 0.95 / 1.11 & 48.2\% & 638 & 0.77\% & 8.4$\times$ \\
-\addlinespace
-\multicolumn{7}{l}{\textit{Feature-aware GNN baseline}} \\
-S$^2$CAG  & dyn\_cora   & 0.07 / 0.35 & 9.7\% & 11 & 0.35\% & 3.0$\times$ \\
-S$^2$CAG  & dyn\_pubmed & 0.79 / 1.80 & 26.7\% & 64 & 1.04\% & 3.4$\times$ \\
-S$^2$CAG  & arxivmath   & 0.95 / 1.11 & 62.8\% & 690 & 1.08\% & 4.3$\times$ \\
-\bottomrule
-\end{tabular}
-\end{table}
+Profiled timing on the focused \texttt{999:50} streams separates algorithmic
+locality from implementation overhead. Radius expansion, closure, aggregation,
+and projection stay in the millisecond range on \textit{dyn\_pubmed} and
+\textit{arxivmath}; backend execution is the dominant term for Leiden on
+\textit{arxivmath} and for all S$^2$CAG rows. Thus, the speedups in
+Figure~\ref{fig:workload-speedup} are driven by smaller contracted backend
+instances, while the local-maintenance overhead remains explicit and
+measurable.
 
-\begin{figure}[t]
+\begin{figure}[!b]
 \centering
-\begin{tikzpicture}[x=7.0cm,y=0.055cm]
-\draw[->] (-0.22,0) -- (0.6,0)
-    node[below,font=\scriptsize] {$|\bar E|/|E|$ (\%)};
-\draw[->] (-0.22,0) -- (-0.22,47)
-    node[above,font=\scriptsize] {Base/Local};
-\foreach \x/\lab in {-0.15/0.4,0.05/0.6,0.25/0.8,0.45/1.0}
-  \draw (\x,0) -- ++(0,-1.0) node[below,font=\scriptsize] {\lab};
-\foreach \y in {10,20,30,40}
-  \draw (-0.22,\y) -- ++(-0.012,0) node[left,font=\scriptsize] {\y};
-\draw[densely dotted,gray] (-0.22,1) -- (0.6,1);
-\fill[blue] (-0.15,9.6) circle (1.5pt)
-    node[above right,font=\scriptsize] {L-Cora};
-\fill[blue] (0.09,22.0) circle (1.5pt)
-    node[above left,font=\scriptsize] {L-Pub};
-\fill[blue] (0.24,43.9) circle (1.5pt)
-    node[above right,font=\scriptsize] {L-Arx};
-\draw[blue,thick] (-0.15,9.6) -- (0.09,22.0) -- (0.24,43.9);
-\fill[dkgreen] (-0.17,0.25) rectangle (-0.152,1.31);
-\node[above right,font=\scriptsize] at (-0.152,1.31) {DF-Cora};
-\fill[dkgreen] (0.09,0.95) rectangle (0.108,2.35);
-\node[above right,font=\scriptsize] at (0.108,2.35) {DF-Pub};
-\fill[dkgreen] (0.22,8.4) rectangle (0.238,9.8);
-\node[above right,font=\scriptsize] at (0.238,9.8) {DF-Arx};
-\draw[dkgreen,thick] (-0.16,0.78) -- (0.10,1.6) -- (0.23,9.1);
-\fill[mauve] (-0.20,3.0) circle (1.5pt)
-    node[above right,font=\scriptsize] {S2-Cora};
-\fill[mauve] (0.49,3.4) circle (1.5pt)
-    node[above left,font=\scriptsize] {S2-Pub};
-\fill[mauve] (0.53,4.3) circle (1.5pt)
-    node[above right,font=\scriptsize] {S2-Arx};
-\draw[mauve,thick] (-0.20,3.0) -- (0.49,3.4) -- (0.53,4.3);
-\end{tikzpicture}
-\caption{Mechanism plot connecting measured contracted backend size to
-end-to-end speedup on the focused grid plus a \textit{dyn\_cora} small-control
-point. The pattern is monotone only within each backend family: topology-only
-Leiden benefits most from the sub-percent contracted edge fraction, DF-Leiden
-is limited when the native dynamic baseline is already local, and S$^2$CAG
-additionally pays GPU materialization and feature-aggregation overhead.}
+\includegraphics[width=.78\columnwidth]{workload_speedup.pdf}
+\caption{Contracted workload and speedup.}
 \label{fig:workload-speedup}
 \end{figure}
 
 \subsubsection{Ablation Study}
 
 This experiment addresses RQ4.
-The ablation suite isolates the tunable choices that are already supported by
-the measurement pipeline: graph-radius expansion, hierarchy depth, feature
+The ablation suite isolates the tunable choices evaluated in this study:
+graph-radius expansion, hierarchy depth, feature
 mode, feature aggregation, affected-community closure, and contraction. Radius
 and depth are measured with Leiden to isolate the topology-only part of
 ComNetX, while feature and aggregation choices are measured with S$^2$CAG.
 The closure and contraction mechanism is first quantified through
-Tables~\ref{tab:workload} and~\ref{tab:contracted-workload}, and then tested
+Table~\ref{tab:workload} and Figure~\ref{fig:workload-speedup}, and then tested
 directly in Table~\ref{tab:closure-ablation}.
+For the topology ablation, each cell reports final modularity $Q$, cumulative
+time $T$ in seconds, and speedup over full-snapshot Leiden on the same stream.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption{Topology ablation for Leiden on two larger datasets. Each
-cell reports the final modularity $Q$, total time $T$ in seconds, and speedup
-over full-snapshot Leiden on the same stream.}
+\caption{Topology ablation for Leiden.}
 \label{tab:ablation}
 \setlength{\tabcolsep}{1.8pt}
 \scriptsize
@@ -1004,12 +830,13 @@ comparison is also backend- and dataset-dependent: $L=4$ harms
 This supports the main design message of ComNetX: the radius and hierarchy are
 control knobs for the locality--context trade-off, not constants that should be
 claimed optimal for every workload.
+For the S$^2$CAG feature-mode ablation on the \texttt{999:100} streams, each
+entry is reported as final modularity $Q$, cumulative time $T$, and
+final-snapshot NMI.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption{S$^2$CAG feature and radius ablation on the cn69
-\texttt{999:100} stream from \texttt{results/paper\_icdm/3}. Each cell
-reports $Q$ / $T$ / NMI on the final snapshot.}
+\caption{S$^2$CAG feature-mode ablation.}
 \label{tab:feature-ablation}
 \setlength{\tabcolsep}{2pt}
 \scriptsize
@@ -1022,31 +849,36 @@ Naive, random features  & $-$0.001 / 14.64 / 0.023 & $-$0.002 / 97.50 / 0.000 \\
 Local, dataset features & 0.788 / 8.20 / 0.463 & 0.532 / 39.02 / 0.180 \\
 Local, random features  & 0.784 / 4.86 / 0.462 & 0.534 / 27.61 / 0.186 \\
 Local, one-hot features & 0.779 / 10.65 / 0.452 & 0.518 / 203.13 / 0.182 \\
-Local, random, $r=0$   & 0.818 / 5.01 / 0.466 & 0.756 / 20.63 / 0.198 \\
-Local, random, $r=2$   & 0.668 / 7.05 / 0.446 & 0.161 / 118.31 / 0.041 \\
-Local, random, sum agg. & 0.784 / 4.89 / 0.462 & 0.534 / 27.40 / 0.186 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The feature ablation gives two important cautions. First, random features are
-not a magic replacement for attributes: in the naive full-graph run they nearly
+Table~\ref{tab:feature-ablation} gives two important cautions. First, random features are
+not a drop-in replacement for attributes: in the naive full-graph run they nearly
 collapse S$^2$CAG quality. They become useful only as part of the local
 ComNetX deployment, where the contracted instances are much smaller and the
-topology dominates the update. Second, the radius trend for S$^2$CAG is even
-sharper than for Leiden: $r=2$ substantially worsens both quality and runtime
-on \textit{dyn\_pubmed}. The aggregation ablation shows identical quality for
-sum and normalized aggregation in this run, with runtime differences that
-are kept out of the stream-id robustness table because it intentionally
-excludes random-feature runs.
+topology dominates the update. The one-hot row shows that a more explicit
+feature representation does not improve this local setting enough to offset its
+additional cost on \textit{dyn\_pubmed}.
+In the closure ablation, ``No closure'' keeps only the radius-expanded
+vertices, whereas ``No contraction'' gives the backend the post-closure
+induced subgraph without community contraction; $T$ is the total profiled time
+in seconds.
 
-\begin{table}[t]
+The direct ablation separates the two roles of the hierarchy. The
+\textit{dyn\_cora} control shows the expected small-graph regime: removing
+closure or contraction can reduce wall-clock time when overhead dominates, but
+the no-contraction instance is about $18\times$ larger than the full contracted
+instance and loses modularity. On the larger graphs, removing closure is fastest
+but loses substantial modularity because the backend sees only the radius-one
+boundary. Removing contraction preserves or improves quality on
+\textit{arxivmath}, but the backend instance grows by two orders of magnitude
+and the run becomes substantially slower; contraction is therefore the mechanism
+that turns closure from context recovery into a scalable update.
+
+\begin{table}[H]
 \centering
-\caption{Direct closure/contraction ablation for Leiden. The pilot measures
-the focused datasets from the main comparison and adds \textit{dyn\_cora} as a
-small-graph control. ``No closure'' keeps only the radius-expanded vertices,
-while ``No contraction'' gives the backend the post-closure induced subgraph
-without community contraction. $T$ is the total profiled time in seconds.}
+\caption{Closure and contraction ablation for Leiden.}
 \label{tab:closure-ablation}
 \setlength{\tabcolsep}{2pt}
 \scriptsize
@@ -1068,38 +900,33 @@ No contraction & arxivmath & 0.874 & 1520.57 & 32.56\% \\
 \end{tabular}
 \end{table}
 
-The direct ablation separates the two roles of the hierarchy. The
-\textit{dyn\_cora} control shows the expected small-graph regime: removing
-closure or contraction can reduce wall-clock time when overhead dominates, but
-the no-contraction instance is about $18\times$ larger than the full contracted
-instance and loses modularity. On the larger graphs, removing closure is fastest
-but loses substantial modularity because the backend sees only the radius-one
-boundary. Removing contraction preserves or improves quality on
-\textit{arxivmath}, but the backend instance grows by two orders of magnitude
-and the run becomes impractically slow; contraction is therefore the mechanism
-that turns closure from context recovery into a scalable update.
-
 \subsubsection{Real-Data Long-Horizon Robustness}
 
 This experiment addresses the drift component of RQ5.
 Protocol P1 is useful for checking many backends under a common setup, but it
-is only the breadth screen. Protocol P2 carries the dynamic-stability claim by
+is only the breadth study. Protocol P2 carries the dynamic-stability claim by
 varying both the initial-history fraction and the number of update batches.
 Table~\ref{tab:long-horizon} reports a balanced topology snapshot for
-\textit{dyn\_pubmed} and \textit{arxivmath} at the same 500-update horizon
-using the new cn69 long-horizon measurements, and adds the completed
-\textit{dyn\_pubmed} \texttt{999:100} LD-Leiden endpoint whose NMI was missing
-from the earlier logs. Denser $99{:}m$ and $999{:}m$ starts are otherwise kept
-out of the compact table unless they fill a previously missing NMI cell. The
+\textit{dyn\_pubmed} and \textit{arxivmath} at the 500-update horizon using
+paired long-horizon measurements. Denser $99{:}m$ and $999{:}m$ starts are kept
+out of the compact table. The
 goal is to show not only a large cumulative speedup, but also the range of
 stream granularities where quality drift remains controlled.
+Rows report final modularity $Q$, final-snapshot NMI, and cumulative time $T$
+in seconds; Local speedups are relative to the corresponding non-local backend.
 
-\begin{table}[t]
+The long-horizon results strengthen the scalability claim for topology-based
+backends: Local Leiden is about $17\times$ faster than full Leiden on
+\textit{dyn\_pubmed} and about $29\times$ faster on \textit{arxivmath} at the
+500-update horizon. At the same time, the NMI gap grows relative to the
+ten-update setting, especially on \textit{dyn\_pubmed}, indicating that
+long-horizon drift must be reported rather than summarized by one final number.
+Per-update runtime and modularity are available for these streams, while NMI is
+available at the final snapshot and is reported in Table~\ref{tab:long-horizon}.
+
+\begin{table}[H]
 \centering
-\caption{Long-horizon topology endpoints from the cn69 \texttt{9:500}
-measurements and the \texttt{999:100} LD-Leiden NMI completion block. Each row
-reports final modularity $Q$, NMI, and cumulative time $T$ in seconds; Local
-speedups are relative to the corresponding non-local backend.}
+\caption{Long-horizon topology endpoints.}
 \label{tab:long-horizon}
 \setlength{\tabcolsep}{2pt}
 \scriptsize
@@ -1112,8 +939,6 @@ dyn\_pubmed & Leiden & 500 & 0.784 & 0.208 & 427.50 & 1.0$\times$ \\
 dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 25.06 & 17.1$\times$ \\
 dyn\_pubmed & DF-Leiden & 500 & 0.762 & 0.195 & 8.06 & 1.0$\times$ \\
 dyn\_pubmed & Local DF & 500 & 0.715 & 0.138 & 7.35 & 1.1$\times$ \\
-dyn\_pubmed & LD-Leiden & 100 & 0.784 & 0.202 & 3.41 & 1.0$\times$ \\
-dyn\_pubmed & Local LD & 100 & 0.737 & 0.191 & 0.61 & 5.6$\times$ \\
 \midrule
 arxivmath & Leiden & 500 & 0.887 & 0.427 & 8421.63 & 1.0$\times$ \\
 arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 289.27 & 29.1$\times$ \\
@@ -1123,456 +948,101 @@ arxivmath & Local DF & 500 & 0.869 & 0.335 & 32.99 & 7.4$\times$ \\
 \end{tabular}
 \end{table}
 
-The long-horizon results strengthen the scalability claim for topology-based
-backends: Local Leiden is about $17\times$ faster than full Leiden on
-\textit{dyn\_pubmed} and about $29\times$ faster on \textit{arxivmath} at the
-500-update horizon. At the same time, the NMI gap grows relative to the
-ten-update setting, especially on \textit{dyn\_pubmed}, indicating that
-long-horizon drift must be visualized rather than hidden in one final number.
-The registry stores per-update runtime and modularity for these streams, while
-NMI is available at the final snapshot and is reported in
-Table~\ref{tab:long-horizon}. Figure~\ref{fig:long-horizon-curves} therefore
-plots the largest real graph, \textit{arxivmath}, across the 500-update
-$9{:}500$ stream and includes final-snapshot NMI as an endpoint-only panel.
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[x=0.72cm,y=0.62cm]
-\node[font=\footnotesize] at (3.1,4.35) {(a) Cumulative time};
-\draw[->] (1,0.8) -- (5.35,0.8)
-    node[below,font=\scriptsize] {updates};
-\draw[->] (1,0.8) -- (1,4.10)
-    node[above,font=\scriptsize] {seconds, log$_{10}$};
-\foreach \x/\lab in {1/100,2/200,3/300,4/400,5/500}
-  \draw (\x,0.8) -- ++(0,-0.08) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {1/10,2/100,3/1k,4/10k}
-  \draw (1,\y) -- ++(-0.08,0) node[left,font=\scriptsize] {\lab};
-\draw[blue,thick] plot coordinates {(1,3.20) (2,3.50) (3,3.68) (4,3.81) (5,3.93)}
-  node[right,font=\scriptsize] {Leiden};
-\draw[blue,dashed,thick] plot coordinates {(1,1.81) (2,2.13) (3,2.30) (4,2.39) (5,2.46)}
-  node[right,font=\scriptsize] {Local Leiden};
-\draw[dkgreen,thick] plot coordinates {(1,1.66) (2,1.98) (3,2.17) (4,2.29) (5,2.39)}
-  node[right,font=\scriptsize] {DF};
-\draw[dkgreen,dashed,thick] plot coordinates {(1,0.85) (2,1.17) (3,1.34) (4,1.43) (5,1.52)}
-  node[right,font=\scriptsize] {Local DF};
-\end{tikzpicture}
-
-\vspace{0.45em}
-
-\begin{tikzpicture}[x=0.72cm,y=37cm]
-\node[font=\footnotesize] at (3.1,0.069) {(b) Modularity};
-\draw[->] (1,0) -- (5.35,0)
-    node[below,font=\scriptsize] {updates};
-\draw[->] (1,0) -- (1,0.062)
-    node[above,font=\scriptsize] {$Q$};
-\foreach \x/\lab in {1/100,2/200,3/300,4/400,5/500}
-  \draw (\x,0) -- ++(0,-0.0015) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {0.01/0.85,0.03/0.87,0.05/0.89}
-  \draw (1,\y) -- ++(-0.08,0) node[left,font=\scriptsize] {\lab};
-\draw[densely dotted,gray] (1,0.03) -- (5.35,0.03);
-\draw[blue,thick] plot coordinates {(1,0.0498) (2,0.0485) (3,0.0476) (4,0.0472) (5,0.0468)}
-  node[right,font=\scriptsize] {Leiden};
-\draw[blue,dashed,thick] plot coordinates {(1,0.0428) (2,0.0411) (3,0.0375) (4,0.0342) (5,0.0337)}
-  node[right,font=\scriptsize] {Local Leiden};
-\draw[dkgreen,thick] plot coordinates {(1,0.0131) (2,0.0082) (3,0.0070) (4,0.0057) (5,0.0151)}
-  node[right,font=\scriptsize] {DF};
-\draw[dkgreen,dashed,thick] plot coordinates {(1,0.0418) (2,0.0384) (3,0.0363) (4,0.0346) (5,0.0295)}
-  node[right,font=\scriptsize] {Local DF};
-\end{tikzpicture}
-
-\vspace{0.45em}
-
-\begin{tikzpicture}[x=0.82cm,y=6.0cm]
-\node[font=\footnotesize] at (3.0,0.54) {(c) Final NMI};
-\draw[->] (0.6,0) -- (5.1,0)
-    node[below,font=\scriptsize] {method};
-\draw[->] (0.6,0) -- (0.6,0.50)
-    node[above,font=\scriptsize] {NMI};
-\foreach \y/\lab in {0.2/0.2,0.4/0.4}
-  \draw (0.6,\y) -- ++(-0.06,0) node[left,font=\scriptsize] {\lab};
-\fill[blue] (1.0,0) rectangle (1.35,0.427);
-\draw[blue,thick,fill=white] (1.65,0) rectangle (2.00,0.355);
-\fill[dkgreen] (2.75,0) rectangle (3.10,0.388);
-\draw[dkgreen,thick,fill=white] (3.40,0) rectangle (3.75,0.335);
-\node[above,font=\scriptsize] at (1.175,0.427) {0.427};
-\node[above,font=\scriptsize] at (1.825,0.355) {0.355};
-\node[above,font=\scriptsize] at (2.925,0.388) {0.388};
-\node[above,font=\scriptsize] at (3.575,0.335) {0.335};
-\node[below,font=\scriptsize] at (1.175,0) {L};
-\node[below,font=\scriptsize] at (1.825,0) {Loc-L};
-\node[below,font=\scriptsize] at (2.925,0) {DF};
-\node[below,font=\scriptsize] at (3.575,0) {Loc-DF};
-\end{tikzpicture}
-\caption{Long-horizon curves for \textit{arxivmath} on the cn69
-\texttt{9:500} stream. Runtime is cumulative over updates and shown on a
-logarithmic scale; modularity is plotted from the same per-update registry
-series. Final NMI is endpoint-only in the current logs and is therefore shown
-as endpoint bars rather than a per-update curve.}
-\label{fig:long-horizon-curves}
-\end{figure}
-
-\subsubsection{Runtime and Memory Breakdown}
-
-This experiment supports RQ3 by separating algorithmic locality from
-implementation overhead.
-Table~\ref{tab:breakdown} decomposes the update time and memory footprint.
-This table is necessary because ICDM reviewers are likely to ask whether the
-speedup comes from the proposed locality mechanism or from implementation
-details such as data conversion, sparse matrix formats, or GPU materialization.
-Its rows deliberately mirror the complete focused grid in
-Table~\ref{tab:contracted-workload}: topology and native-dynamic rows test
-whether contraction reduces solver work, while S$^2$CAG rows test whether
-local materialization controls the memory footprint of a feature-aware GPU
-backend. The latest workload-profile records now fill this focused grid and add
-\textit{dyn\_cora} as a small-control row for each backend family.
-
-\begin{table}[t]
-\centering
-\caption{Runtime and memory breakdown for ComNetX on the focused
-\texttt{999:50} streams. Timing columns are mean milliseconds per profiled
-update. Expand includes radius expansion, closure, and reset; Aggregate
-includes contraction and cut. CPU memory is peak resident memory in MB; GPU
-memory is peak allocated memory for neural backends.}
-\label{tab:breakdown}
-\setlength{\tabcolsep}{1.6pt}
-\scriptsize
-\begin{tabular}{@{}lccccccc@{}}
-\toprule
-\textbf{Backend} & \textbf{Dataset} & \textbf{Exp.} & \textbf{Aggr.} &
-\textbf{Solve} & \textbf{Proj.} & \textbf{CPU} & \textbf{GPU} \\
-\midrule
-\multicolumn{8}{l}{\textit{Topology-only and native dynamic baselines}} \\
-Leidenalg & dyn\_cora   & 16.24 & 5.25 & 42.15 & 0.40 & 845 & n/a \\
-Leidenalg & dyn\_pubmed & 3.56 & 5.07 & 7.76 & 0.48 & 848 & n/a \\
-Leidenalg & arxivmath   & 8.37 & 6.67 & 141.48 & 0.55 & 1190 & n/a \\
-DF-Leiden & dyn\_cora   & 2.42 & 3.78 & 1.12 & 0.37 & 848 & n/a \\
-DF-Leiden & dyn\_pubmed & 3.23 & 5.19 & 1.71 & 0.46 & 850 & n/a \\
-DF-Leiden & arxivmath   & 7.27 & 6.33 & 10.88 & 0.49 & 1190 & n/a \\
-\addlinespace
-\multicolumn{8}{l}{\textit{Feature-aware GPU baseline}} \\
-S$^2$CAG  & dyn\_cora   & 16.94 & 6.39 & 715.37 & 0.53 & 1171 & 2.0 \\
-S$^2$CAG  & dyn\_pubmed & 4.11 & 7.09 & 1190.28 & 1.01 & 4109 & 16.1 \\
-S$^2$CAG  & arxivmath   & 10.49 & 11.98 & 6313.82 & 1.70 & 4893 & 277.4 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The breakdown is collected with wall-clock timers around four code regions:
-radius expansion plus closure, construction of the membership matrix and
-contracted graph, backend execution, and projection of labels back to the
-original vertices. The topology rows show that expansion and aggregation stay
-in single-digit milliseconds on the large focused graphs, while backend
-execution becomes the dominant term on \textit{arxivmath}. The
-\textit{dyn\_cora} rows confirm that contracted instances remain tiny, but also
-show the small-graph regime where backend and framework overhead can dominate
-absolute time. For S$^2$CAG, backend execution dominates even after contraction,
-explaining why the GNN speedups in Figure~\ref{fig:workload-speedup} are
-smaller despite sub-percent contracted edge fractions.
-
 \subsubsection{Controlled DSBM Stress Test}
 
-This experiment addresses the failure-mode component of RQ5.
-The locality assumption is stress-tested by varying the update size and the
-type of touched vertices. Table~\ref{tab:dsbm-leiden-results} and
-Figure~\ref{fig:update-size} report the paired Leiden measurements now
-available for all three generated update regimes. This experiment defines the
-boundary between the regime where ComNetX is expected to be useful and the
-regime where it naturally degenerates toward full recomputation.
+This experiment addresses the failure-mode component of RQ5 by varying update
+size and touched-vertex type in an independent DSBM stress suite. Each
+synthetic sequence starts from an SBM-style planted-partition snapshot and then
+applies controlled edge updates to produce dynamic graph snapshots. Each graph
+has $n=100{,}000$ vertices, $k=32$ planted communities, target average degree
+$58$, $1\%$ degree-$512$ hubs, and assortativity
+$p_{\mathrm{in}}=0.97$. We evaluate random, hub-centered, and
+community-internal updates over $T\in\{5,10,100\}$ batches, with changed-edge
+rates from $0.01\%$ to $1\%$. Across generated streams, the mean affected
+vertex ranges are 0.58--43.25\% for random updates, 0.54--25.99\% for
+hub-centered updates, and 0.57--14.77\% for community-internal updates; the
+corresponding intra-community changed-edge shares are 49.8--51.6\%,
+49.6--50.8\%, and 100.0\%.
 
-For this purpose we prepared an independent synthetic DSBM stress suite rather
-than reusing the real-data $999{:}10$ protocol.
-
-\paragraph{Synthetic dynamic graph generation.}
-We generate synthetic dynamic undirected graphs inspired by the stochastic
-block model with planted community structure. Each graph contains
-$n=100{,}000$ vertices partitioned uniformly into $k=32$ communities. Edges are
-generated with strong assortativity: with probability $p_{\mathrm{in}}=0.97$,
-a sampled endpoint is required to belong to the same community as the source
-vertex; otherwise it is sampled from a different community. The target average
-degree is $d_{\mathrm{avg}}=58$, and the maximum degree is capped at
-$d_{\max}=1024$. To obtain a realistic heavy-tailed component, we designate
-$1\%$ of vertices as hubs with expected degree $512$; the remaining vertices
-receive a lower expected degree chosen so that the overall average remains
-$58$.
-
-For each generated graph, we construct dynamic update batches of five relative
-sizes: $0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, and $1\%$ of the expected number
-of graph edges. Since $|E|\approx n d_{\mathrm{avg}}/2=2.9\cdot10^6$, these
-correspond to $290$, $1{,}450$, $2{,}900$, $14{,}500$, and $29{,}000$ changed
-edges. We evaluate three update regimes. In the \textsc{Random} regime, update
-edges are sampled uniformly from all generated edges. In the \textsc{Hubs}
-regime, every update edge is required to be incident to one of the top-degree
-vertices. In the \textsc{Community} regime, update edges are restricted to lie
-inside the smallest communities. We generate sequences with
-$T\in\{5,10,100\}$ time steps.
-
-\begin{table}[t]
-\centering
-\caption{Parameters of the synthetic dynamic graph generator.}
-\label{tab:synthetic-generation}
-\setlength{\tabcolsep}{3pt}
-\scriptsize
-\begin{tabular}{@{}p{0.53\linewidth}p{0.38\linewidth}@{}}
-\toprule
-\textbf{Parameter} & \textbf{Value} \\
-\midrule
-Number of vertices, $n$ & $100{,}000$ \\
-Number of communities, $k$ & $32$ \\
-Time steps, $T$ & $5$, $10$, $100$ \\
-Target average degree, $d_{\mathrm{avg}}$ & $58$ \\
-Maximum degree, $d_{\max}$ & $1024$ \\
-Intra-community probability, $p_{\mathrm{in}}$ & $0.97$ \\
-Hub vertex fraction & $1\%$ \\
-Hub expected degree & $512$ \\
-Expected edges, $|E|\approx n d_{\mathrm{avg}}/2$ & $2.9\cdot10^6$ \\
-Update batch sizes & $290$, $1{,}450$, $2{,}900$, $14{,}500$, $29{,}000$ \\
-Update fractions & $0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, $1\%$ of $|E|$ \\
-Update regimes & Random, hub-centered, community-internal \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Table~\ref{tab:dsbm} summarizes the generated regimes from the dataset
-statistics registry.
-
-\begin{table}[t]
-\centering
-\caption{Synthetic DSBM stress suite. Affected percentage ranges are computed
-over all generated update sizes and the 5/10/100-batch stream granularities.}
-\label{tab:dsbm}
-\setlength{\tabcolsep}{3pt}
-\footnotesize
-\begin{tabular}{lcc}
-\toprule
-\textbf{Regime} & \textbf{Affected vertices} & \textbf{Intra-comm. edges} \\
-\midrule
-random & 0.58--43.25\% & 49.8--51.6\% \\
-hub-centered & 0.54--25.99\% & 49.6--50.8\% \\
-community-internal & 0.57--14.77\% & 100.0\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table*}[t]
-\centering
-\caption{Paired DSBM Leiden stress results. The registry window \texttt{0:m}
-is reported explicitly because some high-change synthetic streams exhaust
-their available update sequence before the requested 100-step horizon. $T_N$
-and $T_L$ are cumulative naive and Local Leiden times in seconds; speedup is
-$T_N/T_L$, $\Delta Q=Q_L-Q_N$, and
-$\Delta\mathrm{NMI}=\mathrm{NMI}_L-\mathrm{NMI}_N$.}
-\label{tab:dsbm-leiden-results}
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{0.92}
-\scriptsize
-\begin{tabular}{@{}llrrrrrr@{}}
-\toprule
-\textbf{Regime} & \textbf{Changed edges (\%)} & \textbf{Window} &
-\textbf{$T_N$} & \textbf{$T_L$} & \textbf{Speedup} & \textbf{$\Delta Q$} &
-\textbf{$\Delta$NMI} \\
-\midrule
-Random & 0.01 & 0:4 & 176.23 & 53.15 & 3.32 & +0.0006 & +0.006 \\
- &  & 0:9 & 403.17 & 115.45 & 3.49 & -0.0029 & -0.019 \\
- &  & 0:99 & 4340.87 & 1280.69 & 3.39 & -0.0003 & -0.001 \\
- & 0.05 & 0:4 & 177.59 & 203.15 & 0.87 & -0.0008 & -0.004 \\
- &  & 0:9 & 391.13 & 458.10 & 0.85 & -0.0003 & -0.001 \\
- &  & 0:99 & 4322.08 & 4870.37 & 0.89 & -0.0007 & -0.004 \\
- & 0.10 & 0:4 & 177.15 & 262.57 & 0.67 & -0.0003 & -0.001 \\
- &  & 0:9 & 397.99 & 580.24 & 0.69 & -0.0012 & -0.007 \\
- &  & 0:99 & 4238.51 & 6026.09 & 0.70 & -0.0027 & -0.017 \\
- & 0.50 & 0:4 & 177.05 & 687.43 & 0.26 & -0.0036 & -0.009 \\
- &  & 0:9 & 386.54 & 1498.01 & 0.26 & -0.0043 & -0.012 \\
- &  & 0:99 & 3693.27 & 14913.52 & 0.25 & -0.0043 & -0.012 \\
- & 1.00 & 0:4 & 176.94 & 684.77 & 0.26 & -0.0043 & -0.012 \\
- &  & 0:9 & 411.59 & 1509.08 & 0.27 & -0.0043 & -0.012 \\
- &  & 0:99 & 2732.45 & 11607.14 & 0.24 & -0.0043 & -0.012 \\
-\addlinespace
-Hub-centered & 0.01 & 0:4 & 176.52 & 121.21 & 1.46 & -0.0003 & -0.001 \\
- &  & 0:9 & 396.98 & 269.36 & 1.47 & -0.0003 & -0.001 \\
- &  & 0:99 & 4410.66 & 2869.38 & 1.54 & -0.0003 & -0.001 \\
- & 0.05 & 0:4 & 176.30 & 240.78 & 0.73 & -0.0008 & -0.004 \\
- &  & 0:9 & 399.98 & 537.79 & 0.74 & -0.0008 & -0.004 \\
- &  & 0:99 & 6118.94 & 5422.07 & 1.13 & -0.0051 & -0.033 \\
- & 0.10 & 0:4 & 177.47 & 294.01 & 0.60 & -0.0022 & -0.013 \\
- &  & 0:9 & 393.27 & 642.55 & 0.61 & -0.0014 & -0.007 \\
- &  & 0:98 & 4659.98 & 5552.37 & 0.84 & -0.0065 & -0.037 \\
- & 0.50 & 0:4 & 180.84 & 693.43 & 0.26 & -0.0071 & -0.035 \\
- &  & 0:9 & 415.64 & 1657.29 & 0.25 & -0.0063 & -0.030 \\
- &  & 0:20 & 942.10 & 3706.79 & 0.25 & -0.0229 & -0.088 \\
- & 1.00 & 0:4 & 182.29 & 709.44 & 0.26 & -0.0024 & -0.004 \\
- &  & 0:9 & 434.99 & 1684.83 & 0.26 & -0.0043 & -0.012 \\
- &  & 0:10 & 486.37 & 1874.51 & 0.26 & +0.0018 & +0.003 \\
-\addlinespace
-Community & 0.01 & 0:4 & 267.79 & 76.60 & 3.50 & -0.0016 & -0.008 \\
- &  & 0:9 & 645.36 & 131.60 & 4.90 & -0.0002 & -0.001 \\
- &  & 0:99 & 5530.30 & 1350.46 & 4.10 & -0.0011 & -0.007 \\
- & 0.05 & 0:4 & 189.21 & 174.54 & 1.08 & -0.0076 & -0.049 \\
- &  & 0:9 & 437.36 & 406.79 & 1.08 & -0.0051 & -0.034 \\
- &  & 0:99 & 5627.06 & 4714.06 & 1.19 & -0.0052 & -0.034 \\
- & 0.10 & 0:4 & 233.27 & 287.38 & 0.81 & +0.0016 & -0.000 \\
- &  & 0:9 & 518.28 & 656.08 & 0.79 & -0.0029 & -0.024 \\
- &  & 0:76 & 5036.69 & 5417.29 & 0.93 & -0.0059 & -0.040 \\
- & 0.50 & 0:4 & 206.02 & 367.96 & 0.56 & -0.0062 & -0.038 \\
- &  & 0:9 & 454.12 & 765.42 & 0.59 & +0.0046 & -0.009 \\
- &  & 0:16 & 773.32 & 1340.85 & 0.58 & -0.0036 & -0.037 \\
- & 1.00 & 0:4 & 295.47 & 500.91 & 0.59 & -0.0056 & -0.032 \\
- &  & 0:8 & 588.72 & 1082.87 & 0.54 & +0.0021 & -0.009 \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[x=1.42cm,y=0.38cm]
-\node[font=\footnotesize] at (-1.0,5.88) {(a) Speedup};
-\draw[->] (-2.10,0) -- (0.25,0)
-    node[below,font=\scriptsize] {changed edges (\%)};
-\draw[->] (-2.10,0) -- (-2.10,5.45)
-    node[above,font=\scriptsize] {Naive/Local};
-\foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
-  \draw (\x,0) -- ++(0,-0.12) node[below,font=\scriptsize] {\lab};
-\foreach \y in {1,2,3,4,5}
-  \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\y};
-\draw[densely dotted,gray] (-2.10,1) -- (0.25,1);
-\draw[blue,thick] plot coordinates {(-2,3.32) (-1.3,0.87) (-1,0.67) (-0.3,0.26) (0,0.26)};
-\draw[blue,dashed,thick] plot coordinates {(-2,3.49) (-1.3,0.85) (-1,0.69) (-0.3,0.26) (0,0.27)};
-\draw[blue,densely dotted,thick] plot coordinates {(-2,3.39) (-1.3,0.89) (-1,0.70) (-0.3,0.25) (0,0.24)};
-\draw[dkgreen,thick] plot coordinates {(-2,1.46) (-1.3,0.73) (-1,0.60) (-0.3,0.26) (0,0.26)};
-\draw[dkgreen,dashed,thick] plot coordinates {(-2,1.47) (-1.3,0.74) (-1,0.61) (-0.3,0.25) (0,0.26)};
-\draw[dkgreen,densely dotted,thick] plot coordinates {(-2,1.54) (-1.3,1.13) (-1,0.84) (-0.3,0.25) (0,0.26)};
-\draw[mauve,thick] plot coordinates {(-2,3.50) (-1.3,1.08) (-1,0.81) (-0.3,0.56) (0,0.59)};
-\draw[mauve,dashed,thick] plot coordinates {(-2,4.90) (-1.3,1.08) (-1,0.79) (-0.3,0.59) (0,0.54)};
-\draw[mauve,densely dotted,thick] plot coordinates {(-2,4.10) (-1.3,1.19) (-1,0.93) (-0.3,0.58) (0,0.54)};
-\draw[blue,thick] (-2.02,5.18) -- ++(0.16,0) node[right,font=\scriptsize] {random};
-\draw[dkgreen,thick] (-1.22,5.18) -- ++(0.16,0) node[right,font=\scriptsize] {hub};
-\draw[mauve,thick] (-0.58,5.18) -- ++(0.16,0) node[right,font=\scriptsize] {community};
-\draw[black,thick] (-2.02,4.72) -- ++(0.16,0) node[right,font=\scriptsize] {0:4};
-\draw[black,dashed,thick] (-1.43,4.72) -- ++(0.16,0) node[right,font=\scriptsize] {0:9};
-\draw[black,densely dotted,thick] (-0.84,4.72) -- ++(0.16,0) node[right,font=\scriptsize] {longest};
-\end{tikzpicture}
-
-\vspace{0.45em}
-
-\begin{tikzpicture}[x=1.42cm,y=95cm]
-\node[font=\footnotesize] at (-1.0,0.0084) {(b) Quality change};
-\draw[->] (-2.10,-0.025) -- (0.25,-0.025)
-    node[below,font=\scriptsize] {changed edges (\%)};
-\draw[->] (-2.10,-0.025) -- (-2.10,0.0060)
-    node[above,font=\scriptsize] {$\Delta Q$};
-\foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
-  \draw (\x,-0.025) -- ++(0,-0.0007) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {-0.024/-0.024,-0.016/-0.016,-0.008/-0.008,0/0,0.004/0.004}
-  \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\lab};
-\draw[densely dotted,gray] (-2.10,0) -- (0.25,0);
-\draw[blue,thick] plot coordinates {(-2,0.0006) (-1.3,-0.0008) (-1,-0.0003) (-0.3,-0.0036) (0,-0.0043)};
-\draw[blue,dashed,thick] plot coordinates {(-2,-0.0029) (-1.3,-0.0003) (-1,-0.0012) (-0.3,-0.0043) (0,-0.0043)};
-\draw[blue,densely dotted,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0007) (-1,-0.0027) (-0.3,-0.0043) (0,-0.0043)};
-\draw[dkgreen,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0008) (-1,-0.0022) (-0.3,-0.0071) (0,-0.0024)};
-\draw[dkgreen,dashed,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0008) (-1,-0.0014) (-0.3,-0.0063) (0,-0.0043)};
-\draw[dkgreen,densely dotted,thick] plot coordinates {(-2,-0.0003) (-1.3,-0.0051) (-1,-0.0065) (-0.3,-0.0229) (0,0.0018)};
-\draw[mauve,thick] plot coordinates {(-2,-0.0016) (-1.3,-0.0076) (-1,0.0016) (-0.3,-0.0062) (0,-0.0056)};
-\draw[mauve,dashed,thick] plot coordinates {(-2,-0.0002) (-1.3,-0.0051) (-1,-0.0029) (-0.3,0.0046) (0,0.0021)};
-\draw[mauve,densely dotted,thick] plot coordinates {(-2,-0.0011) (-1.3,-0.0052) (-1,-0.0059) (-0.3,-0.0036) (0,0.0021)};
-\end{tikzpicture}
-
-\vspace{0.45em}
-
-\begin{tikzpicture}[x=1.42cm,y=42cm]
-\node[font=\footnotesize] at (-1.0,0.017) {(c) NMI change};
-\draw[->] (-2.10,-0.092) -- (0.25,-0.092)
-    node[below,font=\scriptsize] {changed edges (\%)};
-\draw[->] (-2.10,-0.092) -- (-2.10,0.010)
-    node[above,font=\scriptsize] {$\Delta$NMI};
-\foreach \x/\lab in {-2/0.01,-1.3/0.05,-1/0.1,-0.3/0.5,0/1.0}
-  \draw (\x,-0.092) -- ++(0,-0.0024) node[below,font=\scriptsize] {\lab};
-\foreach \y/\lab in {-0.08/-0.08,-0.04/-0.04,0/0}
-  \draw (-2.10,\y) -- ++(-0.04,0) node[left,font=\scriptsize] {\lab};
-\draw[densely dotted,gray] (-2.10,0) -- (0.25,0);
-\draw[blue,thick] plot coordinates {(-2,0.006) (-1.3,-0.004) (-1,-0.001) (-0.3,-0.009) (0,-0.012)};
-\draw[blue,dashed,thick] plot coordinates {(-2,-0.019) (-1.3,-0.001) (-1,-0.007) (-0.3,-0.012) (0,-0.012)};
-\draw[blue,densely dotted,thick] plot coordinates {(-2,-0.001) (-1.3,-0.004) (-1,-0.017) (-0.3,-0.012) (0,-0.012)};
-\draw[dkgreen,thick] plot coordinates {(-2,-0.001) (-1.3,-0.004) (-1,-0.013) (-0.3,-0.035) (0,-0.004)};
-\draw[dkgreen,dashed,thick] plot coordinates {(-2,-0.001) (-1.3,-0.004) (-1,-0.007) (-0.3,-0.030) (0,-0.012)};
-\draw[dkgreen,densely dotted,thick] plot coordinates {(-2,-0.001) (-1.3,-0.033) (-1,-0.037) (-0.3,-0.088) (0,0.003)};
-\draw[mauve,thick] plot coordinates {(-2,-0.008) (-1.3,-0.049) (-1,0.000) (-0.3,-0.038) (0,-0.032)};
-\draw[mauve,dashed,thick] plot coordinates {(-2,-0.001) (-1.3,-0.034) (-1,-0.024) (-0.3,-0.009) (0,-0.009)};
-\draw[mauve,densely dotted,thick] plot coordinates {(-2,-0.007) (-1.3,-0.034) (-1,-0.040) (-0.3,-0.037) (0,-0.009)};
-\end{tikzpicture}
-\caption{Measured update-size sensitivity for the paired DSBM Leiden stress
-suite. The x-axis is the changed-edge fraction on a log scale; speedup,
-$\Delta Q$, and $\Delta$NMI compare Local Leiden with full-snapshot Leiden on
-the same stream.
-Solid and dashed curves show the \texttt{0:4} and \texttt{0:9} windows, while
-dotted curves show the longest available window for each changed-edge fraction
-from Table~\ref{tab:dsbm-leiden-results}.}
-\label{fig:update-size}
-\end{figure}
-
-The complete DSBM stress grid exposes the operating envelope directly. At the
-smallest update size, Local Leiden remains faster in all regimes:
-$3.3$--$3.5\times$ on the short random and community streams, $4.9\times$ on
-the \texttt{0:9} community stream, and $1.5\times$ on hub-centered updates.
-At $0.05\%$ changed edges the result becomes topology-dependent: community
-updates remain near or above break-even, hub updates are mostly slower except
-for the longest available $0.05\%$ stream, and random updates are already below
-break-even. From $0.1\%$ onward, most local runs are slower than full
-recomputation, with especially poor speedups on the $0.5\%$--$1.0\%$ random
-and hub-centered streams. Quality drift is usually small in both modularity and
-NMI, but hub-centered $0.5\%$ changes at the longest available window lose
-$0.0229$ modularity and $0.088$ NMI. The synthetic block therefore makes the
-intended boundary explicit: local
-hierarchical recomputation is useful for very small or strongly localized
-changes, while large or hub-heavy update batches should trigger a full refresh.
-
-\subsubsection{Evidence Summary}
-
-The experimental section is organized as a single evidence chain. First,
-Table~\ref{tab:main-results} and
-Figure~\ref{fig:quality-runtime-pareto} establish breadth by showing that
-heterogeneous backends can be adapted through the same local hierarchical
-interface and by visualizing the resulting quality--runtime frontier. Second,
-Tables~\ref{tab:stability} and~\ref{tab:long-horizon}, together with
-Figure~\ref{fig:long-horizon-curves}, establish dynamic robustness across
-repeated non-random stream ids, different initial-history fractions, and longer update
-horizons. Third, Tables~\ref{tab:workload} and
-\ref{tab:contracted-workload}, Figure~\ref{fig:workload-speedup}, and
-Table~\ref{tab:breakdown} explain why the speedups are plausible: ComNetX does
-not merely skip work, but replaces full-snapshot backend calls with small
-post-closure contracted instances and makes the remaining overhead explicit.
-Fourth, Tables~\ref{tab:ablation},
-\ref{tab:feature-ablation}, and~\ref{tab:closure-ablation} test whether the
-radius, hierarchy depth, feature mode, feature aggregation, closure, and
-contraction choices are necessary. Finally,
-Table~\ref{tab:dsbm} and Figure~\ref{fig:update-size}
-define the update-size and update-locality envelope where local recomputation
-is beneficial, with the paired solver measurements reported explicitly in
-Table~\ref{tab:dsbm-leiden-results}. This evidence chain is the core argument
-that turns ComNetX
-from an engineering acceleration technique into a general dynamic graph mining
-method.
+The DSBM stress study exposes the operating envelope directly. At the smallest
+update size, Local Leiden remains faster in all regimes, with
+$3.3$--$4.9\times$ speedups on random and community streams and $1.5\times$ on
+hub-centered updates. At $0.05\%$ changed edges the result becomes
+topology-dependent: community updates remain near or above break-even, while
+random updates are already below break-even. From $0.1\%$ onward, most local
+runs are slower than full recomputation, especially on $0.5\%$--$1.0\%$
+random and hub-centered streams. Quality drift is usually small, but
+hub-centered $0.5\%$ changes at the longest available window lose $0.0229$
+modularity and $0.088$ NMI. Thus, local hierarchical recomputation is useful
+for very small or strongly localized changes, while large or hub-heavy update
+batches should trigger a full refresh.
 
 \subsubsection{Limitations}
 
-ComNetX is designed for update streams where the affected communities remain
-small relative to the full graph. If an update touches a hub, a very large
-community, or a region whose boundary is important for the backend objective,
-the local instance may approach the full graph or lose useful global context.
-The experiments also show that not every backend benefits equally from
-localization: Leiden is stable, whereas some representation-learning methods
-are more sensitive to the restricted context and feature representation. The
-paper therefore presents ComNetX as an adaptive locality framework rather than
-as a universal replacement for every dynamic community detection method. The
-workload, ablation, and stress-test experiments above make this limitation
-precise instead of leaving it as an informal caveat.
+ComNetX is designed for streams where affected communities remain small
+relative to the graph. If an update touches a hub, a very large community, or a
+region whose boundary is important for the backend objective, the local instance
+may approach the full graph or lose useful context. The experiments also show
+that backends benefit unevenly from localization: Leiden is stable, whereas
+representation-learning methods are more sensitive to restricted context and
+feature representation. We therefore present ComNetX as an adaptive locality
+framework, with workload, ablation, and stress-test results defining when a
+full refresh is preferable.
 
 \section{Related work} \label{S:5}
-\textbf{Static and modularity-based community detection.} Classical CD methods rely on modularity, information flow, label propagation, or related structural criteria. Louvain and Leiden are widely used because they combine high modularity with strong scalability~\cite{BGLL08,TWE19}, while Infomap and label-propagation methods offer alternative flow- and propagation-based views~\cite{RB07,SF09,TS23}. The quality and limitations of such partitions have been extensively studied, including resolution effects, ground-truth evaluation, and robustness of detected communities~\cite{POM09,YL15,YAT16,FH16}. Recent static methods continue to improve modularity optimization through greedy disassembly and local-move strategies~\cite{Rustamaji24,TTB24}, but direct application to evolving graphs still tends to require full recomputation.
+\textbf{Static and modularity-based community detection.} Classical CD methods
+rely on modularity, information flow, label propagation, or related structural
+criteria. Louvain and Leiden are widely used because they combine high
+modularity with strong scalability~\cite{BGLL08,TWE19}, while Infomap and
+label-propagation methods offer alternative flow- and propagation-based
+views~\cite{RB07,SF09,TS23}. The quality and limitations of such partitions
+have been extensively studied, including resolution effects, ground-truth
+evaluation, and robustness of detected communities~\cite{POM09,YL15,YAT16,FH16}.
+Recent static methods continue to improve modularity optimization through
+greedy disassembly and local-move strategies~\cite{Rustamaji24,TTB24}, but
+direct application to evolving graphs still tends to require full
+recomputation.
 
-\textbf{Dynamic and local community detection.} Dynamic CD methods address evolving graphs by balancing snapshot quality, temporal smoothness, and update efficiency~\cite{RC17,JHG21,CZW23}. Incremental modularity and label-propagation algorithms update only parts of the previous solution~\cite{SLX14,MZW20,ZCL19,Seif20,XCS13}, while flow- and evolution-based approaches track persistent structures over time~\cite{Bov22,Sun22,Mazza23}. Recent work has also moved toward continuous-time temporal community objectives, such as longitudinal modularity and the LAGO optimizer for tracking the precise times when vertices enter and exit communities~\cite{Brabant25}. This line is complementary to ComNetX: continuous-time methods avoid temporal discretization, whereas our setting targets batched snapshot maintenance and focuses on reusing arbitrary snapshot solvers under local updates. More recent work studies sparse temporal observations, fully dynamic graph routines, and scalable multicore variants~\cite{Conrad25,Blaskovic25,HHC22,SLu24,SKB25}. Locality is a key direction in this line: Delta-Screening and dynamic Leiden variants process affected regions rather than entire snapshots~\cite{ZK21,SLe24}; DLPA-S performs similarity-based local updates with connectivity post-processing~\cite{DKS26}; VD-STAR scales structural clustering to billion-edge graphs with amortized logarithmic updates~\cite{ZGR25}; and Spider combines seeded geodesic expansion with modularity-guided refinement~\cite{HK26}. These works motivate our locality requirement, but they are usually tied to a particular update rule or objective.
+\textbf{Dynamic and local community detection.} Dynamic CD methods balance
+snapshot quality, temporal consistency, and update efficiency~\cite{RC17,CZW23,HKT17}.
+Incremental modularity and label-propagation algorithms update selected parts
+of the previous solution~\cite{SLX14,MZW20,ZCL19,Seif20,XCS13}, while flow-
+and evolution-based approaches track persistent structures over time~\cite{Bov22,Sun22,Mazza23}.
+Recent work has also moved toward continuous-time temporal community
+objectives, such as longitudinal modularity and the LAGO optimizer for tracking
+the times when vertices enter and exit communities~\cite{Brabant25}. This line
+is complementary to ComNetX: continuous-time methods avoid temporal
+discretization, whereas our setting targets batched snapshot maintenance and
+focuses on reusing arbitrary snapshot solvers under local updates.
+Other work studies sparse temporal observations, fully dynamic graph routines,
+and scalable multicore or distributed variants~\cite{Conrad25,Blaskovic25,HHC22,SLu24,SKB25,Sattar25}.
+Locality is a key direction in this line: Delta-Screening and dynamic Leiden
+variants process affected regions rather than entire snapshots~\cite{ZK21,SLe24};
+DLPA-S performs similarity-based local updates with connectivity
+post-processing~\cite{DKS26}; VD-STAR supports dynamic structural clustering
+with flexible similarity thresholds~\cite{ZGR25}; and Spider combines seeded
+geodesic expansion with modularity-guided refinement~\cite{HK26}. These works
+motivate the locality requirement, but they are usually tied to a particular
+update rule or objective.
 
-\textbf{Attributed and GNN-based graph clustering.} Attributed networks and GNN-based clustering extend CD beyond purely topological criteria. Surveys and recent models show that neural embeddings can capture high-order dependencies and combine naturally with modularity or clustering losses~\cite{CCL23,LXZ23,TPP23,SGH09,LYD24,ZXZ20}. Examples include modularity-oriented contrastive learning and neural modularity maximization~\cite{LLC24,BKH24}, structural-entropy objectives~\cite{ZPS25}, pre-train-and-refine pipelines for scalable partitioning~\cite{QZG24,QZG24HPEC}, and spectral subspace clustering for attributed graphs~\cite{LYZ25}. Recent 2025 models further explore fairness, node importance, and correlation-aware graph convolutions~\cite{GPT25,CLH25,BCC25}. Although these methods improve expressiveness, they are often expensive to rerun after each graph update.
+\textbf{Attributed and GNN-based graph clustering.} Attributed and GNN-based
+methods extend CD beyond purely topological criteria. Surveys and recent
+models show that neural embeddings can capture high-order dependencies and
+combine naturally with modularity or clustering losses~\cite{CCL23,LXZ23,TPP23,SGH09,LYD24,ZXZ20}.
+Examples include modularity-oriented contrastive learning and neural modularity
+maximization~\cite{LLC24,BKH24}, structural-entropy objectives~\cite{ZPS25},
+pre-train-and-refine pipelines for scalable partitioning~\cite{QZG24,QZG24HPEC},
+and spectral subspace clustering for attributed graphs~\cite{LYZ25}. Recent
+models also explore fairness-aware deep community detection~\cite{GPT25}.
+Although these methods improve expressiveness, they are often expensive to
+rerun after each graph update.
 
-Overall, prior work offers either efficient dynamic routines specialized to a fixed algorithmic design or expressive static/feature-aware solvers that are costly in dynamic settings. ComNetX is complementary: it acts as a lightweight local adapter around an arbitrary solver, including static algorithms, GNN-based methods, and native dynamic solvers, while restricting computation to affected aggregated subproblems.
+Overall, prior work offers either efficient dynamic routines specialized to a
+fixed algorithmic design or expressive static and feature-aware solvers that
+are costly in dynamic settings. ComNetX is complementary: it acts as a local
+adapter around an arbitrary solver, including static algorithms, GNN-based
+methods, and native dynamic solvers, while restricting computation to affected
+aggregated subproblems.
 %----------------------------------------------------------------------------------------
 \section{Conclusion} \label{S:6}
 We presented ComNetX, a local hierarchical framework for adapting community
@@ -1589,11 +1059,11 @@ can exploit locality without losing global community context. In particular,
 Local Leiden preserves the modularity of full-snapshot recomputation on the
 studied graphs while reducing update time substantially on larger networks.
 The new ablations show that radius, hierarchy depth, and feature representation
-are not cosmetic parameters: they can change both quality and runtime by large
+are substantive parameters: they can change both quality and runtime by large
 factors. The long-horizon topology runs are the first evidence that large
 cumulative speedups can persist over extended streams, although quality drift
-must be reported explicitly and cannot be inferred from the short all-backend
-screen alone.
+must be reported explicitly and cannot be inferred from the short multi-backend
+study alone.
 
 Overall, ComNetX is effective not merely because it runs a solver on a smaller
 subgraph, but because hierarchical community closure preserves enough context
@@ -1604,25 +1074,32 @@ explicit fallback interpretation: as the affected region grows, the local
 problem approaches the full snapshot, revealing when a full refresh is the
 right choice.
 %----------------------------------------------------------------------------------------
+\IEEEtriggeratref{38}
 \begingroup
 \begin{thebibliography}{00}
-\scriptsize\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}\renewcommand{\baselinestretch}{0.78}\selectfont
+\fontsize{6.2}{6.35}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}
 \bibitem{N03}
     Newman, M.E.J. (2003). The structure and function of complex networks. \textit{SIAM Review}, 45(2), 167--256.
 \bibitem{OSH07}
-    Onnela, J., Saramäki, J., Hyvönen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of Natl. Acad. Sci. U.S.A.}, 104(18), 7332--7336.
+    Onnela, J., Saram{\"a}ki, J., Hyv{\"o}nen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7332--7336.
 \bibitem{PBV07}
     Palla, G., Barab{\'a}si, A., \& Vicsek, T. (2007). Quantifying social group evolution. \textit{Nature}, 446, 664--667. 
+\bibitem{HLL83}
+    Holland, P.W., Laskey, K.B., \& Leinhardt, S. (1983). Stochastic blockmodels: First steps. \textit{Social Networks}, 5(2), 109--137.
+\bibitem{XH14}
+    Xu, K.S., \& Hero, A.O. (2014). Dynamic stochastic blockmodels for time-evolving social networks. \textit{IEEE Journal of Selected Topics in Signal Processing}, 8(4), 552--562.
 \bibitem{POM09}
-    Porter, M.A., Onnela, J.P., \& Mucha, P.J. et al. (2009). Communities in Networks. \textit{Notices of the American Mathematical Society}, 56(9), 1082--1097. 
+    Porter, M.A., Onnela, J.P., \& Mucha, P.J. et al. (2009). Communities in Networks. \textit{Notices AMS}, 56(9), 1082--1097.
 \bibitem{SF09}
     Fortunato, S. (2010). Community detection in graphs. \textit{Physics Reports}, 486(3--5), 75--174. 
 \bibitem{RCC04}
-    Radicchi, F., Castellano, C., \& Cecconi, F. et al. (2004) Defining and identifying communities in networks \textit{Proceedings of the National Academy of Sciences}, 101(9).
-\bibitem{YL15}
-    Yang, J., Leskovec, J. (2015) Defining and evaluating network communities based on ground-truth \textit{Knowledge and Information Systems}, 42(1), 181--213.
+    Radicchi, F., Castellano, C., \& Cecconi, F. et al. (2004). Defining and identifying communities in networks. \textit{Proceedings of the National Academy of Sciences}, 101(9).
 \bibitem{FL02}
-    Flake, G.W., \& Lawrence, S. (2002) Self-Organization and Identification of Web Communities \textit{Computer}, 35(3), 66--70.
+    Flake, G.W., \& Lawrence, S. (2002). Self-Organization and Identification of Web Communities. \textit{Computer}, 35(3), 66--70.
+\bibitem{RB07}
+    Rosvall, M., \& Bergstrom, C.T. (2007). An information-theoretic framework for resolving community structure in complex networks. \textit{Proceedings of the National Academy of Sciences}, 104, 7327--7331.
+\bibitem{TS23}
+    Traag, V.A., {\v S}ubelj, L. (2023). Large network community detection by fast label propagation. \textit{Scientific Reports}, 13, 2701.
 \bibitem{NG04}
     Newman, M.E.J., Girvan, M. (2004). Finding and evaluating community structure in networks. \textit{Physical Review E}, 69(2), 026113. 
 \bibitem{BDG08}
@@ -1631,227 +1108,106 @@ right choice.
     Blondel, V., Guillaume, J., Lambiotte, R., \& Lefebvre, E. (2008). Fast unfolding of communities in large networks. \textit{Journal of Statistical Mechanics: Theory and Experiment}, P10008.
 \bibitem{TWE19}
     Traag, V.A., Waltman, L., Van Eck, N.J. (2019). From Louvain to Leiden: guaranteeing well-connected communities. \textit{Scientific reports}, 9, Article 5233. 
+\bibitem{Sah23}
+    Sahu, S. (2023). GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting. \textit{arXiv preprint}.
 \bibitem{RC17}
     Rossetti, G., Cazabet, R. (2017). Community Discovery in Dynamic Networks: A Survey. \textit{ACM Computing Surveys}, 51(2), 1--37. 
-\bibitem{Sah23}
-    Sahu, S. (2023v). GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting. \textit{arXiv preprint}. 
-\bibitem{CCL23}
-    Cheng, H., He, C., \& Liu, H. (2023). Community Detection Based on Directed Weighted Signed Graph Convolutional Networks. \textit{IEEE Transactions on Network Science and Engineering}, 11(2). 
-    Chunaev, P. (2020). Community detection in node-attributed social networks: A survey. \textit{Computer Science Review}, 37, 100286. 
-\bibitem{ZXY20}
-    Zhang, Y., Xiong, Y., \& Ye, Y. et al. (2020). SEAL: Learning Heuristics for Community Detection with Generative Adversarial Networks. \textit{Proceedings of KDD'20: The 26th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1103--1113. 
-\bibitem{DSD24}
-    Devesh, K.V.V., Sreesankar, S., \& Dinesan, K. et al. (2024). Analyzing GNN Models for Community Detection Using Graph Embeddings: A Comparative Study. \textit{Proceedings of 15th International Conference on Computing Communication and Networking Technologies (ICCCNT)}. 
-\bibitem{LXZ23}
-    Liu, Y., Xia, J., \& Zhou, S. (2023). A Survey of Deep Graph Clustering: Taxonomy, Challenge, Application, and Open Resource. \textit{arXiv preprint}. 
-\bibitem{JLL23}
-    Ji, S., Lu, X., \& Liu, M. et al. (2023). Community-based Dynamic Graph Learning for Popularity Prediction. \textit{Proceedings of KDD'23: The 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 930--940.
-\bibitem{RB07}
-    Rosvall, M., \& Bergstrom, C.T. (2007). An information-theoretic framework for resolving community structure in complex networks. \textit{Proceedings of the National Academy of Sciences}, 104, 7327--7331. 
-\bibitem{TS23}
-    Traag, V.A., Šubelj, L. (2023). Large network community detection by fast label propagation. \textit{Scientific Reports}, 13, 2701. 
-\bibitem{YAT16}
-    Yang, Z., Algesheimer, R., \& Tessone, C. J. (2016). A Comparative Analysis of Community Detection Algorithms on Artificial Networks. \textit{Scientific Reports}, 6, Article 30750. 
-\bibitem{Rustamaji24}
-    Rustamaji, H.C., Kusuma, W.A., Nurdiati, S., Batubara, I. (2024). Community detection with greedy modularity disassembly strategy. \textit{Scientific Reports}, 14, 4694. 
-\bibitem{JHG21}
-    José-García, A., Handl, Ju., Gómez-Flores, W., Garza-Fabre, M. (2021). An evolutionary many-objective approach to multiview clustering using feature and relational data. \textit{Applied Soft Computing}, 108, 107425. 
 \bibitem{CZW23}
-    Cai, L., Zhou, J., Wang, D. (2023). 
-    Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm. 
-    \textit{PeerJ Computer Science}, 9, e1477. 
-\bibitem{SLX14}
-    Shang, J., Liu, L., Xie, F., Chen, Z., Miao, J., Fang, X., \& Wu, C. (2014). A real-time detecting algorithm for tracking community structure of dynamic networks. \textit{arXiv preprint}. 
-\bibitem{MZW20}
-    Ma, Y., Zhao, Y., Wang, J., et al. (2020). Modularity-Based Incremental Label Propagation Algorithm for Community Detection. \textit{Applied Sciences}, 10(12), 4060. 
+    Cai, L., Zhou, J., Wang, D. (2023). Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm. \textit{PeerJ Computer Science}, 9, e1477.
+\bibitem{HKT17}
+    Halappanavar, M., Lu, H., Kalyanaraman, A., \& Tumeo, A. (2017). Scalable static and dynamic community detection using Grappolo. \textit{Proc. HPEC}, 1--6.
 \bibitem{LHK14}
-    Lu, H., Halappanava, M., \& Kalyanaraman, A. (2015). Parallel Heuristics for Scalable Community Detection. \textit{Parallel Computing}, 47, 19--37. 
+    Lu, H., Halappanava, M., \& Kalyanaraman, A. (2015). Parallel Heuristics for Scalable Community Detection. \textit{Parallel Computing}, 47, 19--37.
+\bibitem{HHC22}
+    Hanauer, K., Henzinger, M., \& Schulz, C. (2022). Recent Advances in Fully Dynamic Graph Algorithms: A Quick Reference Guide. \textit{ACM JEA}, 27, 1--45.
+\bibitem{SLX14}
+    Shang, J., Liu, L., Xie, F., Chen, Z., Miao, J., Fang, X., \& Wu, C. (2014). A real-time detecting algorithm for tracking community structure of dynamic networks. \textit{arXiv preprint}.
+\bibitem{MZW20}
+    Ma, Y., Zhao, Y., Wang, J., et al. (2020). Modularity-Based Incremental Label Propagation Algorithm for Community Detection. \textit{Applied Sciences}, 10(12), 4060.
 \bibitem{ZCL19}
-    Zhuang, D., Chang, J., \& Li, M. (2019). DynaMo: Dynamic community detection by incrementally maximizing modularity. \textit{IEEE Transactions on Knowledge and Data Engineering}, 33(5), 1934--1945.
+    Zhuang, D., Chang, J., \& Li, M. (2019). DynaMo: Dynamic community detection by incrementally maximizing modularity. \textit{IEEE TKDE}, 33(5), 1934--1945.
 \bibitem{Seif20}
-    Seifikar M., Farzi S., Barati M. (2020). C-Blondel: An Efficient Louvain-Based Dynamic Community Detection Algorithm, \textit{IEEE Transactions on Computational Social Systems}, 7(2), 308--318.
-\bibitem{Bov22}
-    Bovet, A., Delvenne, J.-C., Lambiotte, R. (2022) Flow stability for dynamic community detection. \textit{Science Advances}, 8(19).
+    Seifikar M., Farzi S., Barati M. (2020). C-Blondel: An Efficient Louvain-Based Dynamic Community Detection Algorithm. \textit{IEEE Transactions on Computational Social Systems}, 7(2), 308--318.
 \bibitem{XCS13}
-    Xie, J., Chen, M., \& Szymanski, B.K. (2013). LabelRankT: incremental community detection in dynamic networks via label propagation. \textit{DyNetMM: the Workshop on Dynamic Networks Management and Mining}, 25--32.
+    Xie, J., Chen, M., \& Szymanski, B.K. (2013). LabelRankT: incremental community detection in dynamic networks via label propagation. \textit{DyNetMM}, 25--32.
+\bibitem{Bov22}
+    Bovet, A., Delvenne, J.-C., Lambiotte, R. (2022). Flow stability for dynamic community detection. \textit{Science Advances}, 8(19).
 \bibitem{Sun22}
-    Sun, Z., Sun, Y., Chang, X., et al. (2022). Dynamic community detection based on the Matthew effect. \textit{Physica A: Statistical Mechanics and its Applications}, 597, 127315.
+    Sun, Z., Sun, Y., Chang, X., et al. (2022). Dynamic community detection based on the Matthew effect. \textit{Physica A}, 597, 127315.
 \bibitem{Mazza23}
     Mazza, M., Cola, G., Tesconi, M. (2023). Modularity-based approach for tracking communities in dynamic social networks. \textit{Knowledge-Based Systems}, 281, 111067.
-\bibitem{Brabant25}
-    Brabant, V., Bonifati, A., \& Cazabet, R. (2025).
-    Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity.
-    \textit{Proceedings of the 2025 IEEE International Conference on Data Mining (ICDM)}.
 \bibitem{Conrad25}
     Conrad, N.D., Tonello, E., Zonker, J., et al. (2025). Detection of dynamic communities in temporal networks with sparse data. \textit{Applied Network Science}, 10, Article 1.
 \bibitem{Blaskovic25}
-    Blašković, F., Conrad, T.O.F., Klus, S., et al. (2025). Random walk based snapshot clustering for detecting community dynamics in temporal networks. \textit{Scientific Reports}, 15, 24414.
-\bibitem{HKT17}
-    Halappanavar, M., Lu, H., Kalyanaraman, A., \& Tumeo, A. (2017). Scalable static and dynamic community detection using Grappolo. \textit{Proceedings of the IEEE High Performance Extreme Computing Conference (HPEC)}, 1--6.
-\bibitem{HHC22}
-    Hanauer, K., Henzinger, M., \& Schulz, Ch. (2022). Recent Advances in Fully Dynamic Graph Algorithms – A Quick Reference Guide. \textit{ACM J. Exp. Algorithmics}, 27, 1--45.
+    Bla{\v s}kovi{\'c}, F., Conrad, T.O.F., Klus, S., et al. (2025). Random walk based snapshot clustering for detecting community dynamics in temporal networks. \textit{Scientific Reports}, 15, 24414.
+\bibitem{ZK21}
+    Zarayeneh, N., Kalyanaraman, A. (2021). Delta-Screening: A Fast and Efficient Technique to Update Communities in Dynamic Graphs. \textit{IEEE TNSE}, 8(2), 1614--1629.
+\bibitem{SLe24}
+    Sahu, S. (2024). A Starting Point for Dynamic Community Detection with Leiden Algorithm. \textit{arXiv preprint}.
 \bibitem{SLu24}
-    Sahu, S. (2024). DF Louvain: Fast Incrementally Expanding Approach for Community Detection on Dynamic Graphs. \textit{arXiv preprint}. 
-\bibitem{SKB25}
-    Sahu, S., Kothapalli, K., Banerjee, D.\,S. (2025).
-    Parallel Multicore Algorithms for Community Detection in Dynamic Graphs.
-    \textit{International Journal of Networking and Computing}, 15 (1), 2--31. 
+    Sahu, S. (2024). DF Louvain: Fast Incrementally Expanding Approach for Community Detection on Dynamic Graphs. \textit{arXiv preprint}.
 \bibitem{DKS26}
-    Douadi A., Kamel N., Sais L. (2026).
-    Incremental Similarity‐Based Label Propagation Algorithm for Dynamic Community Detection.
-    \textit{Concurrency and Computation: Practice and Experience}, 38 (2). 
+    Douadi A., Kamel N., Sais L. (2026). Incremental Similarity-Based Label Propagation Algorithm for Dynamic Community Detection. \textit{Concurrency and Computation: Practice and Experience}, 38(2).
+\bibitem{SKB25}
+    Sahu, S., Kothapalli, K., Banerjee, D.S. (2025). Parallel Multicore Algorithms for Community Detection in Dynamic Graphs. \textit{IJNC}, 15(1), 2--31.
+\bibitem{Sattar25}
+    Sattar, N.S., Ibrahim, K.Z., Buluc, A., \& Arifuzzaman, S. (2025). DyG-DPCD: A Distributed Parallel Community Detection Algorithm for Large-Scale Dynamic Graphs. \textit{International Journal of Parallel Programming}, 53, Article 4.
+\bibitem{HK26}
+    Harutyunyan H.A., Kamalipour P. (2026). Spider Community Detection: Seeded Geodesic Expansion with Modularity-Guided Refinement and Greedy Merge Matching. \textit{Computers}, 15(2), 83.
+\bibitem{CCL23}
+    Chunaev, P. (2020). Community detection in node-attributed social networks: A survey. \textit{Computer Science Review}, 37, 100286.
+\bibitem{LXZ23}
+    Liu, Y., Xia, J., \& Zhou, S. (2023). A Survey of Deep Graph Clustering: Taxonomy, Challenge, Application, and Open Resource. \textit{arXiv preprint}.
+\bibitem{ZXY20}
+    Zhang, Y., Xiong, Y., \& Ye, Y. et al. (2020). SEAL: Learning Heuristics for Community Detection with Generative Adversarial Networks. \textit{Proc. KDD}, 1103--1113.
+\bibitem{DSD24}
+    Devesh, K.V.V., Sreesankar, S., \& Dinesan, K. et al. (2024). Analyzing GNN Models for Community Detection Using Graph Embeddings: A Comparative Study. \textit{Proceedings of ICCCNT}.
+\bibitem{JLL23}
+    Ji, S., Lu, X., \& Liu, M. et al. (2023). Community-based Dynamic Graph Learning for Popularity Prediction. \textit{Proc. KDD}, 930--940.
+\bibitem{TPP23}
+    Tsitsulin, A., Palowitch, J., Perozzi, B., \& M{\"u}ller, E. (2023). Graph clustering with graph neural networks. \textit{JMLR}, 24(1), 5809--5829.
+\bibitem{SGH09}
+    Scarselli, F., Gori, M., Tsoi, A.C., Hagenbuchner, M., \& Monfardini, G. (2009). The graph neural network model. \textit{IEEE Transactions on Neural Networks}, 20(1), 61--80.
+\bibitem{ZXZ20}
+    Zhang, T., Xiong, Y., \& Zhang, J. et al. (2020). CommDGI: Community Detection Oriented Deep Graph Infomax. \textit{Proc. CIKM}, 1843--1852.
+\bibitem{LYD24}
+    Liu, C., Yang, Y., \& Ding, Y. et al. (2024). DAG: Deep Adaptive and Generative K-Free Community Detection on Attributed Graphs. \textit{Proc. KDD}, 5454--5465.
 \bibitem{G10}
     Good B.H., et al. (2010). Performance of modularity maximization in practical contexts. \textit{Physical Review E}, 81(4).
 \bibitem{FH16}
     Fortunato, S., Hric D. (2016). Community detection in networks: A user guide. \textit{Physics Reports}, 659, 1--44.
-\bibitem{LLC24}
-    Liu, Y., Li, J., \& Chen, Y. et al. (2024). Revisiting Modularity Maximization for Graph Clustering: A Contrastive Learning Perspective. \textit{Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1968--1979.
-\bibitem{BKH24}
-    Bhowmick, A., Kosan, M., \& Huang, Z. et al. (2024). DGCLUSTER: a neural framework for attributed graph clustering via modularity maximization. \textit{Proceedings of the 38th AAAI Conference on Artificial Intelligence and 36th Conference on Innovative Applications of Artificial Intelligence and 14th Symposium on Educational Advances in Artificial Intelligence}, 11069--11077.
-\bibitem{ZGR25}
-    Zhao Z., Gan, J., \& Ruan, B. et al. (2025). Dynamic Structural Clustering Unleashed: Flexible Similarities, Versatile Updates and for All Parameters. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 3980--3991.
+\bibitem{YL15}
+    Yang, J., Leskovec, J. (2015). Defining and evaluating network communities based on ground-truth. \textit{Knowledge and Information Systems}, 42(1), 181--213.
+\bibitem{YAT16}
+    Yang, Z., Algesheimer, R., \& Tessone, C.J. (2016). A Comparative Analysis of Community Detection Algorithms on Artificial Networks. \textit{Scientific Reports}, 6, Article 30750.
+\bibitem{Rustamaji24}
+    Rustamaji, H.C., Kusuma, W.A., Nurdiati, S., Batubara, I. (2024). Community detection with greedy modularity disassembly strategy. \textit{Scientific Reports}, 14, 4694.
 \bibitem{TTB24}
     Taibi, S., Toumi, L. \& Bouamama, S. (2024). Complex network community discovery using fast local move iterated greedy algorithm. \textit{The Journal of Supercomputing}, 81(1).
-\bibitem{HK26}
-    Harutyunyan H.A., Kamalipour P. (2026). Spider Community Detection: Seeded Geodesic Expansion with Modularity-Guided Refinement and Greedy Merge Matching. \textit{Computers}, 15(2):83.
-\bibitem{LYZ25}
-    Lin, X., Yang, R., \& Zheng, H. et al. (2025). Spectral Subspace Clustering for Attributed Graphs. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 789--799. 
-\bibitem{TPP23}
-    Tsitsulin, A., Palowitch, J., Perozzi, B. \& and Muller, E. (2023) Graph clustering with graph neural networks. \textit{The Journal of Machine Learning Research}, 24(1), 5809--5829.
-\bibitem{SGH09}
-    Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., \& Monfardini, G. (2009) The graph neural network model. \textit{IEEE transactions on neural networks}, 20(1), 61--80.
-\bibitem{LYD24}
-    Liu, C., Yang, Y., \& Ding, Y. et al (2024) DAG: Deep Adaptive and Generative K-Free Community Detection on Attributed Graphs. \textit{Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 5454--5465.
-\bibitem{ZXZ20}
-    Zhang, T., Xiong, Y., \& Zhang, J. et al (2020) CommDGI: Community Detection Oriented Deep Graph Infomax. \textit{Proceedings of the 29th ACM International Conference on Information \& Knowledge Management}, 1843--1852.
-\bibitem{ZPS25}
-    Zhang, J., Peng, H., \& Sun, L. et al. (2025). Unsupervised Graph Clustering with Deep Structural Entropy. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 3752--3763.
+\bibitem{LLC24}
+    Liu, Y., Li, J., \& Chen, Y. et al. (2024). Revisiting Modularity Maximization for Graph Clustering: A Contrastive Learning Perspective. \textit{Proc. KDD}, 1968--1979.
+\bibitem{BKH24}
+    Bhowmick, A., Kosan, M., \& Huang, Z. et al. (2024). DGCLUSTER: a neural framework for attributed graph clustering via modularity maximization. \textit{Proc. AAAI}, 11069--11077.
 \bibitem{QZG24}
-    Qin, M., Zhang, C., \& Gao, Y. et al. (2024). Pre-train and Refine: Towards Higher Efficiency in K-Agnostic Community Detection without Quality Degradation. \textit{Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 2467--2478.
-\bibitem{GPT25}
-    Gkartzios, C., Pitoura, E., Tsaparas., P. (2025). Modularity-Fair Deep Community Detection. \textit{Proceedings of the 2025 IEEE International Conference on Data Mining (ICDM)}, 287--296.
-\bibitem{CLH25}
-    Chen, N., Liu, Z., \& Hooi, B. et al. (2025). NodeImport: Imbalanced Node Classification with Node Importance Assessment. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 94--105.
-\bibitem{BCC25}
-    Bei, Y., Chen, W., \& Chen, H. et al. (2025). Correlation-Aware Graph Convolutional Networks for Multi-Label Node Classification. \textit{Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}.
+    Qin, M., Zhang, C., \& Gao, Y. et al. (2024). Pre-train and Refine: Towards Higher Efficiency in K-Agnostic Community Detection without Quality Degradation. \textit{Proc. KDD}, 2467--2478.
 \bibitem{QZG24HPEC}
-    Qin, M., Zhang, C. \& Gao, Y. et al. (2024). Towards Faster Graph Partitioning via Pre-training and Inductive Inference. \textit{2024 IEEE High Performance Extreme Computing Conference (HPEC)}.
-\bibitem{ZK21}
-    Zarayeneh, N., Kalyanaraman, A. (2021). Delta-Screening: A Fast and Efficient Technique to Update Communities in Dynamic Graphs. \textit{IEEE transactions on network science and engineering}, 8(2), 1614--1629.
-\bibitem{SLe24}
-    Sahu, S. (2024). A Starting Point for Dynamic Community Detection with Leiden Algorithm. \textit{arXiv preprint}.
+    Qin, M., Zhang, C. \& Gao, Y. et al. (2024). Towards Faster Graph Partitioning via Pre-training and Inductive Inference. \textit{Proc. HPEC}.
+\bibitem{ZPS25}
+    Zhang, J., Peng, H., \& Sun, L. et al. (2025). Unsupervised Graph Clustering with Deep Structural Entropy. \textit{Proc. KDD}, 3752--3763.
+\bibitem{GPT25}
+    Gkartzios, C., Pitoura, E., Tsaparas, P. (2025). Modularity-Fair Deep Community Detection. \textit{Proc. ICDM}, 287--296.
+\bibitem{LYZ25}
+    Lin, X., Yang, R., \& Zheng, H. et al. (2025). Spectral Subspace Clustering for Attributed Graphs. \textit{Proc. KDD}, 789--799.
 \bibitem{KZL24}
-    Kong, D., Zhang, A., \& Li, Y. (2024). Learning Persistent Community Structures in Dynamic Networks via Topological Data Analysis. \textit{The 38th Annual AAAI Conference on Artificial Intelligence (AAAI)}.
+    Kong, D., Zhang, A., \& Li, Y. (2024). Learning Persistent Community Structures in Dynamic Networks via Topological Data Analysis. \textit{Proc. AAAI}.
+\bibitem{Brabant25}
+    Brabant, V., Bonifati, A., \& Cazabet, R. (2025).
+    Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity.
+    \textit{Proc. ICDM}.
+\bibitem{ZGR25}
+    Zhao Z., Gan, J., \& Ruan, B. et al. (2025). Dynamic Structural Clustering Unleashed: Flexible Similarities, Versatile Updates and for All Parameters. \textit{Proc. KDD}, 3980--3991.
 \end{thebibliography}
 \endgroup
 
 
-\appendices
-\section{Full Per-Dataset Results}\label{app:full-results}
-
-This appendix reports the complete single-run result tables used to construct
-Table~\ref{tab:main-results}: Table~\ref{tab:full-mod-time} gives modularity
-and runtime, and Table~\ref{tab:full-extrinsic} gives ARI/F1/NMI. The
-main text aggregates these single-run cells in Table~\ref{tab:main-results}
-and reports a separate non-random stream-id robustness check in
-Table~\ref{tab:stability}; the appendix keeps the per-dataset cells for
-reproducibility.
-
-\begin{table*}[ht]
-\centering
-\caption{Full modularity ($Q$) and total processing time in seconds ($T$) on the P1 short-horizon sequence. Each cell shows $Q$ / $T$. ``OOM'' indicates out of memory.}
-\label{tab:full-mod-time}
-\setlength{\tabcolsep}{2pt}
-\scriptsize
-\begin{tabular}{lcccccc}
-\hline
-\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
-\hline
-\multicolumn{7}{l}{\textit{DF-Leiden}} \\
-Dynamic & 0.81\,/\,0.00 & 0.82\,/\,0.01 & 0.89\,/\,0.00 & 0.86\,/\,0.03 & 0.76\,/\,0.10 & 0.85\,/\,3.74 \\
-Local   & 0.80\,/\,0.22 & 0.80\,/\,0.10 & 0.88\,/\,0.07 & 0.78\,/\,0.23 & 0.78\,/\,0.11 & 0.88\,/\,0.44 \\
-\hline
-\multicolumn{7}{l}{\textit{MFC}} \\
-Dynamic & 0.42\,/\,881.5 & 0.49\,/\,1532 & 0.43\,/\,1832 & 0.70\,/\,816.3 & 0.18\,/\,2949 & OOM \\
-Local   & 0.73\,/\,31.5  & 0.26\,/\,32.2  & 0.67\,/\,22.9  & 0.78\,/\,38.4  & 0.02\,/\,35.9  & 0.06\,/\,381.7 \\
-\hline
-\multicolumn{7}{l}{\textit{Leidenalg}} \\
-Naive & 0.82\,/\,1.25 & 0.83\,/\,1.32 & 0.89\,/\,0.83 & 0.86\,/\,2.90 & 0.79\,/\,6.51 & 0.89\,/\,150.7 \\
-Local & 0.81\,/\,0.54 & 0.79\,/\,0.25 & 0.88\,/\,0.10 & 0.86\,/\,1.86 & 0.78\,/\,0.29 & 0.88\,/\,3.64 \\
-\hline
-\multicolumn{7}{l}{\textit{FLMIG}} \\
-Naive & 0.82\,/\,15.7 & 0.75\,/\,20.0 & 0.87\,/\,29.8 & 0.86\,/\,73.1 & 0.75\,/\,178.9 & 0.87\,/\,103535 \\
-Local & 0.77\,/\,0.35 & 0.52\,/\,1.64 & 0.72\,/\,0.36 & 0.74\,/\,18.3 & 0.08\,/\,1.90 & 0.59\,/\,37.9 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
-Naive & 0.80\,/\,2.79 & 0.70\,/\,5.28 & 0.84\,/\,2.07 & 0.64\,/\,16.5 & 0.73\,/\,25.4 & 0.55\,/\,533.3 \\
-Local & 0.74\,/\,0.43 & 0.67\,/\,1.20 & 0.84\,/\,0.38 & 0.86\,/\,12.4 & 0.09\,/\,1.07 & 0.07\,/\,13.4 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
-Naive & 0.82\,/\,3.11 & 0.82\,/\,5.56 & 0.89\,/\,2.33 & 0.77\,/\,16.7 & 0.79\,/\,28.7 & 0.88\,/\,795.6 \\
-Local & 0.77\,/\,0.35 & 0.62\,/\,1.18 & 0.80\,/\,0.38 & 0.84\,/\,12.7 & 0.42\,/\,1.18 & 0.07\,/\,13.5 \\
-\hline
-\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
-Naive & 0.69\,/\,38.5 & 0.04\,/\,252.6 & 0.78\,/\,164.2 & 0.38\,/\,13.6 & 0.62\,/\,110.0 & 0.00\,/\,2281 \\
-Local & 0.78\,/\,6.61 & 0.62\,/\,7.66 & 0.77\,/\,4.48 & 0.66\,/\,21.8 & 0.52\,/\,13.8 & 0.54\,/\,178.1 \\
-\hline
-\multicolumn{7}{l}{\textit{MAGI}} \\
-Naive & 0.34\,/\,75.1 & 0.06\,/\,81.7 & 0.35\,/\,57.9 & 0.82\,/\,127.4 & 0.49\,/\,300.3 & OOM \\
-Local & 0.73\,/\,144.4& 0.33\,/\,460.5& 0.76\,/\,254.8& 0.59\,/\,524.6& 0.06\,/\,533.1& 0.07\,/\,868.2 \\
-\hline
-\multicolumn{7}{l}{\textit{DMoN}} \\
-Naive & 0.06\,/\,16.7 & 0.13\,/\,17.7 & 0.10\,/\,15.1 & $-$0.04\,/\,101.9 & 0.14\,/\,294.0 & OOM \\
-Local & 0.79\,/\,28.6 & 0.61\,/\,30.3 & 0.77\,/\,23.2 & 0.54\,/\,33.4 & 0.10\,/\,31.6 & 0.16\,/\,65.1 \\
-\hline
-\end{tabular}
-\end{table*}
-
-\begin{table*}[ht]
-\centering
-\caption{Full ARI / F1 / NMI with respect to ground truth on the final snapshot. ``OOM'' indicates out of memory.}
-\label{tab:full-extrinsic}
-\setlength{\tabcolsep}{1.5pt}
-\scriptsize
-\begin{tabular}{lcccccc}
-\hline
-\textbf{Method} & \textbf{dyn\_cora} & \textbf{dyn\_acm} & \textbf{dyn\_citeseer} & \textbf{patent} & \textbf{dyn\_pubmed} & \textbf{arxivmath} \\
-\hline
-\multicolumn{7}{l}{\textit{DF-Leiden}} \\
-Dynamic & 0.24/8e-4/0.44 & 0.07/1e-4/0.26 & 0.10/3e-4/0.33 & 0.18/1e-3/0.37 & 0.08/0/0.19 & 0.12/7e-7/0.39 \\
-Local   & 0.24/1e-2/0.45 & 0.05/3e-4/0.25 & 0.10/2e-4/0.33 & 0.17/2e-2/0.36 & 0.09/5e-3/0.20 & 0.17/1e-5/0.40 \\
-\hline
-\multicolumn{7}{l}{\textit{MFC}} \\
-Dynamic & 0.01/8e-4/0.15 & 0.01/0/0.15 & 0.01/4e-5/0.17 & 0.13/3e-2/0.19 & 0.03/1e-3/0.02 & OOM \\
-Local   & 0.21/2e-3/0.43 & 0.01/2e-5/0.20 & 0.07/4e-4/0.29 & 0.19/2e-2/0.37 & 0.00/3e-2/0.02 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{Leidenalg}} \\
-Naive & 0.24/8e-3/0.46 & 0.05/1e-3/0.26 & 0.10/6e-4/0.33 & 0.16/4e-2/0.36 & 0.10/1e-2/0.21 & 0.17/1e-7/0.42 \\
-Local & 0.28/3e-3/0.46 & 0.04/1e-4/0.24 & 0.10/6e-4/0.33 & 0.18/2e-2/0.37 & 0.09/1e-2/0.18 & 0.17/8e-7/0.40 \\
-\hline
-\multicolumn{7}{l}{\textit{FLMIG}} \\
-Naive & 0.24/9e-3/0.46 & 0.09/2e-3/0.22 & 0.07/2e-4/0.27 & 0.16/4e-2/0.36 & 0.07/1e-2/0.13 & 0.13/2e-7/0.34 \\
-Local & 0.22/2e-3/0.42 & 0.02/2e-4/0.20 & 0.08/3e-4/0.29 & 0.18/2e-2/0.37 & 0.01/3e-2/0.03 & 0.05/4e-7/0.22 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Infomap}} \\
-Naive & 0.25/9e-4/0.45 & 0.19/7e-4/0.30 & 0.20/2e-3/0.35 & 0.25/2e-2/0.38 & 0.21/7e-3/0.23 & 0.08/0/0.27 \\
-Local & 0.21/5e-3/0.43 & 0.06/1e-3/0.23 & 0.14/5e-4/0.33 & 0.18/2e-2/0.37 & 0.004/8e-3/0.04 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{PRGPT-Locale}} \\
-Naive & 0.25/2e-3/0.47 & 0.06/2e-4/0.27 & 0.10/5e-4/0.33 & 0.21/5e-3/0.37 & 0.09/8e-3/0.20 & 0.20/7e-6/0.42 \\
-Local & 0.24/5e-3/0.44 & 0.04/9e-4/0.23 & 0.07/5e-4/0.30 & 0.18/2e-2/0.37 & 0.10/4e-2/0.14 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{S$^2$CAG}} \\
-Naive & 0.21/2e-2/0.44 & 0.00/0/0.09 & 0.03/4e-4/0.25 & 0.05/8e-2/0.06 & 0.08/2e-2/0.17 & 3e-6/0/0.00 \\
-Local & 0.26/3e-3/0.46 & 0.04/3e-6/0.24 & 0.08/6e-5/0.32 & 0.17/6e-3/0.36 & 0.07/1e-5/0.14 & 0.02/4e-7/0.16 \\
-\hline
-\multicolumn{7}{l}{\textit{MAGI}} \\
-Naive & 0.07/1e-3/0.42 & 0.005/1e-5/0.25 & 0.01/2e-5/0.31 & 0.10/3e-2/0.27 & 0.05/2e-4/0.22 & OOM \\
-Local & 0.21/4e-3/0.43 & 0.01/5e-4/0.19 & 0.11/3e-4/0.30 & 0.17/1e-2/0.36 & 0.001/5e-5/0.02 & 0.004/4e-7/0.14 \\
-\hline
-\multicolumn{7}{l}{\textit{DMoN}} \\
-Naive & 0.002/2e-5/0.25 & 0.003/4e-6/0.16 & 0.002/6e-6/0.24 & 0.002/1e-6/0.16 & 0.004/3e-6/0.04 & OOM \\
-Local & 0.26/1e-3/0.46 & 0.03/0/0.22 & 0.08/5e-6/0.32 & 0.17/2e-3/0.36 & $-$0.002/6e-7/0.05 & 0.004/4e-7/0.17 \\
-\hline
-\end{tabular}
-\end{table*}
 \end{document}

@@ -41,6 +41,57 @@ Summarize available DSBM stream metadata:
 python3 scripts/paper/summarize_dsbm_streams.py
 ```
 
+Collect anonymized hardware metadata on the same server used for timing
+measurements:
+
+```bash
+python3 scripts/paper/collect_hardware_info.py --output results/icdm-2026-0/hardware_summary.json
+python3 scripts/paper/collect_hardware_info.py --format text
+python3 scripts/paper/collect_hardware_info.py --format paper
+```
+
+Insert the paper-ready hardware sentence only after the JSON was collected on
+the measurement server:
+
+```bash
+python3 scripts/paper/insert_hardware_sentence.py --hardware-json results/icdm-2026-0/hardware_summary.json --dry-run
+python3 scripts/paper/insert_hardware_sentence.py --hardware-json results/icdm-2026-0/hardware_summary.json
+```
+
+The insertion helper refuses no-GPU local-container summaries and requires
+NVIDIA/CUDA details, because the article reports GPU-enabled baselines.
+
+## Plot Paper Figures
+
+Regenerate the main-paper workload-to-speedup mechanism figure:
+
+```bash
+python3 scripts/paper/plot_workload_speedup.py
+```
+
+The script writes `article/workload_speedup.pdf`, which is included by the
+ICDM paper source.
+
+## Verify Article
+
+Run the ICDM article hygiene checks:
+
+```bash
+python3 scripts/paper/verify_icdm_article.py
+```
+
+The verifier rebuilds the PDF, checks the 10-page limit, scans the source and
+PDF text for internal markers, validates labels and citations, checks anonymity
+metadata, rejects appendices in the main source, and requires at least 50 cited
+references.
+
+After collecting and inserting the hardware sentence from the measurement
+server, run the final-submission gate:
+
+```bash
+python3 scripts/paper/verify_icdm_article.py --final
+```
+
 ## Process Results
 
 Build a consolidated registry from raw result JSON files:
