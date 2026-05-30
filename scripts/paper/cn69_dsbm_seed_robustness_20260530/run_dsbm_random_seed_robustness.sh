@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -o pipefail
 
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <max-changes> <seed>" >&2
@@ -23,15 +22,6 @@ RESULTS_ROOT="${PAPER_ICDM_RESULTS_ROOT:-results/paper_icdm_dsbm_seed_robustness
 LOG_ROOT="${PAPER_ICDM_LOG_ROOT:-logs/paper_icdm_dsbm_seed_robustness/series_${SERIES}}"
 
 mkdir -p "${RESULTS_ROOT}/${RUN_ID}" "${LOG_ROOT}"
-
-if [[ ! -f "${DATASET_ROOT}/out.${DATASET}.100_batches" ]]; then
-  echo "Missing stream: ${DATASET_ROOT}/out.${DATASET}.100_batches" >&2
-  exit 1
-fi
-if [[ ! -f "${DATASET_ROOT}/coms.${DATASET}.100_batches.npz" ]]; then
-  echo "Missing communities: ${DATASET_ROOT}/coms.${DATASET}.100_batches.npz" >&2
-  exit 1
-fi
 
 export CUDA_VISIBLE_DEVICES="${VISIBLE_GPU}"
 export PARENT_HOSTNAME="${PARENT_HOSTNAME:-cn69_dsbm_random_mc${MAX_CHANGES}_seed${SEED}}"

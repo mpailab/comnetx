@@ -8,43 +8,9 @@ from os import PathLike
 from optimizer import Optimizer
 import sparse
 
+from baselines.dgc import create_leiden
 from metrics import Metrics, calculate_ground_truth_metrics
 from our_utils import print_zone
-
-
-class _LocalLeidenAdapter:
-    def __init__(self, adj, partition=None):
-        self.adj = adj
-        self._partition = partition
-        self._modularity = None
-
-    def apply(self):
-        from baselines.leiden import leidenalg_partition
-
-        self._partition = leidenalg_partition(self.adj, init_partition=self._partition)
-        self._modularity = Metrics.modularity(self.adj, self._partition)
-        return 0.0
-
-    def partition(self):
-        return self._partition
-
-    def modularity(self):
-        if self._modularity is None:
-            self._modularity = Metrics.modularity(self.adj, self._partition)
-        return self._modularity
-
-
-def create_leiden(method: str, adj, options=None, partition=None):
-    try:
-        from baselines.dgc import create_leiden as create_dgc_leiden
-    except ImportError:
-        if method == "leidenalg":
-            if options is not None:
-                raise
-            return _LocalLeidenAdapter(adj, partition=partition)
-        raise
-
-    return create_dgc_leiden(method, adj, options=options, partition=partition)
 
 
 def _initial_partition_cache_path(
