@@ -55,6 +55,20 @@ def _load_launcher(monkeypatch):
     return module
 
 
+def _load_launcher_without_dynamic_graph_backend(monkeypatch):
+    monkeypatch.delitem(sys.modules, "dynamic_graphs_communities", raising=False)
+    monkeypatch.delitem(sys.modules, "baselines.dgc", raising=False)
+
+    spec = importlib.util.spec_from_file_location(
+        "launcher_without_dgc_test_module",
+        SRC / "launcher.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 def _test_config(launcher, **overrides):
     defaults = {
         "dataset_name": "fake",
@@ -72,6 +86,14 @@ def _test_config(launcher, **overrides):
     }
     defaults.update(overrides)
     return launcher._LaunchConfig(**defaults)
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_launcher_import_does_not_require_dynamic_graph_backend(monkeypatch):
+    launcher = _load_launcher_without_dynamic_graph_backend(monkeypatch)
+
+    assert hasattr(launcher, "dynamic_launch")
 
 
 class _SpyOptimizer:
