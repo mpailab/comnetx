@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import random
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -36,6 +37,23 @@ from magi.batch_kmeans_cuda import kmeans
 
 from metrics import Metrics
 
+def _set_seed(seed: int | None) -> None:
+    if seed is None:
+        return
+
+    seed = int(seed)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    try:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    except Exception:
+        pass
 
 def squeeze_single_batch_adj(adj: torch.Tensor) -> torch.Tensor:
     if isinstance(adj, torch.Tensor) and adj.layout == torch.sparse_coo:
@@ -129,7 +147,8 @@ def magi(adj: torch.Tensor,
          device=None,
          n_epochs=None,
          batchsize: int = 2048,
-         timing_info=None):
+         timing_info=None,
+         seed: int | None = None):
 
     """
     MAGI method
@@ -159,6 +178,8 @@ def magi(adj: torch.Tensor,
     torch.Tensor
         Predicted cluster assignments for all nodes, shape [N].
     """
+
+    _set_seed(seed)
 
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -251,6 +272,8 @@ def magi(adj: torch.Tensor,
     if edge_index.size(1) == 0:
         return torch.arange(N, device=device, dtype=torch.long)
 
+    sampler_workers = 0 if seed is not None else 4
+
     train_loader = NeighborSampler(edge_index, adj_sparse,
                                    is_train=True,
                                    node_idx=all_nodes,
@@ -260,7 +283,7 @@ def magi(adj: torch.Tensor,
                                    batch_size=args.batchsize,
                                    shuffle=True,
                                    drop_last=True,
-                                   num_workers=4,
+                                   num_workers = sampler_workers,
                                    num_nodes=N)
 
     test_loader = NeighborSampler(edge_index, adj_sparse,
@@ -270,8 +293,10 @@ def magi(adj: torch.Tensor,
                                   batch_size=2048,
                                   shuffle=False,
                                   drop_last=False,
-                                  num_workers=4,
+                                  num_workers = sampler_workers,
                                   num_nodes=N)
+
+    _set_seed(seed)
 
     encoder = Encoder(num_features, hidden_channels=hidden,
                       dropout=args.dropout, ns=args.ns).to(device)
@@ -391,7 +416,7 @@ def magi(adj: torch.Tensor,
             embeddings=embeddings,
             device=device,
             k_max=min(50, num_points),
-            random_state=42,
+            random_state=42 if seed is None else int(seed),
             criterion="bic",
         )
         print(f"Estimated number of clusters by elbow_vmf: k={inferred_k}")
@@ -409,6 +434,7 @@ def magi(adj: torch.Tensor,
         tol=1e-4,
         device=device,
         spectral_clustering=False,
+        seed=seed,
     )
     new_labels = torch.as_tensor(pred_labels, dtype=torch.long, device=device)
     return new_labels
@@ -590,7 +616,8 @@ def estimate_k_eigengap(embeddings: torch.Tensor, k_max: int = 30):
 def find_best_k_with_modularity(adj_sparse : torch.Tensor,
                                 embeddings : torch.Tensor, 
                                 k_range, 
-                                device=torch.device('cuda:0')):
+                                device=torch.device('cuda:0'), 
+                                seed: int | None = None):
 
     """
     Finds the best number of clusters based on modularity.
@@ -638,6 +665,7 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
             kmeans_device=device.type,
             batch_size=-1,
             tol=1e-4,
+            seed=seed,
             device=device,
             spectral_clustering=False
         )
@@ -657,7 +685,9 @@ def find_best_k_with_modularity(adj_sparse : torch.Tensor,
 
 
 def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
-               tol=1e-4, device=torch.device('cuda:0'), spectral_clustering=False):
+               tol=1e-4, device=torch.device('cuda:0'),
+               spectral_clustering=False,
+               seed: int | None = None):
     
     """
     Clustering method from MAGI
@@ -700,12 +730,14 @@ def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
             Cluster centroids (for k-means), or None for spectral clustering.
     """
 
+    _set_seed(seed)
+
     if spectral_clustering:
         if isinstance(feature, torch.Tensor):
             feature = feature.numpy()
         print("spectral clustering on cpu...")
         Cluster = SpectralClustering(
-            n_clusters=n_clusters, affinity='precomputed', random_state=0)
+            n_clusters=n_clusters, affinity='precomputed', random_state=seed)
         f_adj = np.matmul(feature, np.transpose(feature))
         predict_labels = Cluster.fit_predict(f_adj)
         cluster_centers = None
@@ -721,7 +753,12 @@ def clustering(feature, n_clusters, kmeans_device='cpu', batch_size=100000,
             if isinstance(feature, torch.Tensor):
                 feature = feature.detach().cpu().numpy()
             print("kmeans on cpu...")
-            Cluster = KMeans(n_clusters=n_clusters, max_iter=10000, n_init=20)
+            Cluster = KMeans(
+                n_clusters=n_clusters,
+                max_iter=10000,
+                n_init=20,
+                random_state=seed,
+            )
             predict_labels = Cluster.fit_predict(feature)
             cluster_centers = torch.tensor(
                 Cluster.cluster_centers_, dtype=torch.float32
@@ -737,6 +774,7 @@ def main():
     parser.add_argument("--batchsize", type=int, default=2048)
     parser.add_argument("--n-clusters", type=int, default=None)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
@@ -748,6 +786,7 @@ def main():
         n_epochs=args.epochs,
         batchsize=args.batchsize,
         n_clusters=args.n_clusters,
+        seed=args.seed,
     )
 
     torch.save(new_labels, args.out)

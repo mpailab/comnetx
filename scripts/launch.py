@@ -52,6 +52,9 @@ else:
 
 GROUND_TRUTH_METRICS = conf.get("GROUND_TRUTH_METRICS", True)
 
+SEED = conf.get("SEED", 42)
+SEED = None if SEED is None else int(SEED)
+
 # datasets
 with open(os.path.join(INFO, "konect.json")) as _:
     info = json.load(_)
@@ -101,7 +104,7 @@ if bad_feature_modes:
         f"Supported: {sorted(supported_feature_modes)}"
     )
 RANDOM_FEATURE_DIM = conf.get("RANDOM_FEATURE_DIM", 64)
-RANDOM_FEATURE_SEED = conf.get("RANDOM_FEATURE_SEED", 42)
+RANDOM_FEATURE_SEED = conf.get("RANDOM_FEATURE_SEED", SEED)
 
 # baseline iterations
 SUPPORTED_ITER_METHODS = {"magi", "dmon", "dese", "flmig", "s2cag", "mfc"}
@@ -210,9 +213,9 @@ def measure():
                             continue
                         method_name = method.split(":")[0]
 
-                        if method_name == "dfleiden" and mode == "smart":
-                            print("Warning! Ignore smart mode for method: dfleiden")
-                            continue
+                        #if method_name == "dfleiden" and mode == "smart":
+                            #print("Warning! Ignore smart mode for method: dfleiden")
+                            #continue
                         for baseline_iter in iter_vals:
                             if mode == "smart" and SMART_PARAMS_GRID:
                                 smart_params_list = SMART_PARAMS_LISTS
@@ -254,6 +257,7 @@ def measure():
                                         method,
                                         baseline_iter=baseline_iter,
                                         mode=mode,
+                                        seed=SEED,
                                         smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
                                         smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
                                         verbose=VERBOSE,

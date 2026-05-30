@@ -23,6 +23,24 @@ from PRGPT.PRGPT_static import get_sp_GCN_sup, get_sp_adj, get_rand_proj_mat, ra
 from PRGPT.PRGPT_static import get_init_res, InfoMap_rfn, locale_rfn, clus_reorder
 from PRoCD.utils import get_mod_mtc
 
+def _set_seed(seed: int | None) -> None:
+    if seed is None:
+        return
+
+    seed = int(seed)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    try:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    except Exception:
+        pass
+    
 def to_com_tensor(clus_res, origin_num_nodes, reverse_mapping):
     com = {}
     for node_new_id, com_id in enumerate(clus_res):
@@ -35,10 +53,13 @@ def to_com_tensor(clus_res, origin_num_nodes, reverse_mapping):
             additional_com_id += 1
     return torch.tensor([com[id] for id in range(origin_num_nodes)], dtype=torch.long)
 
-def rough_prgpt(adj : torch.Tensor, 
-#                device=None,
-                refine=None,
-                timing_info=None):
+def rough_prgpt(
+    adj : torch.Tensor, 
+#   device=None,
+    refine=None,
+    timing_info=None,
+    seed: int | None = None,
+):
     
     """
     PRGPT method "as is"
@@ -50,6 +71,8 @@ def rough_prgpt(adj : torch.Tensor,
         Default: None
 
     """
+
+    _set_seed(seed)
     
     # Layer configurations & parameter settings
     emb_dim = 32 # Embedding dimensionality
@@ -119,7 +142,8 @@ def rough_prgpt(adj : torch.Tensor,
     # Feat ext via Gaussian rand proj
     time_s = time.time()
     # ==========
-    rand_mat = get_rand_proj_mat(tst_num_nodes, emb_dim, rand_seed=rand_seed_gbl)
+    prgpt_seed = rand_seed_gbl if seed is None else int(seed)
+    rand_mat = get_rand_proj_mat(tst_num_nodes, emb_dim, rand_seed=prgpt_seed)
     rand_mat_tnr = torch.FloatTensor(rand_mat).to(device)
     red_feat_tnr = get_red_feat(ptn_sp_adj_tnr,
                                 torch.reshape(tst_degs_tnr, (-1, 1)),
@@ -171,7 +195,14 @@ def rough_prgpt(adj : torch.Tensor,
     elif refine == "locale":
         # Online refinement via Locale
         time_s = time.time()
-        clus_res_Lcl = locale_rfn(init_graph, init_node_map, clus_res_init, tst_num_nodes, rand_seed=0)
+        locale_seed = 0 if seed is None else int(seed)
+        clus_res_Lcl = locale_rfn(
+            init_graph,
+            init_node_map,
+            clus_res_init,
+            tst_num_nodes,
+            rand_seed=locale_seed,
+        )
         time_e = time.time()
         rfn_time_Lcl = time_e - time_s
         # Evaluation for PR-GPT w/ Locale
@@ -191,12 +222,17 @@ def main():
     parser.add_argument("--features", required=False)
     parser.add_argument("--refine", type=str, default="infomap")
     parser.add_argument("--out", required=True)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
     features = torch.load(args.features)
 
-    new_labels = rough_prgpt(adj, refine=args.refine)
+    new_labels = rough_prgpt(
+        adj,
+        refine=args.refine,
+        seed=args.seed,
+    )
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     torch.save(new_labels, args.out)

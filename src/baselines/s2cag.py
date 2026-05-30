@@ -20,9 +20,27 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.metrics import adjusted_rand_score as ari
 
 import numpy as np
+import random
 import scipy.sparse as sp
 import torch
 import argparse
+
+def _set_seed(seed: int | None) -> None:
+    if seed is None:
+        return
+
+    seed = int(seed)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    try:
+        tf.keras.utils.set_random_seed(seed)
+    except Exception:
+        tf.random.set_seed(seed)
 
 def torch_sparse_to_scipy(tensor):
     """Convert torch.sparse_coo_tensor → scipy.sparse.csr_matrix"""
@@ -94,8 +112,9 @@ def generate_graph_features(
     embedding_dim: int = 64, 
     alpha: float = 0.9, 
     power: int = 10, 
-    add_self_loops: bool = True 
-    ) -> torch.Tensor:
+    add_self_loops: bool = True,
+    seed: int | None = None,
+) -> torch.Tensor:
     """
     Args:
         adj : torch.Tensor [N,N]
@@ -121,6 +140,7 @@ def generate_graph_features(
 
     adj_norm = get_normalized_adj(adj)
     
+    _set_seed(seed)
     features = torch.rand(num_nodes, embedding_dim, device=device)
     
     # 4. Power Iteration (Сглаживание / Пропагация)
@@ -140,15 +160,23 @@ def generate_graph_features(
         
     return features
 
-def s2cag(adj_torch: torch.Tensor, 
+def s2cag(
+          adj_torch: torch.Tensor, 
           features_torch: torch.Tensor | None = None, 
           labels: torch.Tensor | None = None,
           timing_info=None,
-          dataset = 'dataset',
-          T = None, n_runs = None, 
-          alpha= 1.0, fdim = 0, method = 'sub', 
-          gamma = 1.0, tau = 7,
-          metrics_mod=None):
+          dataset='dataset',
+          T=None,
+          n_runs=None, 
+          alpha=1.0,
+          fdim=0,
+          method='sub', 
+          gamma=1.0,
+          tau=7,
+          metrics_mod=None,
+          seed: int | None = None):
+    
+    _set_seed(seed)
     if T is None:
         T = 10
     if n_runs is None:
@@ -162,7 +190,7 @@ def s2cag(adj_torch: torch.Tensor,
         labels = labels.squeeze()
 
     if features_torch is None:
-        features_torch = generate_graph_features(adj_torch, embedding_dim=8, alpha=0.9, power=10)
+        features_torch = generate_graph_features(adj_torch, embedding_dim=8, alpha=0.9, power=10, seed=seed)
 
     # print("features_torch =", features_torch)
 
@@ -192,6 +220,7 @@ def s2cag(adj_torch: torch.Tensor,
     x = features
 
     for run in range(n_runs):
+        _set_seed(seed)
         features = x
 
         t0 = time()
@@ -200,12 +229,12 @@ def s2cag(adj_torch: torch.Tensor,
 
 
 
-    metrics['time'].append(time()-t0)
-    metrics['acc'].append(clustering_accuracy(labels, P)*100)
-    # from sklearn.metrics import accuracy_score
-    # metrics['acc'].append(accuracy_score(labels, P) * 100)
-    metrics['nmi'].append(nmi(labels, P)*100)
-    metrics['ari'].append(ari(labels, P)*100)
+        metrics['time'].append(time()-t0)
+        metrics['acc'].append(clustering_accuracy(labels, P)*100)
+        # from sklearn.metrics import accuracy_score
+        # metrics['acc'].append(accuracy_score(labels, P) * 100)
+        metrics['nmi'].append(nmi(labels, P)*100)
+        metrics['ari'].append(ari(labels, P)*100)
 
 
     results = {
@@ -247,6 +276,7 @@ def main():
     parser.add_argument("--method", type=str, default="sub")
     parser.add_argument("--gamma", type=float, default=1)
     parser.add_argument("--tau", type=int, default=50)   
+    parser.add_argument("--seed", type=int, default=42)
 
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -255,9 +285,20 @@ def main():
     features = torch.load(args.features)
     labels = torch.load(args.labels)
 
-    new_labels = s2cag(adj, features, labels,
-                       T = 15, n_runs = 5, alpha= 0.8, 
-                       method = 'sub', gamma = 1, tau = 50)
+    new_labels = s2cag(
+        adj,
+        features,
+        labels,
+        dataset=args.dataset,
+        T=args.T,
+        n_runs=args.runs,
+        alpha=args.alpha,
+        fdim=args.fdim,
+        method=args.method,
+        gamma=args.gamma,
+        tau=args.tau,
+        seed=args.seed,
+    )
 
     torch.save(new_labels, args.out)
     print("S2CAG finished successfully")

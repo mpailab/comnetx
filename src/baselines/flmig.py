@@ -21,6 +21,16 @@ from sklearn.metrics.cluster import normalized_mutual_info_score
 from GraphTools import GraphTolls
 from FLMIG import Fast_local_Move_IG
 
+def _set_seed(seed: int | None) -> None:
+    if seed is None:
+        return
+
+    seed = int(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
 class MyFastLocalMoveIG(Fast_local_Move_IG):
     def __init__(self, Nb, Beta, path, initial_labels=None):
         self.initial_labels = initial_labels
@@ -132,6 +142,7 @@ def flmig_adopted(
     return_labels: bool = False,
     timing_info: dict | None = None,
     initial_labels=None,
+    seed: int | None = None,
 ):
     """
     Args:
@@ -147,6 +158,8 @@ def flmig_adopted(
     if timing_info is None:
         timing_info = {}
 
+    _set_seed(seed)
+    
     t0 = time.time()
     if adj.device.type == "cuda":
         adj = adj.cpu()
@@ -192,6 +205,7 @@ def flmig_adopted(
 
         for nb_run in range(max_rb):
             # print(f"rb {nb_run}, max_rb {max_rb}")
+            _set_seed(seed)
             communities = MyFastLocalMoveIG(Number_iter, Beta, path, initial_labels=initial_labels)
             mod, community, tim = communities.Run_FMLIG()
 

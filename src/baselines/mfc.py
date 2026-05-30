@@ -3,6 +3,7 @@ import torch
 import sys,os
 import pickle
 import numpy as np
+import random
 import time
 from pathlib import Path
 import warnings
@@ -31,6 +32,23 @@ if not hasattr(graph_filtration_layer, "_comnetx_original_wasserstein_distance")
         graph_filtration_layer.wasserstein_distance
     )
 
+def _set_seed(seed: int | None) -> None:
+    if seed is None:
+        return
+
+    seed = int(seed)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    try:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    except Exception:
+        pass
 
 def _has_off_diagonal_points(dgm) -> bool:
     if dgm is None:
@@ -337,7 +355,17 @@ def load_graphs(file_name, network_type, adj_matrix=None, labels=None, features=
     else:
         raise NameError
 
-def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_mf=250):
+def main(
+    network_type,
+    adj_matrix,
+    labels,
+    features=None,
+    num_epoch=500,
+    start_mf=250,
+    seed: int | None = None,
+):
+    _set_seed(seed)
+
     _patch_toporeg_wasserstein_distance()
     _patch_gaemf_pinv()
 
@@ -371,6 +399,8 @@ def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_m
 
         if isinstance(labels, torch.Tensor):
             labels = labels.to(compute_device)
+
+        _set_seed(seed)
 
         model = model_init(network_type, adj, features.size(1), args)
         model_list.append(model)
@@ -425,6 +455,8 @@ def main(network_type, adj_matrix, labels, features=None, num_epoch=500, start_m
             # print('one snapshot')
             gt_dgm = [None, dgm_list[t]]
 
+        _set_seed(seed)
+
         retrain_with_topo(
             network_type,
             m,
@@ -458,8 +490,9 @@ def mfc_adopted(
     features: torch.Tensor | None = None,
     network_type: str = "MFC",
     timing_info: dict | None = None,
-    num_epoch = None,
+    num_epoch=None,
     initial_partition: torch.Tensor | None = None,
+    seed: int | None = None,
 ):
     """
     Запуск MFC-TopoReg на одном графе.
@@ -474,6 +507,8 @@ def mfc_adopted(
         Словарь, куда накапливается conversion_time.
     """
 
+    _set_seed(seed)
+    
     if num_epoch is None:
         num_epoch = 10
 
@@ -513,6 +548,7 @@ def mfc_adopted(
         features=features,
         num_epoch=num_epoch,
         start_mf=start_mf,
+        seed=seed,
     )
     
     snap = raw[0]

@@ -18,7 +18,8 @@ class Optimizer:
                  baseline_iter: int = None,
                  verbose: int = 0,
                  use_gpu: bool = False,
-                 aggregation_mode: str = "normalized"):
+                 aggregation_mode: str = "normalized",
+                 seed: int | None = None):
         """
 
 
@@ -56,7 +57,7 @@ class Optimizer:
             self.has_real_features = False
         else:
             self.features = features.float().to(self.device)
-            self.synthetic_features = self._is_sparse_identity(self.features)
+            self.synthetic_features = self._is_synthetic_features(self.features)
             self.has_real_features = not self.synthetic_features
 
         self.set_communities(communities)
@@ -70,6 +71,39 @@ class Optimizer:
         self.conversion_time = 0.0
         self.last_timing_info = None
         self.local_algorithm_calls = 0
+        self.seed = None if seed is None else int(seed)
+
+    @staticmethod
+    def _is_synthetic_features(features: torch.Tensor) -> bool:
+        if features is None:
+            return True
+
+        if not isinstance(features, torch.Tensor):
+            return False
+
+        if Optimizer._is_sparse_identity(features):
+            return True
+
+        if features.dim() == 2:
+            # dense all-zero features
+            if features.layout != torch.sparse_coo:
+                if torch.count_nonzero(features).item() == 0:
+                    return True
+
+                # dense identity / onehot по вершинам
+                n, m = features.shape
+                if n == m and torch.count_nonzero(features).item() == n:
+                    diag = torch.diagonal(features)
+                    if bool(torch.all(diag == 1).detach().cpu()):
+                        return True
+
+            # sparse all-zero
+            if features.layout == torch.sparse_coo:
+                feat = features.coalesce()
+                if feat._nnz() == 0 or torch.count_nonzero(feat.values()).item() == 0:
+                    return True
+
+        return False
 
     @staticmethod
     def _normalize_aggregation_mode(mode: str) -> str:
@@ -329,17 +363,34 @@ class Optimizer:
                     labels,
                     n_epochs=self.baseline_iter,
                     timing_info=timing_info,
+                    seed=self.seed,
                 )
             elif self.method in ("prgpt:infomap", "prgpt:locale"):
                 from baselines.rough_PRGPT import rough_prgpt
                 refine = self.method.split(":")[1]
-                res = rough_prgpt(adj, refine=refine, timing_info=timing_info)
+                res = rough_prgpt(
+                    adj,
+                    refine=refine,
+                    timing_info=timing_info,
+                    seed=self.seed,
+                )
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
-                res = leidenalg_partition(adj, init_partition = labels, timing_info = timing_info)
+                res = leidenalg_partition(
+                    adj,
+                    init_partition=labels,
+                    timing_info=timing_info,
+                    seed=self.seed,
+                )
             elif self.method in ("ldleiden", "dfleiden"):
                 from baselines.dgc import _run_leiden
-                res = _run_leiden(self.method, adj, init_partition = labels, timing_info = timing_info)
+                res = _run_leiden(
+                    self.method,
+                    adj,
+                    init_partition=labels,
+                    timing_info=timing_info,
+                    seed=self.seed,
+                )
             elif self.method == "dmon":
                 from baselines.dmon import adapted_dmon
                 res = adapted_dmon(
@@ -348,21 +399,29 @@ class Optimizer:
                     labels,
                     epochs=self.baseline_iter,
                     timing_info=timing_info,
+                    seed=self.seed,
                 )
             elif self.method == "networkit":
-                 from baselines.network import networkit_partition
-                 res = networkit_partition(adj, timing_info = timing_info)
+                from baselines.network import networkit_partition
+                res = networkit_partition(
+                    adj,
+                    timing_info=timing_info,
+                    seed=self.seed,
+                )
             elif self.method == "mfc":
                 from baselines.mfc import mfc_adopted
+
                 if not self.has_real_features:
                     features = None
+
                 res = mfc_adopted(
                     adj=adj,
-                    features=features,
+                    features=None,
                     network_type="MFC",
                     timing_info=timing_info,
                     num_epoch=self.baseline_iter,
-                    initial_partition = labels
+                    initial_partition = labels,
+                    seed=self.seed,
                 )
 
             elif self.method == "flmig":
@@ -372,13 +431,21 @@ class Optimizer:
                     Number_iter=self.baseline_iter,
                     return_labels=True,
                     timing_info=timing_info,
-                    initial_labels=labels
+                    initial_labels=labels,
+                    seed=self.seed,
                 )
             elif self.method == "dese":
                 from baselines.dese import dese
                 if not self.has_real_features:
                     raise ValueError("dese can't work without real features")
-                res = dese(adj, features, labels, n_epochs=self.baseline_iter, timing_info=timing_info)
+                res = dese(
+                    adj,
+                    features,
+                    labels,
+                    n_epochs=self.baseline_iter,
+                    timing_info=timing_info,
+                    seed=self.seed,
+                )
             elif self.method == "s2cag":
                 from baselines.s2cag import s2cag
                 if not self.has_real_features:
@@ -389,6 +456,7 @@ class Optimizer:
                     labels,
                     T=self.baseline_iter,
                     timing_info=timing_info,
+                    seed=self.seed,
                 )
             else:
                 raise ValueError("Unsupported baseline method name")

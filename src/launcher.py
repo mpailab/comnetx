@@ -19,6 +19,7 @@ def _initial_partition_cache_path(
     init_batch_number,
     method_name,
     subcoms_depth: int,
+    seed: int | None = None,
 ) -> str:
     """
     Build the cache file path for an initial partition.
@@ -43,8 +44,9 @@ def _initial_partition_cache_path(
         Full path to the ``.npz`` cache file.
     """
     depth_suffix = "" if subcoms_depth == 1 else f"_d:{subcoms_depth}"
+    seed_suffix = "" if seed is None else f"_s:{seed}"
     filename = f"{dataset_name}_b:{init_batch_number}_by_{method_name}"
-    return os.path.join(cache_dir, f"{filename}{depth_suffix}.npz")
+    return os.path.join(cache_dir, f"{filename}{depth_suffix}{seed_suffix}.npz")
 
 
 def _load_cached_initial_partition(cache_file: str | PathLike | None, device):
@@ -106,6 +108,7 @@ def _build_layered_initial_partition(
     method_name,
     subcoms_depth: int,
     device,
+    seed: int | None = None
 ):
     """
     Extend a flat initial partition into a hierarchy of community layers.
@@ -164,7 +167,7 @@ def _build_layered_initial_partition(
 
         # Run the same local method on the aggregated graph and restore labels
         # back to original graph nodes.
-        temp_algo = create_leiden(method_name, aggr_adj)
+        temp_algo = create_leiden(method_name, aggr_adj, seed=seed)
         temp_algo.apply()
         aggr_partition = torch.as_tensor(
             temp_algo.partition(),
@@ -189,6 +192,7 @@ def compute_initial_partition(
     cache_dir: str | PathLike | None = None,
     subcoms_depth=1,
     device=None,
+    seed: int | None = None,
 ):
     """
     Build an initial community partition for an adjacency matrix.
@@ -239,6 +243,7 @@ def compute_initial_partition(
             init_batch_number,
             method_name,
             subcoms_depth,
+            seed=seed,
         )
 
         cached_partition = _load_cached_initial_partition(cache_file, device)
@@ -246,7 +251,7 @@ def compute_initial_partition(
             return cached_partition
 
     adj_algo = adj_matrix.to(device)
-    temp_algo = create_leiden(method_name, adj_algo)
+    temp_algo = create_leiden(method_name, adj_algo, seed=seed)
     temp_algo.apply()
     # Most backends return partition labels on CPU; keep the launcher state on
     # the requested runtime device from the first conversion onward.
@@ -265,6 +270,7 @@ def compute_initial_partition(
             method_name,
             subcoms_depth,
             device,
+            seed=seed,
         )
 
     _save_cached_initial_partition(cache_file, init_partition, init_mod)
@@ -302,6 +308,7 @@ class _LaunchConfig:
     # Bootstrap batch marker extracted from p:n strategies.
     init_batch_number: str | None
     ground_truth_metrics: bool
+    seed: int | None
 
 
 def _print_verbose(verbose: int, level: int, *args, **kwargs) -> None:
@@ -353,7 +360,8 @@ def _build_launch_config(
     use_gpu,
     aggregation_mode,
     cache_dir: str | PathLike | None,
-    ground_truth_metrics: bool
+    ground_truth_metrics: bool,
+    seed: int | None = None,
 ) -> _LaunchConfig:
     """
     Normalize public launch parameters into the compact internal config object.
@@ -380,7 +388,8 @@ def _build_launch_config(
         aggregation_mode=aggregation_mode,
         cache_dir=cache_dir,
         init_batch_number=_init_batch_number(batches_strategy),
-        ground_truth_metrics= ground_truth_metrics
+        ground_truth_metrics= ground_truth_metrics,
+        seed=seed,
     )
 
 
@@ -510,6 +519,7 @@ def _compute_launch_initial_partition(
     subcoms_depth=1,
     device=None,
     verbose=0,
+    seed: int | None = None,
 ):
     """
     Compute or load the initial partition used by p:n launch strategies.
@@ -554,6 +564,7 @@ def _compute_launch_initial_partition(
         cache_dir,
         subcoms_depth=subcoms_depth,
         device=device,
+        seed=seed,
     )
     _print_verbose(verbose, 1, f"Initial modularity: {init_mod:.2g}")
     return init_partition
@@ -740,6 +751,7 @@ def _run_dynamic_mfc(
             init_batch_number=config.init_batch_number,
             cache_dir=config.cache_dir,
             verbose=config.verbose,
+            seed=config.seed,
         )
 
     # mfc_adopted owns the temporal loop internally and returns one final label
@@ -748,10 +760,11 @@ def _run_dynamic_mfc(
     with print_zone(config.verbose >= 4):
         last_partition = mfc_adopted(
             adj=ds.adj,
-            features=getattr(ds, "features", None),
+            features=None,#getattr(ds, "features", None),
             network_type="MFC",
             num_epoch=config.baseline_iter,
             initial_partition=init_partition,
+            seed=config.seed,
         )
 
     measured_time = time.perf_counter() - time_s
@@ -809,9 +822,15 @@ def _run_dynamic_backend(
                     init_batch_number=config.init_batch_number,
                     cache_dir=config.cache_dir,
                     verbose=config.verbose,
+                    seed=config.seed,
                 )
 
-            algo = create_leiden(config.method, batch, partition=init_partition)
+            algo = create_leiden(
+                config.method,
+                batch,
+                partition=init_partition,
+                seed=config.seed,
+            )
 
             if init_partition is not None:
                 # FIXME: Some dynamic backends need a priming apply() after receiving
@@ -887,6 +906,7 @@ def _run_optimizer_modes(
                 verbose=config.verbose,
                 use_gpu=config.use_gpu,
                 aggregation_mode=config.aggregation_mode,
+                seed=config.seed,
             )
 
             if config.init_batch_number is not None:
@@ -901,6 +921,7 @@ def _run_optimizer_modes(
                     subcoms_depth=opt.subcoms_depth,
                     device=opt.runtime_device(),
                     verbose=config.verbose,
+                    seed=config.seed,
                 )
                 if init_partition.dim() == 1:
                     init_partition = init_partition.unsqueeze(0)
@@ -989,7 +1010,9 @@ def dynamic_launch(ds, batches_strategy,
                     use_gpu: bool = False,
                     aggregation_mode: str = "sum",
                     cache_dir: str | PathLike | None = None,
-                    ground_truth_metrics: bool = False):
+                    ground_truth_metrics: bool = False,
+                    seed: int | None = None,
+                    ):
     """
     Launch community detection experiments for static and dynamic graph batches.
 
@@ -1047,7 +1070,8 @@ def dynamic_launch(ds, batches_strategy,
         use_gpu=use_gpu,
         aggregation_mode=aggregation_mode,
         cache_dir=cache_dir,
-        ground_truth_metrics = ground_truth_metrics
+        ground_truth_metrics = ground_truth_metrics,
+        seed=seed,
     )
 
     # Select the execution engine. MFC dynamic mode owns its full temporal loop,

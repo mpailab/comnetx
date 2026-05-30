@@ -28,7 +28,26 @@ torch.autograd.set_detect_anomaly(True)
 
 import argparse
 
-def train(dataset, args):
+def set_seed(seed: int | None):
+    if seed is None:
+        return
+
+    seed = int(seed)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    try:
+        dgl.seed(seed)
+        dgl.random.seed(seed)
+    except Exception:
+        pass
+
+def train(dataset, args, seed: int | None = None):
+    set_seed(seed)
     #prepare graph dataset and device
     if args.gpu >= 0 and torch.cuda.is_available():
         device = 'cuda:{}'.format(args.gpu)
@@ -96,7 +115,8 @@ def train(dataset, args):
 
     return best_cluster, pred
 
-def data_preprocess(adj, features, labels):
+def data_preprocess(adj, features, labels, seed: int | None = None):
+    set_seed(seed)
     labels = labels.tolist()
     edge_index = adj.coalesce().indices()
     num_nodes = adj.size(0)
@@ -141,7 +161,9 @@ def dese(adj,
          timing_info=None, 
          n_epochs=None,
          num_clusters=None,
-         metrics_mod=None):
+         metrics_mod=None,
+         seed: int | None = None):
+    set_seed(seed)
     if n_epochs is None:
         n_epochs = 1
     time_s = time()
@@ -161,9 +183,11 @@ def dese(adj,
     if num_clusters is None:
         num_clusters = len(torch.unique(labels))
     
-    dataset = data_preprocess(adj, features, labels)
+    dataset = data_preprocess(adj, features, labels, seed=seed)
     # print("features ===", features.shape)
     features_dim = features.shape[-1]
+
+    seed_value = 42 if seed is None else int(seed)
 
     if args is None:
         class Args:
@@ -183,19 +207,20 @@ def dese(adj,
             k = 2
             dropout = 0.1
             beta_f = 0.2
-            seed = 42
+            seed = seed_value
             save = False
             fig_network = False
         args = Args()
     else:
         args.num_clusters_layer = [num_clusters]
         args.embed_dim = features_dim
+        args.seed = seed_value
 
     time_e = time()
     if timing_info is not None:
         timing_info['conversion_time'] = time_e - time_s
 
-    metrics, out_label = train(dataset, args)
+    metrics, out_label = train(dataset, args, seed=seed)
     # print(type(out_label))
     # print("out_label =", out_label)
     if metrics_mod==True:
@@ -249,7 +274,6 @@ def main():
     parser.add_argument("--out", required=True)
 
     args = parser.parse_args()
-    print(args.device)
     adj = torch.load(args.adj)
     adj = torch.sparse_coo_tensor(
         adj.indices(),
@@ -258,7 +282,7 @@ def main():
     ).coalesce()
     features = torch.load(args.features)
     labels = torch.load(args.labels)
-    new_labels = dese(adj, features, labels, args)
+    new_labels = dese(adj, features, labels, args, seed=args.seed)
 
     torch.save(new_labels, args.out)
     print("DeSE finished successfully")

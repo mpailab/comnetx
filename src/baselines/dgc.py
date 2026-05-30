@@ -1,6 +1,8 @@
 import argparse
 import time
 import torch
+import random
+import numpy as np
 
 try:
     from dynamic_graphs_communities import AlgorithmOptions, LDLeiden, DFLeiden, Leidenalg, Networkit
@@ -14,7 +16,19 @@ ALG_CLASS = {
     "ldleiden": LDLeiden,
     "dfleiden": DFLeiden
 }
-def create_leiden(method: str, adj, options=None, partition=None):
+
+def _set_seed(seed: int | None) -> None:
+    if seed is None:
+        return
+
+    seed = int(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+def create_leiden(method: str, adj, options=None, partition=None,  seed: int | None = None):
+    _set_seed(seed)
     if method not in ALG_CLASS:
         raise ValueError(f"Unknown method: {method}")
 
@@ -35,8 +49,10 @@ def _run_leiden(
     adj: torch.Tensor,
     init_partition=None,
     options=None,
-    timing_info=None
+    timing_info=None,
+    seed: int | None = None,
 ):
+    _set_seed(seed)
     conversion_time = 0.0
 
     # Move to CPU if needed (the algorithm expects CPU tensors)
@@ -50,8 +66,13 @@ def _run_leiden(
     time_s = time.time()
     if options is not None:
         options = AlgorithmOptions(**options)
+    elif seed is not None:
+        try:
+            options = AlgorithmOptions(seed=int(seed))
+        except TypeError:
+            options = None
 
-    algo = create_leiden(method, adj, options, partition = init_partition)
+    algo = create_leiden(method, adj, options, partition = init_partition, seed=seed)
 
     time_e = time.time()
     conversion_time += time_e - time_s

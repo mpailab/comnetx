@@ -4,6 +4,7 @@ import sys
 from absl import app
 from absl import flags
 import os
+import random
 import numpy as np
 import scipy.sparse
 from scipy.sparse import base
@@ -29,6 +30,22 @@ sys.stdout = stdout
 sys.stderr = stderr
 
 tf.get_logger().setLevel('ERROR')
+
+def _set_seed(seed: int | None) -> None:
+  if seed is None:
+    return
+
+  seed = int(seed)
+
+  random.seed(seed)
+  np.random.seed(seed)
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed_all(seed)
+
+  try:
+    tf.keras.utils.set_random_seed(seed)
+  except Exception:
+    tf.random.set_seed(seed)
 
 PROJECT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 dmon_root = os.path.join(PROJECT_PATH, "baselines", "DMON")
@@ -162,6 +179,12 @@ def adapted_dmon(adj: torch.Tensor,
   if epochs is None:
      epochs = 200
 
+  seed = kwargs.get("seed", None)
+  _set_seed(seed)
+
+  tf.keras.backend.clear_session()
+  _set_seed(seed)
+
   class Args:
     _architecture = [64]
     _collapse_regularization = 1
@@ -249,12 +272,13 @@ def main():
     parser.add_argument("--features", required=True)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     adj = torch.load(args.adj)
     features = torch.load(args.features)
 
-    new_labels = adapted_dmon(adj, features, _n_epochs=args.epochs)
+    new_labels = adapted_dmon(adj, features, epochs=args.epochs, seed=args.seed)
 
     torch.save(new_labels, args.out)
     print("DMON finished successfully")
