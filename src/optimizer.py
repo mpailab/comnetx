@@ -422,8 +422,9 @@ class Optimizer:
 
         If inplace=True (default), zeroes disallowed entries in-place.
         If inplace=False, rebuilds sparse tensor keeping only allowed edges.
-        If preserve_outside=True, edges outside node_mask are retained; only
-        edges with both endpoints inside node_mask are cut by node_labels.
+        If preserve_outside=True, edges with both endpoints outside node_mask
+        are retained for broader hierarchy levels. Edges touching node_mask are
+        still cut unless both endpoints share node_labels.
         """
         indices = adj.indices()
         row, col = indices
@@ -431,7 +432,8 @@ class Optimizer:
         inside = node_mask[row] & node_mask[col]
         same_label = node_labels[row] == node_labels[col]
         if preserve_outside:
-            keep = (~inside) | same_label
+            outside = (~node_mask[row]) & (~node_mask[col])
+            keep = outside | same_label
         else:
             keep = inside & same_label
 

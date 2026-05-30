@@ -287,7 +287,33 @@ def test_run_preserves_broader_level_context():
 
     assert len(opt.aggregated_adjs) == 2
     assert opt.aggregated_adjs[0].sum().item() == pytest.approx(2.0)
-    assert opt.aggregated_adjs[1].sum().item() == pytest.approx(6.0)
+    assert opt.aggregated_adjs[1].sum().item() == pytest.approx(4.0)
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_cut_by_partition_preserves_only_fully_outside_edges():
+    adj = torch.zeros((5, 5), dtype=torch.float32)
+    for src, dst in ((0, 1), (0, 2), (1, 3), (3, 4)):
+        adj[src, dst] = 1
+
+    node_mask = torch.tensor([True, True, False, False, False])
+    node_labels = torch.tensor([0, 0, 0, 1, 2])
+
+    cut = Optimizer.cut_by_partition(
+        adj.to_sparse_coo(),
+        node_mask,
+        node_labels,
+        inplace=False,
+        preserve_outside=True,
+    ).to_dense()
+
+    expected = torch.zeros((5, 5), dtype=torch.float32)
+    expected[0, 1] = 1  # inside-inside, same label
+    expected[0, 2] = 1  # touches node_mask, same label
+    expected[3, 4] = 1  # fully outside node_mask
+
+    assert torch.equal(cut, expected)
 
 
 @pytest.mark.unit
