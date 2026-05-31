@@ -833,6 +833,7 @@ final-snapshot NMI.
 \midrule
 Naive, dataset features & 0.691 / 37.87 / 0.437 & 0.624 / 394.13 / 0.202 \\
 Naive, random features  & $-$0.001 / 14.64 / 0.023 & $-$0.002 / 97.50 / 0.000 \\
+Naive, one-hot features & 0.751 / 45.12 / 0.360 & 0.528 / 11041.55 / 0.059 \\
 Local, dataset features & 0.788 / 8.20 / 0.463 & 0.532 / 39.02 / 0.180 \\
 Local, random features  & 0.784 / 4.86 / 0.462 & 0.534 / 27.61 / 0.186 \\
 Local, one-hot features & 0.779 / 10.65 / 0.452 & 0.518 / 203.13 / 0.182 \\
@@ -844,9 +845,10 @@ Table~\ref{tab:feature-ablation} gives two important cautions. First, random fea
 not a drop-in replacement for attributes: in the naive full-graph run they nearly
 collapse S$^2$CAG quality. They become useful only as part of the local
 ComNetX deployment, where the contracted instances are much smaller and the
-topology dominates the update. The one-hot row shows that a more explicit
-feature representation does not improve this local setting enough to offset its
-additional cost on \textit{dyn\_pubmed}.
+topology dominates the update. Second, one-hot features improve the naive
+modularity on \textit{dyn\_cora}, but on \textit{dyn\_pubmed} they are
+prohibitively expensive and have low final-snapshot NMI; in the local setting,
+they do not improve quality enough to offset their additional cost.
 In the closure ablation, ``No closure'' keeps only the radius-expanded
 vertices, whereas ``No contraction'' gives the backend the post-closure
 induced subgraph without community contraction; $T$ is the total profiled time
@@ -956,9 +958,12 @@ update size, Local Leiden remains faster in all regimes, with
 $3.3$--$4.9\times$ speedups on random and community streams and $1.5\times$ on
 hub-centered updates. At $0.05\%$ changed edges the result becomes
 topology-dependent: community updates remain near or above break-even, while
-random updates are already below break-even. From $0.1\%$ onward, most local
-runs are slower than full recomputation, especially on $0.5\%$--$1.0\%$
-random and hub-centered streams. Quality drift is usually small, but
+random updates are already below break-even. A four-seed follow-up on random
+streams confirms this boundary, with $3.38$--$3.42\times$ speedups at
+$0.01\%$ but only $0.88$--$0.90\times$ at $0.05\%$. From $0.1\%$ onward,
+most local runs are slower than full recomputation, especially on
+$0.5\%$--$1.0\%$ random and hub-centered streams. Quality drift is usually
+small, but
 hub-centered $0.5\%$ changes at the longest available window lose $0.0229$
 modularity and $0.088$ NMI. Thus, local hierarchical recomputation is useful
 for very small or strongly localized changes, while large or hub-heavy update

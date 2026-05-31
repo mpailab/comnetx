@@ -1,15 +1,15 @@
 {
   "tag": "icdm-2026-0",
   "tag_commit": "ca2ea6fd698f78241047143ad6a033dd149dcb03",
-  "generated_at": "2026-05-29T11:07:41.700776+00:00",
+  "generated_at": "2026-05-31T07:48:11.225765+00:00",
   "counts": {
-    "total_measurement_entries": 4017,
+    "total_measurement_entries": 4033,
     "measurement_entries_by_category": {
-      "real_graph_measurements": 1430,
-      "synthetic_dsbm_measurements": 246,
-      "workload_profiles": 100,
+      "legacy_measurements": 1705,
       "neighborhood_measurements": 536,
-      "legacy_measurements": 1705
+      "real_graph_measurements": 1430,
+      "synthetic_dsbm_measurements": 262,
+      "workload_profiles": 100
     }
   },
   "measurement_groups": {
@@ -20,7 +20,7 @@
     },
     "synthetic_dsbm_measurements": {
       "description": "Synthetic DSBM stress measurements with controlled update streams.",
-      "measurement_entry_count": 246,
+      "measurement_entry_count": 262,
       "output": "measurements/synthetic_dsbm_measurements.json"
     },
     "workload_profiles": {
@@ -41,7 +41,7 @@
   },
   "auxiliary_bundles": {
     "launch_manifests": {
-      "record_count": 200,
+      "record_count": 208,
       "output": "auxiliary/launch_manifests.json"
     },
     "launcher_errors": {
@@ -62,21 +62,21 @@
       "category_counts_sum_to_total": true
     },
     "raw_measurement_entries_by_type": {
-      "experiment": 3381,
+      "experiment": 3397,
       "neighborhood": 536,
       "workload_profile": 100
     },
     "grouped_measurement_entries_by_type": {
-      "experiment": 3381,
+      "experiment": 3397,
       "neighborhood": 536,
       "workload_profile": 100
     },
     "measurement_entries_by_category": {
-      "real_graph_measurements": 1430,
-      "synthetic_dsbm_measurements": 246,
-      "workload_profiles": 100,
+      "legacy_measurements": 1705,
       "neighborhood_measurements": 536,
-      "legacy_measurements": 1705
+      "real_graph_measurements": 1430,
+      "synthetic_dsbm_measurements": 262,
+      "workload_profiles": 100
     }
   }
 }

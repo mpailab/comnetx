@@ -2,7 +2,7 @@
   "group": "launch_manifests",
   "tag": "icdm-2026-0",
   "tag_commit": "ca2ea6fd698f78241047143ad6a033dd149dcb03",
-  "generated_at": "2026-05-29T11:07:41.700776+00:00",
+  "generated_at": "2026-05-31T07:48:11.225763+00:00",
   "records": [
     {
       "bundle_record_id": "launch-manifest-00000",
@@ -6843,6 +6843,278 @@
         "updated_at": "2026-05-28T17:07:17.349499",
         "current_attempt": null,
         "output": "bundle://source-root/paper_icdm/8/medium08_dsbm_random_10_mc1450_leidenalg_smart_20260528_170708.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00200",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-43",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-43/out.dsbm-random-1024-58-mc1450-43.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.527513",
+        "updated_at": "2026-05-30T19:47:50.184636",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc1450_seed43_100b/random_mc1450_seed43_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00201",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-44",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-44/out.dsbm-random-1024-58-mc1450-44.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.372730",
+        "updated_at": "2026-05-30T19:47:44.167291",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc1450_seed44_100b/random_mc1450_seed44_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00202",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-45",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-45/out.dsbm-random-1024-58-mc1450-45.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.464824",
+        "updated_at": "2026-05-30T19:48:30.443073",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc1450_seed45_100b/random_mc1450_seed45_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00203",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-46",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc1450-46/out.dsbm-random-1024-58-mc1450-46.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.494111",
+        "updated_at": "2026-05-30T19:46:33.962107",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc1450_seed46_100b/random_mc1450_seed46_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00204",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-43",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-43/out.dsbm-random-1024-58-mc290-43.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.069851",
+        "updated_at": "2026-05-30T18:36:02.170963",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc290_seed43_100b/random_mc290_seed43_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00205",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-44",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-44/out.dsbm-random-1024-58-mc290-44.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.418658",
+        "updated_at": "2026-05-30T18:36:09.167235",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc290_seed44_100b/random_mc290_seed44_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00206",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-45",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-45/out.dsbm-random-1024-58-mc290-45.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.340475",
+        "updated_at": "2026-05-30T18:35:48.172193",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc290_seed45_100b/random_mc290_seed45_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00207",
+      "payload": {
+        "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-46",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "random"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-46/out.dsbm-random-1024-58-mc290-46.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-30T16:46:00.440371",
+        "updated_at": "2026-05-30T18:35:12.833787",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc290_seed46_100b/random_mc290_seed46_100b.json"
       }
     }
   ]
