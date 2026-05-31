@@ -1,0 +1,31 @@
+{
+  "root": "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-43",
+  "batch_suffix": "100_batches",
+  "all_batches": false,
+  "regimes": [
+    "random"
+  ],
+  "max_changes": [
+    290
+  ],
+  "methods": [
+    "leidenalg"
+  ],
+  "modes": [
+    "naive",
+    "smart"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-random-1024-58/dsbm-random-1024-58-mc290-43/out.dsbm-random-1024-58-mc290-43.100_batches"
+  ],
+  "attempted_runs": 2,
+  "successful_runs": 2,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-30T16:46:00.069851",
+  "updated_at": "2026-05-30T18:36:02.170963",
+  "current_attempt": null,
+  "output": "results/paper_icdm_dsbm_seed_robustness/series_9/random_mc290_seed43_100b/random_mc290_seed43_100b.json"
+}
