@@ -19,6 +19,7 @@ def _initial_partition_cache_path(
     init_batch_number,
     method_name,
     subcoms_depth: int,
+    resolution: float = 1.0,
 ) -> str:
     """
     Build the cache file path for an initial partition.
@@ -43,8 +44,9 @@ def _initial_partition_cache_path(
         Full path to the ``.npz`` cache file.
     """
     depth_suffix = "" if subcoms_depth == 1 else f"_d:{subcoms_depth}"
+    resolution_suffix = "" if float(resolution) == 1.0 else f"_res:{resolution:g}"
     filename = f"{dataset_name}_b:{init_batch_number}_by_{method_name}"
-    return os.path.join(cache_dir, f"{filename}{depth_suffix}.npz")
+    return os.path.join(cache_dir, f"{filename}{depth_suffix}{resolution_suffix}.npz")
 
 
 def _load_cached_initial_partition(cache_file: str | PathLike | None, device):
@@ -106,6 +108,7 @@ def _build_layered_initial_partition(
     method_name,
     subcoms_depth: int,
     device,
+    resolution: float = 1.0,
 ):
     """
     Extend a flat initial partition into a hierarchy of community layers.
@@ -164,13 +167,21 @@ def _build_layered_initial_partition(
 
         # Run the same local method on the aggregated graph and restore labels
         # back to original graph nodes.
-        temp_algo = create_leiden(method_name, aggr_adj)
-        temp_algo.apply()
-        aggr_partition = torch.as_tensor(
-            temp_algo.partition(),
-            dtype=torch.long,
-            device=device,
-        )
+        if method_name == "leidenalg" and float(resolution) != 1.0:
+            from baselines.leiden import leidenalg_partition
+
+            aggr_partition = leidenalg_partition(
+                aggr_adj,
+                resolution=resolution,
+            ).to(device)
+        else:
+            temp_algo = create_leiden(method_name, aggr_adj)
+            temp_algo.apply()
+            aggr_partition = torch.as_tensor(
+                temp_algo.partition(),
+                dtype=torch.long,
+                device=device,
+            )
         restored_partition = old_idx[aggr_partition[inverse]]
         layers.append(restored_partition)
 
@@ -189,6 +200,7 @@ def compute_initial_partition(
     cache_dir: str | PathLike | None = None,
     subcoms_depth=1,
     device=None,
+    resolution: float = 1.0,
 ):
     """
     Build an initial community partition for an adjacency matrix.
@@ -239,6 +251,7 @@ def compute_initial_partition(
             init_batch_number,
             method_name,
             subcoms_depth,
+            resolution=resolution,
         )
 
         cached_partition = _load_cached_initial_partition(cache_file, device)
@@ -246,16 +259,26 @@ def compute_initial_partition(
             return cached_partition
 
     adj_algo = adj_matrix.to(device)
-    temp_algo = create_leiden(method_name, adj_algo)
-    temp_algo.apply()
-    # Most backends return partition labels on CPU; keep the launcher state on
-    # the requested runtime device from the first conversion onward.
-    init_partition = torch.as_tensor(
-        temp_algo.partition(),
-        dtype=torch.long,
-        device=device,
-    )
-    init_mod = temp_algo.modularity()
+    if method_name == "leidenalg" and float(resolution) != 1.0:
+        from baselines.leiden import leidenalg_partition
+
+        init_partition = leidenalg_partition(adj_algo, resolution=resolution).to(device)
+        init_mod = Metrics.modularity(
+            adj_matrix,
+            init_partition,
+            gamma=float(resolution),
+        )
+    else:
+        temp_algo = create_leiden(method_name, adj_algo)
+        temp_algo.apply()
+        # Most backends return partition labels on CPU; keep the launcher state on
+        # the requested runtime device from the first conversion onward.
+        init_partition = torch.as_tensor(
+            temp_algo.partition(),
+            dtype=torch.long,
+            device=device,
+        )
+        init_mod = temp_algo.modularity()
 
     if subcoms_depth > 1:
         init_partition = _build_layered_initial_partition(
@@ -265,6 +288,7 @@ def compute_initial_partition(
             method_name,
             subcoms_depth,
             device,
+            resolution=resolution,
         )
 
     _save_cached_initial_partition(cache_file, init_partition, init_mod)
@@ -302,6 +326,29 @@ class _LaunchConfig:
     # Bootstrap batch marker extracted from p:n strategies.
     init_batch_number: str | None
     ground_truth_metrics: bool
+    # Leiden/modularity resolution. The default preserves historical callers.
+    resolution: float = 1.0
+
+
+def _is_default_resolution(resolution: float) -> bool:
+    return float(resolution) == 1.0
+
+
+def _metrics_modularity(adjacency, assignments, resolution: float, directed: bool):
+    if _is_default_resolution(resolution):
+        return Metrics.modularity(adjacency, assignments, directed=directed)
+    return Metrics.modularity(
+        adjacency,
+        assignments,
+        gamma=float(resolution),
+        directed=directed,
+    )
+
+
+def _optimizer_modularity(opt, resolution: float, directed: bool):
+    if _is_default_resolution(resolution):
+        return opt.modularity(directed=directed)
+    return opt.modularity(gamma=float(resolution), directed=directed)
 
 
 def _print_verbose(verbose: int, level: int, *args, **kwargs) -> None:
@@ -353,7 +400,8 @@ def _build_launch_config(
     use_gpu,
     aggregation_mode,
     cache_dir: str | PathLike | None,
-    ground_truth_metrics: bool
+    ground_truth_metrics: bool,
+    resolution: float = 1.0,
 ) -> _LaunchConfig:
     """
     Normalize public launch parameters into the compact internal config object.
@@ -380,7 +428,8 @@ def _build_launch_config(
         aggregation_mode=aggregation_mode,
         cache_dir=cache_dir,
         init_batch_number=_init_batch_number(batches_strategy),
-        ground_truth_metrics= ground_truth_metrics
+        ground_truth_metrics=ground_truth_metrics,
+        resolution=float(resolution),
     )
 
 
@@ -510,6 +559,7 @@ def _compute_launch_initial_partition(
     subcoms_depth=1,
     device=None,
     verbose=0,
+    resolution: float = 1.0,
 ):
     """
     Compute or load the initial partition used by p:n launch strategies.
@@ -546,15 +596,18 @@ def _compute_launch_initial_partition(
     avoids scattering cache naming and reporting logic across all execution
     paths.
     """
-    init_partition, init_mod = compute_initial_partition(
-        adj_matrix,
-        dataset_name,
-        init_batch_number,
-        "leidenalg",
-        cache_dir,
-        subcoms_depth=subcoms_depth,
-        device=device,
-    )
+    init_kwargs = {
+        "adj_matrix": adj_matrix,
+        "dataset_name": dataset_name,
+        "init_batch_number": init_batch_number,
+        "method_name": "leidenalg",
+        "cache_dir": cache_dir,
+        "subcoms_depth": subcoms_depth,
+        "device": device,
+    }
+    if not _is_default_resolution(resolution):
+        init_kwargs["resolution"] = resolution
+    init_partition, init_mod = compute_initial_partition(**init_kwargs)
     _print_verbose(verbose, 1, f"Initial modularity: {init_mod:.2g}")
     return init_partition
 
@@ -839,13 +892,16 @@ def _run_dynamic_backend(
             # recorded from subsequent update batches to match historical data.
             init_partition = None
             if config.init_batch_number is not None:
-                init_partition = _compute_launch_initial_partition(
-                    adj_matrix=batch,
-                    dataset_name=config.dataset_name,
-                    init_batch_number=config.init_batch_number,
-                    cache_dir=config.cache_dir,
-                    verbose=config.verbose,
-                )
+                init_kwargs = {
+                    "adj_matrix": batch,
+                    "dataset_name": config.dataset_name,
+                    "init_batch_number": config.init_batch_number,
+                    "cache_dir": config.cache_dir,
+                    "verbose": config.verbose,
+                }
+                if not _is_default_resolution(config.resolution):
+                    init_kwargs["resolution"] = config.resolution
+                init_partition = _compute_launch_initial_partition(**init_kwargs)
 
             algo = create_leiden(config.method, batch, partition=init_partition)
 
@@ -923,21 +979,25 @@ def _run_optimizer_modes(
                 verbose=config.verbose,
                 use_gpu=config.use_gpu,
                 aggregation_mode=config.aggregation_mode,
+                resolution=config.resolution,
             )
 
             if config.init_batch_number is not None:
                 # p:n strategies treat batch zero as the initial graph state.
                 # The initial partition is installed and timing starts from the
                 # following update batch.
-                init_partition = _compute_launch_initial_partition(
-                    adj_matrix=batch,
-                    dataset_name=config.dataset_name,
-                    init_batch_number=config.init_batch_number,
-                    cache_dir=config.cache_dir,
-                    subcoms_depth=opt.subcoms_depth,
-                    device=opt.runtime_device(),
-                    verbose=config.verbose,
-                )
+                init_kwargs = {
+                    "adj_matrix": batch,
+                    "dataset_name": config.dataset_name,
+                    "init_batch_number": config.init_batch_number,
+                    "cache_dir": config.cache_dir,
+                    "subcoms_depth": opt.subcoms_depth,
+                    "device": opt.runtime_device(),
+                    "verbose": config.verbose,
+                }
+                if not _is_default_resolution(config.resolution):
+                    init_kwargs["resolution"] = config.resolution
+                init_partition = _compute_launch_initial_partition(**init_kwargs)
                 if init_partition.dim() == 1:
                     init_partition = init_partition.unsqueeze(0)
                 opt.set_communities(communities=init_partition)
@@ -959,7 +1019,7 @@ def _run_optimizer_modes(
             )
 
         measured_time = _run_optimizer_batch(opt, config, affected_nodes_mask)
-        mod = opt.modularity(directed=ds.is_directed)
+        mod = _optimizer_modularity(opt, config.resolution, ds.is_directed)
         _print_optimizer_batch_result(config, opt, mod, measured_time)
 
         results.append({"modularity": mod, "time": measured_time})
@@ -1024,6 +1084,7 @@ def dynamic_launch(ds, batches_strategy,
                     verbose: int = 1,
                     use_gpu: bool = False,
                     aggregation_mode: str = "sum",
+                    resolution: float = 1.0,
                     cache_dir: str | PathLike | None = None,
                     ground_truth_metrics: bool = False):
     """
@@ -1053,6 +1114,8 @@ def dynamic_launch(ds, batches_strategy,
         Whether Optimizer-backed modes may use CUDA when available.
     aggregation_mode : str
         Feature aggregation mode forwarded to Optimizer.
+    resolution : float
+        Resolution parameter used by Leiden and modularity reporting.
     cache_dir : str | os.PathLike | None
         Optional directory for cached initial partitions.
 
@@ -1082,6 +1145,7 @@ def dynamic_launch(ds, batches_strategy,
         verbose=verbose,
         use_gpu=use_gpu,
         aggregation_mode=aggregation_mode,
+        resolution=resolution,
         cache_dir=cache_dir,
         ground_truth_metrics = ground_truth_metrics
     )
@@ -1104,9 +1168,19 @@ def dynamic_launch(ds, batches_strategy,
         metrics = {}
         if config.ground_truth_metrics and ds.label is not None:
             metrics = calculate_ground_truth_metrics(ds.label, last_partition)
-            labels_mod = Metrics.modularity(full_adj, ds.label, directed=ds.is_directed)
+            labels_mod = _metrics_modularity(
+                full_adj,
+                ds.label,
+                config.resolution,
+                ds.is_directed,
+            )
             metrics["Labels modularity"] = labels_mod
-        final_mod = Metrics.modularity(full_adj, last_partition, directed=ds.is_directed)
+        final_mod = _metrics_modularity(
+            full_adj,
+            last_partition,
+            config.resolution,
+            ds.is_directed,
+        )
         metrics["Final modularity"] = final_mod
         results[-1].update(metrics)
         

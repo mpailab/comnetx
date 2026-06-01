@@ -18,7 +18,8 @@ class Optimizer:
                  baseline_iter: int = None,
                  verbose: int = 0,
                  use_gpu: bool = False,
-                 aggregation_mode: str = "normalized"):
+                 aggregation_mode: str = "normalized",
+                 resolution: float = 1.0):
         """
 
 
@@ -62,6 +63,7 @@ class Optimizer:
         self.set_communities(communities)
         self.method = method
         self.baseline_iter = baseline_iter
+        self.resolution = float(resolution)
         self.aggregation_mode = self._normalize_aggregation_mode(
             aggregation_mode
         )
@@ -337,7 +339,12 @@ class Optimizer:
                 res = rough_prgpt(adj, refine=refine, timing_info=timing_info)
             elif self.method == "leidenalg":
                 from baselines.leiden import leidenalg_partition
-                res = leidenalg_partition(adj, init_partition = labels, timing_info = timing_info)
+                res = leidenalg_partition(
+                    adj,
+                    init_partition=labels,
+                    timing_info=timing_info,
+                    resolution=self.resolution,
+                )
             elif self.method in ("ldleiden", "dfleiden"):
                 from baselines.dgc import _run_leiden
                 res = _run_leiden(self.method, adj, init_partition = labels, timing_info = timing_info)

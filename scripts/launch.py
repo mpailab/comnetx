@@ -81,6 +81,18 @@ METHODS = conf["BASELINES"] # ["prgpt:locale", "prgpt:infomap", "leidenalg", "ne
 MODES = conf["MODES"] # ["smart", "naive", "raw"]
 USE_GPU = conf.get("USE_GPU", True)
 
+resolution_vals_raw = conf.get("RESOLUTIONS")
+if resolution_vals_raw is None:
+    RESOLUTIONS = [conf.get("RESOLUTION", 1.0)]
+elif isinstance(resolution_vals_raw, (int, float)):
+    RESOLUTIONS = [float(resolution_vals_raw)]
+elif isinstance(resolution_vals_raw, list):
+    RESOLUTIONS = [float(item) for item in resolution_vals_raw]
+else:
+    raise ValueError(
+        f'conf["RESOLUTIONS"] must be a number or list, got: {type(resolution_vals_raw)}'
+    )
+
 feature_modes_raw = conf.get("FEATURE_MODES")
 if feature_modes_raw is None:
     feature_modes_raw = [conf.get("FEATURE_MODE", "dataset")]
@@ -170,11 +182,20 @@ def save(db, errors):
         with open(os.path.join(results_dir, f"errors_{conf_name}_{DATE_SUFFIX}.json"), 'w') as _:
             json.dump(errors, _, indent=4)
 
-def get_algname(method, mode, use_gpu, smart_params=None, baseline_iter=None, feature_mode="dataset"):
+def get_algname(
+        method,
+        mode,
+        use_gpu,
+        smart_params=None,
+        baseline_iter=None,
+        feature_mode="dataset",
+        resolution=1.0):
     if method in SUPPORTED_ITER_METHODS and baseline_iter is not None:
         res = f"{method}-i:{baseline_iter}"
     else:
         res = method
+    if method == "leidenalg" and float(resolution) != 1.0:
+        res = f"{res}-res:{resolution:g}"
 
     if mode == "smart" and smart_params:
         params_string = "-".join([f"{ABBR[k]}:{v}" for k, v in smart_params.items()])
@@ -216,64 +237,68 @@ def measure():
                             continue
 
                         for baseline_iter in iter_vals:
-                            if mode == "smart" and SMART_PARAMS_GRID:
-                                smart_params_list = SMART_PARAMS_LISTS
-                            else:
-                                smart_params_list = [()]
-
-                            for smart_params_tuple in smart_params_list:
-                                smart_params_dict = SMART_PAR_DEFAULT.copy()
-                                if smart_params_tuple:
-                                    keys = list(SMART_PARAMS_GRID.keys())
-                                    smart_params_dict.update(zip(keys, smart_params_tuple))
-
-                                agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # режим агрегации фичей: "sum" или "norm"
-                                agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
-                                smart_params_dict["aggregation_mode"] = agg_mode_short
-                                if method not in SUPPORTED_FEATURES_METHODS:
-                                    del smart_params_dict["aggregation_mode"]
-
-                                algname = get_algname(
-                                    method,
-                                    mode,
-                                    USE_GPU,
-                                    smart_params_dict,
-                                    baseline_iter,
-                                    feature_mode=feature_mode,
-                                )
-                                local_db = init(db, algname, ds.name)
-                                if batches_strategy in local_db:
-                                    continue
-
-                                try:
-                                    with print_zone(VERBOSE >= 1):
-                                        print("-----------------------------------------------")
-                                        print(f"Dataset: {ds.name} ({batches_strategy} batches)")
-                                        print(f"Baseline: {algname}")
-                                    results = dynamic_launch(
-                                        ds,
-                                        batches_strategy,
-                                        method,
-                                        baseline_iter=baseline_iter,
-                                        mode=mode,
-                                        smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
-                                        smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
-                                        verbose=VERBOSE,
-                                        use_gpu=USE_GPU,
-                                        aggregation_mode=agg_mode_full,
-                                        cache_dir = CACHE_DIR,
-                                        ground_truth_metrics = GROUND_TRUTH_METRICS
-                                    )
-                                except Exception as e:
-                                    if CATCH_ERRORS:
-                                        err_tuple = (algname, dataset_name, batches_strategy, str(e))
-                                        errors.append(err_tuple)
-                                        print(f"Error {e} on:", dataset_name, batches_strategy, algname)
-                                    else:
-                                        raise
+                            resolution_vals = RESOLUTIONS if method == "leidenalg" else [1.0]
+                            for resolution in resolution_vals:
+                                if mode == "smart" and SMART_PARAMS_GRID:
+                                    smart_params_list = SMART_PARAMS_LISTS
                                 else:
-                                    local_db[batches_strategy] = results
-                                    save(db, errors)
+                                    smart_params_list = [()]
+
+                                for smart_params_tuple in smart_params_list:
+                                    smart_params_dict = SMART_PAR_DEFAULT.copy()
+                                    if smart_params_tuple:
+                                        keys = list(SMART_PARAMS_GRID.keys())
+                                        smart_params_dict.update(zip(keys, smart_params_tuple))
+
+                                    agg_mode_short = AGG_MODE_MAP[smart_params_dict["aggregation_mode"]]  # режим агрегации фичей: "sum" или "norm"
+                                    agg_mode_full = "normalized" if agg_mode_short == "norm" else agg_mode_short # "sum" или "normalized"
+                                    smart_params_dict["aggregation_mode"] = agg_mode_short
+                                    if method not in SUPPORTED_FEATURES_METHODS:
+                                        del smart_params_dict["aggregation_mode"]
+
+                                    algname = get_algname(
+                                        method,
+                                        mode,
+                                        USE_GPU,
+                                        smart_params_dict,
+                                        baseline_iter,
+                                        feature_mode=feature_mode,
+                                        resolution=resolution,
+                                    )
+                                    local_db = init(db, algname, ds.name)
+                                    if batches_strategy in local_db:
+                                        continue
+
+                                    try:
+                                        with print_zone(VERBOSE >= 1):
+                                            print("-----------------------------------------------")
+                                            print(f"Dataset: {ds.name} ({batches_strategy} batches)")
+                                            print(f"Baseline: {algname}")
+                                        results = dynamic_launch(
+                                            ds,
+                                            batches_strategy,
+                                            method,
+                                            baseline_iter=baseline_iter,
+                                            mode=mode,
+                                            smart_subcoms_depth=smart_params_dict["smart_subcoms_depth"],
+                                            smart_neighborhood_step=smart_params_dict["smart_neighborhood_step"],
+                                            verbose=VERBOSE,
+                                            use_gpu=USE_GPU,
+                                            aggregation_mode=agg_mode_full,
+                                            resolution=resolution,
+                                            cache_dir = CACHE_DIR,
+                                            ground_truth_metrics = GROUND_TRUTH_METRICS
+                                        )
+                                    except Exception as e:
+                                        if CATCH_ERRORS:
+                                            err_tuple = (algname, dataset_name, batches_strategy, str(e))
+                                            errors.append(err_tuple)
+                                            print(f"Error {e} on:", dataset_name, batches_strategy, algname)
+                                        else:
+                                            raise
+                                    else:
+                                        local_db[batches_strategy] = results
+                                        save(db, errors)
     return db, errors
 
 if __name__ == "__main__":
