@@ -1,0 +1,31 @@
+{
+  "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-46",
+  "batch_suffix": "100_batches",
+  "all_batches": false,
+  "regimes": [
+    "community"
+  ],
+  "max_changes": [
+    290
+  ],
+  "methods": [
+    "leidenalg"
+  ],
+  "modes": [
+    "naive",
+    "smart"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-46/out.dsbm-community-1024-58-mc290-46.100_batches"
+  ],
+  "attempted_runs": 2,
+  "successful_runs": 2,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-31T15:16:48.209476",
+  "updated_at": "2026-05-31T17:01:07.618654",
+  "current_attempt": null,
+  "output": "results/paper_icdm_dsbm_seed_robustness/series_10/community_mc290_seed46_100b/community_mc290_seed46_100b.json"
+}

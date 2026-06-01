@@ -1,0 +1,31 @@
+{
+  "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-43",
+  "batch_suffix": "100_batches",
+  "all_batches": false,
+  "regimes": [
+    "hubs"
+  ],
+  "max_changes": [
+    1450
+  ],
+  "methods": [
+    "leidenalg"
+  ],
+  "modes": [
+    "naive",
+    "smart"
+  ],
+  "selected_streams": 1,
+  "selected_stream_paths": [
+    "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-43/out.dsbm-hubs-1024-58-mc1450-43.100_batches"
+  ],
+  "attempted_runs": 2,
+  "successful_runs": 2,
+  "skipped_existing": 0,
+  "errors": 0,
+  "status": "completed",
+  "started_at": "2026-05-31T12:55:19.163127",
+  "updated_at": "2026-05-31T16:11:26.008620",
+  "current_attempt": null,
+  "output": "results/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc1450_seed43_100b/hubs_mc1450_seed43_100b.json"
+}
