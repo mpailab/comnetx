@@ -948,23 +948,21 @@ $58$, $1\%$ degree-$512$ hubs, and assortativity
 $p_{\mathrm{in}}=0.97$. We evaluate random, hub-centered, and
 community-internal updates over $T\in\{5,10,100\}$ batches, with changed-edge
 rates from $0.01\%$ to $1\%$. Across generated streams, the mean affected
-vertex ranges are 0.58--43.25\% for random updates, 0.54--25.99\% for
-hub-centered updates, and 0.57--14.77\% for community-internal updates; the
-corresponding intra-community changed-edge shares are 49.8--51.6\%,
-49.6--50.8\%, and 100.0\%.
+vertex ranges are 0.58--43.25\% (random), 0.54--25.99\% (hub-centered), and
+0.57--14.77\% (community-internal); the corresponding intra-community
+changed-edge shares are about 50\%, 50\%, and 100\%.
 
 The DSBM stress study exposes the operating envelope directly. At the smallest
-update size, Local Leiden remains faster in all regimes, with
-$3.3$--$4.9\times$ speedups on random and community streams and $1.5\times$ on
-hub-centered updates. At $0.05\%$ changed edges the result becomes
-topology-dependent: community updates remain near or above break-even, while
-random updates are already below break-even. A four-seed follow-up on random
-streams confirms this boundary, with $3.38$--$3.42\times$ speedups at
-$0.01\%$ but only $0.88$--$0.90\times$ at $0.05\%$. From $0.1\%$ onward,
-most local runs are slower than full recomputation, especially on
-$0.5\%$--$1.0\%$ random and hub-centered streams. Quality drift is usually
-small, but
-hub-centered $0.5\%$ changes at the longest available window lose $0.0229$
+update size, Local Leiden remains faster in all regimes. The completed
+five-seed 100-batch set confirms that this boundary is stable: at
+$0.01\%$, random, hub-centered, and community-internal streams give
+$3.38$--$3.42\times$, $1.54$--$1.57\times$, and $4.10$--$4.59\times$
+speedups, whereas at $0.05\%$ only community-internal streams stay above
+break-even across all seeds ($1.13$--$1.19\times$). From $0.1\%$ onward, most local runs are
+slower than full recomputation, especially on $0.5\%$--$1.0\%$ random and
+hub-centered streams. Quality drift is usually small, but the seed sweep
+includes one community-stream loss of $0.089$ NMI, and hub-centered $0.5\%$
+changes at the longest available window lose $0.0229$
 modularity and $0.088$ NMI. Thus, local hierarchical recomputation is useful
 for very small or strongly localized changes, while large or hub-heavy update
 batches should trigger a full refresh.

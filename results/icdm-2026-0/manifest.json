@@ -1,14 +1,14 @@
 {
   "tag": "icdm-2026-0",
   "tag_commit": "ca2ea6fd698f78241047143ad6a033dd149dcb03",
-  "generated_at": "2026-05-31T07:48:11.225765+00:00",
+  "generated_at": "2026-06-01T10:04:33.726771+00:00",
   "counts": {
-    "total_measurement_entries": 4033,
+    "total_measurement_entries": 4065,
     "measurement_entries_by_category": {
       "legacy_measurements": 1705,
       "neighborhood_measurements": 536,
       "real_graph_measurements": 1430,
-      "synthetic_dsbm_measurements": 262,
+      "synthetic_dsbm_measurements": 294,
       "workload_profiles": 100
     }
   },
@@ -20,7 +20,7 @@
     },
     "synthetic_dsbm_measurements": {
       "description": "Synthetic DSBM stress measurements with controlled update streams.",
-      "measurement_entry_count": 262,
+      "measurement_entry_count": 294,
       "output": "measurements/synthetic_dsbm_measurements.json"
     },
     "workload_profiles": {
@@ -41,7 +41,7 @@
   },
   "auxiliary_bundles": {
     "launch_manifests": {
-      "record_count": 208,
+      "record_count": 224,
       "output": "auxiliary/launch_manifests.json"
     },
     "launcher_errors": {
@@ -62,12 +62,12 @@
       "category_counts_sum_to_total": true
     },
     "raw_measurement_entries_by_type": {
-      "experiment": 3397,
+      "experiment": 3429,
       "neighborhood": 536,
       "workload_profile": 100
     },
     "grouped_measurement_entries_by_type": {
-      "experiment": 3397,
+      "experiment": 3429,
       "neighborhood": 536,
       "workload_profile": 100
     },
@@ -75,7 +75,7 @@
       "legacy_measurements": 1705,
       "neighborhood_measurements": 536,
       "real_graph_measurements": 1430,
-      "synthetic_dsbm_measurements": 262,
+      "synthetic_dsbm_measurements": 294,
       "workload_profiles": 100
     }
   }

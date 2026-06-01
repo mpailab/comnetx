@@ -2,7 +2,7 @@
   "group": "launch_manifests",
   "tag": "icdm-2026-0",
   "tag_commit": "ca2ea6fd698f78241047143ad6a033dd149dcb03",
-  "generated_at": "2026-05-31T07:48:11.225763+00:00",
+  "generated_at": "2026-06-01T10:04:33.726769+00:00",
   "records": [
     {
       "bundle_record_id": "launch-manifest-00000",
@@ -7115,6 +7115,550 @@
         "updated_at": "2026-05-30T18:35:12.833787",
         "current_attempt": null,
         "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_9/random_mc290_seed46_100b/random_mc290_seed46_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00208",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-43",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-43/out.dsbm-community-1024-58-mc1450-43.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T16:11:29.246969",
+        "updated_at": "2026-05-31T18:50:07.278008",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc1450_seed43_100b/community_mc1450_seed43_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00209",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-44",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-44/out.dsbm-community-1024-58-mc1450-44.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T16:08:39.438887",
+        "updated_at": "2026-05-31T18:47:00.960363",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc1450_seed44_100b/community_mc1450_seed44_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00210",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-45",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-45/out.dsbm-community-1024-58-mc1450-45.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T16:10:56.515468",
+        "updated_at": "2026-05-31T18:49:55.238681",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc1450_seed45_100b/community_mc1450_seed45_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00211",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-46",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc1450-46/out.dsbm-community-1024-58-mc1450-46.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T16:10:54.327241",
+        "updated_at": "2026-05-31T18:47:43.172528",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc1450_seed46_100b/community_mc1450_seed46_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00212",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-43",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-43/out.dsbm-community-1024-58-mc290-43.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T15:17:09.838732",
+        "updated_at": "2026-05-31T17:01:09.752384",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc290_seed43_100b/community_mc290_seed43_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00213",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-44",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-44/out.dsbm-community-1024-58-mc290-44.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T15:16:39.021115",
+        "updated_at": "2026-05-31T17:00:52.764160",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc290_seed44_100b/community_mc290_seed44_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00214",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-45",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-45/out.dsbm-community-1024-58-mc290-45.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T15:18:06.097091",
+        "updated_at": "2026-05-31T17:01:29.139751",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc290_seed45_100b/community_mc290_seed45_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00215",
+      "payload": {
+        "root": "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-46",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "community"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-community-1024-58/dsbm-community-1024-58-mc290-46/out.dsbm-community-1024-58-mc290-46.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T15:16:48.209476",
+        "updated_at": "2026-05-31T17:01:07.618654",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/community_mc290_seed46_100b/community_mc290_seed46_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00216",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-43",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-43/out.dsbm-hubs-1024-58-mc1450-43.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.163127",
+        "updated_at": "2026-05-31T16:11:26.008620",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc1450_seed43_100b/hubs_mc1450_seed43_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00217",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-44",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-44/out.dsbm-hubs-1024-58-mc1450-44.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.317528",
+        "updated_at": "2026-05-31T16:08:36.328845",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc1450_seed44_100b/hubs_mc1450_seed44_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00218",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-45",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-45/out.dsbm-hubs-1024-58-mc1450-45.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.018654",
+        "updated_at": "2026-05-31T16:10:53.228605",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc1450_seed45_100b/hubs_mc1450_seed45_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00219",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-46",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          1450
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc1450-46/out.dsbm-hubs-1024-58-mc1450-46.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.035087",
+        "updated_at": "2026-05-31T16:10:51.164339",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc1450_seed46_100b/hubs_mc1450_seed46_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00220",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-43",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-43/out.dsbm-hubs-1024-58-mc290-43.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.174183",
+        "updated_at": "2026-05-31T15:17:06.721092",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc290_seed43_100b/hubs_mc290_seed43_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00221",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-44",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-44/out.dsbm-hubs-1024-58-mc290-44.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.222780",
+        "updated_at": "2026-05-31T15:16:35.934065",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc290_seed44_100b/hubs_mc290_seed44_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00222",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-45",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-45/out.dsbm-hubs-1024-58-mc290-45.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.406521",
+        "updated_at": "2026-05-31T15:18:02.923993",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc290_seed45_100b/hubs_mc290_seed45_100b.json"
+      }
+    },
+    {
+      "bundle_record_id": "launch-manifest-00223",
+      "payload": {
+        "root": "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-46",
+        "batch_suffix": "100_batches",
+        "all_batches": false,
+        "regimes": [
+          "hubs"
+        ],
+        "max_changes": [
+          290
+        ],
+        "methods": [
+          "leidenalg"
+        ],
+        "modes": [
+          "naive",
+          "smart"
+        ],
+        "selected_streams": 1,
+        "selected_stream_paths": [
+          "datasets-sbm/dsbm-hubs-1024-58/dsbm-hubs-1024-58-mc290-46/out.dsbm-hubs-1024-58-mc290-46.100_batches"
+        ],
+        "attempted_runs": 2,
+        "successful_runs": 2,
+        "skipped_existing": 0,
+        "errors": 0,
+        "status": "completed",
+        "started_at": "2026-05-31T12:55:19.272740",
+        "updated_at": "2026-05-31T15:16:44.940461",
+        "current_attempt": null,
+        "output": "bundle://source-root/paper_icdm_dsbm_seed_robustness/series_10/hubs_mc290_seed46_100b/hubs_mc290_seed46_100b.json"
       }
     }
   ]

@@ -8,18 +8,18 @@ including repeated runs, in semantic JSON bundles.
 
 - Tag: `icdm-2026-0`
 - Tagged commit: `ca2ea6fd698f78241047143ad6a033dd149dcb03`
-- Total measurement entries: `4033`
+- Total measurement entries: `4065`
 
 ## Measurement Entries By Type
 
-- `experiment`: `3397` entries.
+- `experiment`: `3429` entries.
 - `neighborhood`: `536` entries.
 - `workload_profile`: `100` entries.
 
 ## Measurement Entries By Category
 
 - `real_graph_measurements`: ICDM paper measurements on real graph streams: topology, GNN, batch-sweep, robustness, and bad-locality runs. Entries: `1430`.
-- `synthetic_dsbm_measurements`: Synthetic DSBM stress measurements with controlled update streams. Entries: `262`.
+- `synthetic_dsbm_measurements`: Synthetic DSBM stress measurements with controlled update streams. Entries: `294`.
 - `workload_profiles`: Mechanism and workload profiling records. Entries: `100`.
 - `neighborhood_measurements`: Neighborhood-size measurements used for locality and workload analysis. Entries: `536`.
 - `legacy_measurements`: Earlier team, archive, imported, and traceability measurements. Entries: `1705`.
