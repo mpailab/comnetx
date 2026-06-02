@@ -434,19 +434,25 @@ locality explicitly rather than reusing the real-data $999{:}10$ protocol.
 \centering
 \caption{Real-world datasets.}
 \label{tab:datasets}
-\begin{tabular}{lrr}
+\begin{tabular}{lrrr}
 \hline
-\textbf{Dataset} & \textbf{Nodes} & \textbf{Edges} \\
+\textbf{Dataset} & \textbf{Nodes} & \textbf{Edges} & \textbf{$Q_{\mathrm{GT}}$} \\
 \hline
-dyn\_cora      & 2\,708   & 5\,278    \\
-dyn\_acm       & 3\,025   & 13\,128   \\
-dyn\_citeseer  & 3\,327   & 4\,552    \\
-patent         & 12\,214  & 41\,916   \\
-dyn\_pubmed    & 19\,717  & 44\,338   \\
-arxivmath      & 270\,013 & 799\,745  \\
+dyn\_cora      & 2\,708   & 5\,278   & 0.64 \\
+dyn\_acm       & 3\,025   & 13\,128  & 0.48 \\
+dyn\_citeseer  & 3\,327   & 4\,552   & 0.54 \\
+patent         & 12\,214  & 41\,916  & 0.35 \\
+dyn\_pubmed    & 19\,717  & 44\,338  & 0.43 \\
+arxivmath      & 270\,013 & 799\,745 & 0.64 \\
 \hline
 \end{tabular}
 \end{table}
+
+The ground-truth partitions have lower modularity than the strongest
+modularity-optimizing outputs on these graphs. Thus, moderate external
+agreement should be interpreted together with the structural objective: high
+modularity partitions may refine or reorganize label classes rather than
+matching them exactly.
 
 All wall-clock measurements were collected on a Dockerized Linux server with
 two AMD EPYC 7742 64-core CPUs, 2.0 TiB RAM, and eight NVIDIA A100-SXM4 GPUs
