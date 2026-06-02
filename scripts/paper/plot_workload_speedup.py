@@ -20,6 +20,9 @@ PDF_METADATA = {
 
 # Audited workload-profile summary used in the main-paper figure.
 # edge_pct is |Ebar|/|E| (%), speedup is Base/Local, and uv_pct is |U|/|V| (%).
+# The single-container rerun has local profile rows but not a complete matched
+# baseline-profile block for every backend, so the mechanism figure keeps the
+# complete audited profile summary instead of mixing protocols.
 ROWS = [
     ("Leiden", "dyn_cora", 0.40, 9.6, 11.5),
     ("Leiden", "dyn_pubmed", 0.64, 22.0, 19.9),

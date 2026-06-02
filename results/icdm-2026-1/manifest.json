@@ -1,14 +1,19 @@
 {
   "tag": "icdm-2026-1",
-  "tag_commit": "be141eb873ee4345834d82aad2b0b82bc17bcbe7",
-  "generated_at": "2026-06-02T07:27:42.801578+00:00",
-  "source_root": "results/paper_icdm_reviewer_followup/series_12",
-  "source_json_file_count": 7,
+  "tag_commit": "c0121d6413484f691bc52ba5545fd5aba531691c",
+  "generated_at": "2026-06-02T17:32:03.713493+00:00",
+  "source_roots": [
+    "results/paper_icdm_reviewer_followup/series_12",
+    "results/paper_icdm_single_container_rerun/series_14"
+  ],
+  "source_json_file_count": 33,
   "counts": {
-    "total_measurement_entries": 22,
+    "total_measurement_entries": 163,
     "measurement_entries_by_category": {
       "gamma_sweep_measurements": 12,
-      "dyn_pubmed_leiden_repeats": 10
+      "dyn_pubmed_leiden_repeats": 10,
+      "single_container_real_graph_measurements": 126,
+      "single_container_workload_profiles": 15
     }
   },
   "measurement_groups": {
@@ -21,6 +26,16 @@
       "description": "Five single-container repeated Leiden measurements on dyn_pubmed, used to audit runtime variation.",
       "measurement_entry_count": 10,
       "output": "measurements/dyn_pubmed_leiden_repeats.json"
+    },
+    "single_container_real_graph_measurements": {
+      "description": "Single-container rerun experiment measurements for undirected real-graph ICDM paper runs: Leidenalg, DF-Leiden, S2CAG, feature ablations, topology ablations, and long-horizon endpoints. DSBM and directed-control measurements are intentionally excluded.",
+      "measurement_entry_count": 126,
+      "output": "measurements/single_container_real_graph_measurements.json"
+    },
+    "single_container_workload_profiles": {
+      "description": "Single-container rerun workload-profile measurements for Leidenalg, DF-Leiden, and S2CAG locality/closure analysis.",
+      "measurement_entry_count": 15,
+      "output": "measurements/single_container_workload_profiles.json"
     }
   },
   "self_check": {
@@ -28,10 +43,14 @@
       "source_json_files_scanned": true,
       "gamma_sweep_entry_count_is_12": true,
       "dyn_pubmed_repeat_entry_count_is_10": true,
-      "bundle_record_ids_are_unique": true
+      "single_container_experiment_entry_count_is_126": true,
+      "single_container_workload_profile_entry_count_is_15": true,
+      "bundle_record_ids_are_unique": true,
+      "bundle_record_id_sequence_complete": true
     },
     "measurement_entries_by_type": {
-      "experiment": 22
+      "experiment": 148,
+      "workload_profile": 15
     }
   }
 }

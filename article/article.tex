@@ -100,8 +100,8 @@ six real networks, longer real-data streams for topology-based backends, and
 controlled dynamic stochastic block model (DSBM) stress streams. The results
 show that ComNetX can preserve the quality of strong modularity-based solvers
 while reducing update time on large graphs: in paired runs on the largest real
-graph, Local Leiden keeps final modularity within 0.005 of full-snapshot
-recomputation while achieving a $47.0\pm8.1\times$ speedup. The combined
+graph, Local Leiden keeps final modularity within 0.006 of full-snapshot
+recomputation while achieving a $41.9\pm0.2\times$ speedup. The combined
 protocols also identify regimes where locality breaks down and a full refresh
 is preferable.
 \end{abstract}
@@ -608,13 +608,13 @@ tests below then assess stability as streams lengthen or locality weakens.
 \textbf{$\overline{\Delta\mathrm{NMI}}$} & \textbf{Geo. speedup} &
 \textbf{arxivmath} & \textbf{OOM avoided} \\
 \midrule
-DF-Leiden      & Dynamic & $-$0.012 & +0.002 & 0.6$\times$  & 8.5$\times$ & 0 \\
+DF-Leiden      & Dynamic & $-$0.010 & +0.001 & 0.1$\times$  & 8.4$\times$ & 0 \\
 MFC            & Dynamic & +0.048 & +0.126 & 45.1$\times$ & OOM$\rightarrow$381.7s & 1 \\
-Leidenalg      & Naive   & $-$0.013 & $-$0.010 & 7.3$\times$  & 41.4$\times$ & 0 \\
+Leidenalg      & Naive   & $-$0.013 & $-$0.012 & 8.0$\times$  & 41.9$\times$ & 0 \\
 FLMIG          & Naive   & $-$0.250 & $-$0.042 & 60.0$\times$ & 2731.8$\times$ & 0 \\
 PRGPT-Infomap  & Naive   & $-$0.165 & $-$0.073 & 7.6$\times$  & 39.8$\times$ & 0 \\
 PRGPT-Locale   & Naive   & $-$0.242 & $-$0.073 & 8.9$\times$  & 58.9$\times$ & 0 \\
-S$^2$CAG       & Naive   & +0.230 & +0.112 & 8.7$\times$  & 12.8$\times$ & 0 \\
+S$^2$CAG       & Naive   & +0.137 & +0.117 & 5.0$\times$  & 10.2$\times$ & 0 \\
 MAGI           & Naive   & +0.082 & $-$0.034 & 0.3$\times$  & OOM$\rightarrow$868.2s & 1 \\
 DMoN           & Naive   & +0.484 & +0.112 & 1.4$\times$  & OOM$\rightarrow$65.1s & 1 \\
 \bottomrule
@@ -624,18 +624,18 @@ DMoN           & Naive   & +0.484 & +0.112 & 1.4$\times$  & OOM$\rightarrow$65.1
 \textbf{Modularity and external agreement.}
 For Leidenalg, Table~\ref{tab:main-results} shows that the Local adapter
 closely tracks full-snapshot recomputation, with mean changes of $-0.013$ in
-modularity and $-0.010$ in NMI.
+modularity and $-0.012$ in NMI.
 FLMIG, whose aggressive pruning strategy is more sensitive to the restriction
 to a local neighbourhood, obtains large speedups but loses more modularity and
 NMI.
 The GNN-based methods show a consistent pattern: in the Naive (full-graph)
 setting, S$^2$CAG, DMoN, and MAGI are often weaker or infeasible under the
 same update protocol.
-When switched to Local mode with compact random features, S$^2$CAG and DMoN
-obtain higher mean modularity and NMI; MAGI mainly benefits by making the
-largest graph executable. Since locality and feature mode change together, this
-result evaluates the complete deployment recipe and must be read together with
-the dataset-feature ablation.
+When switched to Local mode, S$^2$CAG and DMoN obtain higher mean modularity
+and NMI; MAGI mainly benefits by making the largest graph executable. The
+single-container S$^2$CAG row uses dataset features, and
+Table~\ref{tab:feature-ablation} separately shows how dataset, random, and
+one-hot feature choices alter the result.
 The PRGPT variants are less robust to the local restriction: their aggregate
 modularity and NMI deltas are negative despite consistent speedups, indicating
 that these methods rely more heavily on the global context provided by the full
@@ -650,9 +650,9 @@ of the best topology-based methods.
 \textbf{Reduction in processing time.}
 The runtime advantage of the Local adapter is substantial for the larger
 full-recomputation baselines.
-For Leidenalg, Table~\ref{tab:main-results} reports a $41.4\times$ speedup on
+For Leidenalg, Table~\ref{tab:main-results} reports a $41.9\times$ speedup on
 \textit{arxivmath}, and the paired robustness table reports
-$22.7\pm0.8\times$ on \textit{dyn\_pubmed} and $47.0\pm8.1\times$ on
+$17.1\pm0.2\times$ on \textit{dyn\_pubmed} and $41.9\pm0.2\times$ on
 \textit{arxivmath}. FLMIG and the PRGPT variants obtain even larger or
 consistent large-graph speedups, but their quality deltas show that this speed
 comes from a more aggressive loss of global context. The GNN rows show a
@@ -690,16 +690,16 @@ summarizes the observed baseline-to-Local runtime ratio.
 \textbf{$T_B$} & \textbf{B/L} \\
 \midrule
 \multicolumn{9}{l}{\textit{Leiden, Local versus full recomputation}} \\
-Leiden & dyn\_pubmed & 999:10 & 6 & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.39 $\pm$ 0.15 & 9.02 $\pm$ 3.69 & 22.7 $\pm$ 0.8 \\
-Leiden & arxivmath   & 999:10 & 6 & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 4.00 $\pm$ 0.53 & 187.52 $\pm$ 37.06 & 47.0 $\pm$ 8.1 \\
+Leiden & dyn\_pubmed & 999:10 & 5 & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.39 $\pm$ 0.00 & 6.68 $\pm$ 0.02 & 17.1 $\pm$ 0.2 \\
+Leiden & arxivmath   & 999:10 & 5 & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 3.56 $\pm$ 0.02 & 149.07 $\pm$ 0.72 & 41.9 $\pm$ 0.2 \\
 \addlinespace
 \multicolumn{9}{l}{\textit{DF-Leiden, Local versus native dynamic backend}} \\
-DF-Leiden & dyn\_pubmed & 999:10 & 7 & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.15 $\pm$ 0.07 & 0.11 $\pm$ 0.01 & 0.8 $\pm$ 0.3 \\
-DF-Leiden & arxivmath   & 999:10 & 6 & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.50 $\pm$ 0.05 & 4.23 $\pm$ 0.56 & 8.5 $\pm$ 0.5 \\
+DF-Leiden & dyn\_pubmed & 999:10 & 5 & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.24 $\pm$ 0.00 & 0.11 $\pm$ 0.00 & 0.44 $\pm$ 0.01 \\
+DF-Leiden & arxivmath   & 999:10 & 5 & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.45 $\pm$ 0.01 & 3.77 $\pm$ 0.04 & 8.4 $\pm$ 0.1 \\
 \addlinespace
 \multicolumn{9}{l}{\textit{S$^2$CAG, dataset features}} \\
-S$^2$CAG & dyn\_pubmed & 999:10 & 5 & 0.530 $\pm$ 0.000 & 0.622 $\pm$ 0.000 & 91.88 $\pm$ 45.40 & 191.26 $\pm$ 49.43 & 2.4 $\pm$ 0.8 \\
-S$^2$CAG & arxivmath   & 999:10 & 5 & 0.089 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 227.39 $\pm$ 12.35 & 2972.22 $\pm$ 418.59 & 13.1 $\pm$ 1.6 \\
+S$^2$CAG & dyn\_pubmed & 999:10 & 5 & 0.530 $\pm$ 0.000 & 0.622 $\pm$ 0.000 & 26.44 $\pm$ 3.32 & 111.19 $\pm$ 1.28 & 4.3 $\pm$ 0.5 \\
+S$^2$CAG & arxivmath   & 999:10 & 5 & 0.089 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 225.51 $\pm$ 6.82 & 2297.03 $\pm$ 16.33 & 10.2 $\pm$ 0.3 \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -710,7 +710,7 @@ Local DF-Leiden is useful on \textit{arxivmath} but not on
 \textit{dyn\_pubmed}, where the native dynamic backend is already efficient.
 The S$^2$CAG dataset-feature rows show that the adapter can also accelerate a
 feature-aware backend with real attributes: on \textit{arxivmath}, runtime drops
-by $13.1\times$ and modularity improves over full-snapshot S$^2$CAG; on
+by $10.2\times$ and modularity improves over full-snapshot S$^2$CAG; on
 \textit{dyn\_pubmed}, the speedup is smaller and the quality gap larger.
 
 \subsubsection{Comparison with Native Dynamic Methods}
@@ -725,7 +725,7 @@ NMI on both datasets.
 
 DF-Leiden is already highly optimized, so the Local wrapper is not always the
 fastest choice. It is slower on \textit{dyn\_pubmed}, but reaches
-$8.5\pm0.5\times$ speedup on \textit{arxivmath} and remains $7.4\times$ faster
+$8.4\pm0.1\times$ speedup on \textit{arxivmath} and remains $7.4\times$ faster
 at the 500-update horizon. MFC is slower and runs out of memory on the largest
 dataset in the full dynamic setting. Thus, native dynamic solvers remain
 important speed baselines, and ComNetX is most useful when a small affected
@@ -815,11 +815,12 @@ higher and farther right is better.
 
 Figure~\ref{fig:topology-ablation} shows that the topology parameters are not
 monotone quality knobs. On \textit{dyn\_pubmed}, endpoint-only settings dominate
-this grid: $L=2,r=0$ gives the best local modularity ($Q=0.783$,
-$92.1\times$), while $L=1,r=0$ is faster ($146.4\times$) with only a small
-additional quality loss. On \textit{arxivmath}, the $r\ge1$ rows have nearly
-the same quality ($Q\approx0.881$), but the runtime cost grows sharply with
-radius; an additional \textit{dyn\_cora} grid gives yet another pattern, with
+the high-radius rows: $L=2,r=0$ gives the best local modularity ($Q=0.783$,
+$94.5\times$), while $L=1,r=1$ remains fast ($54.4\times$) with less
+quality loss than the default. On \textit{arxivmath}, the $r\ge1$ rows have
+nearly the same quality ($Q\approx0.881$), but the runtime cost grows sharply
+with radius; $L=1,r=0$ is much faster ($634.3\times$) with a slightly lower
+$Q=0.879$. An additional \textit{dyn\_cora} grid gives yet another pattern, with
 $L=3,r=0$ closest in modularity and $L=2,r=0$ the fastest near-quality point.
 Together with the different neighborhood-growth rates in Table~\ref{tab:workload},
 these measurements indicate that the useful $L,r$ range is topology-dependent
@@ -867,12 +868,12 @@ final-snapshot NMI.
 \toprule
 \textbf{Variant} & \textbf{dyn\_cora} & \textbf{dyn\_pubmed} \\
 \midrule
-Naive, dataset features & 0.691 / 37.87 / 0.437 & 0.624 / 394.13 / 0.202 \\
-Naive, random features  & $-$0.001 / 14.64 / 0.023 & $-$0.002 / 97.50 / 0.000 \\
-Naive, one-hot features & 0.751 / 45.12 / 0.360 & 0.528 / 11041.55 / 0.059 \\
-Local, dataset features & 0.788 / 8.20 / 0.463 & 0.532 / 39.02 / 0.180 \\
-Local, random features  & 0.784 / 4.86 / 0.462 & 0.534 / 27.61 / 0.186 \\
-Local, one-hot features & 0.779 / 10.65 / 0.452 & 0.518 / 203.13 / 0.182 \\
+Naive, dataset features & 0.691 / 35.71 / 0.437 & 0.624 / 372.45 / 0.202 \\
+Naive, random features  & $-$0.001 / 13.02 / 0.023 & $-$0.002 / 92.18 / 0.000 \\
+Naive, one-hot features & 0.751 / 43.96 / 0.360 & 0.528 / 8568.07 / 0.059 \\
+Local, dataset features & 0.788 / 6.82 / 0.463 & 0.532 / 36.54 / 0.180 \\
+Local, random features  & 0.784 / 4.67 / 0.462 & 0.534 / 25.68 / 0.186 \\
+Local, one-hot features & 0.779 / 7.25 / 0.452 & 0.518 / 195.59 / 0.182 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -893,12 +894,12 @@ in seconds.
 
 The direct ablation separates the two roles of the hierarchy. On
 \textit{dyn\_cora}, removing closure or contraction can reduce time when
-overhead dominates, but no contraction creates an instance about $18\times$
+overhead dominates, but no contraction creates an instance about $12\times$
 larger than the contracted one and loses modularity. On larger graphs, removing
 closure is fastest but loses substantial modularity; removing contraction
-preserves or improves quality on \textit{arxivmath}, but grows the backend
-instance by two orders of magnitude. Contraction is therefore what turns closure
-from context recovery into a scalable update.
+keeps quality close on \textit{arxivmath}, but grows the backend instance by
+two orders of magnitude. Contraction is therefore what turns closure from
+context recovery into a scalable update.
 
 \begin{table}[H]
 \centering
@@ -911,15 +912,15 @@ from context recovery into a scalable update.
 \textbf{Variant} & \textbf{Dataset} & \textbf{$Q$} & \textbf{$T$} &
 \textbf{$|\bar V|/|V|$} \\
 \midrule
-Full ComNetX & dyn\_cora & 0.808 & 0.75 & 0.41\% \\
-Full ComNetX & dyn\_pubmed & 0.758 & 2.36 & 0.20\% \\
-Full ComNetX & arxivmath & 0.871 & 8.90 & 0.24\% \\
-No closure & dyn\_cora & 0.797 & 0.11 & 0.35\% \\
-No closure & dyn\_pubmed & 0.563 & 0.82 & 0.18\% \\
-No closure & arxivmath & 0.732 & 7.60 & 0.22\% \\
-No contraction & dyn\_cora & 0.763 & 0.35 & 7.26\% \\
-No contraction & dyn\_pubmed & 0.671 & 16.07 & 8.81\% \\
-No contraction & arxivmath & 0.874 & 1520.57 & 32.56\% \\
+Full ComNetX & dyn\_cora & 0.811 & 0.54 & 0.42\% \\
+Full ComNetX & dyn\_pubmed & 0.745 & 0.67 & 0.20\% \\
+Full ComNetX & arxivmath & 0.877 & 5.75 & 0.24\% \\
+No closure & dyn\_cora & 0.794 & 0.11 & 0.35\% \\
+No closure & dyn\_pubmed & 0.565 & 0.76 & 0.18\% \\
+No closure & arxivmath & 0.731 & 5.17 & 0.22\% \\
+No contraction & dyn\_cora & 0.776 & 0.27 & 4.92\% \\
+No contraction & dyn\_pubmed & 0.667 & 10.23 & 8.71\% \\
+No contraction & arxivmath & 0.874 & 956.40 & 33.02\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -934,8 +935,8 @@ and the number of update batches. Table~\ref{tab:long-horizon} reports paired
 compact table. Rows give final modularity, final-snapshot NMI, cumulative time,
 and Local speedup over the corresponding non-local backend.
 
-Local Leiden is about $17\times$ faster than full Leiden on \textit{dyn\_pubmed}
-and about $29\times$ faster on \textit{arxivmath}. The NMI gap also grows
+Local Leiden is about $16\times$ faster than full Leiden on \textit{dyn\_pubmed}
+and about $31\times$ faster on \textit{arxivmath}. The NMI gap also grows
 relative to the ten-update setting, especially on \textit{dyn\_pubmed}; drift
 therefore must be reported explicitly rather than inferred from short streams.
 
@@ -950,15 +951,15 @@ therefore must be reported explicitly rather than inferred from short streams.
 \textbf{Dataset} & \textbf{Method} & \textbf{Updates} &
 \textbf{$Q$} & \textbf{NMI} & \textbf{$T$} & \textbf{Speedup} \\
 \midrule
-dyn\_pubmed & Leiden & 500 & 0.784 & 0.208 & 427.50 & 1.0$\times$ \\
-dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 25.06 & 17.1$\times$ \\
-dyn\_pubmed & DF-Leiden & 500 & 0.762 & 0.195 & 8.06 & 1.0$\times$ \\
-dyn\_pubmed & Local DF & 500 & 0.715 & 0.138 & 7.35 & 1.1$\times$ \\
+dyn\_pubmed & Leiden & 500 & 0.784 & 0.208 & 315.38 & 1.0$\times$ \\
+dyn\_pubmed & Local Leiden & 500 & 0.748 & 0.153 & 19.78 & 15.9$\times$ \\
+dyn\_pubmed & DF-Leiden & 500 & 0.762 & 0.195 & 6.23 & 1.0$\times$ \\
+dyn\_pubmed & Local DF & 500 & 0.715 & 0.138 & 5.94 & 1.05$\times$ \\
 \midrule
-arxivmath & Leiden & 500 & 0.887 & 0.427 & 8421.63 & 1.0$\times$ \\
-arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 289.27 & 29.1$\times$ \\
-arxivmath & DF-Leiden & 500 & 0.855 & 0.388 & 243.29 & 1.0$\times$ \\
-arxivmath & Local DF & 500 & 0.869 & 0.335 & 32.99 & 7.4$\times$ \\
+arxivmath & Leiden & 500 & 0.887 & 0.427 & 7201.70 & 1.0$\times$ \\
+arxivmath & Local Leiden & 500 & 0.874 & 0.355 & 235.84 & 30.5$\times$ \\
+arxivmath & DF-Leiden & 500 & 0.855 & 0.388 & 198.86 & 1.0$\times$ \\
+arxivmath & Local DF & 500 & 0.869 & 0.335 & 26.84 & 7.4$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -978,14 +979,16 @@ vertex ranges are 0.58--43.25\% (random), 0.54--25.99\% (hub-centered), and
 0.57--14.77\% (community-internal); the corresponding intra-community
 changed-edge shares are about 50\%, 50\%, and 100\%.
 
-The DSBM stress study exposes the operating envelope. In the five-seed
-100-batch set, $0.01\%$ random, hub-centered, and community-internal streams give
-$3.38$--$3.42\times$, $1.54$--$1.57\times$, and $4.10$--$4.59\times$ speedups;
-at $0.05\%$, only community-internal streams stay above break-even
-($1.13$--$1.19\times$). From $0.1\%$ onward, most local runs are slower,
-especially for $0.5\%$--$1.0\%$ random and hub-centered updates. Quality drift is
-usually small, but the seed sweep includes one community-stream loss of $0.089$
-NMI and a hub-centered $0.5\%$ loss of $0.0229$ modularity and $0.088$ NMI.
+The DSBM stress study exposes the operating envelope. In the 100-batch set,
+$0.01\%$ random, hub-centered, and community-internal streams give
+$3.11$--$3.42\times$, $0.19$--$1.57\times$, and
+$4.20$--$4.59\times$ speedups; the hub-centered minimum is a single low
+replicate. At $0.05\%$, only community-internal streams stay above break-even
+($1.13$--$1.21\times$). From $0.1\%$ onward, most local runs are slower,
+especially for $0.5\%$--$1.0\%$ random and hub-centered updates.
+Quality drift is usually small, but the seed/batch sweep includes one
+community-stream loss of $0.089$ NMI and a hub-centered $0.5\%$ loss of
+$0.0229$ modularity and $0.088$ NMI.
 Large or hub-heavy batches should therefore trigger a full refresh.
 
 \subsubsection{Limitations}

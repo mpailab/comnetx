@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from statistics import mean
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -14,7 +15,16 @@ from matplotlib.lines import Line2D
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MEASUREMENTS = ROOT / "results" / "icdm-2026-0" / "measurements" / "real_graph_measurements.json"
+NEW_MEASUREMENTS = (
+    ROOT
+    / "results"
+    / "icdm-2026-1"
+    / "measurements"
+    / "single_container_real_graph_measurements.json"
+)
+LEGACY_MEASUREMENTS = (
+    ROOT / "results" / "icdm-2026-0" / "measurements" / "real_graph_measurements.json"
+)
 OUT = ROOT / "article" / "topology_ablation_pareto.pdf"
 PDF_METADATA = {
     "Creator": "ComNetX ICDM figure scripts",
@@ -72,25 +82,76 @@ def bundle_order(record: dict) -> int:
     return int(match.group(1)) if match else 10**9
 
 
-def first_matching(records: list[dict], **criteria: object) -> dict:
-    matches = [
+def matching_records(records: list[dict], **criteria: object) -> list[dict]:
+    return [
         record
         for record in records
         if all(str(record.get(key)) == str(value) for key, value in criteria.items())
     ]
+
+
+def select_matching(records: list[dict], aggregate: bool, **criteria: object) -> dict:
+    matches = matching_records(records, **criteria)
     if not matches:
         details = ", ".join(f"{key}={value}" for key, value in sorted(criteria.items()))
         raise RuntimeError(f"missing topology-ablation measurement: {details}")
-    return min(matches, key=bundle_order)
+
+    if not aggregate:
+        return min(matches, key=bundle_order)
+
+    first = min(matches, key=bundle_order)
+    out = dict(first)
+    out["final_modularity"] = mean(float(record["final_modularity"]) for record in matches)
+    out["total_time"] = mean(float(record["total_time"]) for record in matches)
+    return out
+
+
+def load_records(path: Path) -> list[dict]:
+    return json.loads(path.read_text())["records"]
+
+
+def has_complete_grid(records: list[dict], dataset: str) -> bool:
+    full = matching_records(
+        records,
+        method="leidenalg",
+        mode="naive",
+        base_dataset=dataset,
+        batch_strategy="999:10",
+        updates=10,
+    )
+    if not full:
+        return False
+
+    for level in LEVELS:
+        for radius in RADII:
+            local = matching_records(
+                records,
+                method="leidenalg",
+                mode="smart",
+                base_dataset=dataset,
+                batch_strategy="999:10",
+                updates=10,
+                subcoms_depth=level,
+                radius=radius,
+            )
+            if not local:
+                return False
+
+    return True
 
 
 def load_points() -> dict[str, list[Point]]:
-    records = json.loads(MEASUREMENTS.read_text())["records"]
+    new_records = load_records(NEW_MEASUREMENTS)
+    legacy_records = load_records(LEGACY_MEASUREMENTS)
     by_dataset: dict[str, list[Point]] = {}
 
     for dataset in DATASETS:
-        full = first_matching(
+        records = new_records if has_complete_grid(new_records, dataset) else legacy_records
+        aggregate = records is new_records
+
+        full = select_matching(
             records,
+            aggregate,
             method="leidenalg",
             mode="naive",
             base_dataset=dataset,
@@ -113,8 +174,9 @@ def load_points() -> dict[str, list[Point]]:
 
         for level in LEVELS:
             for radius in RADII:
-                record = first_matching(
+                record = select_matching(
                     records,
+                    aggregate,
                     method="leidenalg",
                     mode="smart",
                     base_dataset=dataset,
