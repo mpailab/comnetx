@@ -1,0 +1,37 @@
+{
+  "tag": "icdm-2026-1",
+  "tag_commit": "be141eb873ee4345834d82aad2b0b82bc17bcbe7",
+  "generated_at": "2026-06-02T07:27:42.801578+00:00",
+  "source_root": "results/paper_icdm_reviewer_followup/series_12",
+  "source_json_file_count": 7,
+  "counts": {
+    "total_measurement_entries": 22,
+    "measurement_entries_by_category": {
+      "gamma_sweep_measurements": 12,
+      "dyn_pubmed_leiden_repeats": 10
+    }
+  },
+  "measurement_groups": {
+    "gamma_sweep_measurements": {
+      "description": "Reviewer follow-up Leiden gamma sensitivity measurements for dyn_pubmed and arxivmath.",
+      "measurement_entry_count": 12,
+      "output": "measurements/gamma_sweep_measurements.json"
+    },
+    "dyn_pubmed_leiden_repeats": {
+      "description": "Five single-container repeated Leiden measurements on dyn_pubmed, used to audit runtime variation.",
+      "measurement_entry_count": 10,
+      "output": "measurements/dyn_pubmed_leiden_repeats.json"
+    }
+  },
+  "self_check": {
+    "checks": {
+      "source_json_files_scanned": true,
+      "gamma_sweep_entry_count_is_12": true,
+      "dyn_pubmed_repeat_entry_count_is_10": true,
+      "bundle_record_ids_are_unique": true
+    },
+    "measurement_entries_by_type": {
+      "experiment": 22
+    }
+  }
+}

@@ -197,10 +197,10 @@ Q = \frac{1}{2m} \sum_{i,j}
 \mathbf{1}\{c_i=c_j\},
 \end{equation}
 where $d_i=\sum_j A_{ij}$ and $\gamma$ is the resolution parameter. We use
-$\gamma=1$ in all reported experiments. Modularity is not a ground-truth
-measure and is affected by known resolution limits~\cite{G10,FH16}; therefore
-we also report NMI as a compact external-agreement measure whenever labels are
-available.
+$\gamma=1$ in the main experiments and report a targeted sensitivity check in
+the ablation study. Modularity is not a ground-truth measure and is affected by
+known resolution limits~\cite{G10,FH16}; therefore we also report NMI as a
+compact external-agreement measure whenever labels are available.
 
 \section{Methodology}\label{S:3}
 \subsection{Overview}
@@ -782,6 +782,20 @@ configuration used across the broader compatibility, workload, and long-horizon
 evidence. Radius and hierarchy are workload-dependent locality--context
 controls, not parameters that should be claimed optimal for every graph.
 
+We also test whether the local contraction changes the behaviour of Leiden's
+resolution parameter. On the \texttt{999:50} \textit{dyn\_pubmed} and
+\textit{arxivmath} streams, we rerun full and Local Leiden for
+$\gamma\in\{0.5,1,2\}$. Local speedups remain large across the sweep:
+$41.6$--$44.8\times$ on \textit{dyn\_pubmed} and
+$135.9$--$161.8\times$ on \textit{arxivmath}. The modularity gaps
+$Q_{\mathrm{Local}}-Q_{\mathrm{Full}}$ are $-0.004$, $-0.026$, and $-0.053$
+on \textit{dyn\_pubmed}, and $-0.004$, $-0.010$, and $-0.013$ on
+\textit{arxivmath} for $\gamma=0.5$, $1$, and $2$, respectively. Thus the
+runtime advantage is not specific to $\gamma=1$, while higher resolution can
+increase quality sensitivity on some graphs. We therefore keep a fixed
+resolution for paired comparisons and leave adaptive resolution selection for
+local instances outside the present scope.
+
 For the S$^2$CAG feature-mode ablation on the \texttt{999:100} streams, each
 entry is reported as final modularity $Q$, cumulative time $T$, and
 final-snapshot NMI.
@@ -927,9 +941,10 @@ ComNetX as an adaptive locality framework whose workload and stress-test
 diagnostics indicate when a full refresh is preferable. All reported real-data
 runs use explicit symmetrization so that baselines defined only for undirected
 graphs are evaluated on the same sequence; direction-preserving objectives are
-therefore outside the present evaluation. The experiments also fix $\gamma=1$,
-so adaptive resolution selection for contracted local instances remains future
-work.
+therefore outside the present evaluation. The main experiments also fix
+$\gamma=1$; the sensitivity check above shows that Local Leiden remains fast
+over a small resolution sweep, but adaptive resolution selection for contracted
+local instances remains future work.
 
 \section{Related work} \label{S:5}
 \textbf{Static and modularity-based community detection.} Classical CD methods
