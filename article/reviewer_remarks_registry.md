@@ -134,3 +134,30 @@ the repository, not whether a future reviewer will necessarily agree.
 | Medium | Verify and triage external R2 missing related works (`Sattar23`, `Liu21` seed/anchor, `Han17` adaptive label propagation); keep the authors' concurrent Bokov et al. arXiv work as a deferred citation unless policy and positioning make it necessary. | 90% addressed |
 | High | Decide whether to compute conductance/normalized-cut. Current manuscript should not mention them unless measured or backed by a clear methodological reason. | 50% addressed |
 | Medium | Improve complexity discussion by connecting $k_\ell,\bar m_\ell$ to monitored empirical quantities and worst-case full-refresh behavior. | 88% addressed |
+
+## Review R3: Detailed Textual and Notation Comments
+
+- Received from: user-supplied third reviewer comments.
+- Registered on: 2026-06-02.
+- Overall status: 92% addressed.
+- Overall risk: low to moderate. The comments mainly target notation,
+  definitions, citation placement, and wording in Sections II--III. The current
+  revision addresses them with local text changes and does not require new
+  experiments.
+
+### Actionable Comments
+
+| ID | Reviewer Concern | Current Status | Corrections Made | Evidence | Remaining Work |
+| --- | --- | --- | --- | --- | --- |
+| R3-2A | Fixed vertex set wording is unclear because vertices are said to appear or disappear from the edge set. | 100% addressed | Rephrased the dynamic graph model as a fixed vertex universe. Edge updates may make vertices isolated or non-isolated in individual snapshots, but vertices remain in $V$. | `article/article.tex`: Dynamic Graph Model. | None. |
+| R3-2B | Baseline names are first introduced without citations. | 100% addressed | Added citations at the first Community Detection Interface mention for Leiden, FLMIG, DMoN, MAGI, S$^2$CAG, MFC, and DF-Leiden. | `article/article.tex`: Community Detection Interface. | None. |
+| R3-2C | Modularity is defined only for undirected graphs; NMI is mentioned without definition. | 95% addressed | Replaced the modularity display with a directed/undirected weighted definition using in/out degrees and noted the undirected symmetric reduction. Added a compact NMI formula with a citation. | `article/article.tex`: Modularity subsection; new bibliography item `Danon05`. | Optional: if space permits, add the empirical contingency-table notation for NMI in an appendix/rebuttal. Main text definition is now sufficient. |
+| R3-3B | Distance to a set is undefined; implementation detail about sparse matrix-vector multiplication is unnecessary; "graph ball" and closure wording are unclear; $U_t^\ell$ notation is imprecise; hierarchy-vs-radius sentence sounds generic. | 95% addressed | Defined $\operatorname{dist}_{\mathbf{A}_t}(v,S_t)$ as shortest-path distance in the unweighted symmetrized support graph; removed the sparse matrix-vector multiplication sentence; replaced "graph ball" with "radius-expanded affected set"; rewrote $U_t^\ell$ with an existential quantifier over $u\in B_r(S_t)$; rephrased the hierarchy-context sentence. | `article/article.tex`: Affected Region and Hierarchical Closure. | None expected. |
+| R3-3C | Local aggregation introduces unnecessary variables $U,g$; $\mathbf{A}^{(\ell)}_t$ is not defined; feature aggregation formula is ambiguous across levels. | 95% addressed | Kept the level index $\ell$ throughout; defined $g_\ell(i)$ and $\mathbf{P}_\ell$ directly on $U_t^\ell$; defined the working adjacency sequence $\mathbf{A}^{(0)}_t,\mathbf{A}^{(\ell+1)}_t$; clarified that feature aggregation is from original vertex features at each level, matching the implementation. | `article/article.tex`: Local Aggregation; `src/optimizer.py`: feature aggregation behavior checked. | None expected. |
+| R3-3E | $\operatorname{nnz}$ is undefined; formulas in Sections II--III should be unnumbered because they are not referenced. | 100% addressed | Added a definition of $\operatorname{nnz}$ in the complexity subsection and converted all displayed equations in Sections II--III to `equation*`. | `article/article.tex`: Sections II--III. | None. |
+
+### Follow-Up Queue
+
+| Priority | Task | Status |
+| --- | --- | --- |
+| Low | Rebuild the article and verify page count, warnings, and citations after R3 edits. | 100% addressed |

@@ -114,9 +114,9 @@ algorithms, graph neural networks
 %----------------------------------------------------------------------------------------
 
 \section{Introduction}
-Dynamic networks model systems whose interactions change over time, including social, biological, communication, and information networks~\cite{N03,OSH07,PBV07}. Community detection (CD) is a central task in such data: it identifies groups of vertices with coherent structural or functional roles and supports monitoring, recommendation, anomaly detection, and exploratory analysis~\cite{POM09,SF09,RCC04,FL02}. Modularity remains one of the most widely used quality criteria~\cite{NG04,BDG08}, and scalable methods such as Louvain and Leiden are strong practical baselines~\cite{BGLL08,TWE19,Sah23}. However, these methods were mainly designed for static snapshots. In dynamic settings, even a small batch of edge updates may require rerunning a solver on the entire graph, which is prohibitive for large networks.
+Dynamic networks model systems whose interactions change over time, including social, communication, biological, and information networks~\cite{OSH07,PBV07,RC17}. Community detection (CD) is a central task in such data: it identifies groups of vertices with coherent structural or functional roles and supports monitoring, recommendation, anomaly detection, and exploratory analysis~\cite{POM09,SF09,RCC04,FL02}. Modularity remains one of the most widely used quality criteria~\cite{NG04,BDG08}, and scalable methods such as Louvain and Leiden are strong practical baselines~\cite{BGLL08,TWE19}; shared-memory implementations further improve static throughput~\cite{LHK14,Sah23}. However, these methods were mainly designed for static snapshots. In dynamic settings, even a small batch of edge updates may require rerunning a solver on the entire graph, which is prohibitive for large networks.
 
-Existing dynamic CD methods reduce this cost by reusing previous partitions, applying incremental modularity updates, or processing affected neighborhoods~\cite{RC17,LHK14,HKT17,ZK21,SLe24}. These ideas are essential for scalability, but they are often tied to a specific objective or update rule. Meanwhile, modern graph clustering increasingly incorporates attributes and neural representations~\cite{CCL23,ZXY20,DSD24,LXZ23,JLL23,TPP23}. Feature-aware and GNN-based methods can capture richer dependencies than purely topological heuristics, yet repeatedly applying them to full snapshots is even more expensive. A dynamic framework should therefore support both classical and feature-aware solvers without redesigning each solver from scratch.
+Existing dynamic CD methods reduce this cost by reusing previous partitions, applying incremental modularity updates, or processing affected neighborhoods~\cite{RC17,CT13,HKT17,ZCL19,ZK21,SLe24}. These ideas are essential for scalability, but they are often tied to a specific objective or update rule. Meanwhile, modern graph clustering increasingly incorporates attributes and neural representations~\cite{CCL23,ZXY20,DSD24,LXW26,JLL23,TPP23}. Feature-aware and GNN-based~\cite{SGH09} methods can capture richer dependencies than purely topological heuristics, yet repeatedly applying them to full snapshots is even more expensive. A dynamic framework should therefore support both classical and feature-aware solvers without redesigning each solver from scratch.
 Continuous-time temporal community methods address a related but different
 problem: they track communities directly in link streams and model when
 vertices enter or leave them. We discuss this line in Section~\ref{S:5}, but
@@ -146,8 +146,10 @@ The paper is organized as follows. Section~\ref{S:2} gives the preliminary defin
 \subsection{Dynamic Graph Model}
 
 Let $G_t=(V,E_t,\mathbf{A}_t,\mathbf{X})$ denote a graph snapshot at
-discrete time $t$. We assume a fixed vertex set with
-$n=|V|$ vertices; isolated vertices may appear or disappear from the edge set.
+discrete time $t$. We assume a fixed vertex universe $V$ with $n=|V|$
+vertices throughout the stream. Edge updates may make a vertex isolated in a
+particular snapshot, or make a previously isolated vertex incident to new
+edges, but such vertices remain elements of $V$.
 The sparse weighted adjacency matrix is $\mathbf{A}_t\in\mathbb{R}^{n\times n}$.
 When node attributes are available, they are stored in
 $\mathbf{X}\in\mathbb{R}^{n\times d}$; otherwise the method can run with
@@ -155,16 +157,16 @@ synthetic or no features, depending on the selected backend.
 
 The transition from $G_{t-1}$ to $G_t$ is represented by a sparse signed batch
 update $\Delta_t$:
-\begin{equation}
+\begin{equation*}
     \mathbf{A}_t = \mathbf{A}_{t-1} + \Delta_t .
-\end{equation}
+\end{equation*}
 A positive entry inserts or increases an edge weight, while a negative entry
 deletes or decreases it. The endpoints of non-zero entries form the directly
 affected set
-\begin{equation}
+\begin{equation*}
     S_t = \{\, i \in V \mid \exists j:\Delta_t(i,j)\ne 0
           \ \text{or}\ \Delta_t(j,i)\ne 0 \,\}.
-\end{equation}
+\end{equation*}
 For directed input graphs, ComNetX uses the symmetrized adjacency only for
 detecting affected neighborhoods; the stored adjacency and the downstream
 metric computation keep the representation selected by the experiment.
@@ -172,35 +174,48 @@ metric computation keep the representation selected by the experiment.
 \subsection{Community Detection Interface}
 
 A community detection solver is treated as a black-box procedure
-\begin{equation}
+\begin{equation*}
     \mathcal{B}(\mathbf{A},\mathbf{X},\mathbf{y}_0) \mapsto \mathbf{y},
-\end{equation}
+\end{equation*}
 where $\mathbf{A}$ is an adjacency matrix, $\mathbf{X}$ is optional, and
 $\mathbf{y}_0$ is an optional warm-start partition. This interface covers
-modularity heuristics such as Leiden and FLMIG, feature-aware GNN clustering
-models such as DMoN, MAGI, S$^2$CAG, and MFC, and dynamic backends such as
-DF-Leiden when they are used as local solvers. A \textit{naive} dynamic
+modularity heuristics such as Leiden~\cite{TWE19} and FLMIG~\cite{TTB24},
+feature-aware GNN clustering models such as DMoN~\cite{TPP23},
+MAGI~\cite{LLC24}, S$^2$CAG~\cite{LYZ25}, and MFC~\cite{KZL24}, and dynamic
+backends such as DF-Leiden~\cite{SLe24} when they are used as local solvers.
+A \textit{naive} dynamic
 adaptation of $\mathcal{B}$ simply runs it on each full snapshot:
-\begin{equation}
+\begin{equation*}
     \mathbf{y}_t =
     \mathcal{B}(\mathbf{A}_t,\mathbf{X},\mathbf{y}_{t-1}).
-\end{equation}
+\end{equation*}
 This is often a strong quality baseline, but its update time depends on the
 full graph rather than on the changed region.
 
 \subsection{Modularity}
-For topology-based evaluation we use modularity~\cite{NG04}. On an undirected
-weighted graph with total edge weight $m$ and partition labels $c_i$, it is
-\begin{equation}
-Q = \frac{1}{2m} \sum_{i,j}
-\left[A_{ij} - \gamma\frac{d_i d_j}{2m}\right]
+For topology-based evaluation we use modularity~\cite{NG04}. For a weighted
+adjacency matrix $\mathbf{A}$, directed or undirected, let
+$W=\sum_{i,j}A_{ij}$, $d_i^{\mathrm{out}}=\sum_j A_{ij}$, and
+$d_j^{\mathrm{in}}=\sum_i A_{ij}$. For partition labels $c_i$, we compute
+\begin{equation*}
+Q = \frac{1}{W} \sum_{i,j}
+\left[A_{ij} - \gamma\frac{d_i^{\mathrm{out}}d_j^{\mathrm{in}}}{W}\right]
 \mathbf{1}\{c_i=c_j\},
-\end{equation}
-where $d_i=\sum_j A_{ij}$ and $\gamma$ is the resolution parameter. We use
-$\gamma=1$ in the main experiments and report a targeted sensitivity check in
-the ablation study. Modularity is not a ground-truth measure and is affected by
-known resolution limits~\cite{G10,FH16}; therefore we also report NMI as a
-compact external-agreement measure whenever labels are available.
+\end{equation*}
+where $\gamma$ is the resolution parameter. For an undirected graph stored as a
+symmetric adjacency, $W=2m$ and $d_i^{\mathrm{out}}=d_i^{\mathrm{in}}=d_i$,
+which recovers the standard undirected definition. We use $\gamma=1$ in the
+main experiments and report a targeted sensitivity check in the ablation study.
+Modularity is not a ground-truth measure and is affected by known resolution
+limits~\cite{G10,FH16}; therefore we also report normalized mutual information
+(NMI) as a compact external-agreement measure whenever labels are available.
+For a predicted partition $C$ and ground-truth labels $Z$, we use the symmetric
+normalization
+\begin{equation*}
+\mathrm{NMI}(C,Z)=\frac{2I(C;Z)}{H(C)+H(Z)},
+\end{equation*}
+where $I$ is empirical mutual information and $H$ is empirical entropy of the
+corresponding label distributions~\cite{Danon05}.
 
 \section{Methodology}\label{S:3}
 \subsection{Overview}
@@ -236,58 +251,66 @@ back to the original vertices.
 
 Let $r$ be a small integer radius. ComNetX expands the directly affected set
 $S_t$ to
-\begin{equation}
+\begin{equation*}
 B_r(S_t)=\{v\in V \mid \operatorname{dist}_{\mathbf{A}_t}(v,S_t)\le r\}.
-\end{equation}
-This expansion is performed by repeated sparse
-matrix--vector multiplication on the symmetrized adjacency, which makes the
-same routine applicable to directed and undirected inputs.
+\end{equation*}
+Here $\operatorname{dist}_{\mathbf{A}_t}(v,S_t)=
+\min_{u\in S_t}\operatorname{dist}_{\mathrm{supp}(\mathbf{A}_t+\mathbf{A}_t^\top)}(v,u)$,
+i.e., the shortest-path distance to the set $S_t$ in the unweighted
+symmetrized support graph.
 
-The graph ball alone is not sufficient for high-quality local recomputation:
-if only part of an existing community is included, the local solver loses the
-context needed to decide whether that community should split, merge, or remain
-unchanged. Therefore, at each hierarchy level $\ell$ we close the affected set
-under the current community labels:
-\begin{equation}
+The radius-expanded affected set alone is not sufficient for high-quality local
+recomputation: if only part of an existing community is included, the local
+solver loses the context needed to decide whether that community should split,
+merge, or remain unchanged. Therefore, at each hierarchy level $\ell$ we close
+the affected set under the current community labels:
+\begin{equation*}
 U_t^\ell =
-\{v\in V \mid \mathbf{C}_{t-1}[\ell,v]\in
-\mathbf{C}_{t-1}[\ell,B_r(S_t)]\}.
-\end{equation}
+\{v\in V \mid \exists u\in B_r(S_t):
+\mathbf{C}_{t-1}[\ell,v]=\mathbf{C}_{t-1}[\ell,u]\}.
+\end{equation*}
 Only vertices in $U_t^\ell$ may be relabeled at level $\ell$; vertices outside
-this set keep their previous labels. This is the main difference between
-ComNetX and a pure radius-limited update: the radius controls where the update
-starts, while the hierarchy controls how much community context is preserved.
+this set keep their previous labels. Thus radius expansion identifies the
+communities that may need revision, and hierarchical closure supplies the full
+current context of those communities to the local backend.
 
 \subsection{Local Aggregation}
 
-For a fixed level $\ell$, let $U=U_t^\ell$ and let
-$g:U\rightarrow\{1,\ldots,k_\ell\}$ map each vertex to the compact identifier
-of its current community at that level. ComNetX builds a sparse membership
-matrix $\mathbf{P}_\ell\in\{0,1\}^{k_\ell\times n}$:
-\begin{equation}
+Fix the update time $t$. At level $\ell$, let
+$g_\ell(i)\in\{1,\ldots,k_\ell\}$ be the compact identifier of the current
+level-$\ell$ community containing $i\in U_t^\ell$. ComNetX builds a sparse
+membership matrix $\mathbf{P}_\ell\in\{0,1\}^{k_\ell\times n}$:
+\begin{equation*}
     \mathbf{P}_\ell[a,i]=1
-    \quad\Longleftrightarrow\quad i\in U\ \text{and}\ g(i)=a .
-\end{equation}
-The local contracted graph is then
-\begin{equation}
+    \quad\Longleftrightarrow\quad i\in U_t^\ell\ \text{and}\ g_\ell(i)=a .
+\end{equation*}
+Let $\mathbf{A}^{(0)}_t$ be $\mathbf{A}_t$ restricted to the affected
+level-$0$ closure and embedded in the original $n\times n$ index space. After
+level $\ell$, inter-community edges are removed from $\mathbf{A}^{(\ell)}_t$ to
+form $\mathbf{A}^{(\ell+1)}_t$. The local contracted graph at level $\ell$ is
+then
+\begin{equation*}
     \bar{\mathbf{A}}_\ell
     = \mathbf{P}_\ell \mathbf{A}^{(\ell)}_t \mathbf{P}_\ell^\top ,
-\end{equation}
-where $\mathbf{A}^{(\ell)}_t$ is the working adjacency at the current level.
-Thus edge weights between two supernodes are exactly the sums of edge weights
-between the corresponding communities.
+\end{equation*}
+so edge weights between two supernodes are exactly the sums of edge weights
+between the corresponding level-$\ell$ communities.
 
 If the selected backend uses features, ComNetX constructs supernode features by
-summing or averaging member features:
-\begin{equation}
+summing or averaging original vertex features represented by each level-$\ell$
+supernode. Let $n_{\ell a}=|\{i\in U_t^\ell:g_\ell(i)=a\}|$; then
+\begin{equation*}
     \bar{\mathbf{X}}_\ell[a]
     =
     \begin{cases}
-    \sum_{i:g(i)=a}\mathbf{X}_i, & \text{sum mode},\\[2mm]
-    |g^{-1}(a)|^{-1}\sum_{i:g(i)=a}\mathbf{X}_i,
+    \sum_{i\in U_t^\ell:g_\ell(i)=a}\mathbf{X}_i, & \text{sum mode},\\[2mm]
+    n_{\ell a}^{-1}\sum_{i\in U_t^\ell:g_\ell(i)=a}\mathbf{X}_i,
     & \text{normalized mode}.
     \end{cases}
-\end{equation}
+\end{equation*}
+Feature aggregation is therefore defined from the original vertex feature
+matrix at each level, not recursively from previously aggregated supernode
+features.
 The experiments use normalized aggregation for feature-aware local runs. For
 topology-only solvers, feature aggregation is skipped. Structural edge weights
 are preserved in $\bar{\mathbf{A}}_\ell$; in the reported feature modes they do
@@ -296,10 +319,10 @@ not additionally reweight $\bar{\mathbf{X}}_\ell$.
 \subsection{Relabeling and Hierarchy Update}
 
 The base solver is invoked on the aggregated instance:
-\begin{equation}
+\begin{equation*}
     \bar{\mathbf{y}}_\ell =
     \mathcal{B}(\bar{\mathbf{A}}_\ell,\bar{\mathbf{X}}_\ell,\varnothing).
-\end{equation}
+\end{equation*}
 The aggregated labels are projected back to the original graph by assigning all
 vertices represented by the same supernode to the corresponding new local
 cluster. ComNetX reuses existing community identifiers whenever
@@ -345,16 +368,18 @@ features $\mathbf{X}$, update $\Delta_t$, radius $r$, backend $\mathcal{B}$
 
 Let $b_t=|B_r(S_t)|$, let $h_\ell=|U_t^\ell|$, and let
 $k_\ell$ be the number of affected communities contracted at level $\ell$.
-For one update, ComNetX performs neighborhood expansion, sparse aggregation,
-and one backend call per level. Its time can be written as
-\begin{equation}
+Let $\operatorname{nnz}(\mathbf{M})$ denote the number of nonzero entries in a
+sparse matrix $\mathbf{M}$. For one update, ComNetX performs neighborhood
+expansion, sparse aggregation, and one backend call per level. Its time can be
+written as
+\begin{equation*}
 \begin{aligned}
 O\!\Big(&\operatorname{nnz}(\Delta_t)+\operatorname{expand}_r(S_t)\\
 &+\sum_{\ell=0}^{L-1}\big[
 \operatorname{nnz}(\mathbf{A}_t[U_t^\ell])
 +T_{\mathcal{B}}(k_\ell,\bar m_\ell,\bar d)\big]\Big).
 \end{aligned}
-\end{equation}
+\end{equation*}
 where $\bar m_\ell=\operatorname{nnz}(\bar{\mathbf{A}}_\ell)$ and $\bar d$ is
 the aggregated feature dimension when features are used. The memory footprint
 of a backend call is governed by the contracted local graph, not by the full
@@ -503,7 +528,7 @@ recomputation. \textit{FLMIG}~\cite{TTB24} is included as a Louvain-style local
 move method with aggressive pruning. For representation-learning and
 feature-aware graph clustering, we include DMoN~\cite{TPP23},
 MAGI~\cite{LLC24}, S$^2$CAG~\cite{LYZ25}, and the PRGPT-Infomap and
-PRGPT-Locale variants~\cite{QZG24}; DMoN, MAGI, and S$^2$CAG use node
+PRGPT-Locale variants~\cite{QZG24HPEC}; DMoN, MAGI, and S$^2$CAG use node
 features when available, whereas the PRGPT variants are evaluated through their
 topological clustering outputs. The native dynamic baselines are
 DF-Leiden~\cite{SLe24}, an OpenMP-parallel dynamic Leiden implementation, and
@@ -1020,7 +1045,7 @@ and feature-aware backends.
 \textbf{Attributed and GNN-based graph clustering.} Attributed and GNN-based
 methods extend CD beyond purely topological criteria. Surveys and recent
 models show that neural embeddings can capture high-order dependencies and
-combine naturally with modularity or clustering losses~\cite{CCL23,LXZ23,TPP23,SGH09,LYD24,ZXZ20}.
+combine naturally with modularity or clustering losses~\cite{CCL23,LXW26,TPP23,LYD24,ZXZ20}.
 Examples include modularity-oriented contrastive learning and neural modularity
 maximization~\cite{LLC24,BKH24}, structural-entropy objectives~\cite{ZPS25},
 pre-train-and-refine pipelines for scalable partitioning~\cite{QZG24,QZG24HPEC},
@@ -1059,142 +1084,140 @@ approaches the full snapshot, indicating when a full refresh is preferable.
 \begingroup
 \begin{thebibliography}{00}
 \fontsize{6.0}{6.1}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}
-\bibitem{N03}
-    Newman, M.E.J. (2003). The structure and function of complex networks. \textit{SIAM Review}, 45(2), 167--256.
 \bibitem{OSH07}
-    Onnela, J., Saram{\"a}ki, J., Hyv{\"o}nen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7332--7336.
+    Onnela, J.-P., Saram{\"a}ki, J., Hyv{\"o}nen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7332--7336.
 \bibitem{PBV07}
-    Palla, G., Barab{\'a}si, A., \& Vicsek, T. (2007). Quantifying social group evolution. \textit{Nature}, 446, 664--667. 
+    Palla, G., Barab{\'a}si, A.-L., \& Vicsek, T. (2007). Quantifying social group evolution. \textit{Nature}, 446, 664--667.
+\bibitem{RC17}
+    Rossetti, G., \& Cazabet, R. (2018). Community discovery in dynamic networks: A survey. \textit{ACM Computing Surveys}, 51(2), Article 35, 1--37.
+\bibitem{POM09}
+    Porter, M.A., Onnela, J.-P., \& Mucha, P.J. (2009). Communities in networks. \textit{Notices of the American Mathematical Society}, 56(9), 1082--1097, 1164--1166.
+\bibitem{SF09}
+    Fortunato, S. (2010). Community detection in graphs. \textit{Physics Reports}, 486(3--5), 75--174.
+\bibitem{RCC04}
+    Radicchi, F., Castellano, C., Cecconi, F., Loreto, V., \& Parisi, D. (2004). Defining and identifying communities in networks. \textit{Proceedings of the National Academy of Sciences}, 101(9), 2658--2663.
+\bibitem{FL02}
+    Flake, G.W., Lawrence, S., Giles, C.L., \& Coetzee, F.M. (2002). Self-organization and identification of web communities. \textit{Computer}, 35(3), 66--71.
+\bibitem{NG04}
+    Newman, M.E.J., \& Girvan, M. (2004). Finding and evaluating community structure in networks. \textit{Physical Review E}, 69, 026113.
+\bibitem{BDG08}
+    Brandes, U., Delling, D., Gaertler, M., G{\"o}rke, R., Hoefer, M., Nikoloski, Z., \& Wagner, D. (2008). On modularity clustering. \textit{IEEE Transactions on Knowledge and Data Engineering}, 20(2), 172--188.
+\bibitem{BGLL08}
+    Blondel, V., Guillaume, J., Lambiotte, R., \& Lefebvre, E. (2008). Fast unfolding of communities in large networks. \textit{Journal of Statistical Mechanics: Theory and Experiment}, P10008.
+\bibitem{TWE19}
+    Traag, V.A., Waltman, L., \& van Eck, N.J. (2019). From Louvain to Leiden: Guaranteeing well-connected communities. \textit{Scientific Reports}, 9, Article 5233.
+\bibitem{LHK14}
+    Lu, H., Halappanavar, M., \& Kalyanaraman, A. (2015). Parallel heuristics for scalable community detection. \textit{Parallel Computing}, 47, 19--37.
+\bibitem{Sah23}
+    Sahu, S., Kothapalli, K., \& Banerjee, D.S. (2024). Fast Leiden algorithm for community detection in shared memory setting. \textit{Proc. 53rd International Conference on Parallel Processing (ICPP)}, 11--20.
+\bibitem{CT13}
+    Chong, W.H., \& Teow, L.-N. (2013). An incremental batch technique for community detection. \textit{Proc. 16th International Conference on Information Fusion (FUSION)}, 750--757.
+\bibitem{HKT17}
+    Halappanavar, M., Lu, H., Kalyanaraman, A., \& Tumeo, A. (2017). Scalable static and dynamic community detection using Grappolo. \textit{Proc. IEEE High Performance Extreme Computing Conference (HPEC)}, 1--6.
+\bibitem{ZCL19}
+    Zhuang, D., Chang, J.M., \& Li, M. (2021). DynaMo: Dynamic community detection by incrementally maximizing modularity. \textit{IEEE Transactions on Knowledge and Data Engineering}, 33(5), 1934--1945.
+\bibitem{ZK21}
+    Zarayeneh, N., \& Kalyanaraman, A. (2021). Delta-Screening: A fast and efficient technique to update communities in dynamic graphs. \textit{IEEE Transactions on Network Science and Engineering}, 8(2), 1614--1629.
+\bibitem{SLe24}
+    Sahu, S. (2024). A starting point for dynamic community detection with Leiden algorithm. \textit{arXiv preprint arXiv:2405.11658}.
+\bibitem{CCL23}
+    Chunaev, P. (2020). Community detection in node-attributed social networks: A survey. \textit{Computer Science Review}, 37, Article 100286.
+\bibitem{ZXY20}
+    Zhang, Y., Xiong, Y., Ye, Y., Liu, T., Wang, W., Zhu, Y., \& Yu, P.S. (2020). SEAL: Learning heuristics for community detection with generative adversarial networks. \textit{Proc. 26th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1103--1113.
+\bibitem{DSD24}
+    Devesh Kumar, V.V., Sreesankar, S., Dinesan, K., Nair, P.B., \& Deepthi, L.R. (2024). Analyzing GNN models for community detection using graph embeddings: A comparative study. \textit{Proc. 15th International Conference on Computing Communication and Networking Technologies (ICCCNT)}, 1--8.
+\bibitem{LXW26}
+    Liu, Y., Xia, J., Wu, B. et al. (2026). A survey of deep graph clustering: Taxonomy, challenge, application, and open resource. \textit{IEEE Transactions on Knowledge and Data Engineering}, 38(6), 3365--3384.
+\bibitem{JLL23}
+    Ji, S., Lu, X., Liu, M. et al. (2023). Community-based dynamic graph learning for popularity prediction. \textit{Proc. 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 930--940.
+\bibitem{TPP23}
+    Tsitsulin, A., Palowitch, J., Perozzi, B., \& M{\"u}ller, E. (2023). Graph clustering with graph neural networks. \textit{Journal of Machine Learning Research}, 24(127), 1--21.
+\bibitem{SGH09}
+    Scarselli, F., Gori, M., Tsoi, A.C., Hagenbuchner, M., \& Monfardini, G. (2009). The graph neural network model. \textit{IEEE Transactions on Neural Networks}, 20(1), 61--80.
+\bibitem{TTB24}
+    Taibi, S., Toumi, L., \& Bouamama, S. (2025). Complex network community discovery using fast local move iterated greedy algorithm. \textit{The Journal of Supercomputing}, 81(1), Article 182.
+\bibitem{LLC24}
+    Liu, Y., Li, J., Chen, Y. et al. (2024). Revisiting modularity maximization for graph clustering: A contrastive learning perspective. \textit{Proc. 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1968--1979.
+\bibitem{LYZ25}
+    Lin, X., Yang, R., Zheng, H., \& Ke, X. (2025). Spectral subspace clustering for attributed graphs. \textit{Proc. 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 789--799.
+\bibitem{KZL24}
+    Kong, D., Zhang, A., \& Li, Y. (2024). Learning persistent community structures in dynamic networks via topological data analysis. \textit{Proceedings of the AAAI Conference on Artificial Intelligence}, 38(8), 8617--8626.
+\bibitem{G10}
+    Good, B.H., de Montjoye, Y.-A., \& Clauset, A. (2010). Performance of modularity maximization in practical contexts. \textit{Physical Review E}, 81, 046106.
+\bibitem{FH16}
+    Fortunato, S., \& Hric, D. (2016). Community detection in networks: A user guide. \textit{Physics Reports}, 659, 1--44.
+\bibitem{Danon05}
+    Danon, L., D{\'i}az-Guilera, A., Duch, J., \& Arenas, A. (2005). Comparing community structure identification. \textit{Journal of Statistical Mechanics: Theory and Experiment}, P09008.
 \bibitem{HLL83}
     Holland, P.W., Laskey, K.B., \& Leinhardt, S. (1983). Stochastic blockmodels: First steps. \textit{Social Networks}, 5(2), 109--137.
 \bibitem{XH14}
     Xu, K.S., \& Hero, A.O. (2014). Dynamic stochastic blockmodels for time-evolving social networks. \textit{IEEE Journal of Selected Topics in Signal Processing}, 8(4), 552--562.
-\bibitem{POM09}
-    Porter, M.A., Onnela, J.P., \& Mucha, P.J. et al. (2009). Communities in Networks. \textit{Notices AMS}, 56(9), 1082--1097.
-\bibitem{SF09}
-    Fortunato, S. (2010). Community detection in graphs. \textit{Physics Reports}, 486(3--5), 75--174. 
-\bibitem{RCC04}
-    Radicchi, F., Castellano, C., \& Cecconi, F. et al. (2004). Defining and identifying communities in networks. \textit{Proceedings of the National Academy of Sciences}, 101(9).
-\bibitem{FL02}
-    Flake, G.W., \& Lawrence, S. (2002). Self-Organization and Identification of Web Communities. \textit{Computer}, 35(3), 66--70.
+\bibitem{QZG24HPEC}
+    Qin, M., Zhang, C., Gao, Y. et al. (2024). Towards faster graph partitioning via pre-training and inductive inference. \textit{Proc. IEEE High Performance Extreme Computing Conference (HPEC)}.
 \bibitem{RB07}
-    Rosvall, M., \& Bergstrom, C.T. (2007). An information-theoretic framework for resolving community structure in complex networks. \textit{Proceedings of the National Academy of Sciences}, 104, 7327--7331.
+    Rosvall, M., \& Bergstrom, C.T. (2007). An information-theoretic framework for resolving community structure in complex networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7327--7331.
 \bibitem{TS23}
-    Traag, V.A., {\v S}ubelj, L. (2023). Large network community detection by fast label propagation. \textit{Scientific Reports}, 13, 2701.
-\bibitem{NG04}
-    Newman, M.E.J., Girvan, M. (2004). Finding and evaluating community structure in networks. \textit{Physical Review E}, 69(2), 026113. 
-\bibitem{BDG08}
-    Brandes, U., Delling, D., \& Gaertler, M. (2008). On Modularity Clustering. \textit{IEEE Transactions on Knowledge and Data Engineering}, 20(2), 172--188.
-\bibitem{BGLL08}
-    Blondel, V., Guillaume, J., Lambiotte, R., \& Lefebvre, E. (2008). Fast unfolding of communities in large networks. \textit{Journal of Statistical Mechanics: Theory and Experiment}, P10008.
-\bibitem{TWE19}
-    Traag, V.A., Waltman, L., Van Eck, N.J. (2019). From Louvain to Leiden: guaranteeing well-connected communities. \textit{Scientific reports}, 9, Article 5233. 
-\bibitem{Sah23}
-    Sahu, S. (2023). GVE-Leiden: Fast Leiden Algorithm for Community Detection in Shared Memory Setting. \textit{arXiv preprint}.
-\bibitem{RC17}
-    Rossetti, G., Cazabet, R. (2017). Community Discovery in Dynamic Networks: A Survey. \textit{ACM Computing Surveys}, 51(2), 1--37. 
+    Traag, V.A., \& {\v S}ubelj, L. (2023). Large network community detection by fast label propagation. \textit{Scientific Reports}, 13, Article 2701.
+\bibitem{YL15}
+    Yang, J., \& Leskovec, J. (2015). Defining and evaluating network communities based on ground-truth. \textit{Knowledge and Information Systems}, 42(1), 181--213.
+\bibitem{YAT16}
+    Yang, Z., Algesheimer, R., \& Tessone, C.J. (2016). A comparative analysis of community detection algorithms on artificial networks. \textit{Scientific Reports}, 6(1), Article 30750.
+\bibitem{Rustamaji24}
+    Rustamaji, H.C., Kusuma, W.A., Nurdiati, S., \& Batubara, I. (2024). Community detection with greedy modularity disassembly strategy. \textit{Scientific Reports}, 14, Article 4694.
 \bibitem{CZW23}
-    Cai, L., Zhou, J., Wang, D. (2023). Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm. \textit{PeerJ Computer Science}, 9, e1477.
-\bibitem{HKT17}
-    Halappanavar, M., Lu, H., Kalyanaraman, A., \& Tumeo, A. (2017). Scalable static and dynamic community detection using Grappolo. \textit{Proc. HPEC}, 1--6.
-\bibitem{LHK14}
-    Lu, H., Halappanava, M., \& Kalyanaraman, A. (2015). Parallel Heuristics for Scalable Community Detection. \textit{Parallel Computing}, 47, 19--37.
-\bibitem{HHC22}
-    Hanauer, K., Henzinger, M., \& Schulz, C. (2022). Recent Advances in Fully Dynamic Graph Algorithms: A Quick Reference Guide. \textit{ACM JEA}, 27, 1--45.
-\bibitem{CT13}
-    Chong, W.H., \& Teow, L.-N. (2013). An incremental batch technique for community detection. \textit{Proc. FUSION}, 750--757.
+    Cai, L., Zhou, J., \& Wang, D. (2023). Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm. \textit{PeerJ Computer Science}, 9, e1477.
+\bibitem{Sattar23}
+    Sattar, N.S., Bulu{\c c}, A., Ibrahim, K.Z., \& Arifuzzaman, S. (2023). Exploring temporal community evolution: Algorithmic approaches and parallel optimization for dynamic community detection. \textit{Applied Network Science}, 8, Article 64.
 \bibitem{SLX14}
-    Shang, J., Liu, L., Xie, F., Chen, Z., Miao, J., Fang, X., \& Wu, C. (2014). A real-time detecting algorithm for tracking community structure of dynamic networks. \textit{arXiv preprint}.
+    Shang, J., Liu, L., Xie, F., Chen, Z., Miao, J., Fang, X., \& Wu, C. (2014). A real-time detecting algorithm for tracking community structure of dynamic networks. \textit{arXiv preprint arXiv:1407.2683}.
 \bibitem{MZW20}
-    Ma, Y., Zhao, Y., Wang, J., et al. (2020). Modularity-Based Incremental Label Propagation Algorithm for Community Detection. \textit{Applied Sciences}, 10(12), 4060.
-\bibitem{ZCL19}
-    Zhuang, D., Chang, J., \& Li, M. (2019). DynaMo: Dynamic community detection by incrementally maximizing modularity. \textit{IEEE TKDE}, 33(5), 1934--1945.
+    Ma, Y., Zhao, Y., Wang, J., Liu, M., Shen, W., \& Ma, Y. (2020). Modularity-based incremental label propagation algorithm for community detection. \textit{Applied Sciences}, 10(12), Article 4060.
 \bibitem{Seif20}
-    Seifikar M., Farzi S., Barati M. (2020). C-Blondel: An Efficient Louvain-Based Dynamic Community Detection Algorithm. \textit{IEEE Transactions on Computational Social Systems}, 7(2), 308--318.
+    Seifikar, M., Farzi, S., \& Barati, M. (2020). C-Blondel: An efficient Louvain-based dynamic community detection algorithm. \textit{IEEE Transactions on Computational Social Systems}, 7(2), 308--318.
 \bibitem{XCS13}
-    Xie, J., Chen, M., \& Szymanski, B.K. (2013). LabelRankT: incremental community detection in dynamic networks via label propagation. \textit{DyNetMM}, 25--32.
+    Xie, J., Chen, M., \& Szymanski, B.K. (2013). LabelRankT: Incremental community detection in dynamic networks via label propagation. \textit{Proc. DyNetMM at SIGMOD/PODS}, 25--32.
 \bibitem{HLS17}
     Han, J., Li, W., Zhao, L., Su, Z., Zou, Y., \& Deng, W. (2017). Community detection in dynamic networks via adaptive label propagation. \textit{PLOS ONE}, 12(11), e0188655.
 \bibitem{Bov22}
-    Bovet, A., Delvenne, J.-C., Lambiotte, R. (2022). Flow stability for dynamic community detection. \textit{Science Advances}, 8(19).
+    Bovet, A., Delvenne, J.-C., \& Lambiotte, R. (2022). Flow stability for dynamic community detection. \textit{Science Advances}, 8(19), eabj3063.
 \bibitem{Sun22}
-    Sun, Z., Sun, Y., Chang, X., et al. (2022). Dynamic community detection based on the Matthew effect. \textit{Physica A}, 597, 127315.
+    Sun, Z., Sun, Y., Chang, X., Wang, F., Pan, Z., Wang, G., \& Liu, J. (2022). Dynamic community detection based on the Matthew effect. \textit{Physica A: Statistical Mechanics and its Applications}, 597, Article 127315.
 \bibitem{Mazza23}
-    Mazza, M., Cola, G., Tesconi, M. (2023). Modularity-based approach for tracking communities in dynamic social networks. \textit{Knowledge-Based Systems}, 281, 111067.
+    Mazza, M., Cola, G., \& Tesconi, M. (2023). Modularity-based approach for tracking communities in dynamic social networks. \textit{Knowledge-Based Systems}, 281, Article 111067.
+\bibitem{Brabant25}
+    Brabant, V., Bonifati, A., \& Cazabet, R. (2025). Discovering communities in continuous-time temporal networks by optimizing L-modularity. \textit{Proc. IEEE International Conference on Data Mining (ICDM)}.
 \bibitem{Conrad25}
-    Conrad, N.D., Tonello, E., Zonker, J., et al. (2025). Detection of dynamic communities in temporal networks with sparse data. \textit{Applied Network Science}, 10, Article 1.
+    Djurdjevac Conrad, N., Tonello, E., Zonker, J., \& Siebert, H. (2025). Detection of dynamic communities in temporal networks with sparse data. \textit{Applied Network Science}, 10, Article 1.
 \bibitem{Blaskovic25}
-    Bla{\v s}kovi{\'c}, F., Conrad, T.O.F., Klus, S., et al. (2025). Random walk based snapshot clustering for detecting community dynamics in temporal networks. \textit{Scientific Reports}, 15, 24414.
+    Bla{\v s}kovi{\'c}, F., Conrad, T.O.F., Klus, S., \& Djurdjevac Conrad, N. (2025). Random walk based snapshot clustering for detecting community dynamics in temporal networks. \textit{Scientific Reports}, 15, Article 24414.
+\bibitem{HHC22}
+    Hanauer, K., Henzinger, M., \& Schulz, C. (2022). Recent advances in fully dynamic graph algorithms: A quick reference guide. \textit{ACM Journal of Experimental Algorithmics}, 27, Article 1.11, 1--45.
+\bibitem{SLu24}
+    Sahu, S. (2024). DF Louvain: Fast incrementally expanding approach for community detection on dynamic graphs. \textit{arXiv preprint arXiv:2404.19634}.
+\bibitem{SKB25}
+    Sahu, S., Kothapalli, K., \& Banerjee, D.S. (2025). Parallel multicore algorithms for community detection in dynamic graphs. \textit{International Journal of Networking and Computing}, 15(1), 2--31.
+\bibitem{Sattar25}
+    Sattar, N.S., Ibrahim, K.Z., Bulu{\c c}, A., \& Arifuzzaman, S. (2025). DyG-DPCD: A distributed parallel community detection algorithm for large-scale dynamic graphs. \textit{International Journal of Parallel Programming}, 53(1), Article 4.
 \bibitem{DGB17}
-    DiTursi, D.J., Ghosh, G., \& Bogdanov, P. (2017). Local Community Detection in Dynamic Networks. \textit{Proc. ICDM}, 847--852.
+    DiTursi, D.J., Ghosh, G., \& Bogdanov, P. (2017). Local community detection in dynamic networks. \textit{Proc. IEEE International Conference on Data Mining (ICDM)}, 847--852.
 \bibitem{CBT23}
-    Christopoulos, D., Baltsou, G., \& Tsichlas, K. (2023). Local Community Detection in Graph Streams with Anchors. \textit{Information}, 14(6), 332.
+    Christopoulos, D., Baltsou, G., \& Tsichlas, K. (2023). Local community detection in graph streams with anchors. \textit{Information}, 14(6), Article 332.
 \bibitem{LSS21}
     Liu, J., Shao, Y., \& Su, S. (2021). Multiple local community detection via high-quality seed identification over both static and dynamic networks. \textit{Data Science and Engineering}, 6, 249--264.
 \bibitem{BCA18}
     Boudebza, S., Cazabet, R., Azouaou, F., \& Nouali, O. (2018). OLCPM: An online framework for detecting overlapping communities in dynamic social networks. \textit{Computer Communications}, 123, 36--51.
-\bibitem{ZK21}
-    Zarayeneh, N., Kalyanaraman, A. (2021). Delta-Screening: A Fast and Efficient Technique to Update Communities in Dynamic Graphs. \textit{IEEE TNSE}, 8(2), 1614--1629.
-\bibitem{SLe24}
-    Sahu, S. (2024). A Starting Point for Dynamic Community Detection with Leiden Algorithm. \textit{arXiv preprint}.
-\bibitem{SLu24}
-    Sahu, S. (2024). DF Louvain: Fast Incrementally Expanding Approach for Community Detection on Dynamic Graphs. \textit{arXiv preprint}.
-\bibitem{SKB25}
-    Sahu, S., Kothapalli, K., Banerjee, D.S. (2025). Parallel Multicore Algorithms for Community Detection in Dynamic Graphs. \textit{IJNC}, 15(1), 2--31.
-\bibitem{Sattar23}
-    Sattar, N.S., Buluc, A., Ibrahim, K.Z., \& Arifuzzaman, S. (2023). Exploring temporal community evolution: algorithmic approaches and parallel optimization for dynamic community detection. \textit{Applied Network Science}, 8, Article 64.
-\bibitem{Sattar25}
-    Sattar, N.S., Ibrahim, K.Z., Buluc, A., \& Arifuzzaman, S. (2025). DyG-DPCD: A Distributed Parallel Community Detection Algorithm for Large-Scale Dynamic Graphs. \textit{International Journal of Parallel Programming}, 53, Article 4.
-\bibitem{CCL23}
-    Chunaev, P. (2020). Community detection in node-attributed social networks: A survey. \textit{Computer Science Review}, 37, 100286.
-\bibitem{LXZ23}
-    Liu, Y., Xia, J., \& Zhou, S. (2023). A Survey of Deep Graph Clustering: Taxonomy, Challenge, Application, and Open Resource. \textit{arXiv preprint}.
-\bibitem{ZXY20}
-    Zhang, Y., Xiong, Y., \& Ye, Y. et al. (2020). SEAL: Learning Heuristics for Community Detection with Generative Adversarial Networks. \textit{Proc. KDD}, 1103--1113.
-\bibitem{DSD24}
-    Devesh, K.V.V., Sreesankar, S., \& Dinesan, K. et al. (2024). Analyzing GNN Models for Community Detection Using Graph Embeddings: A Comparative Study. \textit{Proceedings of ICCCNT}.
-\bibitem{JLL23}
-    Ji, S., Lu, X., \& Liu, M. et al. (2023). Community-based Dynamic Graph Learning for Popularity Prediction. \textit{Proc. KDD}, 930--940.
-\bibitem{TPP23}
-    Tsitsulin, A., Palowitch, J., Perozzi, B., \& M{\"u}ller, E. (2023). Graph clustering with graph neural networks. \textit{JMLR}, 24(1), 5809--5829.
-\bibitem{SGH09}
-    Scarselli, F., Gori, M., Tsoi, A.C., Hagenbuchner, M., \& Monfardini, G. (2009). The graph neural network model. \textit{IEEE Transactions on Neural Networks}, 20(1), 61--80.
-\bibitem{ZXZ20}
-    Zhang, T., Xiong, Y., \& Zhang, J. et al. (2020). CommDGI: Community Detection Oriented Deep Graph Infomax. \textit{Proc. CIKM}, 1843--1852.
 \bibitem{LYD24}
-    Liu, C., Yang, Y., \& Ding, Y. et al. (2024). DAG: Deep Adaptive and Generative K-Free Community Detection on Attributed Graphs. \textit{Proc. KDD}, 5454--5465.
-\bibitem{G10}
-    Good B.H., et al. (2010). Performance of modularity maximization in practical contexts. \textit{Physical Review E}, 81(4).
-\bibitem{FH16}
-    Fortunato, S., Hric D. (2016). Community detection in networks: A user guide. \textit{Physics Reports}, 659, 1--44.
-\bibitem{YL15}
-    Yang, J., Leskovec, J. (2015). Defining and evaluating network communities based on ground-truth. \textit{Knowledge and Information Systems}, 42(1), 181--213.
-\bibitem{YAT16}
-    Yang, Z., Algesheimer, R., \& Tessone, C.J. (2016). A Comparative Analysis of Community Detection Algorithms on Artificial Networks. \textit{Scientific Reports}, 6, Article 30750.
-\bibitem{Rustamaji24}
-    Rustamaji, H.C., Kusuma, W.A., Nurdiati, S., Batubara, I. (2024). Community detection with greedy modularity disassembly strategy. \textit{Scientific Reports}, 14, 4694.
-\bibitem{TTB24}
-    Taibi, S., Toumi, L. \& Bouamama, S. (2024). Complex network community discovery using fast local move iterated greedy algorithm. \textit{The Journal of Supercomputing}, 81(1).
-\bibitem{LLC24}
-    Liu, Y., Li, J., \& Chen, Y. et al. (2024). Revisiting Modularity Maximization for Graph Clustering: A Contrastive Learning Perspective. \textit{Proc. KDD}, 1968--1979.
+    Liu, C., Yang, Y., Ding, Y. et al. (2024). DAG: Deep adaptive and generative K-free community detection on attributed graphs. \textit{Proc. 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 5454--5465.
+\bibitem{ZXZ20}
+    Zhang, T., Xiong, Y., Zhang, J. et al. (2020). CommDGI: Community detection oriented deep graph infomax. \textit{Proc. 29th ACM International Conference on Information and Knowledge Management (CIKM)}, 1843--1852.
 \bibitem{BKH24}
-    Bhowmick, A., Kosan, M., \& Huang, Z. et al. (2024). DGCLUSTER: a neural framework for attributed graph clustering via modularity maximization. \textit{Proc. AAAI}, 11069--11077.
-\bibitem{QZG24}
-    Qin, M., Zhang, C., \& Gao, Y. et al. (2024). Pre-train and Refine: Towards Higher Efficiency in K-Agnostic Community Detection without Quality Degradation. \textit{Proc. KDD}, 2467--2478.
-\bibitem{QZG24HPEC}
-    Qin, M., Zhang, C. \& Gao, Y. et al. (2024). Towards Faster Graph Partitioning via Pre-training and Inductive Inference. \textit{Proc. HPEC}.
+    Bhowmick, A., Kosan, M., Huang, Z., Singh, A., \& Medya, S. (2024). DGCLUSTER: A neural framework for attributed graph clustering via modularity maximization. \textit{Proceedings of the AAAI Conference on Artificial Intelligence}, 38(10), 11069--11077.
 \bibitem{ZPS25}
-    Zhang, J., Peng, H., \& Sun, L. et al. (2025). Unsupervised Graph Clustering with Deep Structural Entropy. \textit{Proc. KDD}, 3752--3763.
+    Zhang, J., Peng, H., Sun, L. et al. (2025). Unsupervised graph clustering with deep structural entropy. \textit{Proc. 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 3752--3763.
+\bibitem{QZG24}
+    Qin, M., Zhang, C., Gao, Y., Zhang, W., \& Yeung, D.-Y. (2024). Pre-train and refine: Towards higher efficiency in K-agnostic community detection without quality degradation. \textit{Proc. 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 2467--2478.
 \bibitem{GPT25}
-    Gkartzios, C., Pitoura, E., Tsaparas, P. (2025). Modularity-Fair Deep Community Detection. \textit{Proc. ICDM}, 287--296.
-\bibitem{LYZ25}
-    Lin, X., Yang, R., \& Zheng, H. et al. (2025). Spectral Subspace Clustering for Attributed Graphs. \textit{Proc. KDD}, 789--799.
-\bibitem{KZL24}
-    Kong, D., Zhang, A., \& Li, Y. (2024). Learning Persistent Community Structures in Dynamic Networks via Topological Data Analysis. \textit{Proc. AAAI}.
-\bibitem{Brabant25}
-    Brabant, V., Bonifati, A., \& Cazabet, R. (2025).
-    Discovering Communities in Continuous-Time Temporal Networks by Optimizing L-Modularity.
-    \textit{Proc. ICDM}.
+    Gkartzios, C., Pitoura, E., \& Tsaparas, P. (2025). Modularity-fair deep community detection. \textit{Proc. IEEE International Conference on Data Mining (ICDM)}, 287--296.
 \end{thebibliography}
 \endgroup
 
