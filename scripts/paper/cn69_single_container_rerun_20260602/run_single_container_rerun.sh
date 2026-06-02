@@ -247,4 +247,10 @@ run_dsbm \
   --use-gpu \
   --catch-errors
 
+# Directed real-data control, placed at the very end. The main article queue
+# symmetrizes directed graphs for cross-backend comparability; these Leiden-only
+# rows keep the original directionality and therefore do not duplicate the
+# earlier symmetrized runs.
+run_launch_repeat 12_leiden_directed_control "Leiden directed 999:10 control" 1 12_leiden_directed_control_99910.json
+
 log "Sequential rerun completed"

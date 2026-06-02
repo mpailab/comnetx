@@ -32,8 +32,11 @@ Order and rationale:
 12. `Leiden workload and closure/contraction profile`, 1 repeat: workload and closure tables.
 13. `DF-Leiden workload profile`, 1 repeat: native dynamic workload points.
 14. `S2CAG workload profile`, 1 repeat: GNN workload points.
-15. `DSBM five-seed 100-batch core regimes`, 1 repeat: the longest block, placed last.
+15. `DSBM five-seed 100-batch core regimes`, 1 repeat: the longest robustness block.
+16. `Leiden directed 999:10 control`, 1 repeat: `dyn_pubmed` and `arxivmath` without explicit symmetrization.
 
 Expected total wall-clock is below five days under the existing cn69 timings.
-The real-data blocks should finish first; the final DSBM block is intentionally
-last so it can be interrupted without losing the main article-table reruns.
+The real-data blocks should finish first; the DSBM block is intentionally late
+so it can be interrupted without losing the main article-table reruns. The
+directed Leiden control is placed after DSBM because it is auxiliary reviewer
+evidence rather than part of the main sequential rerun.
