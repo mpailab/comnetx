@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 from matplotlib.lines import Line2D
 
 
@@ -22,7 +23,7 @@ PDF_METADATA = {
     "ModDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
 }
 
-DATASETS = ("dyn_pubmed", "arxivmath")
+DATASETS = ("dyn_cora", "dyn_pubmed", "arxivmath")
 LEVELS = (1, 2, 3, 4)
 RADII = (0, 1, 2)
 
@@ -30,6 +31,27 @@ RADIUS_STYLES = {
     0: ("#1f77b4", "o"),
     1: ("#d95f02", "s"),
     2: ("#2ca02c", "^"),
+}
+
+X_AXIS = {
+    "dyn_cora": {
+        "scale": "linear",
+        "xlim": (0, 26),
+        "xticks": [1, 5, 10, 15, 20, 25],
+        "xticklabels": ["1x", "5x", "10x", "15x", "20x", "25x"],
+    },
+    "dyn_pubmed": {
+        "scale": "log",
+        "xlim": (0.85, 220),
+        "xticks": [1, 10, 100],
+        "xticklabels": ["1x", "10x", "100x"],
+    },
+    "arxivmath": {
+        "scale": "log",
+        "xlim": (0.85, 720),
+        "xticks": [1, 10, 100],
+        "xticklabels": ["1x", "10x", "100x"],
+    },
 }
 
 
@@ -158,7 +180,7 @@ def main() -> None:
     )
 
     by_dataset = load_points()
-    fig, axes = plt.subplots(1, 2, figsize=(3.35, 1.85), constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(6.8, 1.75), constrained_layout=True)
 
     for ax, dataset in zip(axes, DATASETS, strict=True):
         points = by_dataset[dataset]
@@ -183,7 +205,7 @@ def main() -> None:
             zorder=4,
         )
         ax.text(
-            full.speedup * 1.08,
+            full.speedup + 0.75 if dataset == "dyn_cora" else full.speedup * 1.08,
             full.modularity,
             "Full",
             ha="left",
@@ -222,10 +244,13 @@ def main() -> None:
         modularities = [point.modularity for point in points]
         margin = (max(modularities) - min(modularities)) * 0.12
         ax.set_ylim(min(modularities) - margin, max(modularities) + margin)
-        ax.set_xscale("log")
-        ax.set_xlim(0.85, 720)
-        ax.set_xticks([1, 3, 10, 30, 100])
-        ax.set_xticklabels(["1x", "3x", "10x", "30x", "100x"])
+        axis = X_AXIS[dataset]
+        ax.set_xscale(axis["scale"])
+        ax.set_xlim(*axis["xlim"])
+        ax.set_xticks(axis["xticks"])
+        ax.set_xticklabels(axis["xticklabels"])
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=4))
+        ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.3f"))
         ax.set_title(dataset)
         ax.grid(axis="both", color="#d0d0d0", lw=0.4, ls=":", zorder=0)
         ax.spines["top"].set_visible(False)
@@ -249,7 +274,7 @@ def main() -> None:
         for radius, (color, marker) in RADIUS_STYLES.items()
     ]
     handles.append(Line2D([0], [0], color="#222222", lw=0.75, label="Pareto"))
-    axes[1].legend(
+    axes[-1].legend(
         handles=handles,
         loc="lower left",
         frameon=False,
