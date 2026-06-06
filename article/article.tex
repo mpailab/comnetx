@@ -266,7 +266,7 @@ B_r(S_t)=\{v\in V \mid \operatorname{dist}_{\mathbf{A}_t}(v,S_t)\le r\}.
 \end{equation*}
 Here $\operatorname{dist}_{\mathbf{A}_t}(v,S_t)=
 \min_{u\in S_t}\operatorname{dist}_{\mathbf{A}_t+\mathbf{A}_t^\top}(v,u)$,
-i.e., the shortest-path distance to the set $S_t$ in the unweighted graph
+i.e., the shortest-path distance to the set $S_t$ in the graph
 induced by nonzero entries of the symmetrized adjacency.
 
 The radius-expanded affected set alone is not sufficient for high-quality local
@@ -607,51 +607,41 @@ as streams lengthen or locality weakens.
 \centering
 \caption{Compatibility study across backends.}
 \label{tab:main-results}
-\setlength{\tabcolsep}{2pt}
+\setlength{\tabcolsep}{1.2pt}
 \scriptsize
-\begin{tabular}{@{}llrr@{}}
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
-\textbf{Backend} & \textbf{Base} & \textbf{Geometric mean} &
+\textbf{Backend} & \textbf{Base} & \textbf{$\Delta Q$} &
+\textbf{$\Delta$NMI} & \textbf{\shortstack{Geometric\\mean}} &
 \textbf{arxivmath} \\
 \midrule
-Leidenalg      & Naive   & 8.0$\times$  & 41.9$\times$ \\
-FLMIG          & Naive   & 60.5$\times$ & 2606.8$\times$ \\
-PRGPT-Infomap  & Naive   & 7.7$\times$  & 45.2$\times$ \\
-PRGPT-Locale   & Naive   & 8.9$\times$  & 62.1$\times$ \\
-S$^2$CAG       & Naive   & 5.0$\times$  & 10.2$\times$ \\
-MAGI           & Naive   & 0.3$\times$  & OOM$\rightarrow$985.0s \\
-DMoN           & Naive   & 1.0$\times$  & OOM$\rightarrow$90.0s \\
-MFC            & Dynamic & 56.8$\times$ & OOM$\rightarrow$381.7s \\
-DF-Leiden      & Dynamic & 0.1$\times$  & 8.4$\times$ \\
+Leidenalg      & Naive   & $-0.013$ & $-0.012$ & 8.0$\times$  & 41.9$\times$ \\
+FLMIG          & Naive   & $-0.247$ & $-0.039$ & 60.5$\times$ & 2606.8$\times$ \\
+PRGPT-Infomap  & Naive   & $-0.131$ & $-0.064$ & 7.7$\times$  & 45.2$\times$ \\
+PRGPT-Locale   & Naive   & $-0.272$ & $-0.083$ & 8.9$\times$  & 62.1$\times$ \\
+S$^2$CAG       & Naive   & $+0.137$ & $+0.117$ & 5.0$\times$  & 10.2$\times$ \\
+MAGI           & Naive   & $+0.081$ & $-0.035$ & 0.3$\times$  & OOM$\rightarrow$985.0s \\
+DMoN           & Naive   & $+0.514$ & $+0.113$ & 1.0$\times$  & OOM$\rightarrow$90.0s \\
+MFC            & Dynamic & $+0.075$ & $+0.136$ & 56.8$\times$ & OOM$\rightarrow$381.7s \\
+DF-Leiden      & Dynamic & $-0.010$ & $+0.001$ & 0.1$\times$  & 8.4$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \textbf{Modularity and external agreement.}
-For Leidenalg, the P1 measurements show that the Local adapter closely tracks
-full-snapshot recomputation, with mean changes of $-0.013$ in modularity and
-$-0.012$ in NMI.
-FLMIG, whose aggressive pruning strategy is more sensitive to the restriction
-to a local neighborhood, obtains large speedups but loses more modularity and
-NMI.
-The GNN-based methods show a consistent pattern: in the Naive (full-graph)
-setting, S$^2$CAG, DMoN, and MAGI are often weaker or infeasible under the
-same update protocol.
-When switched to Local mode, S$^2$CAG and DMoN obtain higher mean modularity
-and NMI; MAGI mainly benefits by making the largest graph executable. The
-S$^2$CAG row in Table~\ref{tab:main-results} uses dataset features, and
-Table~\ref{tab:feature-ablation} separately shows how dataset, random, and
-one-hot feature choices alter the result.
-The PRGPT variants are less robust to the local restriction: their aggregate
-modularity and NMI deltas are negative despite consistent speedups, indicating
-that these methods rely more heavily on the global context provided by the full
-graph.
-The Local adapter also complements native dynamic solvers. For DF-Leiden the
-mean NMI change is nearly neutral and the large-graph speedup is substantial;
-for MFC, the Local version avoids the out-of-memory failure on the largest
-graph and improves the aggregate quality measures in
-the P1 measurements, although its absolute quality remains below that of the
-best topology-based methods.
+The $\Delta Q$ and $\Delta$NMI columns of Table~\ref{tab:main-results} report
+aggregate P1 quality deltas, computed as the adapter result minus the baseline
+result over finite baseline runs.
+These values show that Local Leiden closely tracks
+full-snapshot recomputation, while FLMIG and the PRGPT variants trade larger
+speedups for lower aggregate quality. The feature-aware rows are more
+heterogeneous: S$^2$CAG and DMoN improve both aggregate quantities under P1,
+MAGI mainly contributes out-of-memory avoidance on the largest graph with mixed
+NMI behavior, and MFC improves the aggregate P1 quality measures while still
+remaining below the best topology-based methods in absolute quality. The
+focused repeated rows in Table~\ref{tab:stability} and the S$^2$CAG
+feature-mode ablation in Table~\ref{tab:feature-ablation} provide the visible
+quality breakdowns for the largest datasets and feature choices.
 
 \textbf{Reduction in processing time.}
 The runtime advantage of the Local adapter is substantial for the larger
@@ -1123,139 +1113,139 @@ persist or a full refresh is preferable.
 \begin{thebibliography}{00}
 \fontsize{6.39}{6.40}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}
 \bibitem{OSH07}
-    Onnela, J.-P., Saram{\"a}ki, J., Hyv{\"o}nen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7332--7336.
+    J. Onnela, J. Saram{\"a}ki, J. Hyv{\"o}nen, et al., ``Structure and tie strengths in mobile communication networks,'' \textit{Proc. Natl. Acad. Sci. USA}, vol. 104, no. 18, pp. 7332--7336, 2007.
 \bibitem{PBV07}
-    Palla, G., Barab{\'a}si, A.-L., \& Vicsek, T. (2007). Quantifying social group evolution. \textit{Nature}, 446, 664--667.
+    G. Palla, A.-L. Barab{\'a}si, and T. Vicsek, ``Quantifying social group evolution,'' \textit{Nature}, vol. 446, pp. 664--667, 2007.
 \bibitem{RC17}
-    Rossetti, G., \& Cazabet, R. (2018). Community discovery in dynamic networks: A survey. \textit{ACM Computing Surveys}, 51(2), Article 35.
+    G. Rossetti and R. Cazabet, ``Community discovery in dynamic networks: A survey,'' \textit{ACM Comput. Surveys}, vol. 51, no. 2, Art. no. 35, 2018.
 \bibitem{POM09}
-    Porter, M.A., Onnela, J.-P., \& Mucha, P.J. (2009). Communities in networks. \textit{Notices of the AMS}, 56(9), 1082--1097.
+    M. A. Porter, J.-P. Onnela, and P. J. Mucha, ``Communities in networks,'' \textit{Notices Amer. Math. Soc.}, vol. 56, no. 9, pp. 1082--1097, 2009.
 \bibitem{SF09}
-    Fortunato, S. (2010). Community detection in graphs. \textit{Physics Reports}, 486(3--5), 75--174.
+    S. Fortunato, ``Community detection in graphs,'' \textit{Phys. Rep.}, vol. 486, nos. 3--5, pp. 75--174, 2010.
 \bibitem{RCC04}
-    Radicchi, F., Castellano, C., Cecconi, F., Loreto, V., \& Parisi, D. (2004). Defining and identifying communities in networks. \textit{Proceedings of the National Academy of Sciences of the United States of America}, 101(9), 2658--2663.
+    F. Radicchi, C. Castellano, F. Cecconi, V. Loreto, and D. Parisi, ``Defining and identifying communities in networks,'' \textit{Proc. Natl. Acad. Sci. USA}, vol. 101, no. 9, pp. 2658--2663, 2004.
 \bibitem{FL02}
-    Flake, G.W., Lawrence, S., Giles, C.L., \& Coetzee, F.M. (2002). Self-organization and identification of web communities. \textit{Computer}, 35(3), 66--71.
+    G. W. Flake, S. Lawrence, C. L. Giles, and F. M. Coetzee, ``Self-organization and identification of web communities,'' \textit{Computer}, vol. 35, no. 3, pp. 66--71, 2002.
 \bibitem{NG04}
-    Newman, M.E.J., \& Girvan, M. (2004). Finding and evaluating community structure in networks. \textit{Physical Review E}, 69, 026113.
+    M. E. J. Newman and M. Girvan, ``Finding and evaluating community structure in networks,'' \textit{Phys. Rev. E}, vol. 69, Art. no. 026113, 2004.
 \bibitem{BDG08}
-    Brandes, U., Delling, D., Gaertler, M., G{\"o}rke, R., Hoefer, M., Nikoloski, Z., \& Wagner, D. (2008). On modularity clustering. \textit{IEEE Transactions on Knowledge and Data Engineering}, 20(2), 172--188.
+    U. Brandes, D. Delling, M. Gaertler, R. G{\"o}rke, M. Hoefer, Z. Nikoloski, and D. Wagner, ``On modularity clustering,'' \textit{IEEE Trans. Knowl. Data Eng.}, vol. 20, no. 2, pp. 172--188, 2008.
 \bibitem{BGLL08}
-    Blondel, V., Guillaume, J., Lambiotte, R., \& Lefebvre, E. (2008). Fast unfolding of communities in large networks. \textit{Journal of Statistical Mechanics: Theory and Experiment}, 2008(10), Article P10008.
+    V. Blondel, J. Guillaume, R. Lambiotte, and E. Lefebvre, ``Fast unfolding of communities in large networks,'' \textit{J. Stat. Mech.: Theory Exp.}, vol. 2008, no. 10, Art. no. P10008, 2008.
 \bibitem{TWE19}
-    Traag, V.A., Waltman, L., \& van Eck, N.J. (2019). From Louvain to Leiden: Guaranteeing well-connected communities. \textit{Scientific Reports}, 9(1), Article 5233.
+    V. A. Traag, L. Waltman, and N. J. van Eck, ``From Louvain to Leiden: Guaranteeing well-connected communities,'' \textit{Sci. Rep.}, vol. 9, no. 1, Art. no. 5233, 2019.
 \bibitem{LHK14}
-    Lu, H., Halappanavar, M., \& Kalyanaraman, A. (2015). Parallel heuristics for scalable community detection. \textit{Parallel Computing}, 47, 19--37.
+    H. Lu, M. Halappanavar, and A. Kalyanaraman, ``Parallel heuristics for scalable community detection,'' \textit{Parallel Comput.}, vol. 47, pp. 19--37, 2015.
 \bibitem{Sah23}
-    Sahu, S., Kothapalli, K., \& Banerjee, D.S. (2024). Fast Leiden algorithm for community detection in shared memory setting. \textit{Proc. 53rd International Conference on Parallel Processing}, 11--20.
+    S. Sahu, K. Kothapalli, and D. S. Banerjee, ``Fast Leiden algorithm for community detection in shared memory setting,'' in \textit{Proc. 53rd Int. Conf. Parallel Process.}, 2024, pp. 11--20.
 \bibitem{CT13}
-    Chong, W.H., \& Teow, L.-N. (2013). An incremental batch technique for community detection. \textit{Proc. 16th International Conference on Information Fusion}, 750--757.
+    W. H. Chong and L.-N. Teow, ``An incremental batch technique for community detection,'' in \textit{Proc. 16th Int. Conf. Inf. Fusion}, 2013, pp. 750--757.
 \bibitem{HKT17}
-    Halappanavar, M., Lu, H., Kalyanaraman, A., \& Tumeo, A. (2017). Scalable static and dynamic community detection using Grappolo. \textit{Proc. IEEE High Performance Extreme Computing Conference}, 1--6.
+    M. Halappanavar, H. Lu, A. Kalyanaraman, and A. Tumeo, ``Scalable static and dynamic community detection using Grappolo,'' in \textit{Proc. IEEE High Perform. Extreme Comput. Conf.}, 2017, pp. 1--6.
 \bibitem{ZCL19}
-    Zhuang, D., Chang, J.M., \& Li, M. (2021). DynaMo: Dynamic community detection by incrementally maximizing modularity. \textit{IEEE Transactions on Knowledge and Data Engineering}, 33(5), 1934--1945.
+    D. Zhuang, J. M. Chang, and M. Li, ``DynaMo: Dynamic community detection by incrementally maximizing modularity,'' \textit{IEEE Trans. Knowl. Data Eng.}, vol. 33, no. 5, pp. 1934--1945, 2021.
 \bibitem{ZK21}
-    Zarayeneh, N., \& Kalyanaraman, A. (2021). Delta-Screening: A fast and efficient technique to update communities in dynamic graphs. \textit{IEEE Transactions on Network Science and Engineering}, 8(2), 1614--1629.
+    N. Zarayeneh and A. Kalyanaraman, ``Delta-Screening: A fast and efficient technique to update communities in dynamic graphs,'' \textit{IEEE Trans. Netw. Sci. Eng.}, vol. 8, no. 2, pp. 1614--1629, 2021.
 \bibitem{SLe24}
-    Sahu, S. (2024). A starting point for dynamic community detection with Leiden algorithm. \textit{arXiv:2405.11658}.
+    S. Sahu, ``A starting point for dynamic community detection with Leiden algorithm,'' arXiv:2405.11658, 2024.
 \bibitem{CCL23}
-    Chunaev, P. (2020). Community detection in node-attributed social networks: A survey. \textit{Computer Science Review}, 37, Article 100286.
+    P. Chunaev, ``Community detection in node-attributed social networks: A survey,'' \textit{Comput. Sci. Rev.}, vol. 37, Art. no. 100286, 2020.
 \bibitem{ZXY20}
-    Zhang, Y., Xiong, Y., Ye, Y., Liu, T., Wang, W., Zhu, Y., \& Yu, P.S. (2020). SEAL: Learning heuristics for community detection with generative adversarial networks. \textit{Proc. 26th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1103--1113.
+    Y. Zhang, Y. Xiong, Y. Ye, T. Liu, W. Wang, Y. Zhu, and P. S. Yu, ``SEAL: Learning heuristics for community detection with generative adversarial networks,'' in \textit{Proc. 26th ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2020, pp. 1103--1113.
 \bibitem{DSD24}
-    Devesh Kumar, V.V., Sreesankar, S., Dinesan, K., Nair, P.B., \& Deepthi, L.R. (2024). Analyzing GNN models for community detection using graph embeddings: A comparative study. \textit{Proc. 15th International Conference on Computing Communication and Networking Technologies}, 1--8.
+    V. V. Devesh Kumar, S. Sreesankar, K. Dinesan, P. B. Nair, and L. R. Deepthi, ``Analyzing GNN models for community detection using graph embeddings: A comparative study,'' in \textit{Proc. Int. Conf. Comput., Commun. Netw. Technol.}, 2024, pp. 1--8.
 \bibitem{LXW26}
-    Liu, Y., Xia, J., Wu, B. et al. (2026). A survey of deep graph clustering: Taxonomy, challenge, application, and open resource. \textit{IEEE Transactions on Knowledge and Data Engineering}, 38(6), 3365--3384.
+    Y. Liu, J. Xia, B. Wu, et al., ``A survey of deep graph clustering: Taxonomy, challenge, application, and open resource,'' \textit{IEEE Trans. Knowl. Data Eng.}, vol. 38, no. 6, pp. 3365--3384, 2026.
 \bibitem{JLL23}
-    Ji, S., Lu, X., Liu, M. et al. (2023). Community-based dynamic graph learning for popularity prediction. \textit{Proc. 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 930--940.
+    S. Ji, X. Lu, M. Liu, et al., ``Community-based dynamic graph learning for popularity prediction,'' in \textit{Proc. 29th ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2023, pp. 930--940.
 \bibitem{TPP23}
-    Tsitsulin, A., Palowitch, J., Perozzi, B., \& M{\"u}ller, E. (2023). Graph clustering with graph neural networks. \textit{Journal of Machine Learning Research}, 24(127), 1--21.
+    A. Tsitsulin, J. Palowitch, B. Perozzi, and E. M{\"u}ller, ``Graph clustering with graph neural networks,'' \textit{J. Mach. Learn. Res.}, vol. 24, no. 127, pp. 1--21, 2023.
 \bibitem{SGH09}
-    Scarselli, F., Gori, M., Tsoi, A.C., Hagenbuchner, M., \& Monfardini, G. (2009). The graph neural network model. \textit{IEEE Transactions on Neural Networks}, 20(1), 61--80.
+    F. Scarselli, M. Gori, A. C. Tsoi, M. Hagenbuchner, and G. Monfardini, ``The graph neural network model,'' \textit{IEEE Trans. Neural Netw.}, vol. 20, no. 1, pp. 61--80, 2009.
 \bibitem{TTB24}
-    Taibi, S., Toumi, L., \& Bouamama, S. (2025). Complex network community discovery using fast local move iterated greedy algorithm. \textit{The Journal of Supercomputing}, 81(1), Article 182.
+    S. Taibi, L. Toumi, and S. Bouamama, ``Complex network community discovery using fast local move iterated greedy algorithm,'' \textit{J. Supercomput.}, vol. 81, no. 1, Art. no. 182, 2025.
 \bibitem{LLC24}
-    Liu, Y., Li, J., Chen, Y. et al. (2024). Revisiting modularity maximization for graph clustering: A contrastive learning perspective. \textit{Proc. 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 1968--1979.
+    Y. Liu, J. Li, Y. Chen, et al., ``Revisiting modularity maximization for graph clustering: A contrastive learning perspective,'' in \textit{Proc. 30th ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2024, pp. 1968--1979.
 \bibitem{LYZ25}
-    Lin, X., Yang, R., Zheng, H., \& Ke, X. (2025). Spectral subspace clustering for attributed graphs. \textit{Proc. 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 789--799.
+    X. Lin, R. Yang, H. Zheng, and X. Ke, ``Spectral subspace clustering for attributed graphs,'' in \textit{Proc. 31st ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2025, pp. 789--799.
 \bibitem{KZL24}
-    Kong, D., Zhang, A., \& Li, Y. (2024). Learning persistent community structures in dynamic networks via topological data analysis. \textit{Proceedings of the AAAI Conference on Artificial Intelligence}, 38(8), 8617--8626.
+    D. Kong, A. Zhang, and Y. Li, ``Learning persistent community structures in dynamic networks via topological data analysis,'' in \textit{Proc. AAAI Conf. Artif. Intell.}, vol. 38, no. 8, 2024, pp. 8617--8626.
 \bibitem{G10}
-    Good, B.H., de Montjoye, Y.-A., \& Clauset, A. (2010). Performance of modularity maximization in practical contexts. \textit{Physical Review E}, 81, 046106.
+    B. H. Good, Y.-A. de Montjoye, and A. Clauset, ``Performance of modularity maximization in practical contexts,'' \textit{Phys. Rev. E}, vol. 81, Art. no. 046106, 2010.
 \bibitem{FH16}
-    Fortunato, S., \& Hric, D. (2016). Community detection in networks: A user guide. \textit{Physics Reports}, 659, 1--44.
+    S. Fortunato and D. Hric, ``Community detection in networks: A user guide,'' \textit{Phys. Rep.}, vol. 659, pp. 1--44, 2016.
 \bibitem{Danon05}
-    Danon, L., D{\'i}az-Guilera, A., Duch, J., \& Arenas, A. (2005). Comparing community structure identification. \textit{Journal of Statistical Mechanics: Theory and Experiment}, 2005(9), 219--228.
+    L. Danon, A. D{\'i}az-Guilera, J. Duch, and A. Arenas, ``Comparing community structure identification,'' \textit{J. Stat. Mech.: Theory Exp.}, vol. 2005, no. 9, pp. 219--228, 2005.
 \bibitem{HLL83}
-    Holland, P.W., Laskey, K.B., \& Leinhardt, S. (1983). Stochastic blockmodels: First steps. \textit{Social Networks}, 5(2), 109--137.
+    P. W. Holland, K. B. Laskey, and S. Leinhardt, ``Stochastic blockmodels: First steps,'' \textit{Social Netw.}, vol. 5, no. 2, pp. 109--137, 1983.
 \bibitem{XH14}
-    Xu, K.S., \& Hero, A.O. (2014). Dynamic stochastic blockmodels for time-evolving social networks. \textit{IEEE Journal of Selected Topics in Signal Processing}, 8(4), 552--562.
+    K. S. Xu and A. O. Hero, ``Dynamic stochastic blockmodels for time-evolving social networks,'' \textit{IEEE J. Sel. Topics Signal Process.}, vol. 8, no. 4, pp. 552--562, 2014.
 \bibitem{QZG24HPEC}
-    Qin, M., Zhang, C., Gao, Y. et al. (2024). Towards faster graph partitioning via pre-training and inductive inference. \textit{Proc. IEEE High Performance Extreme Computing Conference}, 1--7.
+    M. Qin, C. Zhang, Y. Gao, et al., ``Towards faster graph partitioning via pre-training and inductive inference,'' in \textit{Proc. IEEE High Perform. Extreme Comput. Conf.}, 2024, pp. 1--7.
 \bibitem{RB07}
-    Rosvall, M., \& Bergstrom, C.T. (2007). An information-theoretic framework for resolving community structure in complex networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7327--7331.
+    M. Rosvall and C. T. Bergstrom, ``An information-theoretic framework for resolving community structure in complex networks,'' \textit{Proc. Natl. Acad. Sci. USA}, vol. 104, no. 18, pp. 7327--7331, 2007.
 \bibitem{TS23}
-    Traag, V.A., \& {\v S}ubelj, L. (2023). Large network community detection by fast label propagation. \textit{Scientific Reports}, 13, Article 2701.
+    V. A. Traag and L. {\v S}ubelj, ``Large network community detection by fast label propagation,'' \textit{Sci. Rep.}, vol. 13, Art. no. 2701, 2023.
 \bibitem{YL15}
-    Yang, J., \& Leskovec, J. (2015). Defining and evaluating network communities based on ground-truth. \textit{Knowledge and Information Systems}, 42(1), 181--213.
+    J. Yang and J. Leskovec, ``Defining and evaluating network communities based on ground-truth,'' \textit{Knowl. Inf. Syst.}, vol. 42, no. 1, pp. 181--213, 2015.
 \bibitem{YAT16}
-    Yang, Z., Algesheimer, R., \& Tessone, C.J. (2016). A comparative analysis of community detection algorithms on artificial networks. \textit{Scientific Reports}, 6(1), Article 30750.
+    Z. Yang, R. Algesheimer, and C. J. Tessone, ``A comparative analysis of community detection algorithms on artificial networks,'' \textit{Sci. Rep.}, vol. 6, no. 1, Art. no. 30750, 2016.
 \bibitem{Rustamaji24}
-    Rustamaji, H.C., Kusuma, W.A., Nurdiati, S., \& Batubara, I. (2024). Community detection with greedy modularity disassembly strategy. \textit{Scientific Reports}, 14, Article 4694.
+    H. C. Rustamaji, W. A. Kusuma, S. Nurdiati, and I. Batubara, ``Community detection with greedy modularity disassembly strategy,'' \textit{Sci. Rep.}, vol. 14, Art. no. 4694, 2024.
 \bibitem{CZW23}
-    Cai, L., Zhou, J., \& Wang, D. (2023). Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm. \textit{PeerJ Computer Science}, 9, e1477.
+    L. Cai, J. Zhou, and D. Wang, ``Improving temporal smoothness and snapshot quality in dynamic network community discovery using NOME algorithm,'' \textit{PeerJ Comput. Sci.}, vol. 9, Art. no. e1477, 2023.
 \bibitem{Sattar23}
-    Sattar, N.S., Bulu{\c c}, A., Ibrahim, K.Z., \& Arifuzzaman, S. (2023). Exploring temporal community evolution: Algorithmic approaches and parallel optimization for dynamic community detection. \textit{Applied Network Science}, 8, Article 64.
+    N. S. Sattar, A. Bulu{\c c}, K. Z. Ibrahim, and S. Arifuzzaman, ``Exploring temporal community evolution: Algorithmic approaches and parallel optimization for dynamic community detection,'' \textit{Appl. Netw. Sci.}, vol. 8, Art. no. 64, 2023.
 \bibitem{SLX14}
-    Shang, J., Liu, L., Xie, F., Chen, Z., Miao, J., Fang, X., \& Wu, C. (2014). A real-time detecting algorithm for tracking community structure of dynamic networks. \textit{arXiv:1407.2683}.
+    J. Shang, L. Liu, F. Xie, Z. Chen, J. Miao, X. Fang, and C. Wu, ``A real-time detecting algorithm for tracking community structure of dynamic networks,'' arXiv:1407.2683, 2014.
 \bibitem{MZW20}
-    Ma, Y., Zhao, Y., Wang, J., Liu, M., Shen, W., \& Ma, Y. (2020). Modularity-based incremental label propagation algorithm for community detection. \textit{Applied Sciences}, 10(12), Article 4060.
+    Y. Ma, Y. Zhao, J. Wang, M. Liu, W. Shen, and Y. Ma, ``Modularity-based incremental label propagation algorithm for community detection,'' \textit{Appl. Sci.}, vol. 10, no. 12, Art. no. 4060, 2020.
 \bibitem{Seif20}
-    Seifikar, M., Farzi, S., \& Barati, M. (2020). C-Blondel: An efficient Louvain-based dynamic community detection algorithm. \textit{IEEE Transactions on Computational Social Systems}, 7(2), 308--318.
+    M. Seifikar, S. Farzi, and M. Barati, ``C-Blondel: An efficient Louvain-based dynamic community detection algorithm,'' \textit{IEEE Trans. Comput. Social Syst.}, vol. 7, no. 2, pp. 308--318, 2020.
 \bibitem{XCS13}
-    Xie, J., Chen, M., \& Szymanski, B.K. (2013). LabelRankT: Incremental community detection in dynamic networks via label propagation. \textit{Proc. Workshop on Dynamic Networks Management and Mining}, 25--32.
+    J. Xie, M. Chen, and B. K. Szymanski, ``LabelRankT: Incremental community detection in dynamic networks via label propagation,'' in \textit{Proc. Workshop Dyn. Netw. Manage. Mining}, 2013, pp. 25--32.
 \bibitem{HLS17}
-    Han, J., Li, W., Zhao, L., Su, Z., Zou, Y., \& Deng, W. (2017). Community detection in dynamic networks via adaptive label propagation. \textit{PLOS ONE}, 12(11), e0188655.
+    J. Han, W. Li, L. Zhao, Z. Su, Y. Zou, and W. Deng, ``Community detection in dynamic networks via adaptive label propagation,'' \textit{PLOS ONE}, vol. 12, no. 11, Art. no. e0188655, 2017.
 \bibitem{Bov22}
-    Bovet, A., Delvenne, J.-C., \& Lambiotte, R. (2022). Flow stability for dynamic community detection. \textit{Science Advances}, 8(19), eabj3063.
+    A. Bovet, J.-C. Delvenne, and R. Lambiotte, ``Flow stability for dynamic community detection,'' \textit{Sci. Adv.}, vol. 8, no. 19, Art. no. eabj3063, 2022.
 \bibitem{Sun22}
-    Sun, Z., Sun, Y., Chang, X., Wang, F., Pan, Z., Wang, G., \& Liu, J. (2022). Dynamic community detection based on the Matthew effect. \textit{Physica A: Statistical Mechanics and its Applications}, 597, Article 127315.
+    Z. Sun, Y. Sun, X. Chang, F. Wang, Z. Pan, G. Wang, and J. Liu, ``Dynamic community detection based on the Matthew effect,'' \textit{Physica A}, vol. 597, Art. no. 127315, 2022.
 \bibitem{Mazza23}
-    Mazza, M., Cola, G., \& Tesconi, M. (2023). Modularity-based approach for tracking communities in dynamic social networks. \textit{Knowledge-Based Systems}, 281, Article 111067.
+    M. Mazza, G. Cola, and M. Tesconi, ``Modularity-based approach for tracking communities in dynamic social networks,'' \textit{Knowl.-Based Syst.}, vol. 281, Art. no. 111067, 2023.
 \bibitem{Brabant25}
-    Brabant, V., Bonifati, A., \& Cazabet, R. (2025). Discovering communities in continuous-time temporal networks by optimizing L-modularity. \textit{Proc. IEEE International Conference on Data Mining}, 1065--1074.
+    V. Brabant, A. Bonifati, and R. Cazabet, ``Discovering communities in continuous-time temporal networks by optimizing L-modularity,'' in \textit{Proc. IEEE Int. Conf. Data Mining}, 2025, pp. 1065--1074.
 \bibitem{Conrad25}
-    Djurdjevac Conrad, N., Tonello, E., Zonker, J., \& Siebert, H. (2025). Detection of dynamic communities in temporal networks with sparse data. \textit{Applied Network Science}, 10, Article 1.
+    N. Djurdjevac Conrad, E. Tonello, J. Zonker, and H. Siebert, ``Detection of dynamic communities in temporal networks with sparse data,'' \textit{Appl. Netw. Sci.}, vol. 10, Art. no. 1, 2025.
 \bibitem{Blaskovic25}
-    Bla{\v s}kovi{\'c}, F., Conrad, T.O.F., Klus, S., \& Djurdjevac Conrad, N. (2025). Random walk based snapshot clustering for detecting community dynamics in temporal networks. \textit{Scientific Reports}, 15, Article 24414.
+    F. Bla{\v s}kovi{\'c}, T. O. F. Conrad, S. Klus, and N. Djurdjevac Conrad, ``Random walk based snapshot clustering for detecting community dynamics in temporal networks,'' \textit{Sci. Rep.}, vol. 15, Art. no. 24414, 2025.
 \bibitem{HHC22}
-    Hanauer, K., Henzinger, M., \& Schulz, C. (2022). Recent advances in fully dynamic graph algorithms: A quick reference guide. \textit{ACM Journal of Experimental Algorithmics}, 27, Article 1.11.
+    K. Hanauer, M. Henzinger, and C. Schulz, ``Recent advances in fully dynamic graph algorithms: A quick reference guide,'' \textit{ACM J. Exp. Algorithmics}, vol. 27, Art. no. 1.11, 2022.
 \bibitem{SLu24}
-    Sahu, S. (2024). DF Louvain: Fast incrementally expanding approach for community detection on dynamic graphs. \textit{arXiv:2404.19634}.
+    S. Sahu, ``DF Louvain: Fast incrementally expanding approach for community detection on dynamic graphs,'' arXiv:2404.19634, 2024.
 \bibitem{SKB25}
-    Sahu, S., Kothapalli, K., \& Banerjee, D.S. (2025). Parallel multicore algorithms for community detection in dynamic graphs. \textit{International Journal of Networking and Computing}, 15(1), 2--31.
+    S. Sahu, K. Kothapalli, and D. S. Banerjee, ``Parallel multicore algorithms for community detection in dynamic graphs,'' \textit{Int. J. Netw. Comput.}, vol. 15, no. 1, pp. 2--31, 2025.
 \bibitem{Sattar25}
-    Sattar, N.S., Ibrahim, K.Z., Bulu{\c c}, A., \& Arifuzzaman, S. (2025). DyG-DPCD: A distributed parallel community detection algorithm for large-scale dynamic graphs. \textit{International Journal of Parallel Programming}, 53(1), Article 4.
+    N. S. Sattar, K. Z. Ibrahim, A. Bulu{\c c}, and S. Arifuzzaman, ``DyG-DPCD: A distributed parallel community detection algorithm for large-scale dynamic graphs,'' \textit{Int. J. Parallel Program.}, vol. 53, no. 1, Art. no. 4, 2025.
 \bibitem{DGB17}
-    DiTursi, D.J., Ghosh, G., \& Bogdanov, P. (2017). Local community detection in dynamic networks. \textit{Proc. IEEE International Conference on Data Mining}, 847--852.
+    D. J. DiTursi, G. Ghosh, and P. Bogdanov, ``Local community detection in dynamic networks,'' in \textit{Proc. IEEE Int. Conf. Data Mining}, 2017, pp. 847--852.
 \bibitem{CBT23}
-    Christopoulos, D., Baltsou, G., \& Tsichlas, K. (2023). Local community detection in graph streams with anchors. \textit{Information}, 14(6), Article 332.
+    D. Christopoulos, G. Baltsou, and K. Tsichlas, ``Local community detection in graph streams with anchors,'' \textit{Information}, vol. 14, no. 6, Art. no. 332, 2023.
 \bibitem{LSS21}
-    Liu, J., Shao, Y., \& Su, S. (2021). Multiple local community detection via high-quality seed identification over both static and dynamic networks. \textit{Data Science and Engineering}, 6, 249--264.
+    J. Liu, Y. Shao, and S. Su, ``Multiple local community detection via high-quality seed identification over both static and dynamic networks,'' \textit{Data Sci. Eng.}, vol. 6, pp. 249--264, 2021.
 \bibitem{BCA18}
-    Boudebza, S., Cazabet, R., Azouaou, F., \& Nouali, O. (2018). OLCPM: An online framework for detecting overlapping communities in dynamic social networks. \textit{Computer Communications}, 123, 36--51.
+    S. Boudebza, R. Cazabet, F. Azouaou, and O. Nouali, ``OLCPM: An online framework for detecting overlapping communities in dynamic social networks,'' \textit{Comput. Commun.}, vol. 123, pp. 36--51, 2018.
 \bibitem{LYD24}
-    Liu, C., Yang, Y., Ding, Y. et al. (2024). DAG: Deep adaptive and generative K-free community detection on attributed graphs. \textit{Proc. 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 5454--5465.
+    C. Liu, Y. Yang, Y. Ding, et al., ``DAG: Deep adaptive and generative K-free community detection on attributed graphs,'' in \textit{Proc. 30th ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2024, pp. 5454--5465.
 \bibitem{ZXZ20}
-    Zhang, T., Xiong, Y., Zhang, J. et al. (2020). CommDGI: Community detection oriented deep graph infomax. \textit{Proc. 29th ACM International Conference on Information and Knowledge Management}, 1843--1852.
+    T. Zhang, Y. Xiong, J. Zhang, et al., ``CommDGI: Community detection oriented deep graph infomax,'' in \textit{Proc. 29th ACM Int. Conf. Inf. Knowl. Manage.}, 2020, pp. 1843--1852.
 \bibitem{BKH24}
-    Bhowmick, A., Kosan, M., Huang, Z., Singh, A., \& Medya, S. (2024). DGCLUSTER: A neural framework for attributed graph clustering via modularity maximization. \textit{Proceedings of the AAAI Conference on Artificial Intelligence}, 38(10), 11069--11077.
+    A. Bhowmick, M. Kosan, Z. Huang, A. Singh, and S. Medya, ``DGCLUSTER: A neural framework for attributed graph clustering via modularity maximization,'' in \textit{Proc. AAAI Conf. Artif. Intell.}, vol. 38, no. 10, 2024, pp. 11069--11077.
 \bibitem{ZPS25}
-    Zhang, J., Peng, H., Sun, L. et al. (2025). Unsupervised graph clustering with deep structural entropy. \textit{Proc. 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 3752--3763.
+    J. Zhang, H. Peng, L. Sun, et al., ``Unsupervised graph clustering with deep structural entropy,'' in \textit{Proc. 31st ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2025, pp. 3752--3763.
 \bibitem{QZG24}
-    Qin, M., Zhang, C., Gao, Y., Zhang, W., \& Yeung, D.-Y. (2024). Pre-train and refine: Towards higher efficiency in K-agnostic community detection without quality degradation. \textit{Proc. 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}, 2467--2478.
+    M. Qin, C. Zhang, Y. Gao, W. Zhang, and D.-Y. Yeung, ``Pre-train and refine: Towards higher efficiency in K-agnostic community detection without quality degradation,'' in \textit{Proc. 30th ACM SIGKDD Conf. Knowl. Discovery Data Mining}, 2024, pp. 2467--2478.
 \bibitem{GPT25}
-    Gkartzios, C., Pitoura, E., \& Tsaparas, P. (2025). Modularity-fair deep community detection. \textit{Proc. IEEE International Conference on Data Mining}, 287--296.
+    C. Gkartzios, E. Pitoura, and P. Tsaparas, ``Modularity-fair deep community detection,'' in \textit{Proc. IEEE Int. Conf. Data Mining}, 2025, pp. 287--296.
 \end{thebibliography}
 \endgroup
 
