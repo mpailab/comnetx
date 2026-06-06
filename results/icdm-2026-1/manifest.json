@@ -1,56 +1,185 @@
 {
-  "tag": "icdm-2026-1",
-  "tag_commit": "c0121d6413484f691bc52ba5545fd5aba531691c",
-  "generated_at": "2026-06-02T17:32:03.713493+00:00",
-  "source_roots": [
-    "results/paper_icdm_reviewer_followup/series_12",
-    "results/paper_icdm_single_container_rerun/series_14"
+  "bundle": "icdm-2026-1",
+  "description": "Canonical measurement data used by the ICDM 2026 article.",
+  "measurement_files": {
+    "experiment": {
+      "description": "Full experiment time-series records used by article tables, ablation analyses, long-horizon runs, DSBM stress tests, and directed-control checks.",
+      "measurement_entry_count": 446,
+      "output": "measurements/experiment_measurements.json"
+    },
+    "workload_profile": {
+      "description": "Full workload-profile payloads for Leiden, DF-Leiden, and S2CAG mechanism analysis.",
+      "measurement_entry_count": 24,
+      "output": "measurements/workload_profiles.json"
+    },
+    "neighborhood": {
+      "description": "Neighborhood growth records used by the empirical neighborhood table.",
+      "measurement_entry_count": 6,
+      "output": "measurements/neighborhood_measurements.json"
+    },
+    "cut_metrics": {
+      "description": "Targeted final-partition conductance and normalized-cut metrics for key Leiden 999:10 runs.",
+      "measurement_entry_count": 4,
+      "output": "measurements/cut_metrics.json"
+    }
+  },
+  "article_navigation": [
+    {
+      "article_item": "Compatibility study (tab:main-results)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_real_graph",
+        "article_compatibility_baselines"
+      ],
+      "methods": [
+        "dfleiden",
+        "dmon",
+        "flmig",
+        "leidenalg",
+        "magi",
+        "mfc",
+        "prgpt:infomap",
+        "prgpt:locale",
+        "s2cag"
+      ]
+    },
+    {
+      "article_item": "Repeated 999:10 robustness (tab:stability)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "dyn_pubmed_leiden_repeats",
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "leidenalg",
+        "dfleiden",
+        "s2cag"
+      ]
+    },
+    {
+      "article_item": "Empirical neighborhood growth (tab:workload)",
+      "data": "measurements/neighborhood_measurements.json",
+      "families": [
+        "article_neighborhood_growth"
+      ]
+    },
+    {
+      "article_item": "Contracted workload and speedup (fig:workload-speedup)",
+      "data": "measurements/workload_profiles.json",
+      "families": [
+        "article_completion_workload_profiles",
+        "single_container_workload_profiles"
+      ],
+      "methods": [
+        "leidenalg",
+        "dfleiden",
+        "s2cag"
+      ],
+      "note": "Speed ratios use paired records from measurements/experiment_measurements.json."
+    },
+    {
+      "article_item": "Leiden topology ablation (fig:topology-ablation)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "article_completion_real_graph",
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Gamma-resolution sensitivity",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "gamma_sweep"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "S2CAG feature-mode ablation (tab:feature-ablation)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "s2cag"
+      ]
+    },
+    {
+      "article_item": "Leiden closure/contraction ablation (tab:closure-ablation)",
+      "data": "measurements/workload_profiles.json",
+      "families": [
+        "single_container_workload_profiles"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Long-horizon topology endpoints (tab:long-horizon)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "leidenalg",
+        "dfleiden"
+      ]
+    },
+    {
+      "article_item": "Directed-control reviewer check",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_directed_control"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Conductance / normalized-cut reviewer check",
+      "data": "measurements/cut_metrics.json",
+      "families": [
+        "leiden_cut_metrics"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Controlled DSBM stress test",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_dsbm"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    }
   ],
-  "source_json_file_count": 33,
   "counts": {
-    "total_measurement_entries": 163,
-    "measurement_entries_by_category": {
-      "gamma_sweep_measurements": 12,
+    "total_records": 480,
+    "records_by_type": {
+      "cut_metrics": 4,
+      "experiment": 446,
+      "neighborhood": 6,
+      "workload_profile": 24
+    },
+    "records_by_family": {
+      "article_compatibility_baselines": 223,
+      "article_completion_real_graph": 11,
+      "article_completion_workload_profiles": 9,
+      "article_neighborhood_growth": 6,
       "dyn_pubmed_leiden_repeats": 10,
-      "single_container_real_graph_measurements": 126,
+      "gamma_sweep": 12,
+      "leiden_cut_metrics": 4,
+      "single_container_directed_control": 4,
+      "single_container_dsbm": 60,
+      "single_container_real_graph": 126,
       "single_container_workload_profiles": 15
-    }
-  },
-  "measurement_groups": {
-    "gamma_sweep_measurements": {
-      "description": "Reviewer follow-up Leiden gamma sensitivity measurements for dyn_pubmed and arxivmath.",
-      "measurement_entry_count": 12,
-      "output": "measurements/gamma_sweep_measurements.json"
-    },
-    "dyn_pubmed_leiden_repeats": {
-      "description": "Five single-container repeated Leiden measurements on dyn_pubmed, used to audit runtime variation.",
-      "measurement_entry_count": 10,
-      "output": "measurements/dyn_pubmed_leiden_repeats.json"
-    },
-    "single_container_real_graph_measurements": {
-      "description": "Single-container rerun experiment measurements for undirected real-graph ICDM paper runs: Leidenalg, DF-Leiden, S2CAG, feature ablations, topology ablations, and long-horizon endpoints. DSBM and directed-control measurements are intentionally excluded.",
-      "measurement_entry_count": 126,
-      "output": "measurements/single_container_real_graph_measurements.json"
-    },
-    "single_container_workload_profiles": {
-      "description": "Single-container rerun workload-profile measurements for Leidenalg, DF-Leiden, and S2CAG locality/closure analysis.",
-      "measurement_entry_count": 15,
-      "output": "measurements/single_container_workload_profiles.json"
-    }
-  },
-  "self_check": {
-    "checks": {
-      "source_json_files_scanned": true,
-      "gamma_sweep_entry_count_is_12": true,
-      "dyn_pubmed_repeat_entry_count_is_10": true,
-      "single_container_experiment_entry_count_is_126": true,
-      "single_container_workload_profile_entry_count_is_15": true,
-      "bundle_record_ids_are_unique": true,
-      "bundle_record_id_sequence_complete": true
-    },
-    "measurement_entries_by_type": {
-      "experiment": 148,
-      "workload_profile": 15
     }
   }
 }

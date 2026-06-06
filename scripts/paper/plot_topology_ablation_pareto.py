@@ -20,10 +20,7 @@ NEW_MEASUREMENTS = (
     / "results"
     / "icdm-2026-1"
     / "measurements"
-    / "single_container_real_graph_measurements.json"
-)
-LEGACY_MEASUREMENTS = (
-    ROOT / "results" / "icdm-2026-0" / "measurements" / "real_graph_measurements.json"
+    / "experiment_measurements.json"
 )
 OUT = ROOT / "article" / "topology_ablation_pareto.pdf"
 PDF_METADATA = {
@@ -107,7 +104,12 @@ def select_matching(records: list[dict], aggregate: bool, **criteria: object) ->
 
 
 def load_records(path: Path) -> list[dict]:
-    return json.loads(path.read_text())["records"]
+    records = json.loads(path.read_text())["records"]
+    return [
+        record
+        for record in records
+        if record.get("measurement_type") == "experiment"
+    ]
 
 
 def has_complete_grid(records: list[dict], dataset: str) -> bool:
@@ -141,17 +143,16 @@ def has_complete_grid(records: list[dict], dataset: str) -> bool:
 
 
 def load_points() -> dict[str, list[Point]]:
-    new_records = load_records(NEW_MEASUREMENTS)
-    legacy_records = load_records(LEGACY_MEASUREMENTS)
+    records = load_records(NEW_MEASUREMENTS)
     by_dataset: dict[str, list[Point]] = {}
 
     for dataset in DATASETS:
-        records = new_records if has_complete_grid(new_records, dataset) else legacy_records
-        aggregate = records is new_records
+        if not has_complete_grid(records, dataset):
+            raise RuntimeError(f"incomplete topology-ablation grid in {NEW_MEASUREMENTS}: {dataset}")
 
         full = select_matching(
             records,
-            aggregate,
+            True,
             method="leidenalg",
             mode="naive",
             base_dataset=dataset,
@@ -176,7 +177,7 @@ def load_points() -> dict[str, list[Point]]:
             for radius in RADII:
                 record = select_matching(
                     records,
-                    aggregate,
+                    True,
                     method="leidenalg",
                     mode="smart",
                     base_dataset=dataset,
@@ -242,7 +243,7 @@ def main() -> None:
     )
 
     by_dataset = load_points()
-    fig, axes = plt.subplots(1, 3, figsize=(6.8, 1.75), constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(6.8, 1.55), constrained_layout=True)
 
     for ax, dataset in zip(axes, DATASETS, strict=True):
         points = by_dataset[dataset]

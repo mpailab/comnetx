@@ -14,13 +14,13 @@
 \usepackage{booktabs}
 \usepackage{cite}
 
-\setlength{\textfloatsep}{6pt plus 1pt minus 2pt}
-\setlength{\floatsep}{6pt plus 1pt minus 2pt}
-\setlength{\dbltextfloatsep}{6pt plus 1pt minus 2pt}
-\setlength{\dblfloatsep}{6pt plus 1pt minus 2pt}
-\setlength{\intextsep}{6pt plus 1pt minus 2pt}
-\setlength{\abovecaptionskip}{2pt}
-\setlength{\belowcaptionskip}{0pt}
+\setlength{\textfloatsep}{4pt plus 1pt minus 2pt}
+\setlength{\floatsep}{4pt plus 1pt minus 2pt}
+\setlength{\dbltextfloatsep}{4pt plus 1pt minus 2pt}
+\setlength{\dblfloatsep}{4pt plus 1pt minus 2pt}
+\setlength{\intextsep}{4pt plus 1pt minus 2pt}
+\setlength{\abovecaptionskip}{1pt}
+\setlength{\belowcaptionskip}{-1pt}
 \setcounter{topnumber}{1}
 \setcounter{bottomnumber}{1}
 \setcounter{totalnumber}{2}
@@ -205,7 +205,7 @@ Q = \frac{1}{W} \sum_{i,j}
 where $\gamma$ is the resolution parameter. For an undirected graph stored as a
 symmetric adjacency, $W=2m$ and $d_i^{\mathrm{out}}=d_i^{\mathrm{in}}=d_i$,
 which recovers the standard undirected definition. We use $\gamma=1$ in the
-main experiments and report a targeted sensitivity check in the ablation study.
+main experiments and report a resolution-sensitivity check in the ablation study.
 Modularity is not a ground-truth measure and is affected by known resolution
 limits~\cite{G10,FH16}; therefore we also report normalized mutual information
 (NMI) as a compact external-agreement measure whenever labels are available.
@@ -469,7 +469,8 @@ graphs with block-dependent edge probabilities~\cite{HLL83}. In the dynamic
 setting, the graph is observed as a sequence of snapshots generated under a
 time-indexed block structure~\cite{XH14}. We instantiate this idea with an
 initial planted-partition graph followed by controlled update layers at $5$,
-$10$, and $100$ batch granularities. These streams vary update size and update
+$10$, and $100$ batch granularities in the generator, and report the selected
+100-batch stress rows in this paper. These streams vary update size and update
 locality explicitly rather than reusing the real-data $999{:}10$ protocol.
 
 \begin{table}[ht]
@@ -506,7 +507,8 @@ and TensorFlow 2.14.0.
 We evaluate both community quality and computational efficiency.
 \begin{itemize}
     \item \textbf{Modularity} ($Q$): the standard modularity of the partition obtained after processing the update sequence, measured on the final graph of the corresponding protocol.
-    \item \textbf{External agreement}: NMI, ARI, and macro-F1 are computed against the ground-truth labels in the result logs. The main tables report NMI as the compact external metric: ARI gives the same qualitative picture in the retained result set, while macro-F1 is usually close to zero because the optimized partitions are not in one-to-one correspondence with label classes.
+    \item \textbf{External agreement}: normalized mutual information (NMI) is computed against the ground-truth labels on the final graph of each protocol. We report NMI as a compact external metric because it is label-permutation invariant and remains comparable when the number of detected communities differs from the number of label classes.
+    \item \textbf{Structural quality}: we compute final-partition mean conductance and normalized cut for full and Local Leiden on the two largest \texttt{999:10} streams. These metrics are complementary diagnostics, not optimization targets.
     \item \textbf{Total processing time} ($T$): the cumulative wall-clock time (in seconds) required to process all measured update batches, i.e., the sum of the execution times of the dynamic algorithm over the whole update sequence.
     \item \textbf{Local workload}: the number of expanded vertices $|B_r(S_t)|$, the number of vertices included after community closure $|U_t^\ell|$, and the number of nodes and edges in the contracted backend instances. These values quantify how much of the full graph is actually inspected.
     \item \textbf{Peak memory}: maximum resident CPU memory and, for GNN-based methods, allocated GPU memory.
@@ -515,7 +517,7 @@ We exclude data-format conversion time; each baseline operates on its native
 graph representation. Whenever repeated measurements are available, comparisons
 are paired by dataset, directedness, batch strategy, initial history, and
 completed update count. The compatibility table is breadth-oriented and uses
-audited finite runs under the common P1 stream, while the robustness table
+finite runs under the common P1 stream, while the robustness table
 reports the subset with at least five paired repetitions.
 
 \subsubsection{Baselines}
@@ -609,14 +611,14 @@ tests below then assess stability as streams lengthen or locality weakens.
 \textbf{arxivmath} & \textbf{OOM avoided} \\
 \midrule
 DF-Leiden      & Dynamic & $-$0.010 & +0.001 & 0.1$\times$  & 8.4$\times$ & 0 \\
-MFC            & Dynamic & +0.048 & +0.126 & 45.1$\times$ & OOM$\rightarrow$381.7s & 1 \\
+MFC            & Dynamic & +0.075 & +0.136 & 56.8$\times$ & OOM$\rightarrow$381.7s & 1 \\
 Leidenalg      & Naive   & $-$0.013 & $-$0.012 & 8.0$\times$  & 41.9$\times$ & 0 \\
-FLMIG          & Naive   & $-$0.250 & $-$0.042 & 60.0$\times$ & 2731.8$\times$ & 0 \\
-PRGPT-Infomap  & Naive   & $-$0.165 & $-$0.073 & 7.6$\times$  & 39.8$\times$ & 0 \\
-PRGPT-Locale   & Naive   & $-$0.242 & $-$0.073 & 8.9$\times$  & 58.9$\times$ & 0 \\
+FLMIG          & Naive   & $-$0.247 & $-$0.039 & 60.5$\times$ & 2606.8$\times$ & 0 \\
+PRGPT-Infomap  & Naive   & $-$0.131 & $-$0.064 & 7.7$\times$  & 45.2$\times$ & 0 \\
+PRGPT-Locale   & Naive   & $-$0.272 & $-$0.083 & 8.9$\times$  & 62.1$\times$ & 0 \\
 S$^2$CAG       & Naive   & +0.137 & +0.117 & 5.0$\times$  & 10.2$\times$ & 0 \\
-MAGI           & Naive   & +0.082 & $-$0.034 & 0.3$\times$  & OOM$\rightarrow$868.2s & 1 \\
-DMoN           & Naive   & +0.484 & +0.112 & 1.4$\times$  & OOM$\rightarrow$65.1s & 1 \\
+MAGI           & Naive   & +0.081 & $-$0.035 & 0.3$\times$  & OOM$\rightarrow$985.0s & 1 \\
+DMoN           & Naive   & +0.514 & +0.113 & 1.0$\times$  & OOM$\rightarrow$90.0s & 1 \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -658,8 +660,10 @@ consistent large-graph speedups, but their quality deltas show that this speed
 comes from a more aggressive loss of global context. The GNN rows show a
 different benefit: S$^2$CAG becomes substantially faster, while DMoN and MAGI
 become executable on large graphs because only small neighbourhood graphs are
-materialised on the GPU. The DF-Leiden row shows that locality can also help an
-algorithm already designed for dynamic updates when the graph is large enough.
+materialised on the GPU; DMoN is near break-even in aggregate runtime but avoids
+the full-snapshot out-of-memory failure on \textit{arxivmath}. The DF-Leiden row
+shows that locality can also help an algorithm already designed for dynamic
+updates when the graph is large enough.
 
 \subsubsection{Statistical Robustness}
 
@@ -672,37 +676,34 @@ measurements of the same stream shape rather than a mixture of different
 horizons or feature draws. The Local rows use the fixed three-level, radius-one
 configuration and are compared with the corresponding naive or native dynamic
 baseline. Table~\ref{tab:stability} keeps only the \texttt{999:10} rows for
-\textit{dyn\_pubmed} and \textit{arxivmath} with at least five repeated
-measurements in the audited result set. Values are reported as mean $\pm$
-standard deviation. $T$ denotes cumulative processing time in seconds, and B/L
-summarizes the observed baseline-to-Local runtime ratio.
+\textit{dyn\_pubmed} and \textit{arxivmath}; each row uses $n=5$ paired
+repetitions of the same stream shape. Table entries use the compact
+mean(sd) form for Local/Baseline quantities.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
-\caption{Statistical robustness over repeated 999:10 runs.}
+\caption{Repeated 999:10 robustness.}
 \label{tab:stability}
-\setlength{\tabcolsep}{3pt}
-\scriptsize
-\begin{tabular}{@{}lllrccccc@{}}
+\setlength{\tabcolsep}{2.5pt}
+\fontsize{6.6}{7.0}\selectfont
+\begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Backend} & \textbf{Dataset} & \textbf{Stream} & \textbf{$n$} &
-\textbf{$Q_L$} & \textbf{$Q_B$} & \textbf{$T_L$} &
-\textbf{$T_B$} & \textbf{B/L} \\
+\textbf{Dataset} & \textbf{Q\textsubscript{L} / Q\textsubscript{B}} & \textbf{T\textsubscript{L} / T\textsubscript{B}} \\
 \midrule
-\multicolumn{9}{l}{\textit{Leiden, Local versus full recomputation}} \\
-Leiden & dyn\_pubmed & 999:10 & 5 & 0.776 $\pm$ 0.000 & 0.786 $\pm$ 0.000 & 0.39 $\pm$ 0.00 & 6.68 $\pm$ 0.02 & 17.1 $\pm$ 0.2 \\
-Leiden & arxivmath   & 999:10 & 5 & 0.881 $\pm$ 0.000 & 0.886 $\pm$ 0.000 & 3.56 $\pm$ 0.02 & 149.07 $\pm$ 0.72 & 41.9 $\pm$ 0.2 \\
+\multicolumn{3}{@{}l}{\textit{Leiden, Local versus full recomputation}} \\
+dyn\_pubmed & 0.776\thinspace(0.000)\hspace{0.18em}/\hspace{0.18em}0.786\thinspace(0.000) & 0.39\thinspace(0.00)\hspace{0.18em}/\hspace{0.18em}6.68\thinspace(0.02) \\
+arxivmath   & 0.881\thinspace(0.000)\hspace{0.18em}/\hspace{0.18em}0.886\thinspace(0.000) & 3.56\thinspace(0.02)\hspace{0.18em}/\hspace{0.18em}149.07\thinspace(0.72) \\
 \addlinespace
-\multicolumn{9}{l}{\textit{DF-Leiden, Local versus native dynamic backend}} \\
-DF-Leiden & dyn\_pubmed & 999:10 & 5 & 0.779 $\pm$ 0.000 & 0.762 $\pm$ 0.000 & 0.24 $\pm$ 0.00 & 0.11 $\pm$ 0.00 & 0.44 $\pm$ 0.01 \\
-DF-Leiden & arxivmath   & 999:10 & 5 & 0.880 $\pm$ 0.000 & 0.850 $\pm$ 0.000 & 0.45 $\pm$ 0.01 & 3.77 $\pm$ 0.04 & 8.4 $\pm$ 0.1 \\
+\multicolumn{3}{@{}l}{\textit{DF-Leiden, Local versus native dynamic backend}} \\
+dyn\_pubmed & 0.779\thinspace(0.000)\hspace{0.18em}/\hspace{0.18em}0.762\thinspace(0.000) & 0.24\thinspace(0.00)\hspace{0.18em}/\hspace{0.18em}0.11\thinspace(0.00) \\
+arxivmath   & 0.880\thinspace(0.000)\hspace{0.18em}/\hspace{0.18em}0.850\thinspace(0.000) & 0.45\thinspace(0.01)\hspace{0.18em}/\hspace{0.18em}3.77\thinspace(0.04) \\
 \addlinespace
-\multicolumn{9}{l}{\textit{S$^2$CAG, dataset features}} \\
-S$^2$CAG & dyn\_pubmed & 999:10 & 5 & 0.530 $\pm$ 0.000 & 0.622 $\pm$ 0.000 & 26.44 $\pm$ 3.32 & 111.19 $\pm$ 1.28 & 4.3 $\pm$ 0.5 \\
-S$^2$CAG & arxivmath   & 999:10 & 5 & 0.089 $\pm$ 0.000 & 0.001 $\pm$ 0.000 & 225.51 $\pm$ 6.82 & 2297.03 $\pm$ 16.33 & 10.2 $\pm$ 0.3 \\
+\multicolumn{3}{@{}l}{\textit{S\textsuperscript{2}CAG, dataset features}} \\
+dyn\_pubmed & 0.530\thinspace(0.000)\hspace{0.18em}/\hspace{0.18em}0.622\thinspace(0.000) & 26.44\thinspace(3.32)\hspace{0.18em}/\hspace{0.18em}111.19\thinspace(1.28) \\
+arxivmath   & 0.089\thinspace(0.000)\hspace{0.18em}/\hspace{0.18em}0.001\thinspace(0.000) & 225.51\thinspace(6.82)\hspace{0.18em}/\hspace{0.18em}2297.03\thinspace(16.33) \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 This repeated-run view shows that topology-only conclusions are stable under a
 fixed stream shape: Leiden keeps a small modularity gap and large speedups, while
@@ -712,6 +713,27 @@ The S$^2$CAG dataset-feature rows show that the adapter can also accelerate a
 feature-aware backend with real attributes: on \textit{arxivmath}, runtime drops
 by $10.2\times$ and modularity improves over full-snapshot S$^2$CAG; on
 \textit{dyn\_pubmed}, the speedup is smaller and the quality gap larger.
+
+\textbf{Direction-preserving Leiden check.}
+The cross-backend protocol symmetrizes real graphs because several baselines are
+undirected. To check that this does not hide a Leiden-specific failure mode, we
+rerun Leiden on the original directed \textit{dyn\_pubmed} and
+\textit{arxivmath} streams. The directed check shows the same qualitative
+pattern as the symmetrized rows: on \textit{dyn\_pubmed}, full versus Local
+Leiden gives $Q=0.788$ versus $0.768$, NMI $0.208$ versus $0.199$, and
+$4.99$s versus $0.36$s ($14.0\times$); on \textit{arxivmath}, the corresponding
+values are $Q=0.886$ versus $0.880$, NMI $0.415$ versus $0.404$, and $108.82$s
+versus $2.83$s ($38.4\times$).
+
+\textbf{Structural-quality metrics.}
+For the symmetrized \texttt{999:10} protocol used in the main real-data
+comparison, we additionally compute conductance and normalized cut for full
+versus Local Leiden on the two largest streams. These metrics do not cover every
+backend, but they test the main topology comparison. Local Leiden reduces
+normalized cut and leaves mean conductance essentially unchanged or slightly
+lower:
+\textit{dyn\_pubmed} changes from mean conductance/Ncut $0.128/6.17$ to
+$0.127/5.33$, and \textit{arxivmath} from $0.0011/8.73$ to $0.0009/6.96$.
 
 \subsubsection{Comparison with Native Dynamic Methods}
 
@@ -744,7 +766,7 @@ Here $|S_t|$ is the average number of directly affected vertices. The $B_h$
 columns report mean vertex percentages within distance $h$ from $S_t$; for
 $B_1$, the maximum mini-batch percentage is also shown.
 
-\begin{table}[H]
+\begin{table}[!b]
 \centering
 \caption{Empirical neighborhood growth.}
 \label{tab:workload}
@@ -781,9 +803,9 @@ near-percent edge fractions, but speedups remain backend-dependent: DF-Leiden
 already performs local dynamic updates, whereas S$^2$CAG still executes neural
 feature materialization and tensor operations inside each call.
 
-Focused \texttt{999:50} profiles separate locality from overhead: expansion,
-closure, aggregation, and projection remain in the millisecond range, while
-backend execution dominates Leiden on \textit{arxivmath} and all S$^2$CAG rows.
+The workload profiles separate locality from overhead: expansion, closure,
+aggregation, and projection remain in the millisecond range, while backend
+execution dominates Leiden on \textit{arxivmath} and all S$^2$CAG rows.
 For S$^2$CAG, the dominant cost is the neural backend itself: feature
 materialization, sparse tensor construction, and training. On A100 GPUs with
 80~GB memory, full-snapshot neural runs often fit in memory, so GPU parallelism
@@ -973,38 +995,30 @@ applies controlled edge updates to produce dynamic graph snapshots. Each graph
 has $n=100{,}000$ vertices, $k=32$ planted communities, target average degree
 $58$, $1\%$ degree-$512$ hubs, and assortativity
 $p_{\mathrm{in}}=0.97$. We evaluate random, hub-centered, and
-community-internal updates over $T\in\{5,10,100\}$ batches, with changed-edge
-rates from $0.01\%$ to $1\%$. Across generated streams, the mean affected
-vertex ranges are 0.58--43.25\% (random), 0.54--25.99\% (hub-centered), and
-0.57--14.77\% (community-internal); the corresponding intra-community
-changed-edge shares are about 50\%, 50\%, and 100\%.
+community-internal updates over 100 batches at changed-edge rates of
+$0.01\%$ and $0.05\%$, with five seeds for each locality/rate pair.
 
 The DSBM stress study exposes the operating envelope. In the 100-batch set,
 $0.01\%$ random, hub-centered, and community-internal streams give
-$3.11$--$3.42\times$, $0.19$--$1.57\times$, and
-$4.20$--$4.59\times$ speedups; the hub-centered minimum is a single low
-replicate. At $0.05\%$, only community-internal streams stay above break-even
-($1.13$--$1.21\times$). From $0.1\%$ onward, most local runs are slower,
-especially for $0.5\%$--$1.0\%$ random and hub-centered updates.
-Quality drift is usually small, but the seed/batch sweep includes one
-community-stream loss of $0.089$ NMI and a hub-centered $0.5\%$ loss of
-$0.0229$ modularity and $0.088$ NMI.
-Large or hub-heavy batches should therefore trigger a full refresh.
+$3.31$--$3.38\times$, $1.51$--$1.54\times$, and
+$4.21$--$4.39\times$ speedups. At $0.05\%$, random and hub-centered streams are
+slower than full recomputation ($0.89\times$ and $0.85$--$0.86\times$), while
+community-internal streams remain above break-even ($1.11$--$1.14\times$).
+Quality drift is usually small: the largest losses are $0.0102$ modularity and
+$0.0481$ NMI at $0.01\%$, and $0.0088$ modularity and $0.0561$ NMI at
+$0.05\%$. Larger or hub-heavy batches should therefore trigger a full refresh.
 
 \subsubsection{Limitations}
 
-ComNetX is designed for streams where affected communities remain small relative
-to the graph. Hub-heavy or very large updates may approach the full snapshot or
-lose boundary context, and representation-learning backends are more sensitive
-than Leiden to restricted context and feature representation. We therefore treat
-ComNetX as an adaptive locality framework whose workload and stress-test
-diagnostics indicate when a full refresh is preferable. All reported real-data
-runs use explicit symmetrization so that baselines defined only for undirected
-graphs are evaluated on the same sequence; direction-preserving objectives are
-therefore outside the present evaluation. The main experiments also fix
-$\gamma=1$; the sensitivity check above shows that Local Leiden remains fast
-over a small resolution sweep, but adaptive resolution selection for contracted
-local instances remains future work.
+ComNetX targets streams where affected communities remain small relative to the
+graph. Hub-heavy or very large updates may approach the full snapshot or lose
+boundary context, and representation-learning backends are more sensitive than
+Leiden to restricted context and feature representation; monitored workload and
+stress-test diagnostics therefore indicate when a full refresh is preferable.
+The cross-backend rows use explicit symmetrization for methods that require
+undirected graphs; the direction-preserving Leiden experiment supports the same
+trend, but directed baselines beyond Leiden and adaptive local resolution remain future
+work.
 
 \section{Related work} \label{S:5}
 \textbf{Static and modularity-based community detection.} Classical CD methods
@@ -1065,28 +1079,21 @@ solvers while restricting computation to affected aggregated subproblems.
 \section{Conclusion} \label{S:6}
 We presented ComNetX, a local hierarchical framework for adapting community
 detection solvers to dynamic graphs. After each batch update, it maintains a
-community hierarchy, expands updated endpoints to a small neighborhood,
-contracts affected communities into local subproblems, and invokes the selected
-backend only on those subproblems. The same mechanism supports topology-only and
-feature-aware solvers.
-
-The experiments show that the approach is most effective when a strong backend
-can exploit locality without losing global context. Local Leiden preserves much
-of the modularity of full recomputation while reducing update time on larger
-networks. Ablations show that radius, hierarchy depth, and feature
-representation materially affect quality and runtime, and long-horizon topology
-runs show that cumulative speedups can persist even when quality drift must be
-reported explicitly.
-
-Overall, ComNetX is effective when hierarchical closure preserves enough context
-for local recomputation to approximate full-snapshot quality. The method is
-solver-agnostic, compatible with feature-aware backends, and has an explicit
-fallback interpretation: as the affected region grows, the local problem
-approaches the full snapshot, indicating when a full refresh is preferable.
+community hierarchy, expands updated endpoints, contracts affected communities
+into local subproblems, and invokes the selected backend only there. The same
+mechanism supports topology-only and feature-aware solvers. The experiments show
+that Local Leiden preserves much of the modularity of full recomputation while
+reducing update time on larger networks; ablations show that radius, hierarchy
+depth, and feature representation materially affect the trade-off; and
+long-horizon and DSBM stress tests show when cumulative speedups persist or a
+full refresh is preferable. ComNetX is therefore best viewed as a solver-agnostic
+locality adapter with explicit workload diagnostics rather than as a replacement
+for every dynamic community-detection objective.
 %----------------------------------------------------------------------------------------
 \begingroup
+\setlength{\labelsep}{0.12em}
 \begin{thebibliography}{00}
-\fontsize{6.0}{6.1}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}
+\fontsize{5.82}{5.87}\selectfont\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\parskip}{0pt}
 \bibitem{OSH07}
     Onnela, J.-P., Saram{\"a}ki, J., Hyv{\"o}nen, J. et al. (2007). Structure and tie strengths in mobile communication networks. \textit{Proceedings of the National Academy of Sciences}, 104(18), 7332--7336.
 \bibitem{PBV07}

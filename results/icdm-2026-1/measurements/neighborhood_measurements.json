@@ -1,0 +1,718 @@
+{
+  "bundle": "icdm-2026-1",
+  "type": "neighborhood",
+  "description": "Neighborhood growth records used by the empirical neighborhood table.",
+  "record_count": 6,
+  "records": [
+    {
+      "measurement_type": "neighborhood",
+      "dataset": "dyn_pubmed",
+      "base_dataset": "dyn_pubmed",
+      "force_undirected": false,
+      "batch_strategy": "999:10",
+      "updates": 10,
+      "nodes": 19717,
+      "edges": 44338,
+      "directedness": "directed",
+      "weightedness": "unweighted",
+      "max_step": 5,
+      "neighborhood_series": [
+        [
+          10,
+          354,
+          3599,
+          9948,
+          16431,
+          18754
+        ],
+        [
+          10,
+          179,
+          1835,
+          7265,
+          14305,
+          18219
+        ],
+        [
+          10,
+          285,
+          2751,
+          9443,
+          16025,
+          18737
+        ],
+        [
+          10,
+          132,
+          1130,
+          6550,
+          13459,
+          18062
+        ],
+        [
+          8,
+          53,
+          484,
+          2094,
+          8701,
+          13547
+        ],
+        [
+          8,
+          122,
+          1158,
+          5461,
+          10281,
+          16304
+        ],
+        [
+          8,
+          75,
+          394,
+          2521,
+          8327,
+          15503
+        ],
+        [
+          8,
+          131,
+          1236,
+          6830,
+          13521,
+          18280
+        ],
+        [
+          8,
+          87,
+          592,
+          3373,
+          10100,
+          16233
+        ],
+        [
+          8,
+          131,
+          1183,
+          6808,
+          12716,
+          17803
+        ]
+      ],
+      "B0_mean": 8.8,
+      "B0_max": 10,
+      "B0_pct_mean": 0.04463153623776437,
+      "B0_pct_max": 0.05071765481564133,
+      "B1_mean": 154.9,
+      "B1_max": 354,
+      "B1_pct_mean": 0.7856164730942842,
+      "B1_pct_max": 1.7954049804737031,
+      "B2_mean": 1436.2,
+      "B2_max": 3599,
+      "B2_pct_mean": 7.284069584622407,
+      "B2_pct_max": 18.25328396814931,
+      "B3_mean": 6029.3,
+      "B3_max": 9948,
+      "B3_pct_mean": 30.579195617994625,
+      "B3_pct_max": 50.453923010599986,
+      "B4_mean": 12386.6,
+      "B4_max": 16431,
+      "B4_pct_mean": 62.82193031394229,
+      "B4_pct_max": 83.33417862758026,
+      "B5_mean": 17144.2,
+      "B5_max": 18754,
+      "B5_pct_mean": 86.95136176903179,
+      "B5_pct_max": 95.11588984125375,
+      "measurement_family": "article_neighborhood_growth",
+      "bundle_record_id": "measurement-000452"
+    },
+    {
+      "measurement_type": "neighborhood",
+      "dataset": "dyn_cora",
+      "base_dataset": "dyn_cora",
+      "force_undirected": false,
+      "batch_strategy": "999:10",
+      "updates": 10,
+      "nodes": 2708,
+      "edges": 5278,
+      "directedness": "undirected",
+      "weightedness": "unweighted",
+      "max_step": 5,
+      "neighborhood_series": [
+        [
+          2,
+          10,
+          93,
+          239,
+          886,
+          1606
+        ],
+        [
+          2,
+          10,
+          41,
+          80,
+          368,
+          928
+        ],
+        [
+          2,
+          10,
+          36,
+          173,
+          848,
+          1625
+        ],
+        [
+          2,
+          11,
+          42,
+          339,
+          733,
+          1374
+        ],
+        [
+          2,
+          6,
+          25,
+          221,
+          512,
+          1051
+        ],
+        [
+          2,
+          10,
+          93,
+          239,
+          886,
+          1606
+        ],
+        [
+          2,
+          10,
+          41,
+          80,
+          368,
+          928
+        ],
+        [
+          2,
+          10,
+          36,
+          173,
+          848,
+          1625
+        ],
+        [
+          2,
+          11,
+          42,
+          339,
+          733,
+          1375
+        ],
+        [
+          2,
+          6,
+          25,
+          221,
+          512,
+          1051
+        ]
+      ],
+      "B0_mean": 2,
+      "B0_max": 2,
+      "B0_pct_mean": 0.07385524372230429,
+      "B0_pct_max": 0.07385524372230429,
+      "B1_mean": 9.4,
+      "B1_max": 11,
+      "B1_pct_mean": 0.34711964549483015,
+      "B1_pct_max": 0.40620384047267355,
+      "B2_mean": 47.4,
+      "B2_max": 93,
+      "B2_pct_mean": 1.7503692762186114,
+      "B2_pct_max": 3.4342688330871494,
+      "B3_mean": 210.4,
+      "B3_max": 339,
+      "B3_pct_mean": 7.7695716395864105,
+      "B3_pct_max": 12.518463810930577,
+      "B4_mean": 669.4,
+      "B4_max": 886,
+      "B4_pct_mean": 24.719350073855242,
+      "B4_pct_max": 32.7178729689808,
+      "B5_mean": 1316.9,
+      "B5_max": 1625,
+      "B5_pct_mean": 48.62998522895126,
+      "B5_pct_max": 60.007385524372225,
+      "measurement_family": "article_neighborhood_growth",
+      "bundle_record_id": "measurement-000453"
+    },
+    {
+      "measurement_type": "neighborhood",
+      "dataset": "dyn_acm",
+      "base_dataset": "dyn_acm",
+      "force_undirected": false,
+      "batch_strategy": "999:10",
+      "updates": 10,
+      "nodes": 3025,
+      "edges": 13128,
+      "directedness": "undirected",
+      "weightedness": "unweighted",
+      "max_step": 5,
+      "neighborhood_series": [
+        [
+          6,
+          89,
+          258,
+          534,
+          1020,
+          1506
+        ],
+        [
+          6,
+          79,
+          323,
+          893,
+          1486,
+          1773
+        ],
+        [
+          6,
+          71,
+          294,
+          803,
+          1383,
+          1725
+        ],
+        [
+          6,
+          40,
+          181,
+          507,
+          1080,
+          1567
+        ],
+        [
+          6,
+          94,
+          329,
+          729,
+          1251,
+          1684
+        ],
+        [
+          6,
+          53,
+          312,
+          906,
+          1501,
+          1786
+        ],
+        [
+          4,
+          78,
+          261,
+          677,
+          1277,
+          1681
+        ],
+        [
+          4,
+          46,
+          219,
+          639,
+          1241,
+          1651
+        ],
+        [
+          4,
+          32,
+          168,
+          485,
+          1033,
+          1531
+        ],
+        [
+          4,
+          36,
+          108,
+          364,
+          1010,
+          1552
+        ]
+      ],
+      "B0_mean": 5.2,
+      "B0_max": 6,
+      "B0_pct_mean": 0.171900826446281,
+      "B0_pct_max": 0.19834710743801653,
+      "B1_mean": 61.8,
+      "B1_max": 94,
+      "B1_pct_mean": 2.0429752066115703,
+      "B1_pct_max": 3.1074380165289255,
+      "B2_mean": 245.3,
+      "B2_max": 329,
+      "B2_pct_mean": 8.10909090909091,
+      "B2_pct_max": 10.87603305785124,
+      "B3_mean": 653.7,
+      "B3_max": 906,
+      "B3_pct_mean": 21.609917355371902,
+      "B3_pct_max": 29.950413223140497,
+      "B4_mean": 1228.2,
+      "B4_max": 1501,
+      "B4_pct_mean": 40.60165289256199,
+      "B4_pct_max": 49.6198347107438,
+      "B5_mean": 1645.6,
+      "B5_max": 1786,
+      "B5_pct_mean": 54.39999999999999,
+      "B5_pct_max": 59.04132231404958,
+      "measurement_family": "article_neighborhood_growth",
+      "bundle_record_id": "measurement-000454"
+    },
+    {
+      "measurement_type": "neighborhood",
+      "dataset": "dyn_citeseer",
+      "base_dataset": "dyn_citeseer",
+      "force_undirected": false,
+      "batch_strategy": "999:10",
+      "updates": 8,
+      "nodes": 3327,
+      "edges": 4552,
+      "directedness": "undirected",
+      "weightedness": "unweighted",
+      "max_step": 5,
+      "neighborhood_series": [
+        [
+          2,
+          8,
+          33,
+          84,
+          223,
+          539
+        ],
+        [
+          2,
+          104,
+          266,
+          445,
+          672,
+          879
+        ],
+        [
+          2,
+          20,
+          105,
+          242,
+          450,
+          653
+        ],
+        [
+          2,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        [
+          2,
+          8,
+          33,
+          84,
+          223,
+          539
+        ],
+        [
+          2,
+          104,
+          266,
+          445,
+          672,
+          879
+        ],
+        [
+          2,
+          20,
+          105,
+          242,
+          450,
+          653
+        ],
+        [
+          2,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      ],
+      "B0_mean": 2,
+      "B0_max": 2,
+      "B0_pct_mean": 0.06011421701232341,
+      "B0_pct_max": 0.06011421701232341,
+      "B1_mean": 33.75,
+      "B1_max": 104,
+      "B1_pct_mean": 1.0144274120829575,
+      "B1_pct_max": 3.125939284640818,
+      "B2_mean": 101.75,
+      "B2_max": 266,
+      "B2_pct_mean": 3.0583107905019538,
+      "B2_pct_max": 7.995190862639014,
+      "B3_mean": 193.5,
+      "B3_max": 445,
+      "B3_pct_mean": 5.8160504959422905,
+      "B3_pct_max": 13.37541328524196,
+      "B4_mean": 337,
+      "B4_max": 672,
+      "B4_pct_mean": 10.129245566576495,
+      "B4_pct_max": 20.198376916140667,
+      "B5_mean": 518.5,
+      "B5_max": 879,
+      "B5_pct_mean": 15.584610760444845,
+      "B5_pct_max": 26.420198376916144,
+      "measurement_family": "article_neighborhood_growth",
+      "bundle_record_id": "measurement-000455"
+    },
+    {
+      "measurement_type": "neighborhood",
+      "dataset": "patent",
+      "base_dataset": "patent",
+      "force_undirected": false,
+      "batch_strategy": "999:10",
+      "updates": 10,
+      "nodes": 12214,
+      "edges": 41916,
+      "directedness": "directed",
+      "weightedness": "unweighted",
+      "max_step": 5,
+      "neighborhood_series": [
+        [
+          6,
+          543,
+          1122,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          535,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          539,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          543,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          547,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          551,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          555,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          559,
+          618,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          553,
+          612,
+          2268,
+          2273,
+          4064
+        ],
+        [
+          5,
+          557,
+          612,
+          2268,
+          2273,
+          4064
+        ]
+      ],
+      "B0_mean": 5.1,
+      "B0_max": 6,
+      "B0_pct_mean": 0.04175536269854266,
+      "B0_pct_max": 0.04912395611593254,
+      "B1_mean": 548.2,
+      "B1_max": 559,
+      "B1_pct_mean": 4.48829212379237,
+      "B1_pct_max": 4.576715244801048,
+      "B2_mean": 667.2,
+      "B2_max": 1122,
+      "B2_pct_mean": 5.462583920091698,
+      "B2_pct_max": 9.186179793679385,
+      "B3_mean": 2268,
+      "B3_max": 2268,
+      "B3_pct_mean": 18.5688554118225,
+      "B3_pct_max": 18.5688554118225,
+      "B4_mean": 2273,
+      "B4_max": 2273,
+      "B4_pct_mean": 18.60979204191911,
+      "B4_pct_max": 18.60979204191911,
+      "B5_mean": 4064,
+      "B5_max": 4064,
+      "B5_pct_mean": 33.273292942524975,
+      "B5_pct_max": 33.273292942524975,
+      "measurement_family": "article_neighborhood_growth",
+      "bundle_record_id": "measurement-000456"
+    },
+    {
+      "measurement_type": "neighborhood",
+      "dataset": "arxivmath",
+      "base_dataset": "arxivmath",
+      "force_undirected": false,
+      "batch_strategy": "999:10",
+      "updates": 10,
+      "nodes": 270013,
+      "edges": 799745,
+      "directedness": "directed",
+      "weightedness": "unweighted",
+      "max_step": 5,
+      "neighborhood_series": [
+        [
+          139,
+          3007,
+          21979,
+          79171,
+          156216,
+          208868
+        ],
+        [
+          136,
+          2287,
+          16901,
+          66587,
+          144096,
+          203112
+        ],
+        [
+          149,
+          2443,
+          17178,
+          69376,
+          149616,
+          206707
+        ],
+        [
+          149,
+          2089,
+          17499,
+          72525,
+          153836,
+          208595
+        ],
+        [
+          148,
+          2953,
+          20420,
+          78244,
+          158039,
+          209915
+        ],
+        [
+          149,
+          2890,
+          20390,
+          76649,
+          152712,
+          206470
+        ],
+        [
+          148,
+          2667,
+          18933,
+          75280,
+          153769,
+          207662
+        ],
+        [
+          146,
+          2396,
+          19508,
+          73605,
+          153871,
+          208359
+        ],
+        [
+          148,
+          2498,
+          18908,
+          74517,
+          152649,
+          206878
+        ],
+        [
+          144,
+          2527,
+          17628,
+          72804,
+          153533,
+          208187
+        ]
+      ],
+      "B0_mean": 145.6,
+      "B0_max": 149,
+      "B0_pct_mean": 0.053923329617462865,
+      "B0_pct_max": 0.05518252824863988,
+      "B1_mean": 2575.7,
+      "B1_max": 3007,
+      "B1_pct_mean": 0.9539170336243069,
+      "B1_pct_max": 1.1136500835144973,
+      "B2_mean": 18934.4,
+      "B2_max": 21979,
+      "B2_pct_mean": 7.012403106517094,
+      "B2_pct_max": 8.139978445482255,
+      "B3_mean": 73875.8,
+      "B3_max": 79171,
+      "B3_pct_mean": 27.360090069737385,
+      "B3_pct_max": 29.32118083203401,
+      "B4_mean": 152833.7,
+      "B4_max": 158039,
+      "B4_pct_mean": 56.60234877579969,
+      "B4_pct_max": 58.53014484487784,
+      "B5_mean": 207475.3,
+      "B5_max": 209915,
+      "B5_pct_mean": 76.83900404795324,
+      "B5_pct_max": 77.74255313633047,
+      "measurement_family": "article_neighborhood_growth",
+      "bundle_record_id": "measurement-000457"
+    }
+  ]
+}

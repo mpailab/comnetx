@@ -1,27 +1,56 @@
 # icdm-2026-1 Measurement Bundle
 
-This directory is a compact supplemental measurement snapshot for the ICDM 2026 reviewer-followup and single-container rerun pass.
-It preserves the earlier follow-up records and adds the undirected real-graph outputs from `results/paper_icdm_single_container_rerun/series_14`.
-DSBM and directed-control measurements are intentionally outside this bundle update.
+This directory stores the canonical measurement data used by the ICDM 2026 article.
 
-## Provenance
+Measurements are split by data type. Experiment time series, workload
+profiles, neighborhood-growth rows, and cut metrics each have a
+separate JSON file with full payloads. Original result file paths are
+not embedded in records.
 
-- Tag: `icdm-2026-1`
-- Reference commit: `c0121d6413484f691bc52ba5545fd5aba531691c`
-- Source roots:
-  - `results/paper_icdm_reviewer_followup/series_12`
-  - `results/paper_icdm_single_container_rerun/series_14`
-- Source JSON files: `33`
-- Total measurement entries: `163`
+## Article Navigation
 
-## Measurement Entries By Type
+- Compatibility study (tab:main-results): `measurements/experiment_measurements.json` (`measurement_family`: `single_container_real_graph`, `article_compatibility_baselines`)
+- Repeated 999:10 robustness (tab:stability): `measurements/experiment_measurements.json` (`measurement_family`: `dyn_pubmed_leiden_repeats`, `single_container_real_graph`)
+- Empirical neighborhood growth (tab:workload): `measurements/neighborhood_measurements.json` (`measurement_family`: `article_neighborhood_growth`)
+- Contracted workload and speedup (fig:workload-speedup): `measurements/workload_profiles.json` (`measurement_family`: `article_completion_workload_profiles`, `single_container_workload_profiles`). Speed ratios use paired records from measurements/experiment_measurements.json.
+- Leiden topology ablation (fig:topology-ablation): `measurements/experiment_measurements.json` (`measurement_family`: `article_completion_real_graph`, `single_container_real_graph`)
+- Gamma-resolution sensitivity: `measurements/experiment_measurements.json` (`measurement_family`: `gamma_sweep`)
+- S2CAG feature-mode ablation (tab:feature-ablation): `measurements/experiment_measurements.json` (`measurement_family`: `single_container_real_graph`)
+- Leiden closure/contraction ablation (tab:closure-ablation): `measurements/workload_profiles.json` (`measurement_family`: `single_container_workload_profiles`)
+- Long-horizon topology endpoints (tab:long-horizon): `measurements/experiment_measurements.json` (`measurement_family`: `single_container_real_graph`)
+- Directed-control reviewer check: `measurements/experiment_measurements.json` (`measurement_family`: `single_container_directed_control`)
+- Conductance / normalized-cut reviewer check: `measurements/cut_metrics.json` (`measurement_family`: `leiden_cut_metrics`)
+- Controlled DSBM stress test: `measurements/experiment_measurements.json` (`measurement_family`: `single_container_dsbm`)
 
-- `experiment`: `148` entries.
-- `workload_profile`: `15` entries.
+## Files
 
-## Measurement Entries By Category
+- `manifest.json`: navigation from article items to data files.
+- `measurements/experiment_measurements.json`: experiment records with complete update series.
+- `measurements/workload_profiles.json`: workload-profile records with complete profile payloads.
+- `measurements/neighborhood_measurements.json`: neighborhood growth rows used by the empirical neighborhood table.
+- `measurements/cut_metrics.json`: targeted structural-quality metrics.
 
-- `gamma_sweep_measurements`: Reviewer follow-up Leiden gamma sensitivity measurements for dyn_pubmed and arxivmath. Entries: `12`.
-- `dyn_pubmed_leiden_repeats`: Five single-container repeated Leiden measurements on dyn_pubmed, used to audit runtime variation. Entries: `10`.
-- `single_container_real_graph_measurements`: Single-container rerun experiment measurements for undirected real-graph ICDM paper runs: Leidenalg, DF-Leiden, S2CAG, feature ablations, topology ablations, and long-horizon endpoints. DSBM and directed-control measurements are intentionally excluded. Entries: `126`.
-- `single_container_workload_profiles`: Single-container rerun workload-profile measurements for Leidenalg, DF-Leiden, and S2CAG locality/closure analysis. Entries: `15`.
+## Record Counts
+
+- Total unified records: `480`
+
+## Records By Type
+
+- `cut_metrics`: `4` records.
+- `experiment`: `446` records.
+- `neighborhood`: `6` records.
+- `workload_profile`: `24` records.
+
+## Records By Family
+
+- `article_compatibility_baselines`: `223` records.
+- `article_completion_real_graph`: `11` records.
+- `article_completion_workload_profiles`: `9` records.
+- `article_neighborhood_growth`: `6` records.
+- `dyn_pubmed_leiden_repeats`: `10` records.
+- `gamma_sweep`: `12` records.
+- `leiden_cut_metrics`: `4` records.
+- `single_container_directed_control`: `4` records.
+- `single_container_dsbm`: `60` records.
+- `single_container_real_graph`: `126` records.
+- `single_container_workload_profiles`: `15` records.

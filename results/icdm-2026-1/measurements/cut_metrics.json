@@ -1,7 +1,7 @@
 {
-  "description": "Targeted reviewer-follow-up cut metrics for final Leiden partitions on key 999:10 graph streams.",
-  "generated_at": "2026-06-06T04:09:54+00:00",
-  "group": "leiden_cut_metrics_targeted",
+  "bundle": "icdm-2026-1",
+  "type": "cut_metrics",
+  "description": "Targeted final-partition conductance and normalized-cut metrics for key Leiden 999:10 runs.",
   "record_count": 4,
   "records": [
     {
@@ -29,7 +29,13 @@
       "smart_radius": null,
       "total_time": 6.846826553344727,
       "updates": 10,
-      "wall_time": 9.271076083183289
+      "wall_time": 9.271076083183289,
+      "measurement_type": "cut_metrics",
+      "measurement_family": "leiden_cut_metrics",
+      "algorithm": "leidenalg",
+      "batch_strategy": "999:10",
+      "base_dataset": "dyn_pubmed",
+      "bundle_record_id": "measurement-000020"
     },
     {
       "batch": "999:10",
@@ -56,7 +62,13 @@
       "smart_radius": 1,
       "total_time": 0.2877165153622627,
       "updates": 10,
-      "wall_time": 0.7048179730772972
+      "wall_time": 0.7048179730772972,
+      "measurement_type": "cut_metrics",
+      "measurement_family": "leiden_cut_metrics",
+      "algorithm": "leidenalg",
+      "batch_strategy": "999:10",
+      "base_dataset": "dyn_pubmed",
+      "bundle_record_id": "measurement-000021"
     },
     {
       "batch": "999:10",
@@ -83,7 +95,13 @@
       "smart_radius": null,
       "total_time": 145.55185045301914,
       "updates": 10,
-      "wall_time": 169.96024007350206
+      "wall_time": 169.96024007350206,
+      "measurement_type": "cut_metrics",
+      "measurement_family": "leiden_cut_metrics",
+      "algorithm": "leidenalg",
+      "batch_strategy": "999:10",
+      "base_dataset": "arxivmath",
+      "bundle_record_id": "measurement-000022"
     },
     {
       "batch": "999:10",
@@ -110,8 +128,13 @@
       "smart_radius": 1,
       "total_time": 3.5864344462752342,
       "updates": 10,
-      "wall_time": 13.965697199106216
+      "wall_time": 13.965697199106216,
+      "measurement_type": "cut_metrics",
+      "measurement_family": "leiden_cut_metrics",
+      "algorithm": "leidenalg",
+      "batch_strategy": "999:10",
+      "base_dataset": "arxivmath",
+      "bundle_record_id": "measurement-000023"
     }
-  ],
-  "started_at": "2026-06-06T04:06:37+00:00"
+  ]
 }
