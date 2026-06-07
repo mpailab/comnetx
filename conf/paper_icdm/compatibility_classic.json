@@ -1,0 +1,42 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  "GROUND_TRUTH_METRICS": true,
+  "FORCE_UNDIRECTED": true,
+  "USE_GPU": true,
+  "DATASETS": [
+    "dyn_cora",
+    "dyn_acm",
+    "dyn_citeseer",
+    "patent",
+    "dyn_pubmed",
+    "arxivmath"
+  ],
+  "BATCHES": [
+    "999:10"
+  ],
+  "BASELINES": [
+    "flmig",
+    "prgpt:infomap",
+    "prgpt:locale"
+  ],
+  "MODES": [
+    "naive",
+    "smart"
+  ],
+  "BASELINE_ITERATIONS": [
+    10
+  ],
+  "SMART_PARAMS_GRID": {
+    "smart_subcoms_depth": [
+      3
+    ],
+    "smart_neighborhood_step": [
+      1
+    ],
+    "aggregation_mode": [
+      "sum"
+    ]
+  }
+}

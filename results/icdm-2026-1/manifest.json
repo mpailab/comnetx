@@ -1,0 +1,185 @@
+{
+  "bundle": "icdm-2026-1",
+  "description": "Canonical measurement data used by the ICDM 2026 article.",
+  "measurement_files": {
+    "experiment": {
+      "description": "Full experiment time-series records used by article tables, ablation analyses, long-horizon runs, DSBM stress tests, and directed-control checks.",
+      "measurement_entry_count": 446,
+      "output": "measurements/experiment_measurements.json"
+    },
+    "workload_profile": {
+      "description": "Full workload-profile payloads for Leiden, DF-Leiden, and S2CAG mechanism analysis.",
+      "measurement_entry_count": 24,
+      "output": "measurements/workload_profiles.json"
+    },
+    "neighborhood": {
+      "description": "Neighborhood growth records used by the empirical neighborhood table.",
+      "measurement_entry_count": 6,
+      "output": "measurements/neighborhood_measurements.json"
+    },
+    "cut_metrics": {
+      "description": "Targeted final-partition conductance and normalized-cut metrics for key Leiden 999:10 runs.",
+      "measurement_entry_count": 4,
+      "output": "measurements/cut_metrics.json"
+    }
+  },
+  "article_navigation": [
+    {
+      "article_item": "Compatibility study (tab:main-results)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_real_graph",
+        "article_compatibility_baselines"
+      ],
+      "methods": [
+        "dfleiden",
+        "dmon",
+        "flmig",
+        "leidenalg",
+        "magi",
+        "mfc",
+        "prgpt:infomap",
+        "prgpt:locale",
+        "s2cag"
+      ]
+    },
+    {
+      "article_item": "Repeated 999:10 robustness (tab:stability)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "dyn_pubmed_leiden_repeats",
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "leidenalg",
+        "dfleiden",
+        "s2cag"
+      ]
+    },
+    {
+      "article_item": "Empirical neighborhood growth (tab:workload)",
+      "data": "measurements/neighborhood_measurements.json",
+      "families": [
+        "article_neighborhood_growth"
+      ]
+    },
+    {
+      "article_item": "Contracted workload and speedup (fig:workload-speedup)",
+      "data": "measurements/workload_profiles.json",
+      "families": [
+        "article_completion_workload_profiles",
+        "single_container_workload_profiles"
+      ],
+      "methods": [
+        "leidenalg",
+        "dfleiden",
+        "s2cag"
+      ],
+      "note": "Speed ratios use paired records from measurements/experiment_measurements.json."
+    },
+    {
+      "article_item": "Leiden topology ablation (fig:topology-ablation)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "article_completion_real_graph",
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Gamma-resolution sensitivity",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "gamma_sweep"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "S2CAG feature-mode ablation (tab:feature-ablation)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "s2cag"
+      ]
+    },
+    {
+      "article_item": "Leiden closure/contraction ablation (tab:closure-ablation)",
+      "data": "measurements/workload_profiles.json",
+      "families": [
+        "single_container_workload_profiles"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Long-horizon topology endpoints (tab:long-horizon)",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_real_graph"
+      ],
+      "methods": [
+        "leidenalg",
+        "dfleiden"
+      ]
+    },
+    {
+      "article_item": "Directed-control reviewer check",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_directed_control"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Conductance / normalized-cut reviewer check",
+      "data": "measurements/cut_metrics.json",
+      "families": [
+        "leiden_cut_metrics"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    },
+    {
+      "article_item": "Controlled DSBM stress test",
+      "data": "measurements/experiment_measurements.json",
+      "families": [
+        "single_container_dsbm"
+      ],
+      "methods": [
+        "leidenalg"
+      ]
+    }
+  ],
+  "counts": {
+    "total_records": 480,
+    "records_by_type": {
+      "cut_metrics": 4,
+      "experiment": 446,
+      "neighborhood": 6,
+      "workload_profile": 24
+    },
+    "records_by_family": {
+      "article_compatibility_baselines": 223,
+      "article_completion_real_graph": 11,
+      "article_completion_workload_profiles": 9,
+      "article_neighborhood_growth": 6,
+      "dyn_pubmed_leiden_repeats": 10,
+      "gamma_sweep": 12,
+      "leiden_cut_metrics": 4,
+      "single_container_directed_control": 4,
+      "single_container_dsbm": 60,
+      "single_container_real_graph": 126,
+      "single_container_workload_profiles": 15
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "dynamic": {
+    "konect": "/workspace/datasets/konect",
+    "dyn_attr": "/workspace/datasets/dyn_attr",
+    "tgc": "/workspace/datasets/tgc"
+  },
+  "static": {
+    "magi": "/workspace/datasets/small",
+    "dyn_sbm": "/workspace/datasets/dyn_sbm",
+    "sbm": "/workspace/datasets/sbm",
+    "small": "/workspace/datasets/small",
+    "attr": "/workspace/datasets/attr"
+  }
+}

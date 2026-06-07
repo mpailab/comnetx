@@ -1,0 +1,31 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": true,
+  "USE_TIMESTAMP_SUFFIX": true,
+  "GROUND_TRUTH_METRICS": true,
+  "FORCE_UNDIRECTED": true,
+  "USE_GPU": true,
+  "DATASETS": [
+    "dyn_cora",
+    "dyn_acm",
+    "dyn_citeseer",
+    "patent",
+    "dyn_pubmed",
+    "arxivmath"
+  ],
+  "BATCHES": [
+    "999:10"
+  ],
+  "BASELINES": [
+    "mfc"
+  ],
+  "MODES": [
+    "dynamic"
+  ],
+  "FEATURE_MODES": [
+    "dataset"
+  ],
+  "BASELINE_ITERATIONS": [
+    100
+  ]
+}

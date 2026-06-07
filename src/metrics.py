@@ -1,0 +1,197 @@
+import torch
+import numpy as np
+from sklearn.metrics import adjusted_rand_score, f1_score, normalized_mutual_info_score, balanced_accuracy_score
+from torch_sparse import SparseTensor
+from scipy.optimize import linear_sum_assignment
+from our_utils import suppress_warnings_context
+
+# import tensorflow as tensor 
+# import torch as tensor 
+def _to_numpy(x):
+    if isinstance(x, torch.Tensor):
+        return x.detach().cpu().numpy()
+    return np.asarray(x)
+
+def calculate_ground_truth_metrics(true_labels, pred_labels, only_fast_metrics=True):
+    metrics = {}
+    with suppress_warnings_context():
+        metrics["ARI"] = Metrics.ari_score(true_labels, pred_labels)
+        metrics["F1"] = Metrics.macro_f1(true_labels, pred_labels)
+        metrics["NMI"] = Metrics.nmi(true_labels, pred_labels) 
+        if not only_fast_metrics:
+            metrics["Purity"] = Metrics.purity_score(true_labels, pred_labels)
+            metrics["Accuracy"] = Metrics.accuracy(true_labels, pred_labels)
+            metrics["Balanced_accuracy"] = Metrics.balanced_acc(true_labels, pred_labels)
+
+    return metrics
+
+class Metrics:
+
+    def __init__(self):
+        pass
+
+    def modularity_slow(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
+        """
+        Args:
+            adjacency: torch.sparse.Tensor [n_nodes, n_nodes]
+            assignments: torch.Tensor [n_nodes] 
+            gamma: float, optional (default = 1.0)
+            directed: bool, optional (default = False)
+        Returns:
+            modularity: float 
+        """
+
+        adjacency = adjacency.coalesce()
+        device = adjacency.device
+        row, col = adjacency.indices()
+        weight = adjacency.values()  
+        assignments = assignments.to(device=device, dtype=torch.long)
+
+        d_out = torch.sparse.sum(adjacency, dim=1).to_dense()
+        d_in = torch.sparse.sum(adjacency, dim=0).to_dense()
+        m = torch.sum(weight)
+
+        communities = torch.unique(assignments)
+        modularity = 0.0
+        
+        for community in communities:
+            c = community.item()
+    
+            # Фактический вес ребер внутри сообщества
+            both_in_community = (assignments[row] == c) & (assignments[col] == c)
+            actual_weight = torch.sum(weight[both_in_community])
+            
+            # Ожидаемый вес
+            mask = (assignments == c)
+            expected_weight = torch.sum(d_out[mask]) * torch.sum(d_in[mask]) / m
+            
+            modularity += (actual_weight - gamma * expected_weight)
+        modularity /=  m
+
+        return modularity.item()
+
+    def modularity(adjacency, assignments, gamma : float = 1.0, directed : bool = False) -> float:
+        """
+        Args:
+            adjacency: torch.sparse.Tensor [n_nodes, n_nodes]
+            assignments: torch.Tensor [n_nodes]
+            gamma: float, optional (default = 1.0)
+            directed: bool, optional (default = False)
+        Returns:
+            modularity: float
+        """
+
+        adjacency = adjacency.coalesce()
+        device = adjacency.device
+        row, col = adjacency.indices()
+        weight = adjacency.values()
+        assignments = assignments.to(device=device, dtype=torch.long)
+
+        if weight.numel() == 0:
+            return 0.0
+
+        # Keep the same (directed) formulation as in the previous implementation.
+        # `directed` is left in the signature for API compatibility.
+        n_nodes = adjacency.size(0)
+        d_out = torch.zeros(n_nodes, device=device, dtype=weight.dtype)
+        d_in = torch.zeros(n_nodes, device=device, dtype=weight.dtype)
+        d_out.scatter_add_(0, row, weight)
+        d_in.scatter_add_(0, col, weight)
+
+        m = torch.sum(weight)
+        if m == 0:
+            return 0.0
+
+        communities, inverse = torch.unique(assignments, return_inverse=True)
+        n_communities = communities.numel()
+
+        same_community = inverse[row] == inverse[col]
+        actual_weight = torch.zeros(n_communities, device=device, dtype=weight.dtype)
+        if torch.any(same_community):
+            actual_weight.scatter_add_(0, inverse[row][same_community], weight[same_community])
+
+        out_per_community = torch.zeros(n_communities, device=device, dtype=weight.dtype)
+        in_per_community = torch.zeros(n_communities, device=device, dtype=weight.dtype)
+        out_per_community.scatter_add_(0, inverse, d_out)
+        in_per_community.scatter_add_(0, inverse, d_in)
+
+        expected_weight = (out_per_community * in_per_community) / m
+        modularity = (actual_weight - gamma * expected_weight).sum() / m
+        return modularity.item()
+
+    def purity_score(true_labels, pred_labels):
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+
+        classes, y_true_idx = np.unique(y_true, return_inverse=True)
+        clusters, y_pred_idx = np.unique(y_pred, return_inverse=True)
+        n_classes = classes.shape[0]
+        n_clusters = clusters.shape[0]
+
+        contingency = np.zeros((n_classes, n_clusters), dtype=np.int64)
+        np.add.at(contingency, (y_true_idx, y_pred_idx), 1)
+
+        max_over_classes = contingency.max(axis=0)
+        return max_over_classes.sum() / y_true.shape[0]
+
+    def ari_score(true_labels, pred_labels):
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return adjusted_rand_score(y_true, y_pred)
+
+    def macro_f1(true_labels, pred_labels):
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return f1_score(y_true, y_pred, average="macro")
+    
+    def accuracy(true_labels, pred_labels) -> float:
+        """
+        Args:
+            true_labels: torch.Tensor [n_nodes] 
+            pred_labels: torch.Tensor [n_nodes] 
+        Returns:
+            accuracy: float 
+        """
+        if true_labels.shape != pred_labels.shape:
+            print("true_labels.shape =", true_labels.shape, "pred_labels.shape =", pred_labels.shape)
+            raise ValueError("true_labels.shape != pred_labels.shape")
+
+        true_labels = true_labels.detach().cpu().numpy().astype(np.int64)
+        pred_labels = pred_labels.detach().cpu().numpy().astype(np.int64)
+        
+        D = max(pred_labels.max(), true_labels.max()) + 1
+        
+        w = np.zeros((D, D), dtype=np.int64)
+        for i in range(pred_labels.size):
+            w[true_labels[i], pred_labels[i]] += 1
+            
+        # (Hungarian Algorithm)
+        row_ind, col_ind = linear_sum_assignment(w.max() - w)
+        
+        accuracy = w[row_ind, col_ind].sum() / pred_labels.size
+        
+        return accuracy
+    
+    def nmi(true_labels, pred_labels) -> float:
+        """
+        Args:
+            true_labels: torch.Tensor [n_nodes] 
+            pred_labels: torch.Tensor [n_nodes] 
+        Returns:
+            nmi: float 
+        """
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return normalized_mutual_info_score(y_true, y_pred)
+
+    def balanced_acc(true_labels, pred_labels) -> float:
+        """
+        Args:
+            true_labels: torch.Tensor [n_nodes] 
+            pred_labels: torch.Tensor [n_nodes] 
+        Returns:
+            balanced_acc: float 
+        """
+        y_true = _to_numpy(true_labels).astype(int)
+        y_pred = _to_numpy(pred_labels).astype(int)
+        return balanced_accuracy_score(y_true, y_pred)

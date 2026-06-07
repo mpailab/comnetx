@@ -1,0 +1,69 @@
+import argparse
+import leidenalg as la
+import igraph as ig
+import torch
+import time
+
+def sparse_tensor_to_igraph(sparse_tensor, directed=True):
+    st = sparse_tensor.coalesce()
+    indices = st.indices()
+    values = st.values()
+    edges = indices.t().numpy()
+    graph = ig.Graph(n=sparse_tensor.shape[0], edges=edges, directed=directed)
+    graph.es['weight'] = values.numpy()
+    return graph
+
+def leidenalg_partition(
+    adj: torch.Tensor,
+    init_partition=None,
+    timing_info=None,
+    resolution: float = 1.0,
+):
+    conversion_time = 0.0
+    if adj.device.type == "cuda":
+        time_s = time.time()
+        adj = adj.cpu()
+        time_e = time.time()
+        conversion_time += time_e - time_s
+
+    time_s = time.time()
+    G = sparse_tensor_to_igraph(adj.to_sparse())
+    if init_partition is not None:
+        initial_membership_list = init_partition.detach().cpu().tolist()
+    else:
+        initial_membership_list = None
+    time_e = time.time()
+    conversion_time += time_e - time_s
+    if timing_info is not None:
+        timing_info['conversion_time'] = timing_info.get('conversion_time', 0.0) + conversion_time
+
+    partition_kwargs = {
+        "initial_membership": initial_membership_list,
+        "weights": "weight",
+        "seed": True,
+        "n_iterations": 2,
+    }
+    partition_type = la.ModularityVertexPartition
+    if float(resolution) != 1.0:
+        partition_type = la.RBConfigurationVertexPartition
+        partition_kwargs["resolution_parameter"] = float(resolution)
+
+    partition = la.find_partition(G, partition_type, **partition_kwargs)
+    return torch.tensor(partition.membership, dtype=torch.long)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--adj", required=True)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
+
+    adj = torch.load(args.adj)
+    if not adj.is_sparse:
+        adj = adj.to_sparse()
+
+    labels = leidenalg_partition(adj)
+    torch.save(labels, args.out)
+    print("LEIDEN finished successfully")
+
+if __name__ == "__main__":
+    main()

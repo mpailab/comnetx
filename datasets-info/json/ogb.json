@@ -1,0 +1,38 @@
+{
+    "ogbn-arxiv": {
+        "n": 169343,
+        "m": 1166243,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "ogbl-collab": {
+        "n": 235868,
+        "m": 1285465,
+        "d": "undirected",
+        "w": "weighted"
+    },
+    "ogbl-ppa": {
+        "n": 576289,
+        "m": 30326273,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "ogbn-products": {
+        "n": 2449029,
+        "m": 61859140,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "ogbl-citation2": {
+        "n": 2927963,
+        "m": 30561187,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "ogbl-vessel": {
+        "n": 3538495,
+        "m": 5345897,
+        "d": "undirected",
+        "w": "unweighted"
+    }
+}

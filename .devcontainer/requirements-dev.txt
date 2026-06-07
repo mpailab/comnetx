@@ -1,0 +1,15 @@
+debugpy
+joblib
+matplotlib
+networkx
+numpy
+pandas
+pyinstrument
+psutil
+pytest
+pyyaml
+scikit-learn
+scipy
+seaborn
+torch<2.8
+tqdm

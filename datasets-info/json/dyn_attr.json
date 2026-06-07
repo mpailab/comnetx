@@ -1,0 +1,110 @@
+{
+    "dyn_acm": {
+        "n": 3025,
+        "m": 13128,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_bat": {
+        "n": 131,
+        "m": 1074,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_citeseer": {
+        "n": 3327,
+        "m": 4552,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_cora": {
+        "n": 2708,
+        "m": 5278,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_dblp": {
+        "n": 4057,
+        "m": 3528,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_eat": {
+        "n": 399,
+        "m": 5995,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_uat": {
+        "n": 1190,
+        "m": 13599,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_wiki": {
+        "n": 2405,
+        "m": 17981,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "dyn_blogcatalog": {
+        "n": 5196,
+        "m": 343486,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_wikics": {
+        "n": 11701,
+        "m": 431726,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_coauthorcs": {
+        "n": 18333,
+        "m": 163788,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_pubmed": {
+        "n": 19717,
+        "m": 44338,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "dyn_coauthorphysics": {
+        "n": 34493,
+        "m": 495924,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_nell": {
+        "n": 65755,
+        "m": 251550,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_flickr": {
+        "n": 89250,
+        "m": 899756,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_ogbn-arxiv": {
+        "n": 169343,
+        "m": 1166243,
+        "d": "directed",
+        "w": "unweighted"
+    },
+    "dyn_reddit2": {
+        "n": 232965,
+        "m": 23213838,
+        "d": "undirected",
+        "w": "unweighted"
+    },
+    "dyn_ogbn-products": {
+        "n": 2449029,
+        "m": 61859140,
+        "d": "undirected",
+        "w": "unweighted"
+    }
+}
