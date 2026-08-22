@@ -1,0 +1,1268 @@
+\documentclass{ieeeaccess}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{bm}
+\usepackage{url}
+
+\makeatletter
+\AtBeginDocument{\DeclareMathVersion{bold}
+\SetSymbolFont{operators}{bold}{T1}{times}{b}{n}
+\SetSymbolFont{NewLetters}{bold}{T1}{times}{b}{it}
+\SetMathAlphabet{\mathrm}{bold}{T1}{times}{b}{n}
+\SetMathAlphabet{\mathit}{bold}{T1}{times}{b}{it}
+\SetMathAlphabet{\mathbf}{bold}{T1}{times}{b}{n}
+\SetMathAlphabet{\mathtt}{bold}{OT1}{pcr}{b}{n}
+\SetSymbolFont{symbols}{bold}{OMS}{cmsy}{b}{n}
+\renewcommand\boldmath{\@nomath\boldmath\mathversion{bold}}}
+\makeatother
+
+\graphicspath{{figures/}}
+\input{generated/metrics_macros.tex}
+
+\begin{document}
+
+% Production metadata are assigned by IEEE after acceptance.
+\history{}
+\doi{}
+\vol{}
+\year{}
+
+\title{ComNetX: Local Hierarchical Adaptation for Batched Dynamic Community Detection}
+
+\author{\uppercase{Aleksandr Konovalov}\authorrefmark{1},
+\uppercase{Anna Uporova}\authorrefmark{1},
+\uppercase{Alexander Drobyshev}\authorrefmark{1},
+\uppercase{Iaroslav Egorov}\authorrefmark{1}, and
+\uppercase{Grigoriy Bokov}\authorrefmark{1}}
+
+\address[1]{AI Research Center, Lomonosov Moscow State University,
+1 Leninskie Gory, Moscow 119991, Russian Federation}
+
+\tfootnote{This work was supported by the Ministry of Economic Development of
+the Russian Federation under subsidy agreement 000000C313925P4H0002, Grant
+139-15-2025-012.}
+
+\markboth
+{Konovalov \headeretal: ComNetX: Local Hierarchical Adaptation for Batched Dynamic Community Detection}
+{Konovalov \headeretal: ComNetX: Local Hierarchical Adaptation for Batched Dynamic Community Detection}
+
+\begin{abstract}
+Dynamic community detection is commonly addressed either by recomputing a
+partition on every graph snapshot or by using a solver-specific update rule.
+Full recomputation preserves the behavior of mature static solvers but
+repeatedly processes unchanged structure, whereas specialized dynamic methods
+are less transferable across objectives, features, and implementations. This
+article presents ComNetX, a hierarchical adaptation layer that replaces a
+full-snapshot backend call with a sequence of contracted local calls. For each
+batch, ComNetX expands the changed edge endpoints, closes this neighborhood
+over the complete pre-update communities it touches, and contracts the
+maintained labels before each backend call. Closure determines which community
+memberships may change; contraction makes that broader update scope
+computationally viable. The adapter localizes backend work but changes the
+backend input and is not an objective-preserving transformation. We evaluate
+ComNetX on six
+batched real-graph benchmarks, 500-update runs on two larger graphs, and
+five-seed dynamic stochastic block model stress streams. On the largest short
+stream, local Leiden reduces cumulative measured processing time by
+\ArxivShortSpeedup$\times$, while final modularity changes from
+\ArxivShortFullQ\ to \ArxivShortLocalQ. Over 500 updates, the corresponding
+values are \ArxivLongSpeedup$\times$ and \ArxivLongFullQ/\ArxivLongLocalQ.
+At the higher synthetic update rate, random and hub-centered streams fall below
+time break-even. The experiments thus identify both a useful operating region
+and the conditions under which full recomputation remains preferable.
+\end{abstract}
+
+\begin{keywords}
+community detection, dynamic graphs, graph clustering, local approximation,
+modularity
+\end{keywords}
+
+\titlepgskip=-21pt
+\maketitle
+
+\section{Introduction}
+\label{sec:introduction}
+\PARstart{D}{ynamic} networks represent systems whose interactions change over
+time, from mobile communication and online social groups to information and
+scientific collaboration networks \cite{Onnela2007,Palla2007,Rossetti2018}.
+Community detection summarizes such a network as groups of vertices with
+coherent structural or functional roles and supports exploratory analysis,
+monitoring, recommendation, and anomaly investigation
+\cite{Porter2009,Fortunato2010,Radicchi2004,Flake2002}. The exact meaning of a
+community depends on the chosen objective and on whether structure, attributes,
+or temporal consistency are available to the method \cite{Fortunato2016,
+Chunaev2020}. Modularity is one of the most widely used structural criteria
+\cite{Newman2004,Brandes2008}; Louvain and Leiden are strong practical
+optimizers \cite{Blondel2008,Traag2019}, and parallel implementations improve
+their static throughput \cite{Lu2015,Sahu2024FastLeiden}. Their direct use on
+an evolving graph nevertheless entails another solver call on the entire
+snapshot after every update batch.
+
+There are two established responses. Full-snapshot recomputation retains a
+trusted static implementation and can initialize it with the previous
+partition, but its workload remains tied to the full graph. Incremental and
+dynamic algorithms instead revise selected parts of the previous solution
+\cite{Halappanavar2017,Zhuang2021DynaMo,Zarayeneh2021DeltaScreening,
+Sahu2025Dynamic}. These methods can be substantially faster, although their
+localization and refinement rules are generally coupled to a particular
+objective, optimizer, or data structure. This coupling matters increasingly
+for attributed and representation-learning approaches, whose backend calls
+may also include feature construction or iterative training
+\cite{Tsitsulin2023DMoN,Liu2024MAGI,Lin2025S2CAG}. Reimplementing a distinct
+dynamic procedure for every such backend is costly and makes comparisons
+difficult.
+
+The central design question is therefore how much of a changed graph should be
+shown to a reusable backend. A small radius around updated edges is inexpensive
+but may intersect only part of an existing community. Closing that radius over
+the current partition supplies the complete membership of each touched
+community, yet the resulting vertex set may be large. ComNetX addresses this
+tension by contracting the maintained labels before invoking the backend. It
+stores multiple label levels, expands the endpoints of each batch, freezes the
+communities touched at every level, and builds compact backend instances whose
+labels are projected to the original vertices.
+
+The evaluated adapter localizes the expensive backend calls while retaining a
+complete label vector for the graph. It should be interpreted as a local
+approximation: contraction changes the backend instance, and the current
+preprocessing still scans global sparse or label structures. The method section
+states these operational boundaries precisely so that the measured
+quality--time trade-off is interpreted at the correct interface.
+
+The article makes four contributions.
+
+\begin{enumerate}
+\item We introduce an affected-community closure and contraction mechanism for
+batched updates. It broadens a small graph neighborhood to the complete
+memberships of touched communities, then exposes compact instances through a
+common partition-producing backend interface.
+\item We formalize the maintained multilevel state and the implemented update
+sequence, including mask freezing, contraction, projection, and successive
+cuts. This specification makes the adaptation reproducible without assuming
+that it preserves a backend objective.
+\item We decompose workload into expanded vertices, closed community members,
+and contracted backend graphs, while also accounting for the global scans in
+the current implementation. The analysis explains why hub degree,
+touched-community size, and contracted size govern different failure modes.
+\item We map the resulting quality--time envelope on six batched streams,
+500-update trajectories, mechanism and parameter controls, and five-seed DSBM
+stress streams. DF-Leiden and fixed-budget S$^2$CAG calls test the reuse
+boundary without being presented as universal backend rankings.
+\end{enumerate}
+
+The remainder of the article reviews related methods, defines the measured
+problem, specifies ComNetX, describes the evaluation, presents the results, and
+closes with limitations and reproducibility information.
+
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Static Objectives and Scalable Optimization}
+
+Structural community definitions include dense-subgraph, cut-based,
+information-flow, and null-model views \cite{Porter2009,Fortunato2010,
+Radicchi2004}. Modularity compares within-community edge weight with a
+degree-preserving null model \cite{Newman2004,Brandes2008}. Louvain combines
+local moves with graph aggregation \cite{Blondel2008}; Leiden adds a refinement
+stage that addresses poorly connected communities \cite{Traag2019}. Shared-
+memory heuristics and fast Leiden variants extend this family to large static
+graphs \cite{Lu2015,Sahu2024FastLeiden}. Other scalable perspectives include
+the map-equation formulation of Infomap \cite{Rosvall2007}, fast label
+propagation \cite{Traag2023LabelPropagation}, greedy modularity disassembly
+\cite{Rustamaji2024}, and iterated local moves \cite{Taibi2025FLMIG}.
+
+No single score fully determines whether a partition is useful. Modularity has
+resolution effects and a highly degenerate optimization landscape
+\cite{Good2010,Fortunato2016}; comparative studies also show that algorithm
+rankings depend on the planted structure and evaluation design
+\cite{Yang2016Comparative}. Class labels or other metadata may describe a
+different organizing principle from graph structure
+\cite{Yang2015GroundTruth,Peel2017}. We therefore report structural quality and
+agreement with reference labels separately, using NMI only as an external
+agreement measure \cite{Danon2005}.
+
+\subsection{Dynamic, Temporal, and Local Community Detection}
+
+Dynamic community detection spans evolutionary objectives, incremental
+partition maintenance, and continuous-time models \cite{Rossetti2018}.
+Snapshot-oriented methods include incremental batch processing
+\cite{Chong2013}, real-time and modularity-based label propagation
+\cite{Shang2014Realtime,Ma2020IncrementalLP}, C-Blondel
+\cite{Seifikar2020}, LabelRankT \cite{Xie2013LabelRankT}, and adaptive label
+propagation \cite{Han2017AdaptiveLP}. DynaMo incrementally maximizes
+modularity \cite{Zhuang2021DynaMo}, whereas Delta-Screening narrows the set of
+vertices whose modularity decisions may change
+\cite{Zarayeneh2021DeltaScreening}. NOME explicitly balances snapshot quality
+and temporal smoothness \cite{Cai2023NOME}. These approaches motivate local
+reuse but remain tied to their own state and update rules.
+
+Scalable dynamic implementations include Grappolo
+\cite{Halappanavar2017}, DF-Louvain \cite{Sahu2024DFLouvain}, multicore dynamic
+algorithms \cite{Sahu2025Dynamic}, and distributed DyG-DPCD
+\cite{Sattar2025DyGDPCD}; broader algorithmic and parallel perspectives are
+surveyed by Sattar et al. \cite{Sattar2023} and Hanauer et al.
+\cite{Hanauer2022DynamicGraphs}. Flow stability, Matthew-effect models, and
+modularity-based tracking treat temporal persistence directly
+\cite{Bovet2022FlowStability,Sun2022Matthew,Mazza2023}. Continuous-time
+L-modularity avoids choosing snapshot boundaries \cite{Brabant2025LModularity},
+while recent work also addresses sparse temporal observations and random-walk
+snapshot clustering \cite{Conrad2025Sparse,Blaskovic2025}. ComNetX instead
+targets batched snapshot maintenance; its experiments do not evaluate a
+continuous-time objective.
+
+The term \emph{local} also covers a different output contract. Seed-, query-,
+and anchor-based methods find one or several nearby communities rather than a
+partition of every vertex \cite{DiTursi2017,Christopoulos2023,
+Liu2021MultiLocal}. OLCPM maintains overlapping communities online
+\cite{Boudebza2018OLCPM}. ComNetX preserves a complete label vector and holds
+labels outside each frozen mask fixed, so these methods are conceptually
+related but not direct baselines.
+
+\subsection{Attributed and Representation-Learning Methods}
+
+Attributed community detection combines topology with node information
+\cite{Chunaev2020}. The graph-neural-network model established a general
+message-passing foundation \cite{Scarselli2009}; later community-oriented
+methods include SEAL \cite{Zhang2020SEAL}, DMoN
+\cite{Tsitsulin2023DMoN}, CommDGI \cite{Zhang2020CommDGI}, MAGI
+\cite{Liu2024MAGI}, and DGCluster \cite{Bhowmick2024DGCluster}. Comparative
+and survey work documents the range of embeddings, clustering losses, and
+evaluation choices \cite{Kumar2024GNNStudy,Liu2026DeepGraphSurvey}. DAG learns
+clusters without a prescribed cluster count \cite{Liu2024DAG}; structural-
+entropy objectives provide another unsupervised signal
+\cite{Zhang2025StructuralEntropy}; and fairness-aware formulations introduce
+constraints beyond aggregate clustering quality \cite{Gkartzios2025Fair}.
+
+Efficiency-oriented designs include pre-train-and-refine community detection
+and inductive graph partitioning \cite{Qin2024PretrainRefine,Qin2024PRGPT},
+while S$^2$CAG uses spectral subspace clustering for attributed graphs
+\cite{Lin2025S2CAG}. Community structure can also be part of a downstream
+dynamic prediction model \cite{Ji2023DynamicPopularity}. MFC combines matrix
+factorization with a topological regularizer to learn persistent communities
+\cite{Kong2024MFC}. These models do not expose identical optimization
+contracts, and contraction or feature averaging changes their inputs in
+different ways. Accordingly, our fixed-budget S$^2$CAG runs demonstrate that
+the interface can be exercised; they do not establish backend-independent
+quality preservation.
+
+\subsection{Position of ComNetX}
+
+Solver-specific dynamic methods localize moves, refinement steps, or state
+transitions inside a particular optimizer. LD-Leiden, for example, repairs a
+Leiden partition locally and exploits shared-memory parallelism
+\cite{Bokov2026LDLeiden}; Sahu's dynamic Leiden starting point develops a
+separate Leiden-specific update path \cite{Sahu2024Start}. Seed- and
+anchor-local methods instead change the output contract by returning selected
+communities. ComNetX occupies a different layer: it localizes the input given
+to a partition-producing backend through affected-community closure and
+contraction while retaining a label for every graph vertex. This layer is
+complementary to specialized dynamic solvers. An implementation such as
+DF-Leiden can be invoked at the boundary, although the evaluated local path
+instantiates it anew instead of preserving its streaming state. The experiments
+include DF-Leiden but no protocol-matched
+LD-Leiden run, so no empirical ranking between the two is claimed.
+
+\section{Problem Formulation and Scope}
+\label{sec:problem}
+
+\subsection{Batched Graph Model}
+
+Let $G_t=(V,E_t,\bm{A}_t,\bm{X})$ be the graph after batch $t$, with a fixed
+vertex set $V$, $n=|V|$, sparse adjacency $\bm{A}_t$, and optional node-feature
+matrix $\bm{X}\in\mathbb{R}^{n\times d}$. A sparse signed batch $\bm{\Delta}_t$
+updates the stored adjacency as
+\begin{equation}
+\bm{A}_t=\bm{A}_{t-1}+\bm{\Delta}_t.
+\label{eq:update}
+\end{equation}
+Its directly affected vertices are
+\begin{equation}
+S_t=\{i:\exists j,\ \Delta_t(i,j)\ne0\ \text{or}\
+\Delta_t(j,i)\ne0\}.
+\label{eq:affected}
+\end{equation}
+The implementation accepts signed sparse batches. The archive identifies no
+deletion experiment, but sign-level provenance is incomplete for some streams
+derived from static graphs. We therefore make no empirical claim about
+deletions. A changing vertex universe and evolving attributes are also outside
+the measured scope.
+
+We treat a community-detection backend as a partition-producing procedure
+\begin{equation}
+\mathcal{B}(\bm{A},\bm{X},\bm{y}_0;\bm{\theta})\longmapsto\bm{y},
+\label{eq:backend}
+\end{equation}
+where $\bm{X}$ and the initial partition $\bm{y}_0$ are optional, and
+$\bm{\theta}$ denotes backend-specific settings such as resolution or a fixed
+iteration budget. The output contains one hard label per input vertex. The
+current projection path additionally requires those labels to be compact
+integers in $\{0,\ldots,k-1\}$ for a $k$-vertex backend instance because they
+index the stored group identifiers; all evaluated adapters satisfy this
+contract. A backend with arbitrary label values would require an explicit
+compaction step before projection. The interface covers modularity heuristics,
+attributed clustering methods, and implementations originating as native
+dynamic methods when they can be invoked on a supplied instance. It does not
+imply persistent backend state across calls, or that these backends optimize
+the same objective or respond identically to contraction.
+
+Full-snapshot adaptation at update $t$ invokes $\mathcal{B}$ on $\bm{A}_t$.
+When the backend accepts an initialization, the previous partition is supplied:
+\begin{equation}
+\bm{y}^{\mathrm{full}}_t=
+\mathcal{B}(\bm{A}_t,\bm{X},\bm{y}_{t-1};\bm{\theta}).
+\label{eq:full_backend}
+\end{equation}
+The measured full Leiden baseline follows this warm-started definition. The
+ComNetX state instead comprises the resident sparse adjacency, optional full
+feature matrix, and $L$ full-length label vectors. Its current local call path
+passes an empty warm start, even though \eqref{eq:backend} permits one. This
+distinction is part of the method specification rather than a tunable choice in
+the reported experiments.
+
+\subsection{Evaluation Quantities}
+
+All main comparisons use an undirected graph representation. Sources marked as
+directed are symmetrized within the paired full/local experiment, and a
+separate control retains direction. For a weighted adjacency, let
+$W=\sum_{i,j}A_{ij}$,
+$d_i^{\mathrm{out}}=\sum_jA_{ij}$, and
+$d_j^{\mathrm{in}}=\sum_iA_{ij}$. The recorded directed modularity at
+resolution $\gamma$ is
+\begin{equation}
+Q_\gamma(C)=\frac{1}{W}\sum_{i,j}
+\left(A_{ij}-\gamma\frac{d_i^{\mathrm{out}}d_j^{\mathrm{in}}}{W}\right)
+\mathbf{1}\{C(i)=C(j)\},
+\label{eq:modularity}
+\end{equation}
+which reduces to the standard undirected expression when $\bm{A}$ is symmetric,
+$W=2m$, and $d_i^{\mathrm{out}}=d_i^{\mathrm{in}}=d_i$. The main experiments
+use $\gamma=1$ unless a resolution sweep is stated. We also use normalized
+mutual information (NMI),
+\begin{equation}
+\operatorname{NMI}(C,Z)=\frac{2I(C;Z)}{H(C)+H(Z)},
+\label{eq:nmi}
+\end{equation}
+between partition $C$ and reference class labels $Z$
+\cite{Danon2005}. These labels are metadata, not asserted structural ground
+truth \cite{Peel2017}.
+
+Except for the mechanism profile in Table~\ref{tab:mechanism}, the recorded
+processing time is the sum of the measured optimizer/backend
+intervals over the update batches. It excludes initial partition construction,
+application of the sparse update to the resident adjacency, metric evaluation,
+data loading, and backend-format conversion. It should therefore be read as
+paired algorithm time under the repository's accounting convention, not as
+end-to-end stream-ingestion latency. Speedup is the full or native-dynamic time
+divided by ComNetX time under the same convention.
+
+Table~\ref{tab:mechanism} uses a distinct profile clock. It sums the separately
+measured adjacency-update time and the wall interval from neighborhood
+expansion through projection and cutting; backend-format conversion remains
+inside that wall interval. Profile times are compared only among the three
+mechanism variants within each dataset.
+
+\section{ComNetX Framework}
+\label{sec:method}
+
+\subsection{Initial Hierarchy}
+
+ComNetX stores $L$ label vectors
+$\bm{C}_t=(C_t^0,\ldots,C_t^{L-1})$, with level 0 fine and level $L-1$
+coarse. The bootstrap policy is fixed in the present implementation: Leiden is
+run on the initial snapshot to obtain $C_0^0$, irrespective of the backend
+used for subsequent measured updates. To construct level $\ell>0$, the code
+contracts the current working adjacency by $C_0^{\ell-1}$, runs Leiden on the
+quotient graph, restores the quotient labels to the original vertices, and
+removes edges crossing the restored labels before constructing the next level.
+Consequently, the initial levels are nested from fine to coarse, but the
+nesting is non-strict: adjacent levels may contain the same partition. Cutting
+inter-community edges before the next quotient can leave only within-group or
+self-loop structure, in which case another bootstrap call need not produce a
+coarser partition. The depth $L$ therefore specifies the number of stored
+states and sequential backend passes, not a guaranteed number of distinct
+resolutions. During an update, later passes operate after the cuts made by
+earlier passes and can evolve differently even when two bootstrap levels
+coincide.
+
+This policy provides a common initial state, but it also affects interpretation.
+In particular, the S$^2$CAG adapter uses an input label vector only to choose
+the requested cluster count. Full-snapshot calls take that count from the
+previous partition, whereas label-free local calls request one cluster per
+contracted vertex. A local fixed-budget result may therefore retain much of the
+Leiden bootstrap, whereas a full-snapshot feature method recomputes all labels. The
+feature-backend results in Section~\ref{sec:backend_results} are therefore
+interface/runtime observations rather than controlled tests of quality
+preservation.
+
+The hierarchy serves two operational purposes. At a given level it identifies
+whole pre-update communities touched by the expanded batch, and its current
+labels define the supernodes of the contracted backend instance. The stored
+levels should not be read as multiple independently optimized outputs. Only
+$C_t^0$ is evaluated and returned as the maintained fine partition; the higher
+levels organize subsequent local calls.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{method_pipeline.pdf}
+\caption{ComNetX workflow. After applying $\bm{\Delta}_t$, its endpoints
+$S_t$ are expanded to $B_t$, and all per-level closure masks $U_t^\ell$ are
+frozen from the pre-update labels before provisional labels are written. Label
+preparation proceeds from level $L-1$ toward level 0, whereas contracted
+backend calls run from level 0 toward level $L-1$. The working adjacency is
+restricted once to $U_t^0$, so boundary edges are omitted; local backends
+receive no warm start. The reported partition is $C_t^0$; labels outside the
+frozen masks remain unchanged, and post-update nesting is not enforced.}
+\label{fig:pipeline}
+\end{figure*}
+
+\subsection{Frozen Affected Masks}
+
+After applying a batch, the code expands $S_t$ by $r$ hops on the support of
+$\bm{A}_t+\bm{A}_t^{\mathsf T}$. Let
+\begin{equation}
+B_t=N_r(S_t)=\{v:\operatorname{dist}(v,S_t)\le r\}.
+\label{eq:radius}
+\end{equation}
+Before changing any label, it freezes one mask per level from the pre-update
+state:
+\begin{equation}
+U_t^\ell=\{v:C_{t-1}^\ell(v)\in
+C_{t-1}^\ell(B_t)\},\qquad 0\le\ell<L.
+\label{eq:closure}
+\end{equation}
+Thus, $U_t^\ell$ contains every vertex whose level-$\ell$ label occurs among
+the expanded vertices. Labels outside $U_t^\ell$ are not overwritten at that
+level. The masks are not recomputed after an earlier backend call.
+
+The implementation then writes vertex indices as provisional labels at level
+$L-1$ for vertices in $B_t$. Because vertex indices do not occupy a reserved
+label namespace, this write must not be interpreted as a guaranteed singleton
+partition. For $\ell=L-2,\ldots,0$, labels from level $\ell+1$ are copied into
+level $\ell$ within $U_t^\ell$. Backend calls are subsequently processed in
+the opposite direction, from level 0 through level $L-1$.
+
+\subsection{Contracted Backend Calls}
+
+The structural working adjacency is created once by retaining only entries of
+$\bm{A}_t$ whose two endpoints lie in $U_t^0$:
+\begin{equation}
+\bm{A}^{\mathrm{work}}_0=\bm{A}_t[U_t^0,U_t^0].
+\label{eq:u0adj}
+\end{equation}
+At level $\ell$, let the distinct current labels among $U_t^\ell$ define
+$k_\ell$ groups. A sparse membership matrix
+$\bm{P}_\ell\in\{0,1\}^{k_\ell\times n}$ has one nonzero per vertex in
+$U_t^\ell$. The backend adjacency is
+\begin{equation}
+\bar{\bm{A}}_\ell=\bm{P}_\ell
+\bm{A}^{\mathrm{work}}_\ell\bm{P}_\ell^{\mathsf T}.
+\label{eq:aggregate}
+\end{equation}
+Because \eqref{eq:u0adj} is performed only once, a vertex in
+$U_t^\ell\setminus U_t^0$ can participate in the level grouping but has no
+structural edge in $\bm{A}^{\mathrm{work}}_\ell$. Equation~\eqref{eq:aggregate}
+is therefore not the induced adjacency of the larger $U_t^\ell$ mask.
+
+When a backend requires features, the recorded local configuration uses mean
+aggregation. For group $a$,
+\begin{equation}
+\bar{\bm{x}}_{\ell a}=
+\frac{1}{|G_{\ell a}|}\sum_{i\in G_{\ell a}}\bm{x}_i.
+\label{eq:features}
+\end{equation}
+Both contraction and feature averaging can change the effective backend
+objective and input distribution. The backend returns labels for the
+contracted nodes without a local warm start. These labels are projected through
+the membership map, using the previous group identifiers as the label
+namespace. The code then zeroes every working edge whose endpoints are outside
+the current mask or have different updated labels, and proceeds to level
+$\ell+1$. The reported partition is $C_t^0$.
+
+The closure in \eqref{eq:closure} therefore supplies the membership of every
+touched pre-update community, but it does not restore full-snapshot structural
+context. Only edges with both endpoints in $U_t^0$ enter
+\eqref{eq:aggregate}; edges from that mask to the unchanged graph are absent.
+At coarser levels, closure can add vertices to the membership matrix without
+adding their original adjacency. This distinction explains why closure and
+contraction are evaluated separately in Section~\ref{sec:results}.
+
+\begin{table}[t]
+\centering
+\caption{Properties of the evaluated implementation.}
+\label{tab:properties}
+\setlength{\tabcolsep}{3.0pt}
+\begin{tabular}{@{}p{0.67\columnwidth}c@{}}
+\toprule
+\textbf{Property} & \textbf{Status} \\
+\midrule
+Initial levels form a non-strict nested sequence & yes \\
+Masks frozen from all pre-update levels & yes \\
+Labels outside each frozen mask unchanged & yes \\
+Backend output must use compact integer labels & yes \\
+Boundary edges supplied to local backend & no \\
+Local backend receives a warm start & no \\
+Post-update nesting enforced or checked & no \\
+Adaptive local/full fallback implemented & no \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The cut operation constrains the edges available to later calls but does not
+prove that $C_t^{\ell+1}$ is a coarsening of $C_t^\ell$. No post-update nesting
+assertion or repair is present. We therefore call $\bm{C}_t$ a multilevel
+operational state after the first update, rather than a guaranteed dendrogram.
+
+\subsection{Update Sequence}
+
+For clarity, one implemented batch update consists of the following ordered
+operations.
+
+\begin{enumerate}
+\item Apply $\bm{\Delta}_t$ to the resident sparse adjacency, collect $S_t$,
+and expand it to $B_t$ on the support of
+$\bm{A}_t+\bm{A}_t^{\mathsf T}$.
+\item Before any label write, compute all $U_t^\ell$ from
+$\bm{C}_{t-1}$. These masks remain fixed for the entire batch.
+\item Write vertex indices as provisional labels on $B_t$ at level $L-1$ and
+copy labels downward inside the frozen masks, from level $L-1$ toward level 0.
+This write attempts to release affected vertices for subsequent calls, but the
+indices do not constitute a guaranteed singleton namespace.
+\item Restrict the working adjacency once to $U_t^0$. Then, for
+$\ell=0,\ldots,L-1$, form $\bm{P}_\ell$, contract adjacency and optional
+features, invoke $\mathcal{B}$ without a local warm start, project the returned
+labels to $U_t^\ell$, and cut edges inconsistent with the updated level.
+\item Return $C_t^0$. At every level the labels outside the corresponding
+frozen mask remain unchanged; no final pass repairs or verifies nesting.
+\end{enumerate}
+
+The opposite directions in steps 3 and 4 are intentional descriptions of the
+code: labels are prepared from coarse to fine, while backend calls run from
+fine to coarse. This sequencing, together with the one-time restriction to
+$U_t^0$, is shown explicitly in Fig.~\ref{fig:pipeline}.
+
+\subsection{Cost and Locality}
+
+Let $m_t=\operatorname{nnz}(\bm{A}_t)$, $h_\ell=|U_t^\ell|$, and let
+$m_0=\operatorname{nnz}(\bm{A}_t[U_t^0,U_t^0])$. The current neighborhood
+routine performs up to $r$ sparse matrix--vector products with the full
+symmetrized adjacency, the closure routine scans $n$ labels at every level,
+and the COO restriction scans the full edge-index array. Level preparation,
+aggregation, and cuts then traverse label arrays and the restricted working
+adjacency. Let $K_{\rm set}(n,h_\ell)$ denote the library-dependent work of the
+\texttt{unique}/\texttt{isin} kernels used at level $\ell$. A transparent
+implementation-level accounting, excluding backend calls and optional feature
+work, is therefore
+\begin{equation}
+O\!\left((r+1)m_t+Ln+Lm_0+
+\sum_{\ell=0}^{L-1}\left[h_\ell+K_{\rm set}(n,h_\ell)\right]\right).
+\label{eq:cost}
+\end{equation}
+Mean feature aggregation adds
+$O(d\sum_\ell h_\ell)$, and the backend costs add
+$\sum_\ell F_{\mathcal B}(k_\ell,\bar m_\ell,d)$ for contracted edge counts
+$\bar m_\ell$. The expression does not assume that set kernels are linear and
+deliberately includes global scans that a backend-instance analysis alone would
+miss.
+
+The instance-dependent quantities make the source of locality more explicit.
+For $r=1$, if $d_t(v)$ is degree in the symmetrized support graph, then
+\begin{equation}
+|B_t|\le |S_t|+\sum_{v\in S_t}d_t(v).
+\label{eq:r1_bound}
+\end{equation}
+Thus, a small edge batch can still have a large radius-one expansion when it
+touches hubs. If $\mathcal{P}_{t-1}^\ell$ is the pre-update level-$\ell$
+partition, the closure size is exactly
+\begin{equation}
+h_\ell=\sum_{C\in\mathcal{P}_{t-1}^\ell:\,C\cap B_t\ne\varnothing}|C|.
+\label{eq:closure_size}
+\end{equation}
+It is governed by the sizes of the communities touched by $B_t$, whereas the
+backend cost is governed by the number of contracted groups and their edges.
+A small neighborhood, a large closed mask, and a small contracted instance can
+therefore occur simultaneously, as they do in the larger measured graphs.
+Equations \eqref{eq:r1_bound} and \eqref{eq:closure_size} describe workload
+geometry; they do not remove the global scans already included in
+\eqref{eq:cost}.
+
+The resident memory also includes the full sparse adjacency, $L$ full label
+vectors, and the full feature matrix when used. ComNetX reduces backend-instance
+size; it does not provide memory proportional only to the changed region. In
+the worst case, a high-degree endpoint or a large touched community makes a
+closed mask comparable with $V$, and preprocessing plus backend overhead can
+erase the time advantage.
+
+\section{Experimental Methodology}
+\label{sec:experiments}
+
+The evaluation addresses four questions: (RQ1) how Leiden quality and measured
+processing time compare with full-snapshot warm-started recomputation; (RQ2)
+how radius, hierarchy depth, closure, and contraction affect the backend
+workload; (RQ3) how quality and time evolve over 500 updates; and (RQ4) where
+random, hub-centered, and community-internal synthetic updates cross time
+break-even. A secondary comparison checks whether DF-Leiden and fixed-budget
+S$^2$CAG calls can be made through the same interface.
+
+\subsection{Datasets and Stream Construction}
+
+Table~\ref{tab:datasets} lists the six input graphs. Cora, ACM, Citeseer, and
+PubMed are static attributed topologies used with artificial edge orders, not
+observed temporal orders. The bundle does not retain enough release,
+generator, or ordering metadata to assign these four streams to a more
+specific lineage, so they are treated as fixed update benchmarks rather than
+evidence about natural temporal evolution. Patent and arxivmath use timestamped
+sequences from temporal graph-clustering
+resources \cite{Liu2025BenchTGC,Liu2023Arxiv4TGC}; their edges are sorted by
+the provided timestamps and divided into equal-edge-count bins, not
+equal-duration windows. The table reports stored source edge counts before any
+required symmetrization.
+
+\begin{table}[t]
+\centering
+\caption{Update-stream benchmarks and actual short-protocol updates.}
+\label{tab:datasets}
+\setlength{\tabcolsep}{2.2pt}
+\scriptsize
+\begin{tabular}{@{}lrrlc@{}}
+\toprule
+\textbf{Dataset} & \textbf{Vertices} & \textbf{Edges} &
+\textbf{Order} & \textbf{Updates} \\
+\midrule
+\input{generated/dataset_rows.tex}
+\end{tabular}
+\end{table}
+
+A real-graph strategy $p{:}q$ partitions the stored sequence into $p+1$ coarse bins,
+uses the first $p$ bins as the initial graph, and splits the tail bin into at
+most $q$ equal edge chunks. Empty chunks are skipped. Thus $999{:}10$ produces
+ten measured updates for five graphs but eight for dyn\_citeseer. The
+$9{:}500$ protocol produces 500 updates on dyn\_pubmed and arxivmath. The short
+protocol has five repeated executions for these two larger datasets and one
+execution for each other dataset. Repetitions use the same stream and settings;
+their standard deviations measure runtime repeatability, not robustness across
+independent temporal windows.
+
+Each DSBM sequence begins from a separately stored initial snapshot; the
+archive label $0{:}99$ denotes its 99 measured update batches rather than an
+empty initial graph. The synthetic suite has $n=100{,}000$ vertices, 32 planted blocks, target
+average degree 58, maximum configured degree 1024, and 1\% high-degree vertices
+with target average degree 512. The low and high workloads modify 290 and 1450 edges per
+update, respectively, under random, hub-centered, or community-internal
+selection. Each condition uses five paired graph seeds, 42--46. The suite is a
+controlled operating-envelope test motivated by static and dynamic stochastic
+block models \cite{Holland1983,Xu2014DSBM}; it is not intended to reproduce a
+particular real network. We do not report an unstored within-block probability.
+
+Table~\ref{tab:protocols} summarizes the layered evaluation design. The
+strategies are edge-sequence partitions rather than durations, and the actual
+number of nonempty updates is reported instead of assuming that it equals the
+requested maximum. A repeated run means another execution of the same retained
+input; only the DSBM suite varies the graph seed.
+
+\begin{table*}[t]
+\centering
+\caption{Evaluation protocols used in this study.}
+\label{tab:protocols}
+\setlength{\tabcolsep}{4.0pt}
+\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Purpose} & \textbf{Graphs} & \textbf{Strategy} &
+\textbf{Actual updates} & \textbf{Replication} \\
+\midrule
+Main Leiden comparison & six real topologies & $999{:}10$ & 8--10 & five fixed-input runs on two graphs \\
+Backend interface & dyn\_pubmed, arxivmath & $999{:}10$ & 10 & five fixed-input runs \\
+Topology and direction controls & selected real topologies & $999{:}10$ & 10 & single runs except the default point \\
+Closure, contraction, and resolution & three/two real topologies & $999{:}50$ & 10, 44, or 50 & single runs \\
+S$^2$CAG feature modes & dyn\_cora, dyn\_pubmed & $999{:}100$ & 10 or 44 & single fixed-budget runs \\
+Long horizon & dyn\_pubmed, arxivmath & $9{:}500$ & 500 & one stream window \\
+Synthetic stress & 30 DSBM streams & $0{:}99$ & 99 & five graph seeds per condition \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Methods and Fixed Configuration}
+
+Leiden is the primary backend and uses resolution 1. Full recomputation receives
+the previous partition as a warm start. ComNetX uses $L=3$, $r=1$, and the
+Leiden bootstrap described in Section~\ref{sec:method}. The DF-Leiden baseline
+retains one native streaming object across batches; ComNetX instead creates a
+fresh DF-Leiden instance for every contracted local call. Each S$^2$CAG
+invocation uses the stated feature mode and executes five internal runs with
+$T=10$ each. Its full-snapshot call obtains the requested cluster count from the
+previous labels, while the label-free local call defaults to the number of
+contracted vertices. The S$^2$CAG rows therefore do not constitute a tuned
+comparison: full and local calls see different graph sizes and cluster-count
+rules, and the common Leiden bootstrap benefits the retained local state. Only
+complete, protocol-matched records for
+Leiden, DF-Leiden, and S$^2$CAG are analyzed. DMoN, MAGI, MFC, FLMIG, and
+PRGPT are discussed as related backends but are not ranked from incomplete or
+heterogeneous records. Paired rows are matched by dataset, update protocol,
+and graph representation; the measurements are not used to support portable
+hardware comparisons.
+
+The main Leiden, long-horizon, resolution, and cut-metric comparisons use
+paired undirected representations. A separate direction-preserving Leiden
+control is reported for dyn\_pubmed and arxivmath. In the S$^2$CAG feature
+ablation, dyn\_cora retains its stored direction and dyn\_pubmed is
+symmetrized; each full/local pair still uses the same representation. This
+control is deliberately narrower than a general validation of directed
+community detection.
+
+The mechanism profile, cut metrics, direction control, resolution sweep, and
+feature ablation are separately executed supporting campaigns. Each table
+compares only the full/local rows matched within that campaign. Small numerical
+differences between nominally similar configurations in different tables are
+therefore run-to-run differences, not alternative values for one execution.
+
+\subsection{Result Traceability}
+
+Tables and figures are regenerated from four source bundles containing 446
+experiment records, 24 workload profiles, six neighborhood profiles, and four
+cut-metric records. The accompanying validation program records the selected
+identifiers and unrounded values, verifies paired settings and series lengths,
+and emits the LaTeX rows and vector figures. This traceability layer guards
+against mixing directions, feature modes, or update protocols; it does not
+replace the source and platform metadata discussed in
+Section~\ref{sec:limitations}.
+
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Short-Horizon Leiden Comparison (RQ1)}
+
+Table~\ref{tab:short} compares full-snapshot warm-started Leiden with ComNetX
+under the $999{:}10$ construction. The time columns are cumulative measured
+processing time as defined in Section~\ref{sec:problem}. Five-run means are
+shown for dyn\_pubmed and arxivmath; the other rows are single runs.
+
+\begin{table*}[t]
+\centering
+\caption{Full/ComNetX Leiden on the short update streams.}
+\label{tab:short}
+\setlength{\tabcolsep}{4.1pt}
+\small
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Full Q} & \textbf{Local Q} &
+\textbf{Full NMI} & \textbf{Local NMI} &
+\textbf{Full T (s)} & \textbf{Local T (s)} &
+\textbf{Speedup} \\
+\midrule
+\input{generated/short_results_rows.tex}
+\end{tabular}
+\end{table*}
+
+ComNetX is faster in every row, from 1.5$\times$ on patent to
+\ArxivShortSpeedup$\times$ on arxivmath. The local modularity difference ranges
+from $-0.0005$ on patent to $-0.0377$ on dyn\_acm when computed from the
+unrounded records. NMI is slightly higher for
+dyn\_cora and patent and lower for the remaining four streams. The largest
+short-stream result is therefore properly scoped: arxivmath modularity changes
+from \ArxivShortFullQ\ to \ArxivShortLocalQ\ while measured processing time
+changes from 149.1 s to 3.559 s. This is a paired processing-time comparison
+under the defined clock, not an end-to-end latency ratio or a guarantee for
+other streams.
+
+The five repetitions on dyn\_pubmed give 6.676$\pm$0.018 s for full Leiden and
+0.391$\pm$0.004 s for ComNetX. On arxivmath, the corresponding values are
+149.069$\pm$0.719 s and 3.559$\pm$0.017 s. Final $Q$ and NMI are unchanged
+across these fixed-input repetitions at the displayed precision, so the runs
+support timing repeatability only.
+
+\subsection{Complementary Quality and Direction Controls}
+
+Modularity and NMI emphasize different aspects of a partition. To check that
+the main Leiden comparison does not depend on modularity alone, we also compute
+two cut-based summaries on one retained $999{:}10$ partition per method and
+large graph. Normalized cut is
+$\sum_C \operatorname{cut}(C,V\setminus C)/\operatorname{vol}(C)$
+\cite{Shi2000}; mean conductance is the unweighted mean over nontrivial
+positive-volume clusters. Lower values indicate less boundary weight relative
+to cluster volume, but both measures depend on the number and size distribution
+of clusters.
+
+\begin{table*}[t]
+\centering
+\caption{Single-run cut metrics for the paired undirected Leiden control.}
+\label{tab:cut_metrics}
+\setlength{\tabcolsep}{5.0pt}
+\small
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Method} & \textbf{Q} &
+\textbf{Clusters} & \textbf{Mean conductance} & \textbf{Ncut} \\
+\midrule
+\input{generated/cut_metric_rows.tex}
+\end{tabular}
+\end{table*}
+
+On dyn\_pubmed, full/ComNetX mean conductance is 0.128444/0.126790 and
+normalized cut is 6.165/5.325. On arxivmath the corresponding values are
+0.001071/0.000860 and 8.729/6.962. These controls do not prove that the local
+partition is globally better: the cluster counts also change, and the rows are
+single runs. They do show that the modest modularity loss is not accompanied by
+a deterioration in every recorded structural summary.
+
+The main tables symmetrize the topology. Table~\ref{tab:directed} retains the
+stored direction for a separate Leiden control on the two larger short streams.
+The same local trend remains visible, with 14.0$\times$ and 38.4$\times$ time
+ratios and modest final quality changes. Because this is one representation
+control for one backend, it supports robustness to the preprocessing choice but
+does not establish a general directed-community result.
+
+\begin{table*}[t]
+\centering
+\caption{Direction-preserving Leiden control; values are full/ComNetX.}
+\label{tab:directed}
+\setlength{\tabcolsep}{5.0pt}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Q} & \textbf{NMI} &
+\textbf{T (s)} & \textbf{Time ratio} \\
+\midrule
+\input{generated/directed_rows.tex}
+\end{tabular}
+\end{table*}
+
+\subsection{Additional Backend Calls}
+\label{sec:backend_results}
+
+Table~\ref{tab:backends} reports complete repeated blocks for the two larger
+short streams. Each cell lists baseline/local values. The baseline is full
+warm-started recomputation for Leiden, a stateful native stream for DF-Leiden,
+and full-snapshot S$^2$CAG whose previous labels determine only the requested
+cluster count. ComNetX uses fresh, label-free backend instances on its
+contracted graphs; for S$^2$CAG, this makes the requested cluster count equal to
+the number of contracted vertices. Time is mean (sample standard deviation)
+over five outer executions.
+
+\begin{table*}[t]
+\centering
+\caption{Repeated fixed-input backend calls; values are baseline/ComNetX.}
+\label{tab:backends}
+\setlength{\tabcolsep}{3.3pt}
+\small
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+\textbf{Dataset} & \textbf{Backend} & \textbf{Q} & \textbf{NMI} &
+\textbf{T (s), mean (sd)} & \textbf{Time ratio} \\
+\midrule
+\input{generated/backend_rows.tex}
+\end{tabular}
+\end{table*}
+
+The interface is not uniformly beneficial. On dyn\_pubmed, wrapping DF-Leiden
+is slower than its native dynamic call (0.4$\times$), whereas arxivmath gives
+8.4$\times$. The S$^2$CAG time ratio is 4.2$\times$ and 10.2$\times$, but its
+quality response changes direction: local modularity is lower on dyn\_pubmed
+and higher than a near-zero full result on arxivmath. These rows execute five
+internal S$^2$CAG runs with $T=10$ per invocation and show call feasibility and
+runtime sensitivity. The Leiden bootstrap,
+unequal effective problem size, and lack of a training-budget study preclude a
+fair claim that ComNetX preserves or improves S$^2$CAG quality.
+
+\subsection{Feature-Mode Sensitivity}
+
+Table~\ref{tab:features} reports the feature ablation with its actual update
+counts and five internal runs with $T=10$ per S$^2$CAG invocation. Each cell reports
+final $Q$, cumulative measured processing time, and final NMI. The experiment
+uses ten nonempty updates on dyn\_cora and 44 on dyn\_pubmed, even though the
+requested strategy is $999{:}100$.
+
+\begin{table*}[t]
+\centering
+\caption{S$^2$CAG feature sensitivity; each cell is Q/T (s)/NMI.}
+\label{tab:features}
+\setlength{\tabcolsep}{5.0pt}
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Variant} & \textbf{dyn\_cora (10 updates)} &
+\textbf{dyn\_pubmed (44 updates)} \\
+\midrule
+\input{generated/feature_ablation_rows.tex}
+\end{tabular}
+\end{table*}
+
+Real attributes are informative in the local dyn\_cora run, which has the
+highest local modularity and NMI. Random inputs nearly collapse the full-graph
+S$^2$CAG result but remain close to the dataset-feature local rows. This does
+not make random features a recommended substitute: the local state begins from
+the common Leiden hierarchy, so topology and bootstrap retention can dominate
+a short fixed-budget call. One-hot features improve the full dyn\_cora
+modularity but are especially expensive on dyn\_pubmed. The main conclusion is
+therefore sensitivity, not a universal feature ranking. A controlled neural
+study would require independent training seeds and matched convergence or
+compute budgets.
+
+\subsection{Locality Mechanisms and Parameter Grid (RQ2)}
+
+The radius-one neighborhood is small in Table~\ref{tab:neighborhood}: its mean
+size is below 5\% of vertices for every stream and below 1\% on dyn\_pubmed and
+arxivmath. Larger radii expand rapidly; radius four reaches 62.82\% and 56.60\%
+on those graphs. This supports a small radius as a workload choice, but it does
+not imply a similarly small closed mask.
+
+\begin{table}[t]
+\centering
+\caption{Neighborhood growth: $|S_t|$ is a vertex count; $B_h$ columns are
+percentages of $V$.}
+\label{tab:neighborhood}
+\setlength{\tabcolsep}{2.8pt}
+\scriptsize
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Dataset} & $\bm{|S_t|}$ & $\bm{B_1}$ \textbf{(\%)} &
+$\bm{B_2}$ \textbf{(\%)} & $\bm{B_3}$ \textbf{(\%)} &
+$\bm{B_4}$ \textbf{(\%)} \\
+\midrule
+\input{generated/neighborhood_rows.tex}
+\end{tabular}
+\end{table}
+
+The Leiden mechanism profiles make the distinction explicit. On dyn\_pubmed,
+the radius-one neighborhood averages 0.79\% of vertices, while the full
+ComNetX variant closes 18.13\% at its final level and contracts that mask to
+0.20\% backend vertices. On arxivmath, the corresponding values are 0.95\%,
+41.95\%, and 0.23\%. ComNetX thus obtains its main reduction from contraction,
+not from inspecting only a tiny vertex subset.
+
+Table~\ref{tab:mechanism} directly removes closure or contraction for Leiden.
+The streams use the same variants within each dataset but have 10, 44, and 50
+actual updates, as shown in the table. Closed and backend-vertex columns are
+means over the final hierarchy level. Algorithm trajectories differ by
+variant, so the closed fraction is not expected to remain fixed when a
+mechanism is removed.
+
+\begin{table*}[t]
+\centering
+\caption{Leiden closure and contraction profiles.}
+\label{tab:mechanism}
+\setlength{\tabcolsep}{4.0pt}
+\small
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Variant} & \textbf{Updates} & \textbf{Q} &
+\textbf{Profile time (s)} & \textbf{Closed vertices (\%)} &
+\textbf{Backend vertices (\%)} \\
+\midrule
+\input{generated/workload_rows.tex}
+\end{tabular}
+\end{table*}
+
+Removing closure reduces quality sharply on dyn\_pubmed and arxivmath, while
+removing contraction enlarges the backend instance and raises arxivmath profiled time
+from 5.752 s to 956.4 s. On that graph, no-contraction modularity remains close
+to the full ComNetX variant, which separates the two functions: closure changes
+the available vertices, and contraction controls the backend size. Because
+boundary edges are absent in every local variant, this ablation does not show
+that full-snapshot context is preserved.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{topology_ablation.pdf}
+\caption{Exploratory Leiden grid for hierarchy depth $L\in\{1,2,3,4\}$ and
+radius $r\in\{0,1,2\}$. Superscripts show $L$; marker shapes show $r$; filled
+blue squares are the fixed $L=3,r=1$ configuration. Non-default points are
+single runs; the default point averages five runs for dyn\_pubmed and arxivmath
+and uses one run for dyn\_cora. The plot therefore describes a quality--time
+surface rather than a statistically validated selection rule.}
+\label{fig:topology}
+\end{figure*}
+
+Figure~\ref{fig:topology} confirms that neither radius nor depth is a monotone
+quality knob. On dyn\_pubmed, $L=2,r=0$ reaches
+$Q=\PubMedTopologyQ$ at \PubMedTopologySpeedup$\times$, whereas on arxivmath
+$L=1,r=0$ reaches $Q=\ArxivTopologyQ$ at
+\ArxivTopologySpeedup$\times$. The dyn\_cora surface follows a different
+pattern. These examples show that endpoint-only and shallow settings can be
+competitive, but they do not define a configuration rule: non-default points
+are single runs on the same retained streams. The reported $L=3,r=1$ setting
+is a fixed cross-experiment configuration, not an estimated optimum. Selecting
+$L$ and $r$ for a new stream would require a pilot segment and a separate
+evaluation window.
+
+Resolution sensitivity provides a second view of the same trade-off.
+Table~\ref{tab:gamma} reruns paired Leiden calls for
+$\gamma\in\{0.5,1,2\}$ on the $999{:}50$ streams. Local processing remains
+faster throughout the sweep, but the dyn\_pubmed modularity gap grows from
+$-0.004$ to $-0.053$ as resolution increases. The arxivmath gap remains between
+$-0.004$ and $-0.013$. Runtime benefit is therefore not peculiar to
+$\gamma=1$, while quality sensitivity is graph- and resolution-dependent.
+
+\begin{table*}[t]
+\centering
+\caption{Single-run Leiden resolution sweep; Q is full/ComNetX.}
+\label{tab:gamma}
+\setlength{\tabcolsep}{5.0pt}
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Dataset} & $\bm{\gamma}$ & \textbf{Updates} &
+\textbf{Q} & $\bm{\Delta Q}$ & \textbf{Time ratio} \\
+\midrule
+\input{generated/gamma_rows.tex}
+\end{tabular}
+\end{table*}
+
+\subsection{Long-Horizon Behavior (RQ3)}
+
+Table~\ref{tab:long} and Figure~\ref{fig:long} use 500 updates. dyn\_pubmed uses
+its stored artificial edge order; arxivmath follows timestamps. The figure reports
+per-update modularity deviation and cumulative time ratio for Leiden. NMI is
+available only at the final snapshot.
+
+\begin{table*}[t]
+\centering
+\caption{Long-horizon endpoints; values are baseline/ComNetX.}
+\label{tab:long}
+\setlength{\tabcolsep}{4.8pt}
+\small
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+\textbf{Dataset} & \textbf{Backend} & \textbf{Q} & \textbf{NMI} &
+\textbf{T (s)} & \textbf{Time ratio} \\
+\midrule
+\input{generated/long_horizon_rows.tex}
+\end{tabular}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.97\textwidth]{long_horizon.pdf}
+\caption{Leiden trajectories over 500 updates. Left: per-batch ComNetX-minus-
+full modularity, where negative values favor the full partition. Right:
+cumulative full/ComNetX processing-time ratio, where values above one favor
+ComNetX.}
+\label{fig:long}
+\end{figure*}
+
+Local Leiden remains faster but the endpoint gaps grow relative to the short
+protocol. On dyn\_pubmed, it is 15.9$\times$ faster, with $Q$ changing from
+0.784 to 0.748 and NMI from 0.208 to 0.153. On arxivmath, the time ratio is
+\ArxivLongSpeedup$\times$, while $Q$ changes from \ArxivLongFullQ\ to
+\ArxivLongLocalQ\ and NMI from \ArxivLongFullNMI\ to
+\ArxivLongLocalNMI. The trajectories show accumulated deviation rather than a
+constant short-stream offset.
+
+Across the 500 dyn\_pubmed updates, the mean local-minus-full modularity
+difference is $-0.0232$ and the largest observed loss is $-0.0500$ at update
+397. For arxivmath, the corresponding values are $-0.00922$ and $-0.01430$ at
+update 373. The endpoint alone therefore understates the transient separation
+on dyn\_pubmed but is representative of the scale of the arxivmath trajectory.
+These are within-stream summaries of the recorded series, not confidence
+intervals across independent temporal windows.
+
+For DF-Leiden, ComNetX is near time break-even on dyn\_pubmed and 7.4$\times$
+faster on arxivmath. The arxivmath local row has higher modularity but lower NMI
+than native DF-Leiden. This divergence reinforces the need to report both
+structural and metadata agreement and prevents a single-metric superiority
+claim.
+
+\subsection{Synthetic Operating Envelope (RQ4)}
+
+Table~\ref{tab:dsbm} gives the mean paired time ratio and the worst local-minus-
+full quality delta over five seeds. Figure~\ref{fig:dsbm} shows the paired
+speedup ranges.
+
+\begin{table}[t]
+\centering
+\caption{DSBM stress test over 99 insertion batches and five seeds; $\pm$ is
+the sample standard deviation of paired speedup across seeds.}
+\label{tab:dsbm}
+\setlength{\tabcolsep}{2.4pt}
+\scriptsize
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Edges/update} & \textbf{Update type} & \textbf{Mean speedup} &
+\textbf{Worst $\Delta Q$} & \textbf{Worst $\Delta$NMI} \\
+\midrule
+\input{generated/dsbm_rows.tex}
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\columnwidth]{dsbm_speedup.pdf}
+\caption{Mean and seed range of full/ComNetX cumulative measured processing
+time in the DSBM stress test. Filled markers denote 290 changed edges per
+update; open markers denote 1450.}
+\label{fig:dsbm}
+\end{figure}
+
+At 290 changed edges per update, every update type is faster locally, with mean
+ratios from 1.53$\times$ to 4.29$\times$. At 1450, random and hub-centered updates fall
+below break-even at \DSBMHighRandomSpeedup$\times$ and
+\DSBMHighHubSpeedup$\times$, while community-internal updates remain slightly
+faster at 1.13$\times$. The worst quality deltas remain negative in every
+condition and are largest in NMI for community-internal updates. These data map
+a failure region, but they do not evaluate an adaptive policy: the code neither
+switches automatically to full recomputation nor performs periodic refreshes.
+
+\section{Limitations and Reproducibility}
+\label{sec:limitations}
+
+\subsection{Method Limitations}
+
+ComNetX is a local approximation at the backend boundary. Edges crossing
+$U_t^0$ are omitted, coarser affected masks do not add structural edges, and
+feature averaging changes attribute distributions. The local backend receives
+no warm start. Initial levels are nested, but updated levels are neither
+repaired nor checked for nesting. The provisional vertex-index labels are not
+guaranteed unique relative to the existing label namespace. These properties
+rule out a semantics-preservation or post-update hierarchy guarantee.
+
+The implementation retains the full graph, features, and label arrays in
+memory. Neighborhood expansion uses full sparse matrix--vector products;
+closure scans all labels per level; and COO filtering scans full edge indices.
+Only the backend instances are consistently reduced. The main experiment clock
+excludes update application, conversion, loading, and metric computation; the
+mechanism-profile clock includes update application and conversion. Neither is
+an end-to-end ingestion measurement, so production gains may differ.
+
+The archived JSON records do not retain hardware identifiers, software
+versions, run timestamps, or explicit repeat identifiers. The timing results
+are therefore paired comparisons within the recorded runs, not portable
+hardware benchmarks; exact platform provenance must be captured in any new
+measurement campaign.
+
+No adaptive local/full policy is implemented. The DSBM break-even results and
+closed/contracted workload fractions identify possible policy inputs, but a
+valid policy requires thresholds selected on pilot data and tested on separate
+windows, together with a drift or periodic-refresh safeguard. We do not present
+such a policy as an existing component.
+
+\subsection{Empirical Validity}
+
+All measured graphs use a fixed vertex set. The archive identifies no deletion
+condition, but sign-level source provenance is incomplete for Cora, ACM, and
+Citeseer; deletion performance is therefore untested. Four real-data streams
+use artificial or otherwise unverified edge orders derived from static
+attributed graphs and cannot support claims about natural temporal evolution.
+Only patent and arxivmath use provided timestamps. The long-horizon experiment
+covers one window per graph;
+it has per-batch modularity and time but no per-batch NMI or partition-agreement
+series. The five repeated real runs hold the stream fixed and therefore measure
+runtime repeatability. Generalization across independent real windows,
+deletions, evolving features, and other hardware remains untested.
+
+The topology grid consists mostly of one run per configuration, so it is an
+exploratory ablation. Each S$^2$CAG invocation executes five internal runs with
+$T=10$, and full and local calls use different cluster-count rules while sharing
+a Leiden bootstrap; without matched optimization budgets, multiple training
+seeds, and independent cluster-count selection, it cannot rank full and local
+feature-aware clustering. Reference class labels are reported as metadata,
+not structural truth.
+
+The real-graph suite ranges from 2,708 to 270,013 vertices and from 4,552 to
+799,745 stored edges; the DSBM suite fixes $n=100{,}000$. It does not provide a
+controlled graph-size scaling experiment. The 500-update records retain
+per-batch modularity and backend time but not a corresponding long-horizon
+series of affected, closed, and contracted instance sizes. Consequently, the
+study identifies an operating envelope across update patterns and horizons,
+but does not fit a predictive scaling law.
+
+\subsection{Artifact Availability}
+
+Source code, configuration files, and the archived measurement bundle are
+available in the public article branch at
+\url{https://github.com/mpailab/comnetx/tree/article}. The source package
+accompanying this manuscript contains the exact validation program, selected
+record identifiers, generated LaTeX rows, and vector figures used here.
+It reproduces the reported selections and checks their settings, update counts,
+and paired seeds against the archived records. The dataset sources are
+identified in Section~\ref{sec:experiments}; their original distribution terms
+continue to apply.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+This article studied a practical middle ground between repeatedly running a
+trusted community-detection solver on an entire snapshot and implementing a
+new dynamic algorithm for every backend. ComNetX maintains a multilevel label
+state, identifies the communities touched by a batch, contracts their current
+labels, and invokes a partition-producing backend on compact instances. The
+evaluated boundary admits topology-only Leiden, feature-aware S$^2$CAG, and
+DF-Leiden calls, while the formal description distinguishes the retained
+ComNetX labels from backend state that is not reused locally and explains how
+labels are projected back to the full graph.
+
+The experiments show that this design can offer a substantial quality--time
+trade-off when affected communities admit strong contraction. Across six short
+streams, ComNetX Leiden is faster in every paired row; on arxivmath the measured
+processing-time ratio is \ArxivShortSpeedup$\times$, with modularity changing
+from \ArxivShortFullQ\ to \ArxivShortLocalQ. Over 500 updates, the ratio remains
+\ArxivLongSpeedup$\times$, with a larger but explicitly measured quality gap.
+Closure and contraction play complementary roles: closure determines which
+community members may change, whereas contraction produces the small backend
+instances responsible for the largest reductions. Resolution, direction, and
+feature controls show where the result is stable and where it depends on graph
+or backend configuration.
+
+ComNetX is not intended to replace specialized dynamic solvers. The current
+implementation omits boundary edges from local calls, performs global
+preprocessing scans, and does not enforce post-update hierarchy nesting. The
+DSBM study further shows that high-rate random and hub-centered changes can
+eliminate the time advantage. A natural next step is an adaptive local/full
+policy trained on independent pilot windows, combined with periodic drift
+checks, deletion and evolving-feature streams, controlled scaling experiments,
+and end-to-end timing with complete platform provenance.
+
+\section*{Acknowledgment}
+OpenAI Codex was used to assist with language editing, manuscript
+restructuring, and consistency checks throughout this article. The authors
+reviewed and revised the resulting text and take responsibility for all claims,
+data, and conclusions.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\begin{IEEEbiographynophoto}{Aleksandr Konovalov}
+received the Specialist degree from the Faculty of Mechanics and Mathematics,
+Lomonosov Moscow State University, Moscow, Russia, in 2013, and the Candidate
+of Physical and Mathematical Sciences degree in 2018. He is currently a Junior
+Researcher with Lomonosov Moscow State University. His research interests
+include constructive mathematical logic, graph neural networks, and dynamic
+community detection.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Anna Uporova}
+is currently pursuing the Specialist degree with the Faculty of Mechanics and
+Mathematics, Lomonosov Moscow State University, Moscow, Russia. Her research
+interests include dynamic graphs, community detection, and graph neural
+networks.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Alexander Drobyshev}
+is currently a postgraduate student with the Chair of Mathematical Theory of
+Intelligent Systems, Faculty of Mechanics and Mathematics, Lomonosov Moscow
+State University, Moscow, Russia. His research interests include
+Boolean-network dynamics, limit cycles, computational complexity, and dynamic
+graph algorithms.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Iaroslav Egorov}
+is affiliated with the AI Research Center, Lomonosov Moscow State University,
+Moscow, Russia. His recent work includes scalable dynamic community detection.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Grigoriy Bokov}
+received the Candidate of Physical and Mathematical Sciences degree in 2014.
+He is currently the Director of the AI Research Center, Lomonosov Moscow State
+University, Moscow, Russia, and an Associate Professor and the Head of the
+Laboratory of Mathematical Problems of Artificial Intelligence at the Faculty
+of Mechanics and Mathematics. His research interests include logical calculi,
+functional systems, automata, machine-learning algorithms, optimization, and
+large dynamic graphs.
+\end{IEEEbiographynophoto}
+
+\EOD
+\end{document}

@@ -1,17 +1,23 @@
 # ComNetX ICDM 2026 Reproducibility Bundle
 
 This branch is a reduced reviewer-facing bundle for the ICDM 2026 ComNetX
-article. It keeps the implementation, article source, figure scripts, and
+submission. It keeps the implementation, article source, figure scripts, and
 canonical measurement data needed to inspect and reproduce the reported results.
 Historical launch queues, legacy bundles, unrelated baselines, and heavy local
 datasets are intentionally not tracked here.
 
-Anonymous repository link:
+The submitted ICDM manuscript remains frozen in `article/`. Journal revision
+work is staged separately in `journal/ieee-access/` so that conference-specific
+build scripts and the provenance of the existing measurements remain intact.
+
+Historical anonymous repository link from the ICDM submission:
 `https://anonymous.4open.science/r/comnetx-792B`
 
 ## What Is Included
 
-- `article/`: camera-ready source, PDF, figures, and the baseline inclusion audit.
+- `article/`: submitted ICDM source, PDF, figures, and the baseline inclusion audit.
+- `journal/ieee-access/`: clean workspace and curated revision notes for the
+  IEEE Access manuscript and its evidence audit.
 - `results/icdm-2026-1/`: canonical normalized measurement bundle used by the article.
 - `src/`: ComNetX optimizer, launcher, metrics, dataset loading, and active baseline wrappers.
 - `baselines/`: external code needed for the included empirical methods: DMoN,
