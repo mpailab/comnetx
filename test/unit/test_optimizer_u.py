@@ -42,7 +42,23 @@ def test_init_with_inputs():
     C = torch.tensor([[1,0]])
     opt = Optimizer(A, features=X, communities=C, subcoms_depth=1)
     assert torch.equal(opt.features, X.float())
-    assert torch.equal(opt.coms, C)
+    assert torch.equal(opt.coms, torch.tensor([[0, 1]]))
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_init_rejects_non_nested_hierarchy():
+    adjacency = torch.zeros((4, 4), dtype=torch.float32).to_sparse_coo()
+    crossing = torch.tensor(
+        [
+            [0, 0, 2, 2],
+            [0, 1, 0, 1],
+        ],
+        dtype=torch.long,
+    )
+
+    with pytest.raises(ValueError, match="nested fine-to-coarse hierarchy"):
+        Optimizer(adjacency, communities=crossing, subcoms_depth=2)
 
 
 @pytest.mark.unit
@@ -53,6 +69,7 @@ def test_update_adj():
     opt.update_adj(adj_matrix.to_sparse_coo())
     true_res = adj_matrix * 2
     res = opt.adj
+    assert res.is_coalesced()
     assert torch.equal(true_res, opt.adj.to_dense())
 
 
@@ -72,6 +89,7 @@ def test_update_adj_adds_and_returns_mask():
     # Mask should include nodes 1 and 2
     assert mask.dtype == torch.bool
     assert torch.equal(mask, torch.tensor([False, True, True]))
+    assert opt.adj.is_coalesced()
 
 
 @pytest.mark.unit
@@ -169,7 +187,7 @@ def test_run_uses_sum_pattern_for_adj_and_sum_features(
         dtype=torch.float32,
     ).to_sparse_coo()
     features = torch.tensor([[2.0], [4.0], [10.0], [14.0]])
-    communities = torch.tensor([[0, 0, 0, 0], [0, 0, 1, 1]])
+    communities = torch.tensor([[0, 0, 0, 0], [0, 0, 0, 0]])
     opt = Optimizer(
         adj,
         features=features,
@@ -199,7 +217,7 @@ def test_run_uses_sum_pattern_for_adj_and_sum_features(
     )
     assert torch.allclose(
         captured["aggr_features"][0],
-        torch.tensor([[6.0], [24.0]], dtype=features.dtype),
+        torch.tensor([[2.0], [28.0]], dtype=features.dtype),
     )
 
 
@@ -218,7 +236,7 @@ def test_run_uses_sum_pattern_for_adj_and_normalized_features(
         dtype=torch.float32,
     ).to_sparse_coo()
     features = torch.tensor([[2.0], [4.0], [10.0], [14.0]])
-    communities = torch.tensor([[0, 0, 0, 0], [0, 0, 1, 1]])
+    communities = torch.tensor([[0, 0, 0, 0], [0, 0, 0, 0]])
     opt = Optimizer(
         adj,
         features=features,
@@ -248,7 +266,7 @@ def test_run_uses_sum_pattern_for_adj_and_normalized_features(
     )
     assert torch.allclose(
         captured["aggr_features"][0],
-        torch.tensor([[3.0], [12.0]], dtype=features.dtype),
+        torch.tensor([[2.0], [28.0 / 3.0]], dtype=features.dtype),
     )
 
 

@@ -2,14 +2,16 @@
 
 The regular launcher reports end-to-end per-update quality and runtime. For the
 paper we also need evidence that the runtime reduction is caused by small local
-workloads rather than hidden full-graph work. This script mirrors the smart-mode
-Optimizer loop and records:
+workloads rather than hidden full-graph work. This script calls the production
+``Optimizer.run`` implementation with its instrumentation enabled and records:
 
 * directly affected and radius-expanded vertices;
 * post-closure vertices at every hierarchy level;
 * contracted backend nodes and edges;
-* time spent in update, radius expansion, closure, reset, aggregation, backend,
-  projection, and cut phases;
+* per-level restricted boundary-objective certificates;
+* identity-atom ranking-certificate comparisons;
+* time spent in update, radius expansion, closure, restriction, aggregation,
+  backend, projection, and certificate phases;
 * CPU RSS and CUDA peak memory.
 
 It writes a custom JSON format understood by ``collect_results_registry.py``.
@@ -36,9 +38,7 @@ if str(SRC_PATH) not in sys.path:
 
 import torch  # noqa: E402
 
-import sparse  # noqa: E402
 from datasets import Dataset  # noqa: E402
-from launcher import _compute_full_adj, _compute_launch_initial_partition, _iter_adjacency_batches  # noqa: E402
 from metrics import Metrics, calculate_ground_truth_metrics  # noqa: E402
 from optimizer import Optimizer  # noqa: E402
 
@@ -109,211 +109,188 @@ def algorithm_name(
     return name
 
 
-def nnz(tensor: torch.Tensor) -> int:
-    if tensor.is_sparse:
-        return int(tensor.coalesce()._nnz())
-    return int(torch.count_nonzero(tensor).item())
-
-
 def profile_smart_update(
     opt: Optimizer,
     affected_nodes_mask: torch.Tensor,
-    method: str,
-    aggregation_mode: str,
     radius: int,
     directed: bool,
     variant: str = "full",
 ) -> tuple[dict[str, Any], float]:
+    """Run one instrumented production update under a registered ablation.
+
+    ``full`` is exactly the production path. ``no_closure`` changes only the
+    scope to the radius-expanded vertices. ``no_contraction`` changes only the
+    level-zero atoms to original-vertex singletons; every higher level remains
+    a parent quotient of the updated preceding level.
+    """
+    run_options = {
+        "full": {
+            "closure_enabled": True,
+            "base_atom_policy": "hierarchical",
+            "mechanism_label": "repaired full method",
+        },
+        "no_closure": {
+            "closure_enabled": False,
+            "base_atom_policy": "hierarchical",
+            "mechanism_label": "radius-only scope",
+        },
+        "no_contraction": {
+            "closure_enabled": True,
+            "base_atom_policy": "singleton",
+            "mechanism_label": "vertex-level base atoms",
+        },
+    }
+    if variant not in run_options:
+        raise ValueError(f"unsupported smart-profile variant: {variant}")
+
     device = opt.runtime_device()
-    timings: dict[str, float] = {}
+    options = run_options[variant]
     row: dict[str, Any] = {
         "affected_vertices": int(affected_nodes_mask.sum().item()),
         "variant": variant,
+        "mechanism_label": options["mechanism_label"],
     }
-
-    start_total = now(device)
 
     start = now(device)
     expanded_nodes_mask = opt.neighborhood(
         opt.runtime_adj(),
         affected_nodes_mask,
         step=radius,
-        is_symmetric=not directed,
     )
-    timings["radius_time"] = elapsed(start, device)
+    radius_time = elapsed(start, device)
+    row["radius_time"] = radius_time
     row["radius_vertices"] = int(expanded_nodes_mask.sum().item())
 
-    start = now(device)
-    compute_device = opt.device
-    needs_features = opt._local_algorithm_requires_features()
-    coms_work = opt.coms
-    adj_base = opt.adj
-    features_work = opt.features if needs_features else None
-    nodes_mask_work = (
-        expanded_nodes_mask
-        if expanded_nodes_mask.device == compute_device
-        else expanded_nodes_mask.to(compute_device)
+    opt.run(
+        expanded_nodes_mask,
+        closure_enabled=bool(options["closure_enabled"]),
+        base_atom_policy=str(options["base_atom_policy"]),
+        collect_profile=True,
     )
-    nodes = torch.nonzero(nodes_mask_work, as_tuple=True)[0]
-
-    ext_mask_work = torch.zeros_like(coms_work, dtype=torch.bool)
-    if variant == "no_closure":
-        for level in range(opt.subcoms_depth):
-            ext_mask_work[level] = nodes_mask_work
-    else:
-        for level in range(opt.subcoms_depth):
-            touched = coms_work[level].index_select(0, nodes)
-            ext_mask_work[level] = torch.isin(coms_work[level], torch.unique(touched))
-
-    coms_work[-1, nodes_mask_work] = nodes
-    for level in range(opt.subcoms_depth - 2, -1, -1):
-        level_ext_mask = ext_mask_work[level]
-        coms_work[level, level_ext_mask] = coms_work[level + 1, level_ext_mask]
-    timings["closure_time"] = elapsed(start, device)
-
+    production_profile = opt.last_run_profile
+    if not isinstance(production_profile, dict):
+        raise RuntimeError("Optimizer did not return the requested run profile")
+    row.update(production_profile)
+    optimizer_time = float(production_profile["total_profiled_time"])
+    row["optimizer_time"] = optimizer_time
+    row["total_profiled_time"] = radius_time + optimizer_time
+    backend_conversion = float(production_profile["backend_conversion_time"])
+    row["principal_profiled_time"] = max(
+        0.0,
+        row["total_profiled_time"] - backend_conversion,
+    )
+    row["timing_accounting"] = (
+        "certificate_time is excluded once from total_profiled_time; "
+        "backend_conversion_time is a diagnostic subcomponent of backend_time, "
+        "included once in total_profiled_time, and subtracted once only for "
+        "principal_profiled_time"
+    )
+    level_rows = production_profile["levels"]
     row["closure_vertices_by_level"] = [
-        int(ext_mask_work[level].sum().item()) for level in range(opt.subcoms_depth)
+        int(item["closure_vertices"]) for item in level_rows
     ]
-
-    start = now(device)
-    affected_nodes_lvl0 = torch.nonzero(ext_mask_work[0], as_tuple=True)[0]
-    adj_work = sparse.reset_matrix(adj_base, affected_nodes_lvl0)
-    timings["reset_time"] = elapsed(start, device)
-
-    level_rows = []
-    backend_total = 0.0
-    aggregation_total = 0.0
-    projection_total = 0.0
-    cut_total = 0.0
-    backend_conversion_total = 0.0
-
-    for level in range(opt.subcoms_depth):
-        level_row: dict[str, Any] = {"level": level}
-
-        start = now(device)
-        level_ext_mask = ext_mask_work[level]
-        coms = coms_work[level, level_ext_mask]
-        ext_nodes = torch.nonzero(level_ext_mask, as_tuple=True)[0]
-        old_idx, inverse, counts = torch.unique(
-            coms,
-            sorted=True,
-            return_counts=True,
-            return_inverse=True,
-        )
-        contracted_nodes = int(old_idx.size(0))
-        timings[f"level_{level}_prepare_time"] = elapsed(start, device)
-
-        if contracted_nodes == 0:
-            level_rows.append(level_row)
-            continue
-
-        start = now(device)
-        if variant == "no_contraction":
-            local_idx = torch.arange(ext_nodes.size(0), device=compute_device)
-            aggr_idx = torch.stack((local_idx, ext_nodes))
-            aggr_adj_ptn = sparse.tensor(
-                aggr_idx,
-                (ext_nodes.size(0), opt.nodes_num),
-                adj_work.dtype,
-            )
-            aggr_adj = opt.aggregate(adj_work, aggr_adj_ptn)
-            del aggr_adj_ptn
-
-            contracted_nodes = int(ext_nodes.size(0))
-            aggr_features = features_work.index_select(0, ext_nodes) if needs_features else None
-        else:
-            aggr_idx = torch.stack((inverse, ext_nodes))
-            aggr_adj_ptn = sparse.tensor(
-                aggr_idx,
-                (contracted_nodes, opt.nodes_num),
-                adj_work.dtype,
-            )
-            aggr_adj = opt.aggregate(adj_work, aggr_adj_ptn)
-            del aggr_adj_ptn
-
-            aggr_features = None
-            if needs_features:
-                ext_features = features_work.index_select(0, ext_nodes)
-                aggr_features = torch.zeros(
-                    (contracted_nodes, ext_features.size(1)),
-                    dtype=ext_features.dtype,
-                    device=ext_features.device,
-                )
-                aggr_features.index_add_(0, inverse, ext_features)
-                if opt.aggregation_mode == "normalized":
-                    aggr_features /= counts.to(dtype=ext_features.dtype).unsqueeze(1)
-        aggregation_time = elapsed(start, device)
-        aggregation_total += aggregation_time
-
-        start = now(device)
-        coms = opt.local_algorithm(aggr_adj, aggr_features, level > 0).to(
-            device=compute_device,
-            dtype=torch.long,
-        )
-        backend_time = elapsed(start, device)
-        backend_total += backend_time
-        backend_conversion_total += float((opt.last_timing_info or {}).get("conversion_time", 0.0))
-
-        start = now(device)
-        if variant == "no_contraction":
-            label_ids, label_inverse = torch.unique(
-                coms,
-                sorted=True,
-                return_inverse=True,
-            )
-            representatives = torch.empty(
-                label_ids.size(0),
-                dtype=ext_nodes.dtype,
-                device=compute_device,
-            )
-            for label_pos in range(label_ids.size(0)):
-                first_local = torch.nonzero(label_inverse == label_pos, as_tuple=True)[0][0]
-                representatives[label_pos] = ext_nodes[first_local]
-            new_coms = representatives[label_inverse]
-        else:
-            new_coms = old_idx[coms[inverse]]
-        coms_work[level, level_ext_mask] = new_coms
-        projection_time = elapsed(start, device)
-        projection_total += projection_time
-
-        start = now(device)
-        adj_work = opt.cut_by_partition(adj_work, level_ext_mask, coms_work[level])
-        cut_time = elapsed(start, device)
-        cut_total += cut_time
-
-        level_row.update(
-            {
-                "closure_vertices": int(level_ext_mask.sum().item()),
-                "contracted_nodes": contracted_nodes,
-                "contracted_edges": nnz(aggr_adj),
-                "aggregation_time": aggregation_time,
-                "backend_time": backend_time,
-                "projection_time": projection_time,
-                "cut_time": cut_time,
-            }
-        )
-        level_rows.append(level_row)
-
-    timings["aggregation_time"] = aggregation_total
-    timings["backend_time"] = backend_total
-    timings["backend_conversion_time"] = backend_conversion_total
-    timings["projection_time"] = projection_total
-    timings["cut_time"] = cut_total
-    timings["total_profiled_time"] = elapsed(start_total, device)
-
-    row.update(timings)
-    row["levels"] = level_rows
     row["contracted_nodes_by_level"] = [
         int(item.get("contracted_nodes", 0)) for item in level_rows
     ]
     row["contracted_edges_by_level"] = [
         int(item.get("contracted_edges", 0)) for item in level_rows
     ]
+    row["boundary_certificates_by_level"] = [
+        item.get("boundary_certificate") for item in level_rows
+    ]
+    row["identity_ranking_certificates_by_level"] = [
+        item.get("ranking_certificate") for item in level_rows
+    ]
     row["modularity"] = Metrics.modularity(opt.adj, opt.coms[0], directed=directed)
-    row["aggregation_mode"] = aggregation_mode
     row.update(cuda_memory(device))
     row["rss_max_mb"] = current_rss_mb()
-    return row, timings["total_profiled_time"]
+    return row, row["total_profiled_time"]
+
+
+def hierarchy_is_nested(communities: torch.Tensor) -> bool:
+    """Return whether every stored fine block refines the next coarse row."""
+    if communities.dim() != 2:
+        return False
+    nodes = communities.size(1)
+    if communities.numel() and (
+        int(communities.min().item()) < 0
+        or int(communities.max().item()) >= nodes
+    ):
+        return False
+    for level in range(communities.size(0) - 1):
+        fine = communities[level]
+        coarse = communities[level + 1]
+        if not torch.equal(coarse, coarse.index_select(0, fine)):
+            return False
+    return True
+
+
+def isolated_scope_invariants(
+    before: torch.Tensor,
+    after: torch.Tensor,
+    scope: torch.Tensor,
+) -> dict[str, Any]:
+    """Audit a discarded radius-only step without relying on label identity.
+
+    Radius-only execution canonicalizes each complete hierarchy row.  Numeric
+    representatives outside the scope may consequently change even though the
+    partition induced on those vertices is unchanged.  Compare that partition
+    relation explicitly and retain numeric writes only as a diagnostic.
+    """
+    collisions = []
+    outside_partition_preserved = []
+    outside_numeric_writes = []
+    outside = ~scope
+    outside_vertices = torch.nonzero(outside, as_tuple=False).flatten()
+    for level in range(after.size(0)):
+        inside_labels = torch.unique(after[level, scope])
+        outside_labels = torch.unique(after[level, outside])
+        collisions.append(
+            int(torch.isin(inside_labels, outside_labels).sum().item())
+            if inside_labels.numel() and outside_labels.numel()
+            else 0
+        )
+        before_outside = before[level, outside]
+        after_outside = after[level, outside]
+        before_partition = Optimizer.canonicalize_partition(
+            before_outside,
+            outside_vertices,
+        )
+        after_partition = Optimizer.canonicalize_partition(
+            after_outside,
+            outside_vertices,
+        )
+        outside_partition_preserved.append(
+            bool(torch.equal(before_partition, after_partition))
+        )
+        outside_numeric_writes.append(
+            int(torch.count_nonzero(before_outside != after_outside).item())
+        )
+    return {
+        "nested_before": hierarchy_is_nested(before),
+        "nested_after": hierarchy_is_nested(after),
+        "scope_label_collisions_by_level": collisions,
+        "outside_partition_preserved_by_level": outside_partition_preserved,
+        "outside_numeric_writes_by_level": outside_numeric_writes,
+    }
+
+
+def clone_optimizer_state(opt: Optimizer) -> Optimizer:
+    """Clone labels while sharing read-only adjacency/features for one step."""
+    features = None if opt.synthetic_features else opt.features
+    cloned = Optimizer(
+        opt.adj,
+        features,
+        communities=opt.coms.detach().clone(),
+        subcoms_depth=opt.subcoms_depth,
+        method=opt.method,
+        baseline_iter=opt.baseline_iter,
+        verbose=opt.verbose,
+        use_gpu=opt.runtime_device().type == "cuda",
+        aggregation_mode=opt.aggregation_mode,
+        resolution=opt.resolution,
+    )
+    return cloned
 
 
 def load_dataset(
@@ -347,6 +324,15 @@ def profile_run(
     variant: str,
     checkpoint: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    # The production measurement image provides the optional DGC wheel used by
+    # launcher bootstrap. Keep this import on the actual run path so the
+    # instrumentation helper remains unit-testable in the lightweight image.
+    from launcher import (
+        _compute_full_adj,
+        _compute_launch_initial_partition,
+        _iter_adjacency_batches,
+    )
+
     baseline_iter = args.baseline_iter if args.baseline_iter is not None else ITER_DEFAULTS.get(method)
     ds = load_dataset(
         dataset,
@@ -376,6 +362,11 @@ def profile_run(
     profile = {
         "algorithm": alg,
         "variant": variant,
+        "state_policy": (
+            "isolated_one_step_from_production_pre_update_state"
+            if variant == "no_closure"
+            else "persistent_variant_trajectory"
+        ),
         "method": method,
         "mode": "smart",
         "dataset": ds.name,
@@ -390,6 +381,7 @@ def profile_run(
         "use_gpu": use_gpu,
         "updates_profiled": 0,
         "total_profiled_time": 0.0,
+        "total_principal_profiled_time": 0.0,
         "peak_cuda_allocated_mb": None,
         "peak_rss_mb": None,
         "metrics": {},
@@ -413,6 +405,11 @@ def profile_run(
                     + float(row.get("update_time", 0.0))
                     for row in rows
                 ),
+                "total_principal_profiled_time": sum(
+                    float(row.get("principal_profiled_time", 0.0))
+                    + float(row.get("update_time", 0.0))
+                    for row in rows
+                ),
                 "peak_cuda_allocated_mb": peak_cuda,
                 "peak_rss_mb": peak_rss,
                 "incomplete": not completed,
@@ -429,6 +426,7 @@ def profile_run(
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
+    last_evaluated_partition = None
     for batch_idx, batch in enumerate(batches):
         if args.max_updates is not None and len(rows) >= args.max_updates:
             break
@@ -473,15 +471,52 @@ def profile_run(
         if batch_idx == 0 and ":" not in str(batch_strategy):
             update_time = 0.0
 
+        run_optimizer = opt
+        persistent_before = None
+        expanded_for_audit = None
+        if variant == "no_closure":
+            persistent_before = opt.coms.detach().clone()
+            run_optimizer = clone_optimizer_state(opt)
+            expanded_for_audit = run_optimizer.neighborhood(
+                run_optimizer.runtime_adj(),
+                affected_nodes_mask,
+                step=args.smart_radius,
+            )
         row, _profiled_time = profile_smart_update(
-            opt,
+            run_optimizer,
             affected_nodes_mask,
-            method,
-            args.aggregation_mode,
             args.smart_radius,
             ds.is_directed,
             variant,
         )
+        if variant == "no_closure":
+            assert persistent_before is not None
+            assert expanded_for_audit is not None
+            row["state_policy"] = profile["state_policy"]
+            row["persistent_state_unchanged_by_control"] = torch.equal(
+                opt.coms,
+                persistent_before,
+            )
+            row["isolated_invariants"] = isolated_scope_invariants(
+                persistent_before,
+                run_optimizer.coms,
+                expanded_for_audit,
+            )
+            last_evaluated_partition = run_optimizer.coms[0].detach().cpu()
+
+            # Advance only the valid production trajectory. The radius-only
+            # result above is discarded and can never contaminate batch t+1.
+            production_scope = opt.neighborhood(
+                opt.runtime_adj(),
+                affected_nodes_mask,
+                step=args.smart_radius,
+            )
+            opt.run(production_scope)
+            row["production_post_advance_nested"] = hierarchy_is_nested(opt.coms)
+        else:
+            row["state_policy"] = profile["state_policy"]
+            row["persistent_state_unchanged_by_control"] = None
+            last_evaluated_partition = opt.coms[0].detach().cpu()
         row["batch_idx"] = batch_idx
         row["update_time"] = update_time
         rows.append(row)
@@ -489,9 +524,16 @@ def profile_run(
             checkpoint(refresh_profile())
 
     full_adj = _compute_full_adj(ds.adj)
-    final_partition = opt.coms[0].detach().cpu()
+    if opt is None or last_evaluated_partition is None:
+        raise RuntimeError("profile run produced no evaluated updates")
+    final_partition = last_evaluated_partition
     final_modularity = Metrics.modularity(full_adj, final_partition, directed=ds.is_directed)
     metrics = {"Final modularity": final_modularity}
+    if variant == "no_closure":
+        metrics["interpretation"] = (
+            "final one-step radius-only counterfactual from the production "
+            "pre-update state; not a persistent multibatch trajectory"
+        )
     if args.ground_truth_metrics and getattr(ds, "label", None) is not None:
         metrics.update(calculate_ground_truth_metrics(ds.label, final_partition))
         metrics["Labels modularity"] = Metrics.modularity(full_adj, ds.label, directed=ds.is_directed)
@@ -551,7 +593,7 @@ def main() -> None:
             current_profiles.append(active_profile)
         result = {
             "generated_at": datetime.now().isoformat(),
-            "profile_schema": "comnetx_smart_workload_v1",
+            "profile_schema": "comnetx_smart_workload_v2",
             "status": status,
             "checkpointed": True,
             "parameters": vars(args),

@@ -1,3 +1,5 @@
+import hashlib
+
 import torch
 import os
 import time
@@ -11,6 +13,25 @@ import sparse
 from baselines.dgc import create_leiden
 from metrics import Metrics, calculate_ground_truth_metrics
 from our_utils import print_zone
+
+
+INITIAL_HIERARCHY_CACHE_SCHEMA = "parent_quotient_v1"
+
+
+def _partition_relation_sha256(partition) -> str:
+    """Hash one partition relation after canonical min-vertex relabeling."""
+
+    labels = torch.as_tensor(partition, dtype=torch.long)
+    if labels.dim() != 1 or labels.numel() == 0:
+        raise RuntimeError(
+            "LD-Leiden priming state must expose one non-empty flat partition"
+        )
+    canonical = Optimizer.canonicalize_partition(labels).cpu().contiguous()
+    array = canonical.numpy().astype("<i8", copy=False)
+    digest = hashlib.sha256()
+    digest.update(f"shape={array.shape};dtype=int64;".encode("ascii"))
+    digest.update(array.tobytes(order="C"))
+    return digest.hexdigest()
 
 
 def _initial_partition_cache_path(
@@ -43,13 +64,21 @@ def _initial_partition_cache_path(
     str
         Full path to the ``.npz`` cache file.
     """
-    depth_suffix = "" if subcoms_depth == 1 else f"_d:{subcoms_depth}"
+    depth_suffix = (
+        ""
+        if subcoms_depth == 1
+        else f"_d:{subcoms_depth}_{INITIAL_HIERARCHY_CACHE_SCHEMA}"
+    )
     resolution_suffix = "" if float(resolution) == 1.0 else f"_res:{resolution:g}"
     filename = f"{dataset_name}_b:{init_batch_number}_by_{method_name}"
     return os.path.join(cache_dir, f"{filename}{depth_suffix}{resolution_suffix}.npz")
 
 
-def _load_cached_initial_partition(cache_file: str | PathLike | None, device):
+def _load_cached_initial_partition(
+    cache_file: str | PathLike | None,
+    device,
+    expected_schema: str | None = None,
+):
     """
     Load an initial partition cache when the file already exists.
 
@@ -69,6 +98,9 @@ def _load_cached_initial_partition(cache_file: str | PathLike | None, device):
         return None
 
     with np.load(cache_file, allow_pickle=False) as data:
+        if expected_schema is not None:
+            if "schema" not in data or str(data["schema"].item()) != expected_schema:
+                return None
         partition = torch.as_tensor(
             data["partition"],
             dtype=torch.long,
@@ -82,6 +114,7 @@ def _save_cached_initial_partition(
     cache_file: str | PathLike | None,
     partition,
     modularity: float,
+    schema: str | None = None,
 ) -> None:
     """
     Persist an initial partition cache when caching is enabled.
@@ -98,7 +131,13 @@ def _save_cached_initial_partition(
     if cache_file is None:
         return
 
-    np.savez_compressed(cache_file, partition=partition.cpu().numpy(), mod=modularity)
+    payload = {
+        "partition": partition.cpu().numpy(),
+        "mod": modularity,
+    }
+    if schema is not None:
+        payload["schema"] = np.asarray(schema)
+    np.savez_compressed(cache_file, **payload)
 
 
 def _build_layered_initial_partition(
@@ -134,23 +173,23 @@ def _build_layered_initial_partition(
         Tensor with shape ``(subcoms_depth, nodes_num)``. Each row contains
         labels restored to the original graph nodes.
     """
-    layers = [init_partition]
+    layers = [Optimizer.canonicalize_partition(init_partition.to(device))]
     nodes_num = adj_matrix.size(0)
 
-    # Optimizer.aggregate expects sparse COO input. Dense snapshots are
-    # converted once, then the working adjacency stays sparse between layers.
-    adj_work = adj_algo.float()
-    if not adj_work.is_sparse:
-        adj_work = adj_work.to_sparse_coo()
-    adj_work = adj_work.coalesce()
+    # Every parent quotient is rebuilt from the same original adjacency. This
+    # preserves inter-block edges instead of carrying a destructive cut from a
+    # preceding layer.
+    adj_base = adj_algo.float()
+    if not adj_base.is_sparse:
+        adj_base = adj_base.to_sparse_coo()
+    adj_base = adj_base.coalesce()
 
-    node_mask = torch.ones(nodes_num, dtype=torch.bool, device=adj_work.device)
-    node_ids = torch.arange(nodes_num, device=adj_work.device)
+    node_ids = torch.arange(nodes_num, device=adj_base.device)
 
     for _ in range(1, subcoms_depth):
         # Reindex current communities to compact ids before building the
         # aggregation pattern P used in P * A * P.T.
-        current_partition = layers[-1].to(adj_work.device)
+        current_partition = layers[-1].to(adj_base.device)
         old_idx, inverse = torch.unique(
             current_partition,
             sorted=True,
@@ -160,9 +199,9 @@ def _build_layered_initial_partition(
         aggr_adj_ptn = sparse.tensor(
             aggr_idx,
             (old_idx.size(0), nodes_num),
-            adj_work.dtype,
+            adj_base.dtype,
         )
-        aggr_adj = Optimizer.aggregate(adj_work, aggr_adj_ptn)
+        aggr_adj = Optimizer.aggregate(adj_base, aggr_adj_ptn)
         del aggr_adj_ptn
 
         # Run the same local method on the aggregated graph and restore labels
@@ -182,12 +221,10 @@ def _build_layered_initial_partition(
                 dtype=torch.long,
                 device=device,
             )
-        restored_partition = old_idx[aggr_partition[inverse]]
+        restored_partition = Optimizer.canonicalize_partition(
+            aggr_partition[inverse], node_ids
+        )
         layers.append(restored_partition)
-
-        # Keep the working adjacency consistent with Optimizer.run: after each
-        # layer, remove edges that cross the new partition.
-        adj_work = Optimizer.cut_by_partition(adj_work, node_mask, restored_partition)
 
     return torch.stack(layers)
 
@@ -243,6 +280,9 @@ def compute_initial_partition(
         device = torch.device(device)
 
     cache_file = None
+    cache_schema = (
+        None if subcoms_depth == 1 else INITIAL_HIERARCHY_CACHE_SCHEMA
+    )
     if cache_dir is not None:
         os.makedirs(cache_dir, exist_ok=True)
         cache_file = _initial_partition_cache_path(
@@ -254,9 +294,25 @@ def compute_initial_partition(
             resolution=resolution,
         )
 
-        cached_partition = _load_cached_initial_partition(cache_file, device)
+        cached_partition = _load_cached_initial_partition(
+            cache_file,
+            device,
+            expected_schema=cache_schema,
+        )
         if cached_partition is not None:
-            return cached_partition
+            cached_labels, cached_modularity = cached_partition
+            if cached_labels.dim() == 1:
+                cached_labels = Optimizer.canonicalize_partition(cached_labels)
+            else:
+                cached_labels = Optimizer.canonicalize_hierarchy(cached_labels)
+                if not Optimizer.hierarchy_is_nested(cached_labels):
+                    # A schema-valid file can still contain a legacy or
+                    # corrupted non-hierarchy.  Rebuild it from the snapshot
+                    # instead of admitting an unchecked precondition to the
+                    # parent-quotient update.
+                    cached_labels = None
+            if cached_labels is not None:
+                return cached_labels, cached_modularity
 
     adj_algo = adj_matrix.to(device)
     if method_name == "leidenalg" and float(resolution) != 1.0:
@@ -280,6 +336,8 @@ def compute_initial_partition(
         )
         init_mod = temp_algo.modularity()
 
+    init_partition = Optimizer.canonicalize_partition(init_partition)
+
     if subcoms_depth > 1:
         init_partition = _build_layered_initial_partition(
             adj_matrix,
@@ -291,7 +349,12 @@ def compute_initial_partition(
             resolution=resolution,
         )
 
-    _save_cached_initial_partition(cache_file, init_partition, init_mod)
+    _save_cached_initial_partition(
+        cache_file,
+        init_partition,
+        init_mod,
+        schema=cache_schema,
+    )
 
     return init_partition, init_mod
 
@@ -835,7 +898,11 @@ def _run_dynamic_backend(
     Returns
     -------
     list[dict[str, float]]
-        Per-processed-batch modularity and runtime entries.
+        Per-processed-batch modularity and runtime entries. Native LD-Leiden
+        entries additionally expose ``optimization_time``, ``update_time``,
+        ``end_to_end_time``, and ``timing_split_supported``. For a supported
+        split clock, the historical ``time`` field is the optimization time.
+        Other dynamic methods retain their historical result shape.
 
     Raises
     ------
@@ -845,6 +912,7 @@ def _run_dynamic_backend(
     results = []
     algo = None
     seen_batch = False
+    ldleiden_priming_audit = None
 
     for batch_idx, batch in enumerate(batches_iter):
         seen_batch = True
@@ -870,23 +938,99 @@ def _run_dynamic_backend(
             algo = create_leiden(config.method, batch, partition=init_partition)
 
             if init_partition is not None:
-                # FIXME: Some dynamic backends need a priming apply() after receiving
+                # Some dynamic backends need a priming apply() after receiving
                 # an external partition. Without it, update()+apply() can enter
-                # an uninitialized C++ state on the next batch.
+                # an uninitialized C++ state on the next batch. For LD-Leiden,
+                # the paper protocol also observes the post-priming partition:
+                # an unmeasured optimization is admissible only when it leaves
+                # the registered bootstrap relation unchanged.
+                bootstrap_digest = None
+                if config.method == "ldleiden":
+                    bootstrap_digest = _partition_relation_sha256(init_partition)
                 algo.apply()
+                if config.method == "ldleiden":
+                    try:
+                        post_priming_partition = algo.partition()
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "LD-Leiden priming partition is not observable; "
+                            "the registered comparison cannot proceed"
+                        ) from exc
+                    if post_priming_partition is None:
+                        raise RuntimeError(
+                            "LD-Leiden priming partition is not observable; "
+                            "the registered comparison cannot proceed"
+                        )
+                    post_priming_digest = _partition_relation_sha256(
+                        post_priming_partition
+                    )
+                    if post_priming_digest != bootstrap_digest:
+                        raise RuntimeError(
+                            "LD-Leiden priming changed the registered bootstrap "
+                            "partition; do not report the run as a matched start"
+                        )
+                    ldleiden_priming_audit = {
+                        "priming_audit_supported": True,
+                        "priming_partition_relation_preserved": True,
+                        "bootstrap_reference_sha256": bootstrap_digest,
+                        "post_priming_partition_sha256": post_priming_digest,
+                    }
                 continue
 
         # Keep the historical streaming protocol: every emitted batch,
         # including the first non-special snapshot, is passed through update().
-        algo.update(batch)
-        elapsed_ms = algo.apply()
-        measured_time = elapsed_ms / 1000.0
-        mod = algo.modularity()
+        # LD-Leiden applies a pending graph update inside apply().  Its split
+        # clock separates that work from optimization so ``time`` is comparable
+        # with the principal backend clock used by the adapter measurements.
+        if config.method == "ldleiden":
+            end_to_end_start = time.perf_counter()
+            algo.update(batch)
+            try:
+                update_ms, optimization_ms = algo.apply(with_update_timing=True)
+            except TypeError as exc:
+                if "with_update_timing" not in str(exc):
+                    raise
+                # Older wheels expose only the combined apply() clock. Keep
+                # that value in ``time`` for API compatibility, but mark the
+                # missing split explicitly so measurement validation can
+                # reject the entry as a principal-clock observation.
+                combined_ms = algo.apply()
+                end_to_end_time = time.perf_counter() - end_to_end_start
+                result = {
+                    "modularity": algo.modularity(),
+                    "time": combined_ms / 1000.0,
+                    "optimization_time": None,
+                    "update_time": None,
+                    "end_to_end_time": end_to_end_time,
+                    "timing_split_supported": False,
+                }
+            else:
+                end_to_end_time = time.perf_counter() - end_to_end_start
+                measured_time = optimization_ms / 1000.0
+                result = {
+                    "modularity": algo.modularity(),
+                    "time": measured_time,
+                    "optimization_time": measured_time,
+                    "update_time": update_ms / 1000.0,
+                    "end_to_end_time": end_to_end_time,
+                    "timing_split_supported": True,
+                }
+        else:
+            algo.update(batch)
+            elapsed_ms = algo.apply()
+            measured_time = elapsed_ms / 1000.0
+            result = {"modularity": algo.modularity(), "time": measured_time}
+
+        if config.method == "ldleiden" and ldleiden_priming_audit is not None:
+            result.update(ldleiden_priming_audit)
+
+        measured_time = result["time"]
+        mod = result["modularity"]
 
         _print_verbose(config.verbose, 2, f"Modularity: {mod:.2g}")
         _print_verbose(config.verbose, 2, f"Time: {measured_time:.2f}")
 
-        results.append({"modularity": mod, "time": measured_time})
+        results.append(result)
 
     if not seen_batch:
         raise ValueError("dynamic backend received no adjacency batches")

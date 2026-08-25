@@ -1,0 +1,25 @@
+{
+  "VERBOSE": 1,
+  "CATCH_ERRORS": false,
+  "USE_TIMESTAMP_SUFFIX": false,
+  "GROUND_TRUTH_METRICS": true,
+  "FORCE_UNDIRECTED": true,
+  "USE_GPU": false,
+  "RESOLUTION": 1.0,
+  "FEATURE_MODE": "dataset",
+  "DATASETS": [
+    "dyn_pubmed",
+    "arxivmath"
+  ],
+  "BATCHES": [
+    "9:500"
+  ],
+  "BASELINES": [
+    "ldleiden"
+  ],
+  "MODES": [
+    "dynamic"
+  ],
+  "SMART_PARAMS_GRID": {}
+}
+

@@ -177,9 +177,14 @@ def run_one(args: argparse.Namespace, dataset_name: str, mode: str) -> dict[str,
     ds = Dataset(dataset_name, paths_config=args.paths_config)
     ds.load(
         batches_strategy=args.batch,
-        force_undirected=args.force_undirected,
         feature_mode="dataset",
     )
+    if args.force_undirected and ds.is_directed:
+        ds._force_undirected()
+        # Cache/result identity must encode the graph representation just as
+        # scripts/launch.py does; otherwise a directed and symmetrized run can
+        # silently share an initial-partition cache file.
+        ds.name = f"{dataset_name}-sym"
 
     config = _build_launch_config(
         ds=ds,

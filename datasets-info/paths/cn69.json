@@ -1,0 +1,11 @@
+{
+  "dynamic": {
+    "konect": "/home/dev/datasets/konect",
+    "dyn_attr": "/home/dev/datasets/row_attr",
+    "tgc": "/home/dev/datasets/tgc"
+  },
+  "static": {
+    "ogb": "/home/dev/static_datasets/ogb_row",
+    "dyn_atr": "/home/dev/static_datasets/torch_geom_row"
+  }
+}

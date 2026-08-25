@@ -213,7 +213,7 @@ def test_compute_initial_partition_builds_layered_tensor(monkeypatch):
     assert init_mod == 0.75
     assert partition.shape == (2, 4)
     assert partition.device == adj.device
-    assert torch.equal(partition[0], torch.tensor([0, 0, 1, 1]))
+    assert torch.equal(partition[0], torch.tensor([0, 0, 2, 2]))
     assert torch.equal(partition[1], torch.tensor([0, 0, 0, 0]))
     assert _FakeLeiden.calls[1].shape == torch.Size([2, 2])
     assert _FakeLeiden.calls[1].device == adj.device
@@ -264,9 +264,69 @@ def test_build_layered_initial_partition_restores_original_node_labels(
         device=torch.device("cpu"),
     )
 
-    assert torch.equal(layered[0], initial_partition)
+    assert torch.equal(layered[0], torch.tensor([0, 0, 2, 2]))
     assert torch.equal(layered[1], torch.tensor([0, 0, 0, 0]))
     assert _FakeLeiden.calls[0].shape == torch.Size([2, 2])
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_build_layered_initial_partition_rebuilds_each_parent_from_original(
+    monkeypatch,
+):
+    launcher = _load_launcher(monkeypatch)
+
+    class _IdentityLeiden:
+        calls = []
+
+        def __init__(self, adj):
+            type(self).calls.append(adj.to_dense().clone())
+            self._size = adj.size(0)
+
+        def apply(self):
+            return 0.0
+
+        def partition(self):
+            return torch.arange(self._size, dtype=torch.long)
+
+    monkeypatch.setattr(
+        launcher,
+        "create_leiden",
+        lambda method_name, adj: _IdentityLeiden(adj),
+    )
+    adjacency = torch.tensor(
+        [
+            [0, 1, 0, 0],
+            [1, 0, 1, 0],
+            [0, 1, 0, 1],
+            [0, 0, 1, 0],
+        ],
+        dtype=torch.float32,
+    ).to_sparse_coo()
+
+    layered = launcher._build_layered_initial_partition(
+        adjacency,
+        adjacency,
+        torch.tensor([0, 0, 2, 2]),
+        "leidenalg",
+        subcoms_depth=3,
+        device=torch.device("cpu"),
+    )
+
+    assert torch.equal(
+        layered,
+        torch.tensor(
+            [
+                [0, 0, 2, 2],
+                [0, 0, 2, 2],
+                [0, 0, 2, 2],
+            ]
+        ),
+    )
+    assert len(_IdentityLeiden.calls) == 2
+    for quotient in _IdentityLeiden.calls:
+        assert quotient[0, 1] > 0
+        assert quotient[1, 0] > 0
 
 
 @pytest.mark.unit
@@ -298,7 +358,7 @@ def test_compute_initial_partition_loads_cached_partition_as_tensor(
     assert init_mod == 0.5
     assert partition.dtype == torch.long
     assert partition.device == torch.device("cpu")
-    assert torch.equal(partition, torch.tensor([1, 1, 0]))
+    assert torch.equal(partition, torch.tensor([0, 0, 2]))
 
 
 @pytest.mark.unit
@@ -324,7 +384,9 @@ def test_initial_partition_cache_helpers_build_save_and_load(
     )
 
     assert Path(shallow_path).name == "fake_b:0_by_leidenalg.npz"
-    assert Path(deep_path).name == "fake_b:999_by_leidenalg_d:3.npz"
+    assert Path(deep_path).name == (
+        "fake_b:999_by_leidenalg_d:3_parent_quotient_v1.npz"
+    )
     assert launcher._load_cached_initial_partition(
         tmp_path / "missing.npz",
         torch.device("cpu"),
@@ -332,13 +394,87 @@ def test_initial_partition_cache_helpers_build_save_and_load(
 
     partition = torch.tensor([[0, 1], [1, 1]], dtype=torch.long)
     launcher._save_cached_initial_partition(deep_path, partition, 0.91)
+    assert launcher._load_cached_initial_partition(
+        deep_path,
+        torch.device("cpu"),
+        expected_schema=launcher.INITIAL_HIERARCHY_CACHE_SCHEMA,
+    ) is None
+
+    launcher._save_cached_initial_partition(
+        deep_path,
+        partition,
+        0.91,
+        schema=launcher.INITIAL_HIERARCHY_CACHE_SCHEMA,
+    )
     loaded_partition, loaded_mod = launcher._load_cached_initial_partition(
         deep_path,
         torch.device("cpu"),
+        expected_schema=launcher.INITIAL_HIERARCHY_CACHE_SCHEMA,
     )
 
     assert loaded_mod == pytest.approx(0.91)
     assert torch.equal(loaded_partition, partition)
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_compute_initial_partition_rebuilds_non_nested_deep_cache(
+    monkeypatch,
+    tmp_path,
+):
+    launcher = _load_launcher(monkeypatch)
+    cache_file = launcher._initial_partition_cache_path(
+        tmp_path,
+        "fake",
+        "999",
+        "leidenalg",
+        subcoms_depth=2,
+    )
+    launcher._save_cached_initial_partition(
+        cache_file,
+        torch.tensor(
+            [
+                [0, 0, 2, 2],
+                [0, 1, 0, 1],
+            ],
+            dtype=torch.long,
+        ),
+        0.5,
+        schema=launcher.INITIAL_HIERARCHY_CACHE_SCHEMA,
+    )
+
+    class _IdentityLeiden:
+        calls = 0
+
+        def __init__(self, adjacency):
+            type(self).calls += 1
+            self.size = adjacency.size(0)
+
+        def apply(self):
+            return 0.0
+
+        def partition(self):
+            return torch.arange(self.size, dtype=torch.long)
+
+        def modularity(self):
+            return 0.0
+
+    monkeypatch.setattr(
+        launcher,
+        "create_leiden",
+        lambda method_name, adjacency: _IdentityLeiden(adjacency),
+    )
+
+    partition, _ = launcher.compute_initial_partition(
+        torch.zeros((4, 4), dtype=torch.float32).to_sparse_coo(),
+        dataset_name="fake",
+        init_batch_number="999",
+        cache_dir=tmp_path,
+        subcoms_depth=2,
+    )
+
+    assert _IdentityLeiden.calls == 2
+    assert launcher.Optimizer.hierarchy_is_nested(partition)
 
 
 @pytest.mark.unit
@@ -883,8 +1019,10 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         def update(self, batch):
             self.updated_batches.append(batch)
 
-        def apply(self):
+        def apply(self, with_update_timing=False):
             self.apply_calls += 1
+            if with_update_timing:
+                return 250.0, 1500.0
             return 1500.0
 
         def modularity(self):
@@ -915,6 +1053,8 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         "_compute_launch_initial_partition",
         fake_compute_launch_initial_partition,
     )
+    clock = iter([10.0, 12.0])
+    monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
     config = _test_config(
         launcher,
         dataset_name="fake",
@@ -926,13 +1066,156 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         batches,
         config,
     )
+    bootstrap_digest = launcher._partition_relation_sha256(initial_partition)
 
-    assert results == [{"modularity": 0.66, "time": 1.5}]
+    assert results == [
+        {
+            "modularity": 0.66,
+            "time": 1.5,
+            "optimization_time": 1.5,
+            "update_time": 0.25,
+            "end_to_end_time": 2.0,
+            "timing_split_supported": True,
+            "priming_audit_supported": True,
+            "priming_partition_relation_preserved": True,
+            "bootstrap_reference_sha256": bootstrap_digest,
+            "post_priming_partition_sha256": bootstrap_digest,
+        }
+    ]
     assert captured["method"] == "ldleiden"
     assert captured["initial_args"] == (batches[0], "fake", "999")
     assert created_algos[0].partition() is initial_partition
     assert created_algos[0].apply_calls == 2
     assert created_algos[0].updated_batches == [batches[1]]
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_run_dynamic_ldleiden_rejects_priming_partition_change(monkeypatch):
+    launcher = _load_launcher(monkeypatch)
+    batches = [
+        torch.zeros((4, 4), dtype=torch.float32),
+        torch.ones((4, 4), dtype=torch.float32),
+    ]
+    initial_partition = torch.tensor([0, 0, 2, 2])
+
+    class _ChangingPrimingAlgo:
+        def __init__(self):
+            self._partition = initial_partition.clone()
+
+        def apply(self, with_update_timing=False):
+            self._partition = torch.tensor([0, 1, 2, 3])
+            return (0.0, 0.0) if with_update_timing else 0.0
+
+        def partition(self):
+            return self._partition
+
+        def update(self, batch):
+            raise AssertionError("updates must not start after a changed priming state")
+
+    monkeypatch.setattr(
+        launcher,
+        "create_leiden",
+        lambda method, batch, partition=None: _ChangingPrimingAlgo(),
+    )
+    monkeypatch.setattr(
+        launcher,
+        "_compute_launch_initial_partition",
+        lambda *args, **kwargs: initial_partition,
+    )
+    config = _test_config(
+        launcher,
+        method="ldleiden",
+        init_batch_number="999",
+    )
+
+    with pytest.raises(RuntimeError, match="priming changed"):
+        launcher._run_dynamic_backend(batches, config)
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_run_dynamic_ldleiden_marks_unsupported_split_timing(monkeypatch):
+    launcher = _load_launcher(monkeypatch)
+    batch = torch.ones((2, 2), dtype=torch.float32)
+
+    class _NoSplitDynamicAlgo:
+        def __init__(self):
+            self.updated_batches = []
+            self.apply_calls = 0
+
+        def update(self, updated_batch):
+            self.updated_batches.append(updated_batch)
+
+        def apply(self):
+            self.apply_calls += 1
+            return 1750.0
+
+        def modularity(self):
+            return 0.55
+
+        def partition(self):
+            return torch.tensor([0, 1])
+
+    algo = _NoSplitDynamicAlgo()
+    monkeypatch.setattr(
+        launcher,
+        "create_leiden",
+        lambda method, initial_batch, partition=None: algo,
+    )
+    clock = iter([20.0, 20.4])
+    monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
+    config = _test_config(launcher, method="ldleiden", mode="dynamic")
+
+    results, last_partition = launcher._run_dynamic_backend([batch], config)
+
+    assert results == [
+        {
+            "modularity": 0.55,
+            "time": 1.75,
+            "optimization_time": None,
+            "update_time": None,
+            "end_to_end_time": pytest.approx(0.4),
+            "timing_split_supported": False,
+        }
+    ]
+    assert algo.updated_batches == [batch]
+    assert algo.apply_calls == 1
+    assert torch.equal(last_partition, torch.tensor([0, 1]))
+
+
+@pytest.mark.unit
+@pytest.mark.short
+def test_run_dynamic_non_ld_backend_keeps_historical_result_shape(monkeypatch):
+    launcher = _load_launcher(monkeypatch)
+    batch = torch.ones((2, 2), dtype=torch.float32)
+
+    class _FakeDynamicAlgo:
+        def update(self, updated_batch):
+            self.updated_batch = updated_batch
+
+        def apply(self):
+            return 500.0
+
+        def modularity(self):
+            return 0.44
+
+        def partition(self):
+            return torch.tensor([1, 1])
+
+    algo = _FakeDynamicAlgo()
+    monkeypatch.setattr(
+        launcher,
+        "create_leiden",
+        lambda method, initial_batch, partition=None: algo,
+    )
+    config = _test_config(launcher, method="dfleiden", mode="dynamic")
+
+    results, last_partition = launcher._run_dynamic_backend([batch], config)
+
+    assert results == [{"modularity": 0.44, "time": 0.5}]
+    assert algo.updated_batch is batch
+    assert torch.equal(last_partition, torch.tensor([1, 1]))
 
 
 @pytest.mark.unit
