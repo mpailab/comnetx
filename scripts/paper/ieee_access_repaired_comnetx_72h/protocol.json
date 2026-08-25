@@ -13,6 +13,8 @@
     "ground_truth_metrics": true,
     "bootstrap_method": "leidenalg",
     "initial_hierarchy_cache_schema": "parent_quotient_v1",
+    "dsbm_operational_handoff_hours": 32,
+    "repeatability_pre_handoff_start_hours": 33,
     "full_baseline_reuse_policy": "Reuse is admissible only when source, protocol, bootstrap, graph representation, hardware, and principal clock hashes match exactly; this queue schedules one fresh paired long run by default.",
     "production_api_must_be_acknowledged": true,
     "source_hash_locked_per_campaign": true,
@@ -30,9 +32,12 @@
   "scientific_decision_rules": [
     "Stages 1-4 are the core evidence and take precedence over every optional control.",
     "After Stage 2, retain valid results even if repaired ComNetX is slower or lower quality. If neither large graph has speedup above one with Delta Q >= -0.05, skip optional breadth experiments and reframe the empirical claim instead of tuning on the test streams.",
-    "Stage 5 may start only when at least 38 hours remain, preserving a 30-hour slot for the 26.95 GPU-hour DSBM queue plus validation margin.",
+    "Stage 5 may start only when at least 38 hours remain and stops at the 32-hour operational handoff boundary, preserving two hours to validate and launch the 30-hour DSBM slot.",
     "Stage 6 may start only when at least 30 hours remain. If it cannot start, record it as skipped_for_budget rather than deleting the existing DSBM section or silently presenting old smart rows as repaired results.",
-    "Stage 7 backend-interface rows are last and cannot displace Stages 1-4 or the reserved DSBM slot."
+    "One validated long-repeatability run resolves its optional stage; a second run is a marginal precision extension launched only with at least 40 hours left.",
+    "Inside the 33-hour pre-handoff boundary, preserving the indivisible 30-hour DSBM design takes precedence over starting long repeatability that cannot be given a meaningful protected window.",
+    "Stage 7 backend-interface rows are last and cannot displace Stages 1-4 or the reserved DSBM slot.",
+    "This combined repaired-ComNetX and LD-Leiden queue supersedes earlier provisional hour-by-hour planning notes; measurement freeze begins when the shared clock expires or File 08 completes."
   ],
   "claim_mapping": {
     "RQ1": "Stages 1, 2, and 4 establish repaired Leiden quality and update-time behavior on real streams.",
@@ -92,6 +97,8 @@
       "minimum_hours_remaining": 12,
       "purpose": "Up to two additional repaired smart-only 9:500 repetitions as budget allows.",
       "config": "configs/stage4_smart_long_9_500.json",
+      "minimum_evidence_repetitions": 1,
+      "second_repeat_launch_gate_hours": 40,
       "maximum_repetitions": 2
     },
     {

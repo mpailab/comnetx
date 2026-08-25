@@ -8,6 +8,7 @@ import hashlib
 import importlib
 import importlib.metadata
 import importlib.util
+import math
 import os
 import platform
 import re
@@ -20,6 +21,11 @@ from typing import Any
 
 try:
     from .input_manifest import build_input_manifest, validate_input_manifest
+    from .process_control import (
+        LauncherSignalInterrupt,
+        install_termination_signal_handlers,
+        run_streaming_process,
+    )
     from .protocol import (
         PROJECT_ROOT,
         RESULTS_ROOT,
@@ -37,6 +43,11 @@ try:
     )
 except ImportError:  # Direct ``python path/to/run_protocol.py`` execution.
     from input_manifest import build_input_manifest, validate_input_manifest
+    from process_control import (
+        LauncherSignalInterrupt,
+        install_termination_signal_handlers,
+        run_streaming_process,
+    )
     from protocol import (
         PROJECT_ROOT,
         RESULTS_ROOT,
@@ -61,6 +72,11 @@ THREAD_ENVIRONMENT = {
     "NUMEXPR_NUM_THREADS": "1",
 }
 CAMPAIGN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+DEADLINE_KILL_GRACE_SECONDS = 60.0
+
+
+class CampaignTimeBoundary(RuntimeError):
+    """Raised when the shared campaign deadline stops an LD-Leiden attempt."""
 
 
 def utc_now() -> str:
@@ -395,6 +411,76 @@ def next_attempt_dir(repeat_dir: Path) -> Path:
     return repeat_dir / f"attempt-{max(indices, default=0) + 1:02d}"
 
 
+def recover_interrupted_phase(
+    campaign_dir: Path,
+    manifest: dict[str, Any],
+    phase_id: str,
+) -> int:
+    """Recover stale LD attempt markers only after their process groups are gone."""
+
+    if manifest.get("phase_status", {}).get(phase_id) != "running":
+        return 0
+    recovered = 0
+    phase_dir = campaign_dir / phase_id
+    for repeat_dir in sorted(path for path in phase_dir.glob("repeat-*") if path.is_dir()):
+        records = []
+        for metadata_path in sorted(repeat_dir.glob("attempt-*/metadata.json")):
+            metadata = read_json(metadata_path)
+            if metadata.get("status") == "running":
+                process_group = metadata.get("process_group_id")
+                if not isinstance(process_group, int) or process_group <= 0:
+                    raise RuntimeError(
+                        f"cannot prove interrupted process cleanup for {metadata_path}"
+                    )
+                try:
+                    os.killpg(process_group, 0)
+                except ProcessLookupError:
+                    pass
+                except PermissionError as exc:
+                    raise RuntimeError(
+                        f"recorded process group is still present: {process_group}"
+                    ) from exc
+                else:
+                    raise RuntimeError(
+                        f"recorded process group is still present: {process_group}"
+                    )
+                metadata.update(
+                    {
+                        "status": "failed",
+                        "failure_kind": "launcher_interrupted",
+                        "recovered_at_utc": utc_now(),
+                    }
+                )
+                write_json(metadata_path, metadata)
+                recovered += 1
+            records.append((metadata_path, metadata))
+        has_completed = any(
+            metadata.get("status") == "completed" for _, metadata in records
+        )
+        for metadata_path, metadata in records:
+            status = metadata.get("status")
+            if status == "completed":
+                continue
+            if status == "failed" and (
+                has_completed
+                or metadata.get("failure_kind")
+                in {"campaign_time_boundary", "launcher_interrupted"}
+            ):
+                continue
+            raise RuntimeError(
+                f"stale phase contains an unaudited failure: {metadata_path}"
+            )
+    manifest["phase_status"][phase_id] = "failed"
+    manifest.setdefault("interrupted_phases", {})[phase_id] = {
+        "recorded_at_utc": utc_now(),
+        "reason": "recovered stale running state after process-group absence check",
+        "recovered_attempts": recovered,
+    }
+    manifest["updated_at_utc"] = utc_now()
+    write_json(campaign_dir / "manifest.json", manifest)
+    return recovered
+
+
 def bootstrap_cache_fingerprint(cache_dir: Path) -> dict[str, str]:
     return {
         path.name: sha256_file(path)
@@ -403,24 +489,23 @@ def bootstrap_cache_fingerprint(cache_dir: Path) -> dict[str, str]:
     }
 
 
-def stream_process(command: list[str], env: dict[str, str], log_path: Path) -> int:
-    with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=PROJECT_ROOT,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-        assert process.stdout is not None
-        for line in process.stdout:
-            sys.stdout.write(line)
-            sys.stdout.flush()
-            log.write(line)
-            log.flush()
-        return process.wait()
+def stream_process(
+    command: list[str],
+    env: dict[str, str],
+    log_path: Path,
+    *,
+    deadline: float | None = None,
+    on_start: Any = None,
+) -> tuple[int, bool]:
+    return run_streaming_process(
+        command,
+        env,
+        log_path,
+        cwd=PROJECT_ROOT,
+        deadline=deadline,
+        deadline_kill_grace_seconds=DEADLINE_KILL_GRACE_SECONDS,
+        on_start=on_start,
+    )
 
 
 def run_attempt(
@@ -429,7 +514,12 @@ def run_attempt(
     protocol: dict[str, Any],
     phase: dict[str, Any],
     repeat_index: int,
+    deadline_epoch: float | None,
 ) -> dict[str, Any]:
+    if deadline_epoch is not None and time.time() >= deadline_epoch:
+        raise CampaignTimeBoundary(
+            f"shared campaign deadline reached before {phase['id']} repeat {repeat_index}"
+        )
     campaign_manifest = read_json(campaign_dir / "manifest.json")
     identity_before = assert_campaign_identity(
         campaign_manifest,
@@ -484,14 +574,32 @@ def run_attempt(
 
     start = time.perf_counter()
     return_code = None
+    deadline_reached = False
     process_error: BaseException | None = None
+    def record_process(process_id: int) -> None:
+        metadata["process_id"] = process_id
+        metadata["process_group_id"] = process_id
+        write_json(metadata_path, metadata)
+
+    command_deadline = (
+        None
+        if deadline_epoch is None
+        else time.monotonic() + deadline_epoch - time.time()
+    )
     try:
-        return_code = stream_process(command, env, attempt_dir / "stdout.log")
+        return_code, deadline_reached = stream_process(
+            command,
+            env,
+            attempt_dir / "stdout.log",
+            deadline=command_deadline,
+            on_start=record_process,
+        )
     except BaseException as exc:  # Preserve interrupts while sealing post-state.
         process_error = exc
     metadata["finished_at_utc"] = utc_now()
     metadata["wall_seconds"] = time.perf_counter() - start
     metadata["return_code"] = return_code
+    metadata["deadline_reached"] = deadline_reached
     try:
         identity_after = assert_campaign_identity(
             campaign_manifest,
@@ -514,11 +622,19 @@ def run_attempt(
         )
     if process_error is not None:
         metadata["status"] = "failed"
+        metadata["failure_kind"] = "launcher_interrupted"
         metadata["process_error"] = (
             f"{type(process_error).__name__}: {process_error}"
         )
         write_json(metadata_path, metadata)
         raise process_error
+    if deadline_reached:
+        metadata["status"] = "failed"
+        metadata["failure_kind"] = "campaign_time_boundary"
+        write_json(metadata_path, metadata)
+        raise CampaignTimeBoundary(
+            f"{phase['id']} repeat {repeat_index} stopped at the shared deadline"
+        )
     if return_code != 0:
         metadata["status"] = "failed"
         write_json(metadata_path, metadata)
@@ -573,6 +689,7 @@ def selected_phases(
 
 
 def main() -> None:
+    install_termination_signal_handlers()
     protocol = load_protocol()
     parser = argparse.ArgumentParser(
         description="Run the pre-registered 72-hour LD-Leiden measurement plan."
@@ -614,7 +731,15 @@ def main() -> None:
             "hardware, container, wheel, and j=1; no graph run is executed."
         ),
     )
+    parser.add_argument(
+        "--deadline-epoch",
+        type=float,
+        help="Absolute deadline of the shared repaired/LD measurement campaign.",
+    )
     args = parser.parse_args()
+
+    if args.deadline_epoch is not None and not math.isfinite(args.deadline_epoch):
+        parser.error("--deadline-epoch must be finite")
 
     if not CAMPAIGN_RE.fullmatch(args.campaign_id):
         parser.error("--campaign-id may contain only letters, digits, dot, underscore, and dash")
@@ -711,13 +836,25 @@ def main() -> None:
     manifest["status"] = "running"
     manifest["updated_at_utc"] = utc_now()
     write_json(manifest_path, manifest)
+    active_phase: dict[str, Any] | None = None
+    active_phase_started = False
     try:
         for phase in phases:
+            active_phase = phase
+            active_phase_started = False
+            recovered = recover_interrupted_phase(
+                campaign_dir,
+                manifest,
+                phase["id"],
+            )
+            if recovered:
+                print(f"Recovered {recovered} interrupted {phase['id']} attempt(s)")
             print(
                 f"Starting {phase['id']}: {phase['repetitions']} repetition(s), "
                 f"included_in_analysis={phase['included_in_analysis']}"
             )
             manifest["phase_status"][phase["id"]] = "running"
+            active_phase_started = True
             manifest["updated_at_utc"] = utc_now()
             write_json(manifest_path, manifest)
             for repeat_index in range(1, int(phase["repetitions"]) + 1):
@@ -733,12 +870,30 @@ def main() -> None:
                     protocol,
                     phase,
                     repeat_index,
+                    args.deadline_epoch,
                 )
             manifest["phase_status"][phase["id"]] = "completed"
             manifest["updated_at_utc"] = utc_now()
             write_json(manifest_path, manifest)
-    except Exception:
+    except BaseException as exc:
         manifest["status"] = "failed"
+        if active_phase is not None and active_phase_started:
+            manifest["phase_status"][active_phase["id"]] = "failed"
+            if isinstance(exc, CampaignTimeBoundary):
+                manifest.setdefault("time_boundary_stops", {})[
+                    active_phase["id"]
+                ] = {
+                    "recorded_at_utc": utc_now(),
+                    "deadline_epoch": args.deadline_epoch,
+                    "reason": str(exc),
+                }
+            elif isinstance(exc, (KeyboardInterrupt, LauncherSignalInterrupt)):
+                manifest.setdefault("interrupted_phases", {})[
+                    active_phase["id"]
+                ] = {
+                    "recorded_at_utc": utc_now(),
+                    "reason": f"{type(exc).__name__}: {exc}",
+                }
         manifest["updated_at_utc"] = utc_now()
         write_json(manifest_path, manifest)
         raise

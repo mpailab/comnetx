@@ -55,7 +55,8 @@ fail and requires a new campaign.
 5. **Topology and controls (optional).** Depth/radius grid comes first, then
    direction and cut metrics, then resolution. Start only with at least 38
    hours remaining. The runner terminates the current control command at the
-   absolute 30-hour boundary, so this stage cannot consume the DSBM reserve.
+   conservative 32-hour handoff boundary. This leaves two hours to validate,
+   resume after a boundary stop, and still launch DSBM with at least 30 hours.
 6. **DSBM operating regime (optional but preserved).** The registered 30 smart
    runs cover three update types, two update rates, and five seeds under
    `100_batches`. Their measured historical cost is about 26.95 GPU-hours, so
@@ -119,7 +120,11 @@ batches is intentionally unsupported by this queue.
 ## Commands
 
 All commands run inside the project dev container. No measurement is launched
-by merely creating this package.
+by merely creating this package. For the actual paired 72-hour campaign, use
+the eight ordered scripts and shared absolute clock documented in
+`scripts/paper/ieee_access_72h_launch/README.md`. The direct runner commands
+below are low-level references; `--hours-left` alone is not a substitute for
+the launcher's sealed `--deadline-epoch`.
 
 Seal the repaired implementation. Preflight runs repository lint/unit checks,
 requires a visible CUDA device and the production dynamic-backend wheel,
@@ -168,7 +173,8 @@ python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
   --hours-left 40 --resume
 ```
 
-Controls may run only while preserving the 30-hour DSBM slot:
+Controls may run only while preserving the 32-hour operational handoff to the
+30-hour DSBM slot:
 
 ```bash
 python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \

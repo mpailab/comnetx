@@ -1,11 +1,18 @@
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
 
 import numpy as np
 import pytest
 
 from scripts.paper.ieee_access_repaired_comnetx_72h import run_queue
+from scripts.paper.ieee_access_ldleiden_72h import run_protocol as ld_run_protocol
 from scripts.paper.ieee_access_repaired_comnetx_72h.protocol import (
     CORE_DATASETS,
+    SOURCE_FILES,
     ValidationError,
     flatten_launcher_payload,
     load_protocol,
@@ -19,9 +26,11 @@ from scripts.paper.ieee_access_repaired_comnetx_72h.input_manifest import (
 )
 from scripts.paper.ieee_access_repaired_comnetx_72h.run_queue import (
     build_stage_commands,
+    recover_interrupted_stage,
 )
 from scripts.paper.ieee_access_repaired_comnetx_72h.validate_campaign import (
     audit_summary,
+    completed_repeatability_names,
 )
 
 
@@ -47,10 +56,235 @@ def test_protocol_prioritizes_core_and_preserves_dsbm_budget():
     assert stages["stage5_topology_controls"]["minimum_hours_remaining"] == 38
     assert stages["stage6_dsbm"]["minimum_hours_remaining"] == 30
     assert stages["stage6_dsbm"]["estimated_gpu_hours"] == 26.95
+    assert protocol["common"]["dsbm_operational_handoff_hours"] == 32
+    assert protocol["common"]["repeatability_pre_handoff_start_hours"] == 33
     assert "stage6_dsbm" in stages["stage7_dfleiden_interface"]["dependencies"]
     assert "stage7_dfleiden_interface" in stages[
         "stage7_s2cag_interface"
     ]["dependencies"]
+    assert any(path.name == "process_control.py" for path in SOURCE_FILES)
+    repaired_control = Path(run_queue.__file__).with_name("process_control.py")
+    ld_control = Path(ld_run_protocol.__file__).with_name("process_control.py")
+    assert repaired_control.read_bytes() == ld_control.read_bytes()
+
+
+def test_measurement_process_records_campaign_deadline_termination(tmp_path):
+    return_code, deadline_reached = run_queue.run_process(
+        [sys.executable, "-c", "import time; time.sleep(5)"],
+        os.environ.copy(),
+        tmp_path / "deadline.log",
+        deadline=time.monotonic() + 0.05,
+    )
+
+    assert return_code != 0
+    assert deadline_reached is True
+
+
+def test_zero_exit_from_deadline_signal_is_still_a_boundary(tmp_path):
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import signal, sys, time; "
+            "signal.signal(signal.SIGTERM, lambda *_: sys.exit(0)); "
+            "time.sleep(5)"
+        ),
+    ]
+    return_code, deadline_reached = run_queue.run_process(
+        command,
+        os.environ.copy(),
+        tmp_path / "handled-term.log",
+        deadline=time.monotonic() + 0.05,
+    )
+
+    assert return_code == 0
+    assert deadline_reached is True
+
+
+def test_natural_parent_failure_is_not_reclassified_as_deadline(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(run_queue, "DEADLINE_KILL_GRACE_SECONDS", 0.05)
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import subprocess, sys; "
+            "subprocess.Popen([sys.executable, '-c', "
+            "'import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+            "time.sleep(5)']); "
+            "raise SystemExit(7)"
+        ),
+    ]
+    return_code, deadline_reached = run_queue.run_process(
+        command,
+        os.environ.copy(),
+        tmp_path / "natural-failure.log",
+        deadline=time.monotonic() + 0.05,
+    )
+
+    assert return_code == 7
+    assert deadline_reached is False
+
+
+@pytest.mark.parametrize("runner", ("repaired", "ld"))
+def test_deadline_kills_descendant_with_closed_standard_streams(
+    tmp_path, monkeypatch, runner
+):
+    module = run_queue if runner == "repaired" else ld_run_protocol
+    monkeypatch.setattr(module, "DEADLINE_KILL_GRACE_SECONDS", 0.05)
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import subprocess, sys, time; "
+            "child = subprocess.Popen([sys.executable, '-c', "
+            "'import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+            "time.sleep(5)'], stdout=subprocess.DEVNULL, "
+            "stderr=subprocess.DEVNULL); "
+            "print(child.pid, flush=True); time.sleep(5)"
+        ),
+    ]
+    log_path = tmp_path / f"{runner}-descendant.log"
+    if runner == "repaired":
+        return_code, deadline_reached = module.run_process(
+            command,
+            os.environ.copy(),
+            log_path,
+            deadline=time.monotonic() + 0.05,
+        )
+    else:
+        return_code, deadline_reached = module.stream_process(
+            command,
+            os.environ.copy(),
+            log_path,
+            deadline=time.monotonic() + 0.05,
+        )
+
+    assert return_code != 0
+    assert deadline_reached is True
+    descendant_pid = int(log_path.read_text(encoding="utf-8").strip())
+    for _ in range(100):
+        try:
+            os.kill(descendant_pid, 0)
+        except ProcessLookupError:
+            break
+        stat_path = Path(f"/proc/{descendant_pid}/stat")
+        if stat_path.is_file() and stat_path.read_text().split()[2] == "Z":
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail(f"descendant {descendant_pid} survived the deadline cleanup")
+
+
+def test_repeatability_validation_keeps_a_completed_run_after_boundary_stop(
+    tmp_path,
+):
+    stage = tmp_path / "stages" / "stage4_long_repeatability"
+    completed = stage / "smart_long_repeat_01" / "attempt-01"
+    stopped = stage / "smart_long_repeat_02" / "attempt-01"
+    completed.mkdir(parents=True)
+    stopped.mkdir(parents=True)
+    (completed / "metadata.json").write_text(
+        json.dumps({"status": "completed"}), encoding="utf-8"
+    )
+    stopped_metadata = {
+        "status": "failed",
+        "failure_kind": "campaign_time_boundary",
+    }
+    (stopped / "metadata.json").write_text(
+        json.dumps(stopped_metadata), encoding="utf-8"
+    )
+
+    assert completed_repeatability_names(tmp_path) == ["smart_long_repeat_01"]
+
+    stopped_metadata["failure_kind"] = "runtime_failure"
+    (stopped / "metadata.json").write_text(
+        json.dumps(stopped_metadata), encoding="utf-8"
+    )
+    with pytest.raises(ValidationError, match="not an audited stop"):
+        completed_repeatability_names(tmp_path)
+
+    stopped_metadata["failure_kind"] = "launcher_interrupted"
+    (stopped / "metadata.json").write_text(
+        json.dumps(stopped_metadata), encoding="utf-8"
+    )
+    assert completed_repeatability_names(tmp_path) == ["smart_long_repeat_01"]
+
+
+def test_stale_running_stage_is_recovered_only_after_group_is_absent(tmp_path):
+    stage_id = "stage4_long_repeatability"
+    manifest = {"stage_status": {stage_id: "running"}}
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    attempt = tmp_path / "stages" / stage_id / "repeat" / "attempt-01"
+    attempt.mkdir(parents=True)
+    metadata_path = attempt / "metadata.json"
+    metadata_path.write_text(
+        json.dumps({"status": "running", "process_group_id": 2_000_000_000}),
+        encoding="utf-8",
+    )
+
+    assert recover_interrupted_stage(tmp_path, manifest, stage_id) == 1
+    recovered = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert recovered["failure_kind"] == "launcher_interrupted"
+    assert manifest["stage_status"][stage_id] == "failed"
+
+    manifest["stage_status"][stage_id] = "running"
+    recovered["status"] = "running"
+    recovered["process_group_id"] = os.getpgrp()
+    metadata_path.write_text(json.dumps(recovered), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="still present"):
+        recover_interrupted_stage(tmp_path, manifest, stage_id)
+
+
+def test_ld_stale_running_phase_is_recovered_after_group_is_absent(tmp_path):
+    phase_id = "smoke_999_10"
+    manifest = {"phase_status": {phase_id: "running"}}
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    attempt = tmp_path / phase_id / "repeat-01" / "attempt-01"
+    attempt.mkdir(parents=True)
+    metadata_path = attempt / "metadata.json"
+    metadata_path.write_text(
+        json.dumps({"status": "running", "process_group_id": 2_000_000_000}),
+        encoding="utf-8",
+    )
+
+    assert ld_run_protocol.recover_interrupted_phase(
+        tmp_path, manifest, phase_id
+    ) == 1
+    recovered = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert recovered["failure_kind"] == "launcher_interrupted"
+    assert manifest["phase_status"][phase_id] == "failed"
+
+
+@pytest.mark.parametrize("runner", ("repaired", "ld"))
+def test_stale_recovery_rejects_unaudited_runtime_failure(tmp_path, runner):
+    if runner == "repaired":
+        item_id = "stage5_topology_controls"
+        manifest = {"stage_status": {item_id: "running"}}
+        attempt = tmp_path / "stages" / item_id / "command" / "attempt-01"
+        recover = recover_interrupted_stage
+    else:
+        item_id = "measured_999_10"
+        manifest = {"phase_status": {item_id: "running"}}
+        attempt = tmp_path / item_id / "repeat-01" / "attempt-01"
+        recover = ld_run_protocol.recover_interrupted_phase
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    attempt.mkdir(parents=True)
+    (attempt / "metadata.json").write_text(
+        json.dumps({"status": "failed", "return_code": 1}), encoding="utf-8"
+    )
+
+    with pytest.raises(RuntimeError, match="unaudited failure"):
+        recover(tmp_path, manifest, item_id)
+    status_map = manifest["stage_status" if runner == "repaired" else "phase_status"]
+    assert status_map[item_id] == "running"
 
 
 def test_queue_builds_registered_repetition_counts_and_smart_only_dsbm(tmp_path):

@@ -1201,10 +1201,47 @@ def command_names(campaign_dir: Path, stage_id: str, prefix: str) -> list[str]:
     return sorted(path.name for path in root.glob(f"{prefix}*") if path.is_dir())
 
 
-def validate_stage4_repeats(campaign_dir: Path) -> dict[str, Any]:
-    names = command_names(campaign_dir, "stage4_long_repeatability", "smart_long_repeat_")
+def completed_repeatability_names(campaign_dir: Path) -> list[str]:
+    """Return completed repeats while admitting only audited boundary remnants."""
+
+    stage_id = "stage4_long_repeatability"
+    names = command_names(campaign_dir, stage_id, "smart_long_repeat_")
     if not 1 <= len(names) <= 2:
-        raise ValidationError("long repeatability must contain one or two runs")
+        raise ValidationError("long repeatability must contain one or two run slots")
+    completed = []
+    for name in names:
+        metadata_paths = sorted(
+            (campaign_dir / "stages" / stage_id / name).glob(
+                "attempt-*/metadata.json"
+            )
+        )
+        if not metadata_paths:
+            raise ValidationError(f"{stage_id}/{name}: attempt metadata is missing")
+        payloads = [read_json(path) for path in metadata_paths]
+        completed_count = sum(
+            payload.get("status") == "completed" for payload in payloads
+        )
+        if completed_count > 1:
+            raise ValidationError(f"{stage_id}/{name}: multiple completed attempts")
+        if completed_count == 1:
+            completed.append(name)
+            continue
+        if any(
+            payload.get("status") != "failed"
+            or payload.get("failure_kind")
+            not in {"campaign_time_boundary", "launcher_interrupted"}
+            for payload in payloads
+        ):
+            raise ValidationError(
+                f"{stage_id}/{name}: incomplete run was not an audited stop"
+            )
+    if not completed:
+        raise ValidationError("long repeatability has no completed run")
+    return completed
+
+
+def validate_stage4_repeats(campaign_dir: Path) -> dict[str, Any]:
+    names = completed_repeatability_names(campaign_dir)
     rows = {dataset: [] for dataset in CORE_DATASETS}
     for name in names:
         attempt = completed_attempt(campaign_dir, "stage4_long_repeatability", name)
@@ -1578,6 +1615,28 @@ def validate_campaign(campaign_dir: Path) -> dict[str, Any]:
     ):
         raise ValidationError("real-input manifest is missing or changed")
     validate_input_manifest(read_json(real_path), verify_content=True)
+    budget_path = campaign_dir / "launch_budget.json"
+    if not budget_path.is_file():
+        raise ValidationError("campaign launch budget is missing")
+    launch_budget = read_json(budget_path)
+    if launch_budget.get("schema") != "comnetx-ieee-access-launch-budget-v1":
+        raise ValidationError("unexpected campaign launch-budget schema")
+    if launch_budget.get("git_sha") != manifest.get("git", {}).get("commit"):
+        raise ValidationError("campaign launch budget uses another git commit")
+    if launch_budget.get("repaired_campaign_id") != manifest.get("campaign_id"):
+        raise ValidationError("campaign launch budget uses another campaign id")
+    budget_hours = launch_budget.get("budget_hours")
+    started_epoch = launch_budget.get("started_at_epoch")
+    deadline_epoch = launch_budget.get("deadline_epoch")
+    if (
+        isinstance(budget_hours, bool)
+        or not isinstance(budget_hours, (int, float))
+        or not 0 < float(budget_hours) <= 72
+        or not isinstance(started_epoch, int)
+        or not isinstance(deadline_epoch, int)
+        or deadline_epoch != started_epoch + int(round(float(budget_hours) * 3600))
+    ):
+        raise ValidationError("campaign launch budget is malformed")
     dsbm_registration = manifest.get("dsbm_input_manifest")
     if dsbm_registration is not None:
         dsbm_path = campaign_dir / dsbm_registration.get("filename", "")
@@ -1594,6 +1653,7 @@ def validate_campaign(campaign_dir: Path) -> dict[str, Any]:
         "historical_smart_l_ge_2_status": "provisional",
         "measurement_source_sha256": recorded.get("source_sha256"),
         "measurement_source_matches_current": True,
+        "launch_budget": launch_budget,
         "preflight_environment": validate_preflight(campaign_dir),
         "stages": {},
     }
@@ -1618,6 +1678,11 @@ def validate_campaign(campaign_dir: Path) -> dict[str, Any]:
             report["stages"][stage["id"]]["budget_skip"] = manifest.get(
                 "budget_skips", {}
             ).get(stage["id"])
+            boundary_stop = manifest.get("time_boundary_stops", {}).get(stage["id"])
+            if boundary_stop is not None:
+                report["stages"][stage["id"]][
+                    "time_boundary_stop"
+                ] = boundary_stop
         elif status == "skipped_by_stage2_no_go":
             if stage["required"]:
                 raise ValidationError("required stage was marked skipped")

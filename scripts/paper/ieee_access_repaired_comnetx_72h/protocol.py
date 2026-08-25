@@ -69,6 +69,7 @@ SOURCE_FILES = tuple(sorted({
     PROJECT_ROOT / "scripts" / "paper" / "compute_leiden_cut_metrics.py",
     PACKAGE_DIR / "check_measurement_environment.py",
     PACKAGE_DIR / "input_manifest.py",
+    PACKAGE_DIR / "process_control.py",
     PACKAGE_DIR / "protocol.py",
     PACKAGE_DIR / "run_queue.py",
     PACKAGE_DIR / "validate_campaign.py",
@@ -172,6 +173,29 @@ def validate_protocol_definition(protocol: dict[str, Any]) -> None:
         raise ValidationError("the registered DSBM cost estimate changed")
     if dsbm.get("minimum_hours_remaining", 0) < 30:
         raise ValidationError("DSBM queue must retain at least a 30-hour start gate")
+    handoff = protocol.get("common", {}).get("dsbm_operational_handoff_hours")
+    stage5_start = by_id["stage5_topology_controls"].get(
+        "minimum_hours_remaining", 0
+    )
+    if not isinstance(handoff, (int, float)) or not 30 < float(handoff) < float(
+        stage5_start
+    ):
+        raise ValidationError(
+            "DSBM operational handoff must lie strictly between its 30-hour "
+            "start gate and the Stage-5 start gate"
+        )
+    repeat_start = protocol.get("common", {}).get(
+        "repeatability_pre_handoff_start_hours"
+    )
+    repeat_stage = by_id["stage4_long_repeatability"]
+    if (
+        not isinstance(repeat_start, (int, float))
+        or not float(handoff) < float(repeat_start) < 40
+        or repeat_stage.get("minimum_evidence_repetitions") != 1
+        or repeat_stage.get("second_repeat_launch_gate_hours") != 40
+        or repeat_stage.get("maximum_repetitions") != 2
+    ):
+        raise ValidationError("long-repeatability launch policy changed")
 
 
 def validate_launcher_config(path: Path, config: dict[str, Any]) -> None:

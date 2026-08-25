@@ -13,7 +13,6 @@ import platform
 import re
 import subprocess
 import sys
-import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -24,6 +23,11 @@ try:
     from .input_manifest import (
         build_dsbm_input_manifest,
         validate_input_manifest,
+    )
+    from .process_control import (
+        LauncherSignalInterrupt,
+        install_termination_signal_handlers,
+        run_streaming_process,
     )
     from .protocol import (
         ALL_DATASETS,
@@ -45,6 +49,11 @@ try:
     from .validate_campaign import validate_stage
 except ImportError:  # Direct script execution.
     from input_manifest import build_dsbm_input_manifest, validate_input_manifest
+    from process_control import (
+        LauncherSignalInterrupt,
+        install_termination_signal_handlers,
+        run_streaming_process,
+    )
     from protocol import (
         ALL_DATASETS,
         CORE_DATASETS,
@@ -66,6 +75,11 @@ except ImportError:  # Direct script execution.
 
 
 CAMPAIGN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+DEADLINE_KILL_GRACE_SECONDS = 60.0
+
+
+class CampaignTimeBoundary(RuntimeError):
+    """Raised when a registered campaign-time boundary stops a command."""
 
 
 @dataclass(frozen=True)
@@ -534,6 +548,76 @@ def next_attempt_dir(command_dir: Path) -> Path:
     return command_dir / f"attempt-{max(indices, default=0) + 1:02d}"
 
 
+def recover_interrupted_stage(
+    campaign_dir: Path,
+    manifest: dict[str, Any],
+    stage_id: str,
+) -> int:
+    """Recover a stale running marker only after every recorded group is gone."""
+
+    if manifest.get("stage_status", {}).get(stage_id) != "running":
+        return 0
+    recovered = 0
+    stage_dir = campaign_dir / "stages" / stage_id
+    for command_dir in sorted(path for path in stage_dir.glob("*") if path.is_dir()):
+        records = []
+        for metadata_path in sorted(command_dir.glob("attempt-*/metadata.json")):
+            metadata = read_json(metadata_path)
+            if metadata.get("status") == "running":
+                process_group = metadata.get("process_group_id")
+                if not isinstance(process_group, int) or process_group <= 0:
+                    raise RuntimeError(
+                        f"cannot prove interrupted process cleanup for {metadata_path}"
+                    )
+                try:
+                    os.killpg(process_group, 0)
+                except ProcessLookupError:
+                    pass
+                except PermissionError as exc:
+                    raise RuntimeError(
+                        f"recorded process group is still present: {process_group}"
+                    ) from exc
+                else:
+                    raise RuntimeError(
+                        f"recorded process group is still present: {process_group}"
+                    )
+                metadata.update(
+                    {
+                        "status": "failed",
+                        "failure_kind": "launcher_interrupted",
+                        "recovered_at_utc": utc_now(),
+                    }
+                )
+                write_json(metadata_path, metadata)
+                recovered += 1
+            records.append((metadata_path, metadata))
+        has_completed = any(
+            metadata.get("status") == "completed" for _, metadata in records
+        )
+        for metadata_path, metadata in records:
+            status = metadata.get("status")
+            if status == "completed":
+                continue
+            if status == "failed" and (
+                has_completed
+                or metadata.get("failure_kind")
+                in {"campaign_time_boundary", "launcher_interrupted"}
+            ):
+                continue
+            raise RuntimeError(
+                f"stale stage contains an unaudited failure: {metadata_path}"
+            )
+    manifest["stage_status"][stage_id] = "failed"
+    manifest.setdefault("interrupted_stages", {})[stage_id] = {
+        "recorded_at_utc": utc_now(),
+        "reason": "recovered stale running state after process-group absence check",
+        "recovered_attempts": recovered,
+    }
+    manifest["updated_at_utc"] = utc_now()
+    write_json(campaign_dir / "manifest.json", manifest)
+    return recovered
+
+
 def materialize_command(spec: CommandSpec, attempt_dir: Path) -> list[str]:
     return [part.replace("{attempt_dir}", str(attempt_dir)) for part in spec.command]
 
@@ -544,37 +628,17 @@ def run_process(
     log_path: Path,
     *,
     deadline: float | None = None,
-) -> int:
-    with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=PROJECT_ROOT,
-            env=environment,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-        timer = None
-        if deadline is not None:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                process.terminate()
-            else:
-                timer = threading.Timer(remaining, process.terminate)
-                timer.daemon = True
-                timer.start()
-        assert process.stdout is not None
-        try:
-            for line in process.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                log.write(line)
-                log.flush()
-            return process.wait()
-        finally:
-            if timer is not None:
-                timer.cancel()
+    on_start: Any = None,
+) -> tuple[int, bool]:
+    return run_streaming_process(
+        command,
+        environment,
+        log_path,
+        cwd=PROJECT_ROOT,
+        deadline=deadline,
+        deadline_kill_grace_seconds=DEADLINE_KILL_GRACE_SECONDS,
+        on_start=on_start,
+    )
 
 
 def run_command(
@@ -583,13 +647,14 @@ def run_command(
     spec: CommandSpec,
     *,
     deadline: float | None = None,
+    stop_boundary_hours_left: float | None = None,
 ) -> None:
     command_dir = campaign_dir / "stages" / stage_id / spec.name
     if completed_attempt(command_dir) is not None:
         print(f"Skipping completed command: {stage_id}/{spec.name}")
         return
     if deadline is not None and time.monotonic() >= deadline:
-        raise RuntimeError(
+        raise CampaignTimeBoundary(
             f"{stage_id}: registered reserve reached before {spec.name}"
         )
     campaign_manifest = read_json(campaign_dir / "manifest.json")
@@ -630,21 +695,46 @@ def run_command(
         "fingerprint_before": fingerprint_before,
         "runtime_identity_before": runtime_identity_before,
     }
+    if stop_boundary_hours_left is not None:
+        metadata["stop_boundary_hours_left"] = stop_boundary_hours_left
     metadata_path = attempt_dir / "metadata.json"
     write_json(metadata_path, metadata)
     started = time.perf_counter()
-    return_code = run_process(
-        command,
-        env,
-        attempt_dir / "stdout.log",
-        deadline=deadline,
-    )
+    def record_process(process_id: int) -> None:
+        metadata["process_id"] = process_id
+        metadata["process_group_id"] = process_id
+        write_json(metadata_path, metadata)
+
+    try:
+        return_code, deadline_reached = run_process(
+            command,
+            env,
+            attempt_dir / "stdout.log",
+            deadline=deadline,
+            on_start=record_process,
+        )
+    except BaseException as exc:
+        metadata.update(
+            {
+                "status": "failed",
+                "failure_kind": "launcher_interrupted",
+                "finished_at_utc": utc_now(),
+                "wall_seconds": time.perf_counter() - started,
+                "process_error": f"{type(exc).__name__}: {exc}",
+            }
+        )
+        log_path = attempt_dir / "stdout.log"
+        if log_path.is_file():
+            metadata["stdout_sha256"] = sha256_file(log_path)
+        write_json(metadata_path, metadata)
+        raise
     stdout_hash = sha256_file(attempt_dir / "stdout.log")
     metadata.update(
         {
             "finished_at_utc": utc_now(),
             "wall_seconds": time.perf_counter() - started,
             "return_code": return_code,
+            "deadline_reached": deadline_reached,
             "stdout_sha256": stdout_hash,
         }
     )
@@ -674,6 +764,14 @@ def run_command(
         raise RuntimeError(
             f"{stage_id}/{spec.name}: hardware/software identity changed "
             "during execution"
+        )
+    if deadline_reached:
+        metadata["status"] = "failed"
+        metadata["failure_kind"] = "campaign_time_boundary"
+        write_json(metadata_path, metadata)
+        raise CampaignTimeBoundary(
+            f"{stage_id}/{spec.name} stopped at the registered campaign-time "
+            f"boundary; see {attempt_dir / 'stdout.log'}"
         )
     if return_code != 0:
         metadata["status"] = "failed"
@@ -815,6 +913,7 @@ def dependency_is_resolved(
 
 
 def main() -> None:
+    install_termination_signal_handlers()
     protocol = load_protocol()
     stages = stage_map(protocol)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -823,7 +922,25 @@ def main() -> None:
     parser.add_argument("--output-root", type=Path, default=RESULTS_ROOT)
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--stage", choices=tuple(stages))
+    action.add_argument("--recover-interrupted-stage", choices=tuple(stages))
     parser.add_argument("--hours-left", type=float)
+    parser.add_argument(
+        "--deadline-epoch",
+        type=float,
+        help=(
+            "Absolute shared campaign deadline. When present it supersedes the "
+            "rounded --hours-left snapshot for all gates and hard stops."
+        ),
+    )
+    parser.add_argument(
+        "--stop-with-hours-left",
+        type=float,
+        default=0.0,
+        help=(
+            "Terminate the current measurement command at this campaign-time "
+            "boundary. Stage 5 always uses at least the registered DSBM handoff."
+        ),
+    )
     parser.add_argument("--repetitions", type=int)
     parser.add_argument("--dsbm-root", type=Path)
     action.add_argument("--preflight", action="store_true")
@@ -893,10 +1010,42 @@ def main() -> None:
         print("Preflight validated; no graph measurements were run.")
         return
 
-    if (args.skip_for_budget or args.skip_for_stage2_no_go) and not (
+    if (
+        args.skip_for_budget
+        or args.skip_for_stage2_no_go
+        or args.recover_interrupted_stage
+    ) and not (
         campaign_dir / "preflight" / "validation.json"
     ).is_file():
         parser.error("run --preflight successfully before recording a stage skip")
+
+    target_stage = (
+        args.stage
+        or args.skip_for_budget
+        or args.skip_for_stage2_no_go
+        or args.recover_interrupted_stage
+    )
+    recovered = 0
+    if (
+        target_stage is not None
+        and manifest.get("stage_status", {}).get(target_stage) == "running"
+    ):
+        recovered = recover_interrupted_stage(campaign_dir, manifest, target_stage)
+        print(f"Recovered stale running stage {target_stage}: {recovered} attempt(s)")
+
+    if args.deadline_epoch is not None:
+        if not math.isfinite(args.deadline_epoch):
+            parser.error("--deadline-epoch must be finite")
+        args.hours_left = max(0.0, (args.deadline_epoch - time.time()) / 3600.0)
+
+    if args.recover_interrupted_stage:
+        if manifest.get("stage_status", {}).get(args.recover_interrupted_stage) == "running":
+            parser.error("running stage could not be recovered")
+        print(
+            f"Interrupted-stage recovery complete: {args.recover_interrupted_stage} "
+            f"({recovered} attempt(s))"
+        )
+        return
 
     if args.skip_for_budget:
         stage = stages[args.skip_for_budget]
@@ -970,10 +1119,13 @@ def main() -> None:
             )
     if args.hours_left is None or not math.isfinite(args.hours_left):
         parser.error("--hours-left is required to enforce the 72-hour stop rules")
-    if args.hours_left < float(stage["minimum_hours_remaining"]):
-        parser.error(
-            f"{stage['id']} requires at least {stage['minimum_hours_remaining']}h remaining; "
-            "do not consume the reserve"
+    if not math.isfinite(args.stop_with_hours_left) or args.stop_with_hours_left < 0:
+        parser.error("--stop-with-hours-left must be a finite non-negative number")
+    stop_boundary = float(args.stop_with_hours_left)
+    if stage["id"] == "stage5_topology_controls":
+        stop_boundary = max(
+            stop_boundary,
+            float(protocol["common"]["dsbm_operational_handoff_hours"]),
         )
     dsbm_root = resolve_project_path(args.dsbm_root) if args.dsbm_root else None
     if dsbm_root is not None and not dsbm_root.exists():
@@ -987,8 +1139,28 @@ def main() -> None:
         dsbm_root=dsbm_root,
         repetitions=args.repetitions,
     )
+    all_requested_commands_completed = all(
+        completed_attempt(
+            campaign_dir / "stages" / stage["id"] / spec.name
+        )
+        is not None
+        for spec in commands
+    )
+    if (
+        args.hours_left < float(stage["minimum_hours_remaining"])
+        and not all_requested_commands_completed
+    ):
+        parser.error(
+            f"{stage['id']} requires at least {stage['minimum_hours_remaining']}h remaining; "
+            "do not consume the reserve"
+        )
+    if stop_boundary >= args.hours_left and not all_requested_commands_completed:
+        parser.error(
+            "the command stop boundary must be below the current hours remaining"
+        )
     if args.dry_run:
         print(f"Stage: {stage['id']}")
+        print(f"Stop boundary: {stop_boundary:g} hours left")
         for spec in commands:
             print(spec.name + ":")
             print("  " + " ".join(materialize_command(spec, Path("ATTEMPT_DIR"))))
@@ -998,21 +1170,66 @@ def main() -> None:
         assert dsbm_root is not None
         seal_dsbm_inputs(campaign_dir, manifest, dsbm_root)
 
+    if args.deadline_epoch is not None:
+        args.hours_left = max(0.0, (args.deadline_epoch - time.time()) / 3600.0)
+        if (
+            args.hours_left < float(stage["minimum_hours_remaining"])
+            and not all_requested_commands_completed
+        ):
+            parser.error(
+                f"{stage['id']} fell below its "
+                f"{stage['minimum_hours_remaining']}h start gate during preconditions; "
+                "re-run the launcher to record the registered budget outcome"
+            )
+        if stop_boundary >= args.hours_left and not all_requested_commands_completed:
+            parser.error(
+                "the command stop boundary was reached during preconditions; "
+                "re-run the launcher"
+            )
+
     manifest["stage_status"][stage["id"]] = "running"
+    manifest.setdefault("time_boundary_stops", {}).pop(stage["id"], None)
+    manifest.setdefault("interrupted_stages", {}).pop(stage["id"], None)
     manifest["updated_at_utc"] = utc_now()
     write_json(manifest_path, manifest)
-    reserve_deadline = None
-    if stage["id"] == "stage5_topology_controls":
-        reserve_deadline = time.monotonic() + (args.hours_left - 30.0) * 3600.0
+    if args.deadline_epoch is None:
+        command_deadline = time.monotonic() + (
+            args.hours_left - stop_boundary
+        ) * 3600.0
+    else:
+        command_deadline = time.monotonic() + (
+            args.deadline_epoch - time.time() - stop_boundary * 3600.0
+        )
     try:
         for spec in commands:
             run_command(
                 campaign_dir,
                 stage["id"],
                 spec,
-                deadline=reserve_deadline,
+                deadline=command_deadline,
+                stop_boundary_hours_left=stop_boundary,
             )
         validation = validate_stage(campaign_dir, stage["id"])
+    except CampaignTimeBoundary as exc:
+        manifest["stage_status"][stage["id"]] = "failed"
+        manifest.setdefault("time_boundary_stops", {})[stage["id"]] = {
+            "recorded_at_utc": utc_now(),
+            "hours_left_at_launch": args.hours_left,
+            "stop_boundary_hours_left": stop_boundary,
+            "reason": str(exc),
+        }
+        manifest["updated_at_utc"] = utc_now()
+        write_json(manifest_path, manifest)
+        raise
+    except (KeyboardInterrupt, LauncherSignalInterrupt) as exc:
+        manifest["stage_status"][stage["id"]] = "failed"
+        manifest.setdefault("interrupted_stages", {})[stage["id"]] = {
+            "recorded_at_utc": utc_now(),
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+        manifest["updated_at_utc"] = utc_now()
+        write_json(manifest_path, manifest)
+        raise
     except Exception:
         manifest["stage_status"][stage["id"]] = "failed"
         manifest["updated_at_utc"] = utc_now()
