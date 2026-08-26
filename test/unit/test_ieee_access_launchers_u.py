@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import pytest
 
-from scripts.paper.ieee_access_72h_launch import sync_bootstrap
+from scripts.paper.ieee_access_72h_launch import launch_budget, sync_bootstrap
 from scripts.paper.ieee_access_72h_launch.sync_bootstrap import synchronize
 from scripts.paper.ieee_access_72h_launch.validate_campaign_pair import (
     assert_clock_creation_safe,
@@ -65,7 +65,8 @@ def test_exactly_eight_ordered_container_launchers_are_shell_valid():
 
 @pytest.mark.short
 def test_launchers_cover_the_registered_stage_and_phase_maps():
-    repaired_ids = {stage["id"] for stage in load_repaired_protocol()["stages"]}
+    repaired_protocol = load_repaired_protocol()
+    repaired_ids = {stage["id"] for stage in repaired_protocol["stages"]}
     assert repaired_ids == {
         "stage1_correctness_smoke",
         "stage2_core_short",
@@ -80,6 +81,22 @@ def test_launchers_cover_the_registered_stage_and_phase_maps():
     assert {
         phase["cli_name"] for phase in load_ld_protocol()["phases"]
     } == {"smoke", "short", "long"}
+    assert [
+        stage["id"]
+        for stage in sorted(
+            repaired_protocol["stages"], key=lambda item: item["priority"]
+        )
+    ] == [
+        "stage1_correctness_smoke",
+        "stage2_core_short",
+        "stage3_mechanism",
+        "stage4_long_core",
+        "stage6_dsbm",
+        "stage7_dfleiden_interface",
+        "stage7_s2cag_interface",
+        "stage4_long_repeatability",
+        "stage5_topology_controls",
+    ]
 
     texts = {
         name: (LAUNCH_DIR / name).read_text(encoding="utf-8")
@@ -94,29 +111,52 @@ def test_launchers_cover_the_registered_stage_and_phase_maps():
     assert "run_repaired_stage stage3_mechanism" in texts["04_mechanism.sh"]
     assert "run_repaired_stage stage4_long_core" in texts["05_long_core.sh"]
     assert "run_ld_phase long" in texts["05_long_core.sh"]
+    assert 'df_stage="stage7_dfleiden_interface"' in texts[
+        "06_repeatability_and_controls.sh"
+    ]
+    assert 's2cag_stage="stage7_s2cag_interface"' in texts[
+        "06_repeatability_and_controls.sh"
+    ]
     assert 'repeat_stage="stage4_long_repeatability"' in texts[
         "06_repeatability_and_controls.sh"
     ]
-    assert 'control_stage="stage5_topology_controls"' in texts[
-        "06_repeatability_and_controls.sh"
-    ]
     assert 'stage="stage6_dsbm"' in texts["07_dsbm.sh"]
-    assert 'df_stage="stage7_dfleiden_interface"' in texts[
-        "08_interfaces_and_final_validation.sh"
-    ]
-    assert 's2cag_stage="stage7_s2cag_interface"' in texts[
-        "08_interfaces_and_final_validation.sh"
-    ]
+    assert 'control_stage="stage5_topology_controls"' in texts["07_dsbm.sh"]
     assert "--dsbm-root" in texts["07_dsbm.sh"]
-    assert "--repetitions 2 --stop-with-hours-left 32" in texts[
+    assert 'seed_order = (42, 43, 44, 45, 46)' in texts["07_dsbm.sh"]
+    assert "dsbm_protected_reserve_hours" in texts[
         "06_repeatability_and_controls.sh"
     ]
-    assert "--repetitions 1" in texts["08_interfaces_and_final_validation.sh"]
+    assert '--stop-with-hours-left "$dsbm_reserve"' in texts[
+        "06_repeatability_and_controls.sh"
+    ]
+    assert "end-of-window reproducibility checkpoint" in texts[
+        "08_interfaces_and_final_validation.sh"
+    ]
+    assert "run_repaired_stage" not in texts["08_interfaces_and_final_validation.sh"]
     assert "if [[ -f \"$BUDGET_STATE_FILE\" ]]" in texts["01_preflight.sh"]
+    assert "extend_budget_clock" in texts["01_preflight.sh"]
+
+    interface_text = texts["06_repeatability_and_controls.sh"]
+    assert interface_text.index('df_stage="stage7_dfleiden_interface"') < (
+        interface_text.index('s2cag_stage="stage7_s2cag_interface"')
+    ) < interface_text.index('repeat_stage="stage4_long_repeatability"')
+    dsbm_text = texts["07_dsbm.sh"]
+    assert dsbm_text.index('stage="stage6_dsbm"') < dsbm_text.index(
+        'control_stage="stage5_topology_controls"'
+    )
+    for filename in (
+        "06_repeatability_and_controls.sh",
+        "07_dsbm.sh",
+        "08_interfaces_and_final_validation.sh",
+    ):
+        assert "record_budget_skip" not in texts[filename]
 
     common_text = COMMON.read_text(encoding="utf-8")
     assert "budget_deadline_epoch" in common_text
     assert "--deadline-epoch \"$deadline_epoch\"" in common_text
+    assert "CAMPAIGN_BUDGET_HOURS=\"${CAMPAIGN_BUDGET_HOURS:-24}\"" in common_text
+    assert "--measurement-window-id \"$measurement_window_id\"" in common_text
 
     listed = subprocess.run(
         [
@@ -170,42 +210,80 @@ def _policy_run(
     decision: str = "go",
     resolved: tuple[str, ...] = (),
     completed_repeats: int = 0,
-    completed_repeat_error: bool = False,
+    completed_dsbm_seeds: int = 0,
+    validated_dsbm_seeds: int | None = None,
+    partial_dsbm_conditions: int = 0,
     finalizable: tuple[str, ...] = (),
-    expected_returncode: int = 0,
-    expected_stderr: str | None = None,
+    next_dsbm_seed: int | None = None,
 ) -> list[str]:
     text = (LAUNCH_DIR / filename).read_text(encoding="utf-8")
     source_pattern = re.compile(r'^source .*_common\.bash"$', re.MULTILINE)
     text, substitutions = source_pattern.subn(f'source "{COMMON}"', text, count=1)
     assert substitutions == 1
-    repeat_helper = (
-        "repeatability_completed_count() { return 1; }"
-        if completed_repeat_error
-        else f"repeatability_completed_count() {{ printf '%s\\n' '{completed_repeats}'; }}"
+    validated_dsbm_seeds = (
+        completed_dsbm_seeds
+        if validated_dsbm_seeds is None
+        else validated_dsbm_seeds
     )
     injection = f"""
+mock_hours='{hours}'
+mock_dsbm_count='{completed_dsbm_seeds}'
+mock_dsbm_partial='{partial_dsbm_conditions}'
 prepare_launcher() {{ :; }}
 require_preflight_campaigns() {{ :; }}
 require_repaired_stage_validated() {{ :; }}
 require_ld_phase_completed() {{ :; }}
 require_optional_stage_can_be_deferred() {{ :; }}
-require_all_optional_stages_resolved() {{ :; }}
-hours_left() {{ printf '%s\\n' '{hours}'; }}
+hours_left() {{ printf '%s\\n' "$mock_hours"; }}
 hours_at_least() {{ awk -v value="$1" -v threshold="$2" 'BEGIN {{ exit !(value >= threshold) }}'; }}
 stage2_breadth_decision() {{ printf '%s\\n' '{decision}'; }}
 stage_is_resolved() {{ case ':{':'.join(resolved)}:' in *:"$1":*) return 0;; *) return 1;; esac; }}
 stage_status() {{ printf '%s\\n' validated; }}
-{repeat_helper}
+repeatability_completed_count() {{ printf '%s\\n' '{completed_repeats}'; }}
+dsbm_completed_seed_count() {{ printf '%s\\n' "$mock_dsbm_count"; }}
+dsbm_validated_seed_count() {{ printf '%s\\n' '{validated_dsbm_seeds}'; }}
+dsbm_current_seed_completed_condition_count() {{ printf '%s\\n' "$mock_dsbm_partial"; }}
+dsbm_protected_reserve_hours() {{
+  awk -v available="$1" -v completed="$mock_dsbm_count" -v partial="$mock_dsbm_partial" '
+    BEGIN {{
+      missing = 3 - completed
+      reserve = 0
+      for (i = 0; i < missing; i++) {{
+        cost = (i == 0 && partial > 0) ? 4 : 17
+        if (reserve + cost > available) break
+        reserve += cost
+      }}
+      print reserve
+    }}'
+}}
+unfinalized_dsbm_seed() {{ :; }}
 repaired_stage_can_finalize() {{ case ':{':'.join(finalizable)}:' in *:"$1":*) return 0;; *) return 1;; esac; }}
-stage_completed_command_count() {{ case ':{':'.join(finalizable)}:' in *:"$1":*) printf '1\\n';; *) printf '0\\n';; esac; }}
-run_repaired_stage() {{ printf 'run:%s\\n' "$*"; }}
+run_repaired_stage() {{
+  printf 'run:%s\\n' "$*"
+  if [[ "$1" == stage6_dsbm ]]; then
+    if (( mock_dsbm_partial > 0 )); then
+      mock_dsbm_cost=4
+    else
+      mock_dsbm_cost=17
+    fi
+    mock_dsbm_count=$((mock_dsbm_count + 1))
+    mock_dsbm_partial=0
+    mock_hours="$(awk -v value="$mock_hours" -v cost="$mock_dsbm_cost" 'BEGIN {{ print value - cost }}')"
+  fi
+}}
 record_budget_skip() {{ printf 'budget:%s\\n' "$1"; }}
 record_stage2_no_go() {{ printf 'no-go:%s\\n' "$1"; }}
 note() {{ :; }}
 """
     source_line = f'source "{COMMON}"'
     text = text.replace(source_line, source_line + injection, 1)
+    if next_dsbm_seed is not None:
+        text = text.replace(
+            'stage="stage6_dsbm"',
+            f"next_dsbm_seed() {{ printf '%s\\n' \"$(( {next_dsbm_seed} + mock_dsbm_count ))\"; }}\n"
+            'stage="stage6_dsbm"',
+            1,
+        )
     script = tmp_path / filename
     script.write_text(text, encoding="utf-8")
     completed = subprocess.run(
@@ -220,168 +298,140 @@ note() {{ :; }}
         capture_output=True,
         text=True,
     )
-    assert completed.returncode == expected_returncode, completed.stderr
-    if expected_stderr is not None:
-        assert expected_stderr in completed.stderr
+    assert completed.returncode == 0, completed.stderr
     return [line for line in completed.stdout.splitlines() if line]
 
 
 @pytest.mark.short
-@pytest.mark.parametrize(
-    ("hours", "decision", "expected"),
-    (
-        (40, "go", ("run:stage4_long_repeatability --repetitions 2 --stop-with-hours-left 32", "run:stage5_topology_controls")),
-        (39, "go", ("run:stage4_long_repeatability --repetitions 1 --stop-with-hours-left 32", "run:stage5_topology_controls")),
-        (37, "go", ("run:stage4_long_repeatability --repetitions 1 --stop-with-hours-left 32", "budget:stage5_topology_controls")),
-        (32, "go", ("budget:stage5_topology_controls",)),
-        (29, "go", ("run:stage4_long_repeatability --repetitions 1", "budget:stage5_topology_controls")),
-        (11, "go", ("budget:stage4_long_repeatability", "budget:stage5_topology_controls")),
-        (40, "no-go", ("run:stage4_long_repeatability --repetitions 2 --stop-with-hours-left 32", "no-go:stage5_topology_controls")),
-    ),
-)
-def test_repeatability_and_control_policy_branches(
-    tmp_path, hours, decision, expected
-):
+def test_file06_runs_interfaces_before_protected_long_repeats(tmp_path):
     actions = _policy_run(
         tmp_path,
         "06_repeatability_and_controls.sh",
-        hours=hours,
-        decision=decision,
-    )
-    assert tuple(actions) == expected
-
-
-@pytest.mark.short
-def test_completed_repeat_is_finalized_before_handoff(tmp_path):
-    actions = _policy_run(
-        tmp_path,
-        "06_repeatability_and_controls.sh",
-        hours=32,
-        completed_repeats=1,
+        hours=19,
     )
     assert tuple(actions) == (
-        "run:stage4_long_repeatability --repetitions 1",
-        "budget:stage5_topology_controls",
+        "run:stage7_dfleiden_interface --stop-with-hours-left 17",
+        "run:stage7_s2cag_interface --repetitions 1 --stop-with-hours-left 17",
+        "run:stage4_long_repeatability --repetitions 2 --stop-with-hours-left 17",
     )
 
 
 @pytest.mark.short
-def test_dsbm_refuses_to_strand_completed_repeat(tmp_path):
-    _policy_run(
+def test_file06_protects_two_primary_dsbm_seed_opportunities(tmp_path):
+    actions = _policy_run(
+        tmp_path,
+        "06_repeatability_and_controls.sh",
+        hours=35,
+    )
+    assert actions == [
+        "run:stage7_dfleiden_interface --stop-with-hours-left 34"
+    ]
+
+
+@pytest.mark.short
+def test_file06_waits_for_completed_dsbm_seed_validation(tmp_path):
+    actions = _policy_run(
+        tmp_path,
+        "06_repeatability_and_controls.sh",
+        hours=20,
+        completed_dsbm_seeds=1,
+        validated_dsbm_seeds=0,
+    )
+    assert actions == []
+
+
+@pytest.mark.short
+def test_temporary_window_shortage_leaves_optional_measurements_pending(tmp_path):
+    file06_actions = _policy_run(
+        tmp_path,
+        "06_repeatability_and_controls.sh",
+        hours=0,
+    )
+    file07_actions = _policy_run(
         tmp_path,
         "07_dsbm.sh",
-        hours=30,
-        resolved=("stage5_topology_controls",),
+        hours=0,
+        next_dsbm_seed=42,
+    )
+    assert file06_actions == []
+    assert file07_actions == []
+
+
+@pytest.mark.short
+def test_completed_repeat_is_finalized_below_new_window_start_gate(tmp_path):
+    actions = _policy_run(
+        tmp_path,
+        "06_repeatability_and_controls.sh",
+        hours=0,
+        resolved=("stage7_dfleiden_interface", "stage7_s2cag_interface"),
         completed_repeats=1,
-        expected_returncode=1,
-        expected_stderr="re-run file 06 before DSBM",
     )
+    assert actions == ["run:stage4_long_repeatability --repetitions 1"]
 
 
 @pytest.mark.short
-def test_dsbm_fails_closed_when_repeat_audit_cannot_be_read(tmp_path):
+def test_file07_prioritizes_one_complete_paired_dsbm_seed_before_stage5(tmp_path):
     actions = _policy_run(
         tmp_path,
         "07_dsbm.sh",
-        hours=30,
-        resolved=("stage5_topology_controls",),
-        completed_repeat_error=True,
-        expected_returncode=1,
-    )
-    assert not any(action.startswith("run:stage6_dsbm") for action in actions)
-
-
-@pytest.mark.short
-@pytest.mark.parametrize(
-    ("filename", "hours", "decision", "resolved", "expected"),
-    (
-        (
-            "07_dsbm.sh",
-            30,
-            "go",
-            ("stage5_topology_controls",),
-            ("run:stage6_dsbm --dsbm-root",),
-        ),
-        (
-            "07_dsbm.sh",
-            29.999,
-            "go",
-            ("stage5_topology_controls",),
-            ("budget:stage6_dsbm",),
-        ),
-        (
-            "08_interfaces_and_final_validation.sh",
-            12,
-            "go",
-            ("stage5_topology_controls", "stage6_dsbm"),
-            (
-                "run:stage4_long_repeatability --repetitions 1",
-                "run:stage7_dfleiden_interface",
-                "run:stage7_s2cag_interface --repetitions 1",
-            ),
-        ),
-        (
-            "08_interfaces_and_final_validation.sh",
-            4,
-            "go",
-            ("stage5_topology_controls", "stage6_dsbm"),
-            (
-                "budget:stage4_long_repeatability",
-                "run:stage7_dfleiden_interface",
-                "budget:stage7_s2cag_interface",
-            ),
-        ),
-        (
-            "08_interfaces_and_final_validation.sh",
-            12,
-            "no-go",
-            ("stage5_topology_controls", "stage6_dsbm"),
-            (
-                "run:stage4_long_repeatability --repetitions 1",
-                "no-go:stage7_dfleiden_interface",
-                "no-go:stage7_s2cag_interface",
-            ),
-        ),
-    ),
-)
-def test_dsbm_and_final_policy_branches(
-    tmp_path, filename, hours, decision, resolved, expected
-):
-    actions = _policy_run(
-        tmp_path,
-        filename,
-        hours=hours,
-        decision=decision,
-        resolved=resolved,
+        hours=17,
+        next_dsbm_seed=42,
     )
     normalized = tuple(
-        re.sub(r" --dsbm-root .+$", " --dsbm-root", line)
+        re.sub(r" --dsbm-root .+ --dsbm-seed", " --dsbm-root --dsbm-seed", line)
         for line in actions
-        if line.startswith(("run:", "budget:", "no-go:"))
     )
-    assert normalized == expected
+    assert normalized == (
+        "run:stage6_dsbm --dsbm-root --dsbm-seed 42",
+    )
 
 
 @pytest.mark.short
-def test_completed_dsbm_is_finalized_below_its_start_gate(tmp_path):
+def test_file07_resumes_partial_paired_seed_with_four_hours(tmp_path):
     actions = _policy_run(
         tmp_path,
         "07_dsbm.sh",
-        hours=29,
-        resolved=("stage5_topology_controls",),
-        finalizable=("stage6_dsbm",),
+        hours=4,
+        partial_dsbm_conditions=5,
+        next_dsbm_seed=42,
     )
     normalized = tuple(
-        re.sub(r" --dsbm-root .+$", " --dsbm-root", line)
+        re.sub(r" --dsbm-root .+ --dsbm-seed", " --dsbm-root --dsbm-seed", line)
         for line in actions
-        if line.startswith(("run:", "budget:"))
     )
-    assert normalized == ("run:stage6_dsbm --dsbm-root",)
+    assert normalized == (
+        "run:stage6_dsbm --dsbm-root --dsbm-seed 42",
+    )
+
+
+@pytest.mark.short
+def test_stage2_no_go_skips_interfaces_but_not_repeatability(tmp_path):
+    actions = _policy_run(
+        tmp_path,
+        "06_repeatability_and_controls.sh",
+        hours=19,
+        decision="no-go",
+    )
+    assert actions == [
+        "no-go:stage7_dfleiden_interface",
+        "no-go:stage7_s2cag_interface",
+        "run:stage4_long_repeatability --repetitions 2 --stop-with-hours-left 17",
+    ]
+
+
+@pytest.mark.short
+def test_file08_is_a_checkpoint_and_does_not_launch_more_measurements(tmp_path):
+    actions = _policy_run(
+        tmp_path,
+        "08_interfaces_and_final_validation.sh",
+        hours=0,
+    )
+    assert actions == []
 
 
 @pytest.mark.short
 def test_all_registered_threshold_boundaries_are_exact_and_finite():
-    for threshold in (40, 38, 33, 32, 30, 12, 4):
+    for threshold in (19, 17, 4, 2, 1):
         for value, expected in ((threshold, True), (threshold - 0.001, False)):
             completed = subprocess.run(
                 [
@@ -417,6 +467,156 @@ def test_all_registered_threshold_boundaries_are_exact_and_finite():
         assert completed.returncode != 0
 
 
+def _budget_identity(paths_config: Path, repaired: str, ld: str) -> dict:
+    return {
+        "schema": launch_budget.SCHEMA,
+        "git_sha": "b" * 40,
+        "repaired_campaign_id": repaired,
+        "ld_campaign_id": ld,
+        "paths_config_sha256": hashlib.sha256(paths_config.read_bytes()).hexdigest(),
+        "max_total_hours": launch_budget.MAX_TOTAL_HOURS,
+        "initial_window_hours": launch_budget.INITIAL_WINDOW_HOURS,
+    }
+
+
+@pytest.mark.short
+def test_budget_initialization_is_exactly_one_immutable_24_hour_window(tmp_path):
+    paths_config = tmp_path / "paths.json"
+    paths_config.write_text("{}\n", encoding="utf-8")
+    expected = _budget_identity(paths_config, "repaired", "ld")
+    state = tmp_path / "launch_budget.json"
+
+    payload = launch_budget.initialize(state, expected, 24, now_epoch=1000)
+    assert payload["windows"] == [
+        {
+            "id": "window-001",
+            "granted_hours": 24.0,
+            "started_at_epoch": 1000,
+            "deadline_epoch": 1000 + 24 * 3600,
+        }
+    ]
+    assert launch_budget.initialize(
+        state, expected, 24, now_epoch=999_999
+    ) == payload
+
+    with pytest.raises(launch_budget.BudgetError, match="fixed at 24 hours"):
+        launch_budget.initialize(
+            tmp_path / "wrong_budget.json", expected, 23, now_epoch=1000
+        )
+
+
+@pytest.mark.short
+def test_budget_extensions_require_expiry_and_no_running_attempts_and_obey_cap(
+    tmp_path,
+):
+    paths_config = tmp_path / "paths.json"
+    paths_config.write_text("{}\n", encoding="utf-8")
+    expected = _budget_identity(paths_config, "repaired", "ld")
+    state = tmp_path / "launch_budget.json"
+    repaired = tmp_path / "repaired"
+    ld = tmp_path / "ld"
+    repaired.mkdir()
+    ld.mkdir()
+    payload = launch_budget.initialize(state, expected, 24, now_epoch=1000)
+    first_deadline = payload["windows"][0]["deadline_epoch"]
+
+    with pytest.raises(launch_budget.BudgetError, match="current window expires"):
+        launch_budget.extend(
+            state, expected, 1, (repaired, ld), now_epoch=first_deadline - 1
+        )
+
+    metadata = repaired / "stages" / "stage2" / "attempt-01" / "metadata.json"
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text(json.dumps({"status": "running"}), encoding="utf-8")
+    with pytest.raises(launch_budget.BudgetError, match="status=running"):
+        launch_budget.extend(
+            state, expected, 1, (repaired, ld), now_epoch=first_deadline
+        )
+
+    metadata.write_text(json.dumps({"status": "completed"}), encoding="utf-8")
+    payload = launch_budget.extend(
+        state, expected, 24, (repaired, ld), now_epoch=first_deadline + 10
+    )
+    second = payload["windows"][-1]
+    assert second["id"] == "window-002"
+    assert second["started_at_epoch"] == first_deadline + 10
+    payload = launch_budget.extend(
+        state,
+        expected,
+        24,
+        (repaired, ld),
+        now_epoch=second["deadline_epoch"],
+    )
+    assert [window["id"] for window in payload["windows"]] == [
+        "window-001",
+        "window-002",
+        "window-003",
+    ]
+    assert sum(window["granted_hours"] for window in payload["windows"]) == 72
+    with pytest.raises(launch_budget.BudgetError, match="72-hour cap"):
+        launch_budget.extend(
+            state,
+            expected,
+            1,
+            (repaired, ld),
+            now_epoch=payload["windows"][-1]["deadline_epoch"],
+        )
+
+
+@pytest.mark.short
+def test_budget_cli_queries_report_the_current_appended_window(tmp_path):
+    paths_config = tmp_path / "paths.json"
+    paths_config.write_text("{}\n", encoding="utf-8")
+    expected = _budget_identity(paths_config, "repaired", "ld")
+    state = tmp_path / "launch_budget.json"
+    repaired = tmp_path / "repaired"
+    ld = tmp_path / "ld"
+    repaired.mkdir()
+    ld.mkdir()
+    payload = launch_budget.initialize(state, expected, 24, now_epoch=1000)
+    payload = launch_budget.extend(
+        state,
+        expected,
+        6,
+        (repaired, ld),
+        now_epoch=payload["windows"][-1]["deadline_epoch"],
+    )
+    current = payload["windows"][-1]
+    common_args = [
+        "--state-file",
+        str(state),
+        "--git-sha",
+        "b" * 40,
+        "--repaired-campaign-id",
+        "repaired",
+        "--ld-campaign-id",
+        "ld",
+        "--paths-config",
+        str(paths_config),
+    ]
+    expectations = {
+        "window-id": "window-002",
+        "granted-hours": "6",
+        "deadline": str(current["deadline_epoch"]),
+        "hours-left": "0.000000",
+    }
+    for command, expected_output in expectations.items():
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(LAUNCH_DIR / "launch_budget.py"),
+                command,
+                *common_args,
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stdout.strip() == expected_output
+
+
 @pytest.mark.short
 def test_generated_campaigns_and_lock_are_ignored_but_readmes_are_tracked():
     ignored_paths = (
@@ -447,11 +647,14 @@ def test_generated_campaigns_and_lock_are_ignored_but_readmes_are_tracked():
 @pytest.mark.short
 def test_readme_lists_each_launcher_once_in_numeric_order():
     text = (LAUNCH_DIR / "README.md").read_text(encoding="utf-8")
+    launch_order = text.split("## Launch order", 1)[1].split(
+        "## First-day scientific order", 1
+    )[0]
     observed = tuple(
         Path(match).name
         for match in re.findall(
             r"^bash (scripts/paper/ieee_access_72h_launch/\d\d_[^ ]+\.sh)$",
-            text,
+            launch_order,
             flags=re.MULTILINE,
         )
     )
@@ -482,6 +685,7 @@ def _make_pair_manifests(repaired: Path, ld: Path) -> None:
         "protocol_id": "ieee-access-repaired-comnetx-72h-v1",
         "campaign_id": repaired.name,
         "status": "core_validated",
+        "stage_status": {},
         "git": {"dirty": False, "commit": "b" * 40},
         "paths_config": {"sha256": "c" * 64},
         "hardware": _write_registered(repaired, "hardware.json", hardware),
@@ -634,25 +838,209 @@ def test_cross_pack_validator_rejects_input_identity_mismatch(tmp_path):
 
 
 @pytest.mark.short
+@pytest.mark.parametrize(
+    ("failure_kind", "audit_key"),
+    (
+        ("campaign_time_boundary", "time_boundary_stops"),
+        ("launcher_interrupted", "interrupted_phases"),
+    ),
+)
+def test_extension_precheck_accepts_only_audited_resumable_ld_failure(
+    tmp_path,
+    failure_kind,
+    audit_key,
+):
+    repaired = tmp_path / "repaired"
+    ld = tmp_path / "ld"
+    _make_pair_manifests(repaired, ld)
+    manifest_path = ld / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    phase_id = "measured_9_500"
+    manifest.update(
+        {
+            "status": "failed",
+            "phase_status": {
+                "smoke_999_10": "completed",
+                "measured_999_10": "completed",
+                phase_id: "failed",
+            },
+            "phase_failures": {
+                phase_id: {
+                    "failure_kind": failure_kind,
+                    "recorded_at_utc": "2026-08-26T00:00:00Z",
+                }
+            },
+        }
+    )
+    if audit_key == "time_boundary_stops":
+        manifest[audit_key] = {
+            phase_id: {
+                "measurement_window_id": "window-001",
+                "deadline_epoch": 123456,
+                "reason": "registered deadline",
+            }
+        }
+    else:
+        manifest[audit_key] = {phase_id: {"reason": "operator interruption"}}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    attempt = ld / phase_id / "repeat-01" / "attempt-01"
+    attempt.mkdir(parents=True)
+    (attempt / "metadata.json").write_text(
+        json.dumps({"status": "failed", "failure_kind": failure_kind}),
+        encoding="utf-8",
+    )
+
+    assert validate_pair(repaired, ld, preflight_only=True)["status"] == (
+        "valid_preflight_pair"
+    )
+
+
+@pytest.mark.short
+def test_extension_precheck_rejects_unaudited_ld_failure(tmp_path):
+    repaired = tmp_path / "repaired"
+    ld = tmp_path / "ld"
+    _make_pair_manifests(repaired, ld)
+    manifest_path = ld / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    phase_id = "measured_9_500"
+    manifest.update(
+        {
+            "status": "failed",
+            "phase_status": {phase_id: "failed"},
+            "phase_failures": {
+                phase_id: {
+                    "failure_kind": "runtime_failure",
+                    "recorded_at_utc": "2026-08-26T00:00:00Z",
+                }
+            },
+        }
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="outside a resumable boundary"):
+        validate_pair(repaired, ld, preflight_only=True)
+
+    manifest["phase_failures"][phase_id][
+        "failure_kind"
+    ] = "campaign_time_boundary"
+    manifest["time_boundary_stops"] = {
+        phase_id: {
+            "measurement_window_id": "window-001",
+            "deadline_epoch": 123456,
+            "reason": "old registered deadline",
+        }
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    attempt = ld / phase_id / "repeat-01" / "attempt-01"
+    attempt.mkdir(parents=True)
+    (attempt / "metadata.json").write_text(
+        json.dumps({"status": "failed", "failure_kind": "runtime_failure"}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unaudited attempt failure"):
+        validate_pair(repaired, ld, preflight_only=True)
+
+
+@pytest.mark.short
+@pytest.mark.parametrize(
+    ("failure_kind", "audit_key"),
+    (
+        ("campaign_time_boundary", "time_boundary_stops"),
+        ("launcher_interrupted", "interrupted_stages"),
+    ),
+)
+def test_extension_precheck_accepts_only_audited_repaired_failure(
+    tmp_path,
+    failure_kind,
+    audit_key,
+):
+    repaired = tmp_path / "repaired"
+    ld = tmp_path / "ld"
+    _make_pair_manifests(repaired, ld)
+    manifest_path = repaired / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    stage_id = "stage6_dsbm"
+    manifest["stage_status"] = {stage_id: "failed"}
+    if audit_key == "time_boundary_stops":
+        manifest[audit_key] = {
+            stage_id: {
+                "measurement_window_id": "window-001",
+                "window_deadline_epoch": 123456,
+                "stop_boundary_hours_left": 0,
+                "reason": "registered deadline",
+            }
+        }
+    else:
+        manifest[audit_key] = {stage_id: {"reason": "operator interruption"}}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    attempt = repaired / "stages" / stage_id / "command" / "attempt-01"
+    attempt.mkdir(parents=True)
+    metadata_path = attempt / "metadata.json"
+    metadata_path.write_text(
+        json.dumps({"status": "failed", "failure_kind": failure_kind}),
+        encoding="utf-8",
+    )
+
+    assert validate_pair(repaired, ld, preflight_only=True)["status"] == (
+        "valid_preflight_pair"
+    )
+
+    metadata_path.write_text(
+        json.dumps({"status": "failed"}), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="unaudited attempt failure"):
+        validate_pair(repaired, ld, preflight_only=True)
+
+    metadata_path.write_text(
+        json.dumps({"status": "failed", "failure_kind": failure_kind}),
+        encoding="utf-8",
+    )
+    manifest.pop(audit_key)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="exact resumable audit"):
+        validate_pair(repaired, ld, preflight_only=True)
+
+
+@pytest.mark.short
 def test_cross_pack_validator_accepts_matched_short_and_long_bootstraps(tmp_path):
     repaired = tmp_path / "repaired"
     ld = tmp_path / "ld"
     _make_pair_manifests(repaired, ld)
     budget = {
-        "schema": "comnetx-ieee-access-launch-budget-v1",
+        "schema": "comnetx-ieee-access-launch-budget-v2",
         "git_sha": "b" * 40,
         "repaired_campaign_id": repaired.name,
         "ld_campaign_id": ld.name,
         "paths_config_sha256": "c" * 64,
-        "budget_hours": 72.0,
-        "started_at_epoch": 1000,
-        "deadline_epoch": 1000 + 72 * 3600,
+        "initial_window_hours": 24.0,
+        "max_total_hours": 72.0,
+        "windows": [
+            {
+                "id": "window-001",
+                "granted_hours": 24.0,
+                "started_at_epoch": 1000,
+                "deadline_epoch": 1000 + 24 * 3600,
+            }
+        ],
     }
     (repaired / "launch_budget.json").write_text(
         json.dumps(budget), encoding="utf-8"
     )
     partition = np.asarray([0, 0, 2], dtype=np.int64)
     for campaign in (repaired, ld):
+        attempt = campaign / "stages" / "measured" / "attempt-01"
+        attempt.mkdir(parents=True)
+        (attempt / "metadata.json").write_text(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "measurement_window_id": "window-001",
+                    "window_deadline_epoch": 1000 + 24 * 3600,
+                    "started_at_utc": "1970-01-01T00:16:40Z",
+                    "finished_at_utc": "1970-01-01T00:16:41Z",
+                }
+            ),
+            encoding="utf-8",
+        )
         cache = campaign / "bootstrap-cache"
         cache.mkdir()
         for dataset in ("dyn_pubmed", "arxivmath"):
@@ -671,3 +1059,16 @@ def test_cross_pack_validator_accepts_matched_short_and_long_bootstraps(tmp_path
         "arxivmath/999",
         "arxivmath/9",
     }
+    assert report["measurement_window_attempts"] == {
+        "repaired": 1,
+        "ldleiden": 1,
+    }
+
+    metadata_path = (
+        repaired / "stages" / "measured" / "attempt-01" / "metadata.json"
+    )
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["finished_at_utc"] = "1970-01-02T00:16:43Z"
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="finished outside its registered window"):
+        validate_pair(repaired, ld, preflight_only=False)

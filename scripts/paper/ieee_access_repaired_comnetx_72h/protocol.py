@@ -169,31 +169,58 @@ def validate_protocol_definition(protocol: dict[str, Any]) -> None:
     }:
         raise ValidationError("the five-RQ evidence mapping is incomplete")
     dsbm = by_id["stage6_dsbm"]
-    if dsbm.get("estimated_gpu_hours") != 26.95:
-        raise ValidationError("the registered DSBM cost estimate changed")
-    if dsbm.get("minimum_hours_remaining", 0) < 30:
-        raise ValidationError("DSBM queue must retain at least a 30-hour start gate")
-    handoff = protocol.get("common", {}).get("dsbm_operational_handoff_hours")
-    stage5_start = by_id["stage5_topology_controls"].get(
-        "minimum_hours_remaining", 0
-    )
-    if not isinstance(handoff, (int, float)) or not 30 < float(handoff) < float(
-        stage5_start
+    if (
+        dsbm.get("historical_total_algorithm_hours") != 63.73
+        or dsbm.get("historical_total_wall_hours") != 76.06
+        or dsbm.get("historical_mean_seed_wall_hours") != 15.21
+    ):
+        raise ValidationError("the registered paired DSBM cost evidence changed")
+    if (
+        dsbm.get("minimum_hours_remaining") != 4
+        or dsbm.get("new_seed_minimum_hours_remaining") != 17
+        or dsbm.get("partial_seed_minimum_hours_remaining") != 4
     ):
         raise ValidationError(
-            "DSBM operational handoff must lie strictly between its 30-hour "
-            "start gate and the Stage-5 start gate"
+            "paired DSBM requires a 17-hour new-seed gate and 4-hour resume gate"
         )
-    repeat_start = protocol.get("common", {}).get(
-        "repeatability_pre_handoff_start_hours"
-    )
+    common = protocol.get("common", {})
+    if common.get("initial_window_hours") != 24:
+        raise ValidationError("the initial measurement window must be 24 hours")
+    if common.get("maximum_aggregate_measurement_hours") != 72:
+        raise ValidationError("the aggregate registered-window cap must remain 72 hours")
+    if (
+        dsbm.get("seed_order") != [42, 43, 44, 45, 46]
+        or dsbm.get("conditions_per_seed") != 6
+        or dsbm.get("runs_per_condition") != 2
+        or dsbm.get("modes") != ["naive", "smart"]
+        or dsbm.get("primary_analysis_seeds") != [42, 43, 44]
+        or dsbm.get("minimum_publishable_seeds") != 3
+        or dsbm.get("precision_extension_seeds") != [45, 46]
+        or dsbm.get("precision_target_seeds") != 5
+        or dsbm.get("precision_extension_budget_contingent") is not True
+    ):
+        raise ValidationError("the fixed-order incremental DSBM design changed")
+    expected_optional_gates = {
+        "stage4_long_repeatability": 2,
+        "stage5_topology_controls": 4,
+        "stage7_dfleiden_interface": 1,
+        "stage7_s2cag_interface": 2,
+    }
+    for stage_id, expected in expected_optional_gates.items():
+        if by_id[stage_id].get("minimum_hours_remaining") != expected:
+            raise ValidationError(
+                f"unexpected first-day start gate for {stage_id}: expected {expected}h"
+            )
+    if "stage6_dsbm" in by_id["stage7_dfleiden_interface"].get("dependencies", []):
+        raise ValidationError("DF-Leiden interface evidence must not depend on DSBM")
+    if "stage6_dsbm" in by_id["stage7_s2cag_interface"].get("dependencies", []):
+        raise ValidationError("S2CAG interface evidence must not depend on DSBM")
     repeat_stage = by_id["stage4_long_repeatability"]
     if (
-        not isinstance(repeat_start, (int, float))
-        or not float(handoff) < float(repeat_start) < 40
-        or repeat_stage.get("minimum_evidence_repetitions") != 1
-        or repeat_stage.get("second_repeat_launch_gate_hours") != 40
+        repeat_stage.get("minimum_evidence_repetitions") != 1
         or repeat_stage.get("maximum_repetitions") != 2
+        or repeat_stage.get("initial_window_launch_gate_hours") != 19
+        or repeat_stage.get("initial_window_stop_reserve_hours") != 17
     ):
         raise ValidationError("long-repeatability launch policy changed")
 

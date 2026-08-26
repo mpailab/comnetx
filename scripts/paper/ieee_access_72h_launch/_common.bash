@@ -6,14 +6,15 @@ cd "$PROJECT_ROOT"
 
 PYTHON_BIN="${PYTHON_BIN:-python}"
 PATHS_CONFIG="${PATHS_CONFIG:-datasets-info/paths/cn69.json}"
-REPAIRED_CAMPAIGN_ID="${REPAIRED_CAMPAIGN_ID:-repaired-comnetx-cn69-20260825}"
-LD_CAMPAIGN_ID="${LD_CAMPAIGN_ID:-ldleiden-cn69-20260825}"
+REPAIRED_CAMPAIGN_ID="${REPAIRED_CAMPAIGN_ID:-repaired-comnetx-cn69-20260826}"
+LD_CAMPAIGN_ID="${LD_CAMPAIGN_ID:-ldleiden-cn69-20260826}"
 DSBM_ROOT="${DSBM_ROOT:-datasets-sbm}"
-CAMPAIGN_BUDGET_HOURS="${CAMPAIGN_BUDGET_HOURS:-72}"
+CAMPAIGN_BUDGET_HOURS="${CAMPAIGN_BUDGET_HOURS:-24}"
+CAMPAIGN_EXTENSION_HOURS="${CAMPAIGN_EXTENSION_HOURS:-}"
 EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-}"
 
 readonly PYTHON_BIN PATHS_CONFIG REPAIRED_CAMPAIGN_ID LD_CAMPAIGN_ID
-readonly DSBM_ROOT CAMPAIGN_BUDGET_HOURS EXPECTED_GIT_SHA
+readonly DSBM_ROOT CAMPAIGN_BUDGET_HOURS CAMPAIGN_EXTENSION_HOURS EXPECTED_GIT_SHA
 
 readonly REPAIRED_RUNNER="scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py"
 readonly REPAIRED_VALIDATOR="scripts/paper/ieee_access_repaired_comnetx_72h/validate_campaign.py"
@@ -21,6 +22,7 @@ readonly LD_RUNNER="scripts/paper/ieee_access_ldleiden_72h/run_protocol.py"
 readonly LD_VALIDATOR="scripts/paper/ieee_access_ldleiden_72h/validate_results.py"
 readonly BOOTSTRAP_SYNC="scripts/paper/ieee_access_72h_launch/sync_bootstrap.py"
 readonly PAIR_VALIDATOR="scripts/paper/ieee_access_72h_launch/validate_campaign_pair.py"
+readonly BUDGET_HELPER="scripts/paper/ieee_access_72h_launch/launch_budget.py"
 readonly REPAIRED_RESULTS_ROOT="results/ieee-access-2026-1/raw/repaired-comnetx"
 readonly LD_RESULTS_ROOT="results/ieee-access-2026-1/raw/ldleiden"
 readonly REPAIRED_CAMPAIGN_DIR="$REPAIRED_RESULTS_ROOT/$REPAIRED_CAMPAIGN_ID"
@@ -57,6 +59,7 @@ require_common_environment() {
   [[ -f "$LD_VALIDATOR" ]] || die "Validator not found: $LD_VALIDATOR"
   [[ -f "$BOOTSTRAP_SYNC" ]] || die "Bootstrap helper not found: $BOOTSTRAP_SYNC"
   [[ -f "$PAIR_VALIDATOR" ]] || die "Pair validator not found: $PAIR_VALIDATOR"
+  [[ -f "$BUDGET_HELPER" ]] || die "Budget helper not found: $BUDGET_HELPER"
   [[ "$REPAIRED_CAMPAIGN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
     || die "Invalid repaired campaign id: $REPAIRED_CAMPAIGN_ID"
   [[ "$LD_CAMPAIGN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
@@ -88,125 +91,47 @@ require_preflight_campaigns() {
   [[ -f "$LD_CAMPAIGN_DIR/manifest.json" ]] \
     || die "Run 01_preflight.sh first (LD-Leiden preflight is missing)"
   [[ -f "$BUDGET_STATE_FILE" ]] \
-    || die "Run 01_preflight.sh first (the shared 72-hour clock is missing)"
+    || die "Run 01_preflight.sh first (the shared measurement window is missing)"
+}
+
+budget_command() {
+  local command="$1"
+  shift
+  "$PYTHON_BIN" "$BUDGET_HELPER" "$command" \
+    --state-file "$BUDGET_STATE_FILE" \
+    --git-sha "$(git rev-parse HEAD)" \
+    --repaired-campaign-id "$REPAIRED_CAMPAIGN_ID" \
+    --ld-campaign-id "$LD_CAMPAIGN_ID" \
+    --paths-config "$PATHS_CONFIG" "$@"
 }
 
 initialize_budget_clock() {
-  local actual_sha
-  actual_sha="$(git rev-parse HEAD)"
-  "$PYTHON_BIN" - "$BUDGET_STATE_FILE" "$CAMPAIGN_BUDGET_HOURS" "$actual_sha" \
-    "$REPAIRED_CAMPAIGN_ID" "$LD_CAMPAIGN_ID" "$PATHS_CONFIG" <<'PY'
-import hashlib
-import json
-import math
-import os
-import sys
-import time
-from pathlib import Path
-
-path = Path(sys.argv[1])
-hours = float(sys.argv[2])
-git_sha = sys.argv[3]
-repaired_campaign_id = sys.argv[4]
-ld_campaign_id = sys.argv[5]
-paths_config = Path(sys.argv[6]).resolve()
-if not math.isfinite(hours) or hours <= 0:
-    raise SystemExit("CAMPAIGN_BUDGET_HOURS must be a positive finite number")
-if hours > 72:
-    raise SystemExit("CAMPAIGN_BUDGET_HOURS cannot exceed the registered 72 hours")
-paths_sha256 = hashlib.sha256(paths_config.read_bytes()).hexdigest()
-if path.exists():
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    expected = {
-        "schema": "comnetx-ieee-access-launch-budget-v1",
-        "git_sha": git_sha,
-        "budget_hours": hours,
-        "repaired_campaign_id": repaired_campaign_id,
-        "ld_campaign_id": ld_campaign_id,
-        "paths_config_sha256": paths_sha256,
-    }
-    for key, value in expected.items():
-        if payload.get(key) != value:
-            raise SystemExit(f"saved campaign clock mismatch for {key}")
-    started = payload.get("started_at_epoch")
-    deadline = payload.get("deadline_epoch")
-    if not isinstance(started, int) or not isinstance(deadline, int):
-        raise SystemExit("saved campaign clock has malformed timestamps")
-    if deadline != started + int(round(hours * 3600)):
-        raise SystemExit("saved campaign deadline is inconsistent with its start")
-    print(f"Reusing deadline epoch {payload['deadline_epoch']}")
-    raise SystemExit(0)
-
-started = int(time.time())
-payload = {
-    "schema": "comnetx-ieee-access-launch-budget-v1",
-    "git_sha": git_sha,
-    "budget_hours": hours,
-    "repaired_campaign_id": repaired_campaign_id,
-    "ld_campaign_id": ld_campaign_id,
-    "paths_config_sha256": paths_sha256,
-    "started_at_epoch": started,
-    "deadline_epoch": started + int(round(hours * 3600)),
+  budget_command initialize --initial-hours "$CAMPAIGN_BUDGET_HOURS"
 }
-path.parent.mkdir(parents=True, exist_ok=True)
-temporary = path.with_suffix(path.suffix + f".tmp-{os.getpid()}")
-temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-temporary.replace(path)
-print(f"Started {hours:g}-hour clock; deadline epoch {payload['deadline_epoch']}")
-PY
+
+extend_budget_clock() {
+  [[ -n "$CAMPAIGN_EXTENSION_HOURS" ]] \
+    || die "CAMPAIGN_EXTENSION_HOURS must be explicit when extending the campaign"
+  budget_command extend \
+    --extension-hours "$CAMPAIGN_EXTENSION_HOURS" \
+    --metadata-root "$REPAIRED_CAMPAIGN_DIR" \
+    --metadata-root "$LD_CAMPAIGN_DIR"
 }
 
 hours_left() {
-  "$PYTHON_BIN" - "$BUDGET_STATE_FILE" "$(git rev-parse HEAD)" \
-    "$REPAIRED_CAMPAIGN_ID" "$LD_CAMPAIGN_ID" "$CAMPAIGN_BUDGET_HOURS" \
-    "$PATHS_CONFIG" <<'PY'
-import hashlib
-import json
-import math
-import sys
-import time
-from pathlib import Path
-
-path = Path(sys.argv[1])
-payload = json.loads(path.read_text(encoding="utf-8"))
-expected = {
-    "schema": "comnetx-ieee-access-launch-budget-v1",
-    "git_sha": sys.argv[2],
-    "repaired_campaign_id": sys.argv[3],
-    "ld_campaign_id": sys.argv[4],
-    "budget_hours": float(sys.argv[5]),
-    "paths_config_sha256": hashlib.sha256(Path(sys.argv[6]).read_bytes()).hexdigest(),
-}
-for key, value in expected.items():
-    if payload.get(key) != value:
-        raise SystemExit(f"saved campaign clock mismatch for {key}")
-started = payload.get("started_at_epoch")
-deadline = payload.get("deadline_epoch")
-if not isinstance(started, int) or not isinstance(deadline, int):
-    raise SystemExit("saved campaign clock has malformed timestamps")
-if deadline != started + int(round(float(sys.argv[5]) * 3600)):
-    raise SystemExit("saved campaign deadline is inconsistent with its start")
-remaining = max(0.0, (float(deadline) - time.time()) / 3600.0)
-if not math.isfinite(remaining):
-    raise SystemExit("invalid remaining-time calculation")
-print(f"{remaining:.6f}")
-PY
+  budget_command hours-left
 }
 
 budget_deadline_epoch() {
-  "$PYTHON_BIN" - "$BUDGET_STATE_FILE" <<'PY'
-import json
-import sys
-from pathlib import Path
+  budget_command deadline
+}
 
-payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-if payload.get("schema") != "comnetx-ieee-access-launch-budget-v1":
-    raise SystemExit("saved campaign clock has an unexpected schema")
-deadline = payload.get("deadline_epoch")
-if not isinstance(deadline, int):
-    raise SystemExit("saved campaign clock has a malformed deadline")
-print(deadline)
-PY
+current_window_id() {
+  budget_command window-id
+}
+
+current_window_granted_hours() {
+  budget_command granted-hours
 }
 
 seconds_left() {
@@ -222,24 +147,27 @@ PY
 }
 
 run_ld_phase() {
-  local phase="$1" seconds deadline_epoch watchdog_seconds return_code
+  local phase="$1" seconds deadline_epoch measurement_window_id
+  local watchdog_seconds return_code
   shift
   seconds="$(seconds_left)"
   deadline_epoch="$(budget_deadline_epoch)"
+  measurement_window_id="$(current_window_id)"
   watchdog_seconds=$((seconds + 65))
-  (( seconds > 0 )) || die "The registered 72-hour measurement budget is exhausted"
+  (( seconds > 0 )) || die "The current measurement window is exhausted"
   note "Starting LD-Leiden $phase with $(hours_left) hours left"
   if timeout --signal=TERM --kill-after=10s "${watchdog_seconds}s" \
     "$PYTHON_BIN" "$LD_RUNNER" \
       --paths-config "$PATHS_CONFIG" \
       --campaign-id "$LD_CAMPAIGN_ID" \
-      --phase "$phase" --deadline-epoch "$deadline_epoch" --resume "$@"; then
+      --phase "$phase" --measurement-window-id "$measurement_window_id" \
+      --deadline-epoch "$deadline_epoch" --resume "$@"; then
     return 0
   else
     return_code=$?
   fi
   if [[ "$return_code" -eq 124 ]]; then
-    die "LD-Leiden $phase reached the registered 72-hour deadline"
+    die "LD-Leiden $phase reached the current measurement-window deadline"
   fi
   return "$return_code"
 }
@@ -366,42 +294,48 @@ PY
 run_repaired_stage() {
   local stage="$1"
   shift
-  local remaining deadline_epoch
+  local remaining deadline_epoch measurement_window_id
   remaining="$(hours_left)"
   deadline_epoch="$(budget_deadline_epoch)"
+  measurement_window_id="$(current_window_id)"
   note "Starting $stage with $remaining hours left"
   "$PYTHON_BIN" "$REPAIRED_RUNNER" \
     --paths-config "$PATHS_CONFIG" \
     --campaign-id "$REPAIRED_CAMPAIGN_ID" \
     --stage "$stage" --hours-left "$remaining" \
+    --measurement-window-id "$measurement_window_id" \
     --deadline-epoch "$deadline_epoch" \
     --stop-with-hours-left 0 --resume "$@"
   "$PYTHON_BIN" "$REPAIRED_VALIDATOR" "$REPAIRED_CAMPAIGN_ID" --stage "$stage"
 }
 
 repaired_stage_can_finalize() {
-  local stage="$1" remaining deadline_epoch
+  local stage="$1" remaining deadline_epoch measurement_window_id
   shift
   remaining="$(hours_left)"
   deadline_epoch="$(budget_deadline_epoch)"
+  measurement_window_id="$(current_window_id)"
   "$PYTHON_BIN" "$REPAIRED_RUNNER" \
     --paths-config "$PATHS_CONFIG" \
     --campaign-id "$REPAIRED_CAMPAIGN_ID" \
     --stage "$stage" --hours-left "$remaining" \
+    --measurement-window-id "$measurement_window_id" \
     --deadline-epoch "$deadline_epoch" --resume --dry-run "$@" \
     >/dev/null 2>&1
 }
 
 record_budget_skip() {
-  local stage="$1" remaining deadline_epoch
+  local stage="$1" remaining deadline_epoch measurement_window_id
   require_optional_stage_can_be_deferred "$stage"
   remaining="$(hours_left)"
   deadline_epoch="$(budget_deadline_epoch)"
+  measurement_window_id="$(current_window_id)"
   note "Recording budget skip for $stage with $remaining hours left"
   "$PYTHON_BIN" "$REPAIRED_RUNNER" \
     --paths-config "$PATHS_CONFIG" \
     --campaign-id "$REPAIRED_CAMPAIGN_ID" \
     --skip-for-budget "$stage" --hours-left "$remaining" \
+    --measurement-window-id "$measurement_window_id" \
     --deadline-epoch "$deadline_epoch" --resume
 }
 
@@ -470,6 +404,127 @@ for command_dir in sorted(path for path in stage_dir.glob("*") if path.is_dir())
         raise SystemExit(f"multiple completed attempts in {command_dir}")
     count += completed
 print(count)
+PY
+}
+
+dsbm_completed_seed_count() {
+  "$PYTHON_BIN" - "$REPAIRED_CAMPAIGN_DIR/stages/stage6_dsbm" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+stage_dir = Path(sys.argv[1])
+conditions = tuple(
+    (regime, max_changes)
+    for max_changes in (290, 1450)
+    for regime in ("random", "hubs", "community")
+)
+completed_seeds = 0
+saw_incomplete = False
+for seed in (42, 43, 44, 45, 46):
+    completed_conditions = 0
+    for regime, max_changes in conditions:
+        command_dir = (
+            stage_dir / f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+        )
+        completed = 0
+        for metadata_path in sorted(command_dir.glob("attempt-*/metadata.json")):
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+            completed += payload.get("status") == "completed"
+        if completed > 1:
+            raise SystemExit(f"multiple completed attempts in {command_dir}")
+        completed_conditions += completed
+    if completed_conditions == len(conditions):
+        if saw_incomplete:
+            raise SystemExit("completed DSBM seed appears after an incomplete seed")
+        completed_seeds += 1
+    else:
+        saw_incomplete = True
+print(completed_seeds)
+PY
+}
+
+dsbm_validated_seed_count() {
+  "$PYTHON_BIN" - \
+    "$REPAIRED_CAMPAIGN_DIR/stages/stage6_dsbm/validation.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.is_file():
+    print(0)
+    raise SystemExit
+payload = json.loads(path.read_text(encoding="utf-8"))
+completed = payload.get("completed_seeds")
+if not isinstance(completed, list) or completed != [42, 43, 44, 45, 46][: len(completed)]:
+    raise SystemExit("saved DSBM validation is not the fixed seed prefix")
+print(len(completed))
+PY
+}
+
+dsbm_current_seed_completed_condition_count() {
+  "$PYTHON_BIN" - "$REPAIRED_CAMPAIGN_DIR/stages/stage6_dsbm" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+stage_dir = Path(sys.argv[1])
+conditions = tuple(
+    (regime, max_changes)
+    for max_changes in (290, 1450)
+    for regime in ("random", "hubs", "community")
+)
+for seed in (42, 43, 44, 45, 46):
+    count = 0
+    for regime, max_changes in conditions:
+        command_dir = (
+            stage_dir / f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+        )
+        completed = 0
+        for metadata_path in sorted(command_dir.glob("attempt-*/metadata.json")):
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+            completed += payload.get("status") == "completed"
+        if completed > 1:
+            raise SystemExit(f"multiple completed attempts in {command_dir}")
+        count += completed
+    if count < len(conditions):
+        print(count)
+        break
+else:
+    print(0)
+PY
+}
+
+dsbm_protected_reserve_hours() {
+  local available="$1" completed partial
+  completed="$(dsbm_completed_seed_count)"
+  partial="$(dsbm_current_seed_completed_condition_count)"
+  "$PYTHON_BIN" - "$available" "$completed" "$partial" <<'PY'
+import math
+import sys
+
+available = float(sys.argv[1])
+completed = int(sys.argv[2])
+partial_conditions = int(sys.argv[3])
+if not math.isfinite(available) or available < 0:
+    raise SystemExit("remaining campaign time must be finite and non-negative")
+missing = max(0, 3 - completed)
+costs = []
+if missing:
+    if partial_conditions:
+        costs.append(min(17, 4 * (6 - partial_conditions)))
+    else:
+        costs.append(17)
+    costs.extend([17] * (missing - 1))
+reserve = 0
+for index, cost in enumerate(costs):
+    if reserve + cost > available:
+        if index == 0 and partial_conditions and available - reserve >= 4:
+            reserve += 4 * int((available - reserve) // 4)
+        break
+    reserve += cost
+print(reserve)
 PY
 }
 

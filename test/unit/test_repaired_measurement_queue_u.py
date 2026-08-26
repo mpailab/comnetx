@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from scripts.paper.ieee_access_repaired_comnetx_72h import run_queue
+from scripts.paper.ieee_access_repaired_comnetx_72h import validate_campaign as campaign_validator
 from scripts.paper.ieee_access_ldleiden_72h import run_protocol as ld_run_protocol
 from scripts.paper.ieee_access_repaired_comnetx_72h.protocol import (
     CORE_DATASETS,
@@ -26,7 +27,9 @@ from scripts.paper.ieee_access_repaired_comnetx_72h.input_manifest import (
 )
 from scripts.paper.ieee_access_repaired_comnetx_72h.run_queue import (
     build_stage_commands,
+    dsbm_seed_progress,
     recover_interrupted_stage,
+    seal_dsbm_inputs,
 )
 from scripts.paper.ieee_access_repaired_comnetx_72h.validate_campaign import (
     audit_summary,
@@ -51,14 +54,56 @@ def test_protocol_prioritizes_core_and_preserves_dsbm_budget():
     stages = stage_map(protocol)
 
     assert [stage["priority"] for stage in protocol["stages"]] == list(range(1, 10))
+    assert [stage["id"] for stage in protocol["stages"]] == [
+        "stage1_correctness_smoke",
+        "stage2_core_short",
+        "stage3_mechanism",
+        "stage4_long_core",
+        "stage6_dsbm",
+        "stage7_dfleiden_interface",
+        "stage7_s2cag_interface",
+        "stage4_long_repeatability",
+        "stage5_topology_controls",
+    ]
     assert all(stage["required"] for stage in protocol["stages"][:4])
     assert protocol["premise"].startswith("Every historical smart-mode result")
-    assert stages["stage5_topology_controls"]["minimum_hours_remaining"] == 38
-    assert stages["stage6_dsbm"]["minimum_hours_remaining"] == 30
-    assert stages["stage6_dsbm"]["estimated_gpu_hours"] == 26.95
-    assert protocol["common"]["dsbm_operational_handoff_hours"] == 32
-    assert protocol["common"]["repeatability_pre_handoff_start_hours"] == 33
-    assert "stage6_dsbm" in stages["stage7_dfleiden_interface"]["dependencies"]
+    assert protocol["common"]["initial_window_hours"] == 24
+    assert protocol["common"]["maximum_aggregate_measurement_hours"] == 72
+    expected_gates = {
+        "stage1_correctness_smoke": 6,
+        "stage2_core_short": 12,
+        "stage3_mechanism": 8,
+        "stage4_long_core": 8,
+        "stage7_dfleiden_interface": 1,
+        "stage7_s2cag_interface": 2,
+        "stage4_long_repeatability": 2,
+        "stage6_dsbm": 4,
+        "stage5_topology_controls": 4,
+    }
+    assert {
+        stage_id: stages[stage_id]["minimum_hours_remaining"]
+        for stage_id in expected_gates
+    } == expected_gates
+    assert stages["stage6_dsbm"]["seed_order"] == [42, 43, 44, 45, 46]
+    assert stages["stage6_dsbm"]["conditions_per_seed"] == 6
+    assert stages["stage6_dsbm"]["new_seed_minimum_hours_remaining"] == 17
+    assert stages["stage6_dsbm"]["partial_seed_minimum_hours_remaining"] == 4
+    assert stages["stage6_dsbm"]["runs_per_condition"] == 2
+    assert stages["stage6_dsbm"]["modes"] == ["naive", "smart"]
+    assert stages["stage6_dsbm"]["primary_analysis_seeds"] == [42, 43, 44]
+    assert stages["stage6_dsbm"]["minimum_publishable_seeds"] == 3
+    assert stages["stage6_dsbm"]["precision_extension_seeds"] == [45, 46]
+    assert stages["stage6_dsbm"]["precision_target_seeds"] == 5
+    assert stages["stage6_dsbm"]["precision_extension_budget_contingent"] is True
+    assert stages["stage6_dsbm"]["historical_total_algorithm_hours"] == 63.73
+    assert stages["stage6_dsbm"]["historical_total_wall_hours"] == 76.06
+    assert stages["stage4_long_repeatability"][
+        "initial_window_launch_gate_hours"
+    ] == 19
+    assert stages["stage4_long_repeatability"][
+        "initial_window_stop_reserve_hours"
+    ] == 17
+    assert "stage6_dsbm" not in stages["stage7_dfleiden_interface"]["dependencies"]
     assert "stage7_dfleiden_interface" in stages[
         "stage7_s2cag_interface"
     ]["dependencies"]
@@ -287,7 +332,7 @@ def test_stale_recovery_rejects_unaudited_runtime_failure(tmp_path, runner):
     assert status_map[item_id] == "running"
 
 
-def test_queue_builds_registered_repetition_counts_and_smart_only_dsbm(tmp_path):
+def test_queue_builds_registered_repetition_counts_and_incremental_dsbm(tmp_path):
     common = {
         "campaign_dir": tmp_path / "campaign",
         "paths_config": tmp_path / "paths.json",
@@ -303,13 +348,36 @@ def test_queue_builds_registered_repetition_counts_and_smart_only_dsbm(tmp_path)
     assert len(df_commands) == 6
     assert df_commands[-1].name == "dfleiden_smart_long_coverage"
 
-    dsbm = build_stage_commands("stage6_dsbm", **common)[0].command
-    assert dsbm[dsbm.index("--modes") + 1] == "smart"
-    assert dsbm[dsbm.index("--batch-suffix") + 1] == "100_batches"
-    assert dsbm[dsbm.index("--max-changes") + 1 : dsbm.index("--methods")] == [
-        "290",
-        "1450",
-    ]
+    dsbm_commands = build_stage_commands("stage6_dsbm", **common)
+    assert len(dsbm_commands) == 30
+    assert dsbm_commands[0].name == "dsbm_seed_42_random_mc290_paired"
+    assert dsbm_commands[-1].name == "dsbm_seed_46_community_mc1450_paired"
+    for spec in dsbm_commands:
+        command = spec.command
+        assert command[
+            command.index("--modes") + 1 : command.index("--smart-depth")
+        ] == ["naive", "smart"]
+        assert command[command.index("--batch-suffix") + 1] == "100_batches"
+        assert len(
+            command[command.index("--regimes") + 1 : command.index("--max-changes")]
+        ) == 1
+        assert len(
+            command[command.index("--max-changes") + 1 : command.index("--seeds")]
+        ) == 1
+        assert len(
+            command[command.index("--seeds") + 1 : command.index("--methods")]
+        ) == 1
+        assert command[command.index("--cache-dir") + 1].endswith("bootstrap-cache")
+
+    selected = build_stage_commands("stage6_dsbm", dsbm_seed=44, **common)
+    assert len(selected) == 6
+    assert all(spec.name.startswith("dsbm_seed_44_") for spec in selected)
+    assert all(
+        spec.command[
+            spec.command.index("--seeds") + 1 : spec.command.index("--methods")
+        ] == ["44"]
+        for spec in selected
+    )
 
 
 def test_launcher_payload_validation_keeps_full_and_repaired_rows_separate():
@@ -438,6 +506,152 @@ def test_dsbm_stage_has_no_unregistered_positional_argument(tmp_path):
     assert command[output_index + 2] == "--name"
 
 
+def test_dsbm_seed_progress_is_fail_fast_and_reports_partial_cells(tmp_path):
+    stage = tmp_path / "stages" / "stage6_dsbm"
+
+    def complete(seed: int, regime: str, max_changes: int) -> None:
+        attempt = (
+            stage
+            / f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+            / "attempt-01"
+        )
+        attempt.mkdir(parents=True)
+        (attempt / "metadata.json").write_text(
+            json.dumps({"status": "completed"}), encoding="utf-8"
+        )
+
+    complete(42, "random", 290)
+    complete(42, "hubs", 290)
+    assert dsbm_seed_progress(tmp_path) == ([], 42, 2)
+
+    for max_changes in (290, 1450):
+        for regime in ("random", "hubs", "community"):
+            complete(44, regime, max_changes)
+    with pytest.raises(RuntimeError, match="after an incomplete"):
+        dsbm_seed_progress(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("complete_seeds", "partial_seed", "expected_status"),
+    (
+        ((42,), 43, "valid_partial"),
+        ((42, 43, 44), 45, "primary_validated"),
+    ),
+)
+def test_dsbm_validator_excludes_partial_seed_cells_from_analysis(
+    tmp_path,
+    monkeypatch,
+    complete_seeds,
+    partial_seed,
+    expected_status,
+):
+    campaign = tmp_path / "campaign"
+    campaign.mkdir()
+    input_manifest = {
+        "schema": "comnetx-ieee-access-dsbm-inputs-v1",
+        "files": [],
+    }
+
+    def write_condition(seed: int, regime: str, max_changes: int) -> None:
+        dataset = f"dsbm-{regime}-fixed-mc{max_changes}-{seed}"
+        input_manifest["files"].append(
+            {
+                "path": str(tmp_path / f"out.{dataset}.100_batches"),
+                "uses": [dataset],
+            }
+        )
+        command_name = f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+        stem = f"repaired_dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+        attempt = (
+            campaign
+            / "stages"
+            / "stage6_dsbm"
+            / command_name
+            / "attempt-01"
+        )
+        attempt.mkdir(parents=True)
+        (attempt / "metadata.json").write_text(
+            json.dumps({"status": "completed"}), encoding="utf-8"
+        )
+        run_manifest = {
+            "status": "completed",
+            "selected_streams": 1,
+            "attempted_runs": 2,
+            "successful_runs": 2,
+            "errors": 0,
+            "seeds": [seed],
+            "regimes": [regime],
+            "max_changes": [max_changes],
+            "modes": ["naive", "smart"],
+        }
+        (attempt / f"manifest_{stem}.json").write_text(
+            json.dumps(run_manifest), encoding="utf-8"
+        )
+        payload = {
+            algorithm: {
+                dataset: {"machine": {"0:99": _series(99)}}
+            }
+            for algorithm in (
+                campaign_validator.FULL_LEIDEN,
+                campaign_validator.SMART_LEIDEN,
+            )
+        }
+        (attempt / f"{stem}.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+
+    for seed in complete_seeds:
+        for max_changes in (290, 1450):
+            for regime in ("random", "hubs", "community"):
+                write_condition(seed, regime, max_changes)
+    write_condition(partial_seed, "random", 290)
+    write_condition(partial_seed, "hubs", 290)
+
+    input_path = campaign / "dsbm_input_manifest.json"
+    input_path.write_text(json.dumps(input_manifest), encoding="utf-8")
+    (campaign / "manifest.json").write_text(
+        json.dumps(
+            {
+                "dsbm_input_manifest": {
+                    "filename": input_path.name,
+                    "sha256": sha256_file(input_path),
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        campaign_validator,
+        "validate_input_manifest",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        campaign_validator,
+        "completed_attempt",
+        lambda campaign_dir, stage_id, command_name: (
+            campaign_dir / "stages" / stage_id / command_name / "attempt-01"
+        ),
+    )
+    monkeypatch.setattr(
+        campaign_validator,
+        "validate_paired_bootstrap",
+        lambda *_args, **_kwargs: {"paired": "checked"},
+    )
+
+    report = campaign_validator.validate_stage6(campaign)
+
+    assert report["status"] == expected_status
+    assert report["completed_seeds"] == list(complete_seeds)
+    assert report["paired_condition_count"] == 6 * len(complete_seeds)
+    assert len(report["paired_cells"]) == 6 * len(complete_seeds)
+    assert {cell["seed"] for cell in report["paired_cells"]} == set(complete_seeds)
+    assert report["partial_seed_progress"] == {
+        "seed": partial_seed,
+        "completed_condition_pairs": 2,
+        "eligible_for_analysis": False,
+    }
+
+
 def test_paired_bootstrap_requires_identical_level_zero_partition(tmp_path):
     campaign = tmp_path / "campaign"
     cache = campaign / "bootstrap-cache"
@@ -512,6 +726,41 @@ def test_input_manifest_detects_content_change_even_with_same_path(tmp_path):
     data.write_text("other", encoding="utf-8")
     with pytest.raises(ValueError, match="changed"):
         validate_input_manifest(manifest, verify_content=True)
+
+
+def _write_registered_dsbm_grid(root: Path) -> None:
+    for regime in ("random", "hubs", "community"):
+        for max_changes in (290, 1450):
+            for seed in (42, 43, 44, 45, 46):
+                dataset = f"dsbm-{regime}-fixed-mc{max_changes}-{seed}"
+                directory = root / dataset
+                directory.mkdir(parents=True)
+                (directory / f"out.{dataset}.100_batches").write_text(
+                    f"stream {dataset}\n", encoding="utf-8"
+                )
+                (directory / f"coms.{dataset}.100_batches.npz").write_bytes(
+                    f"labels {dataset}\n".encode()
+                )
+
+
+@pytest.mark.short
+def test_resumed_dsbm_stage_is_bound_to_exact_sealed_root(tmp_path):
+    campaign = tmp_path / "campaign"
+    first_root = tmp_path / "dsbm-a"
+    second_root = tmp_path / "dsbm-b"
+    _write_registered_dsbm_grid(first_root)
+    _write_registered_dsbm_grid(second_root)
+    manifest: dict = {}
+
+    seal_dsbm_inputs(campaign, manifest, first_root.resolve())
+    seal_dsbm_inputs(campaign, manifest, first_root.resolve())
+
+    registered = json.loads(
+        (campaign / "dsbm_input_manifest.json").read_text(encoding="utf-8")
+    )
+    assert registered["root"] == str(first_root.resolve())
+    with pytest.raises(RuntimeError, match="DSBM root or sealed input content changed"):
+        seal_dsbm_inputs(campaign, manifest, second_root.resolve())
 
 
 def test_runtime_identity_requires_live_hardware_and_environment_match(

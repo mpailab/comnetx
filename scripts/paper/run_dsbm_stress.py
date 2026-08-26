@@ -133,7 +133,13 @@ def load_stream_as_dataset(out_path: Path):
     return ds
 
 
-def selected_streams(root: Path, batch_suffix: str | None, regimes: set[str], max_changes: set[int]) -> list[Path]:
+def selected_streams(
+    root: Path,
+    batch_suffix: str | None,
+    regimes: set[str],
+    max_changes: set[int],
+    seeds: set[int] | None = None,
+) -> list[Path]:
     streams = []
     for path in find_streams(root, batch_suffix):
         dataset = path.parent.name
@@ -143,6 +149,8 @@ def selected_streams(root: Path, batch_suffix: str | None, regimes: set[str], ma
         if regimes and match.group("regime") not in regimes:
             continue
         if max_changes and int(match.group("max_changes")) not in max_changes:
+            continue
+        if seeds and int(match.group("seed")) not in seeds:
             continue
         streams.append(path)
     return sorted(streams, key=stream_sort_key)
@@ -196,10 +204,22 @@ def main() -> None:
     )
     parser.add_argument("--regimes", nargs="*", default=["random", "hubs", "community"])
     parser.add_argument("--max-changes", nargs="*", type=int, default=[290, 1450, 2900, 14500, 29000])
+    parser.add_argument(
+        "--seeds",
+        nargs="*",
+        type=int,
+        default=[],
+        help="Run only these predeclared DSBM seeds; an empty list selects all seeds.",
+    )
     parser.add_argument("--methods", nargs="*", default=["leidenalg", "dfleiden"])
     parser.add_argument("--modes", nargs="*", default=["naive", "smart", "dynamic"])
     parser.add_argument("--smart-depth", type=int, default=3)
     parser.add_argument("--smart-radius", type=int, default=1)
+    parser.add_argument(
+        "--cache-dir",
+        default=None,
+        help="Shared directory for paired full/smart bootstrap partitions.",
+    )
     parser.add_argument("--use-gpu", action="store_true")
     parser.add_argument("--output-dir", default="results/paper_icdm")
     parser.add_argument("--name", default=None)
@@ -231,7 +251,13 @@ def main() -> None:
             "Set DSBM_ROOT or pass --root to the DSBM runner."
         )
 
-    streams = selected_streams(root, batch_suffix, set(args.regimes), set(args.max_changes))
+    streams = selected_streams(
+        root,
+        batch_suffix,
+        set(args.regimes),
+        set(args.max_changes),
+        set(args.seeds),
+    )
     if args.limit is not None:
         streams = streams[: args.limit]
 
@@ -241,6 +267,7 @@ def main() -> None:
         "all_batches": bool(args.all_batches),
         "regimes": args.regimes,
         "max_changes": args.max_changes,
+        "seeds": args.seeds,
         "methods": args.methods,
         "modes": args.modes,
         "selected_streams": len(streams),
@@ -352,6 +379,7 @@ def main() -> None:
                         verbose=1,
                         use_gpu=args.use_gpu,
                         aggregation_mode="sum",
+                        cache_dir=args.cache_dir,
                         ground_truth_metrics=True,
                     )
                 except Exception as exc:

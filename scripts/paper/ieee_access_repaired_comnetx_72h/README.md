@@ -1,4 +1,4 @@
-# Repaired ComNetX: Scientific-Priority 72-Hour Queue
+# Repaired ComNetX: 24-Hour Initial Queue with Registered Extensions
 
 This package replaces, rather than silently mixes with, historical smart-mode
 measurements affected by the hierarchy/namespace repair. Until a stage in this
@@ -6,7 +6,8 @@ campaign is validated, every old smart result with `L >= 2` remains
 **provisional**. Full baselines are not automatically invalidated, but reuse is
 allowed only under exact source, protocol, bootstrap, graph-representation,
 hardware, and clock equivalence. The default queue takes the safer route and
-runs one fresh paired full/smart long-horizon control.
+runs fresh pairs for both the principal long-horizon control and every retained
+DSBM condition.
 
 The runner deliberately cannot create a campaign without
 `--ack-production-api-settled`. This flag should be used only after the
@@ -52,24 +53,32 @@ fail and requires a new campaign.
 4. **Long horizon (required).** Run one fresh paired `9:500` full/smart pass on
    each large graph. If time permits, add one or two smart-only repetitions;
    these are reported separately from the fresh pair.
-5. **Topology and controls (optional).** Depth/radius grid comes first, then
-   direction and cut metrics, then resolution. Start only with at least 38
-   hours remaining. The runner terminates the current control command at the
-   conservative 32-hour handoff boundary. This leaves two hours to validate,
-   resume after a boundary stop, and still launch DSBM with at least 30 hours.
-6. **DSBM operating regime (optional but preserved).** The registered 30 smart
-   runs cover three update types, two update rates, and five seeds under
-   `100_batches`. Their measured historical cost is about 26.95 GPU-hours, so
-   do not start with fewer than 30 hours remaining. If the budget is
-   insufficient, mark the stage `skipped_for_budget`; do not delete it and do
-   not relabel the old smart rows as repaired evidence.
-7. **Backend interface (last).** This stage cannot start until DSBM is either
-   validated or explicitly skipped for budget. Five DF-Leiden short repeats
-   are followed by one repaired smart `9:500` row. S2CAG may stop after one
-   standard repaired coverage run or continue to five, and always adds the
-   smart-only dataset/random/one-hot `999:100` control needed by the retained
-   feature table. Historical full rows may be reused only after a separate
-   exact source/protocol/bootstrap/representation/hardware/clock attestation.
+5. **Paired DSBM operating regime (protected after the core).** The registered
+   design covers three update types, two update rates, and seeds 42--46 under
+   `100_batches`. Every seed contains six resumable condition commands, and
+   every command measures both full Leiden and repaired ComNetX from a verified
+   common level-zero bootstrap: 12 fresh runs per seed. The queue advances only
+   in seed order. One seed is pilot evidence, seeds 42--44 are the minimum
+   publishable set, and seeds 45--46 are a precision target. Historical wall
+   time is about 15.2 hours per pair-complete seed, so a 17-hour start gate is
+   used. A seed interrupted after at least one condition pair resumes with a
+   4-hour gate, while completed pairs are preserved. Archived full rows cannot
+   be paired with new smart rows because their
+   source, bootstrap, hardware, environment, and clock provenance is
+   insufficient.
+6. **Backend interfaces and repeatability (optional).**
+   Five DF-Leiden short repeats plus one repaired smart `9:500` row come first.
+   S2CAG then adds one standard repaired run and the dataset/random/one-hot
+   `999:100` feature control. Two smart-only Leiden long repetitions follow.
+   Before three DSBM seeds validate, File 06 protects every fresh or partial
+   seed opportunity that fits in the current window and runs these only above
+   that dynamic reserve, so they cannot consume the publishable-minimum path.
+7. **Topology and controls (optional breadth).** After the first affordable
+   three-seed DSBM minimum, run the depth/radius grid, direction and cut metrics,
+   and resolution controls with a 4-hour start gate. Precision seeds wait until
+   this stage and the interface/repeatability evidence are resolved. A Stage-2
+   scientific no-go may skip breadth, but does not suppress DSBM or
+   repeatability evidence.
 
 These are evidence-quality gates, not outcome filters. A correct result that
 weakens the paper is still a result and remains in the campaign.
@@ -119,132 +128,31 @@ batches is intentionally unsupported by this queue.
 
 ## Commands
 
-All commands run inside the project dev container. No measurement is launched
-by merely creating this package. For the actual paired 72-hour campaign, use
-the eight ordered scripts and shared absolute clock documented in
-`scripts/paper/ieee_access_72h_launch/README.md`. The direct runner commands
-below are low-level references; `--hours-left` alone is not a substitute for
-the launcher's sealed `--deadline-epoch`.
+Run the registered measurements through the eight ordered container launchers,
+not by manually supplying an `--hours-left` estimate. The authoritative
+first-day and extension commands are documented in
+`scripts/paper/ieee_access_72h_launch/README.md`; they bind every attempt to the
+current append-only window ID and exact deadline. The initial campaign ID is
+`repaired-comnetx-cn69-20260826` unless explicitly overridden before preflight.
 
-Seal the repaired implementation. Preflight runs repository lint/unit checks,
-requires a visible CUDA device and the production dynamic-backend wheel,
-captures package/hardware metadata, and hashes all registered real-stream
-inputs. It does not run a graph measurement:
+File 07 invokes Stage 6 one seed at a time with `--dsbm-seed`, preserving the
+fixed order 42--46 and validating six fresh full/ComNetX condition pairs before
+counting a seed. A boundary stop preserves completed condition commands, and a
+later window resumes the first missing pair in the same seed. Do not use
+`--skip-for-budget` for temporarily unfinished DSBM or other extension work.
 
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --ack-production-api-settled --preflight
-```
-
-Run the four required stages in order, passing the actual time remaining at
-each boundary:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage1_correctness_smoke --hours-left 72 --resume
-
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage2_core_short --hours-left 66 --resume
-
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage3_mechanism --hours-left 56 --resume
-
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage4_long_core --hours-left 48 --resume
-```
-
-Optional long repeatability:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage4_long_repeatability --repetitions 2 \
-  --hours-left 40 --resume
-```
-
-Controls may run only while preserving the 32-hour operational handoff to the
-30-hour DSBM slot:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage5_topology_controls --hours-left 38 --resume
-```
-
-Run the preserved DSBM queue:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage6_dsbm --dsbm-root datasets-sbm \
-  --hours-left 30 --resume
-```
-
-Late interface rows:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage7_dfleiden_interface --hours-left 4 --resume
-
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --stage stage7_s2cag_interface --repetitions 1 \
-  --hours-left 12 --resume
-```
-
-The DF-Leiden command includes five `999:10` smart repetitions plus one
-smart-only `9:500` coverage run. The S2CAG command includes the requested one
-to five standard repetitions plus one three-feature-mode `999:100` coverage
-run.
-
-If an optional stage cannot fit, record that decision without erasing it:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --skip-for-budget stage6_dsbm --hours-left 18 --resume
-```
-
-`--skip-for-budget` is accepted only below the stage's registered start gate,
-after preflight and resolved dependencies. If Stage 2 triggers its scientific
-breadth no-go, record the affected controls explicitly rather than calling the
-outcome a budget decision:
-
-```bash
-python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py \
-  --paths-config datasets-info/paths/cn69.json \
-  --campaign-id repaired-comnetx-cn69-20260825 \
-  --skip-for-stage2-no-go stage5_topology_controls --resume
-```
-
-Inspect commands without executing them using `--dry-run`, or list the queue:
+The low-level queue can still be inspected without executing a measurement:
 
 ```bash
 python scripts/paper/ieee_access_repaired_comnetx_72h/run_queue.py --list
 ```
 
-After the required core is complete:
+After any registered window, File 08 runs the repaired, LD-Leiden, and
+cross-pack validators. The standalone repaired validator is:
 
 ```bash
 python scripts/paper/ieee_access_repaired_comnetx_72h/validate_campaign.py \
-  repaired-comnetx-cn69-20260825
+  repaired-comnetx-cn69-20260826
 ```
 
 All raw outputs, stdout (with immutable digests), failed attempts, paired

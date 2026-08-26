@@ -278,6 +278,7 @@ def build_stage_commands(
     paths_config: Path,
     dsbm_root: Path | None,
     repetitions: int | None,
+    dsbm_seed: int | None = None,
 ) -> list[CommandSpec]:
     cache_dir = campaign_dir / "bootstrap-cache"
     output_root = campaign_dir / "stages" / stage_id
@@ -455,9 +456,14 @@ def build_stage_commands(
     if stage_id == "stage6_dsbm":
         if dsbm_root is None:
             raise ValueError("--dsbm-root is required for stage6_dsbm")
+        if dsbm_seed is not None and dsbm_seed not in (42, 43, 44, 45, 46):
+            raise ValueError("DSBM seed must be one of 42, 43, 44, 45, or 46")
+        seeds = (dsbm_seed,) if dsbm_seed is not None else (42, 43, 44, 45, 46)
         return [
             CommandSpec(
-                name="dsbm_30_smart",
+                name=(
+                    f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+                ),
                 command=[
                     sys.executable,
                     str(PROJECT_ROOT / "scripts" / "paper" / "run_dsbm_stress.py"),
@@ -466,27 +472,35 @@ def build_stage_commands(
                     "--batch-suffix",
                     "100_batches",
                     "--regimes",
-                    "random",
-                    "hubs",
-                    "community",
+                    regime,
                     "--max-changes",
-                    "290",
-                    "1450",
+                    str(max_changes),
+                    "--seeds",
+                    str(seed),
                     "--methods",
                     "leidenalg",
                     "--modes",
+                    "naive",
                     "smart",
                     "--smart-depth",
                     "3",
                     "--smart-radius",
                     "1",
+                    "--cache-dir",
+                    str(cache_dir),
                     "--use-gpu",
                     "--output-dir",
                     "{attempt_dir}",
                     "--name",
-                    "repaired_dsbm_30_smart",
+                    (
+                        f"repaired_dsbm_seed_{seed}_{regime}_"
+                        f"mc{max_changes}_paired"
+                    ),
                 ],
             )
+            for seed in seeds
+            for max_changes in (290, 1450)
+            for regime in ("random", "hubs", "community")
         ]
     if stage_id == "stage7_dfleiden_interface":
         commands = [
@@ -536,6 +550,43 @@ def completed_attempt(command_dir: Path) -> Path | None:
     if len(completed) > 1:
         raise RuntimeError(f"multiple completed attempts in {command_dir}")
     return completed[0] if completed else None
+
+
+def dsbm_seed_progress(
+    campaign_dir: Path,
+) -> tuple[list[int], int | None, int]:
+    """Return complete seeds, first incomplete seed, and its completed cells."""
+    conditions = tuple(
+        (regime, max_changes)
+        for max_changes in (290, 1450)
+        for regime in ("random", "hubs", "community")
+    )
+    completed_seeds: list[int] = []
+    saw_incomplete = False
+    next_seed: int | None = None
+    next_seed_completed_conditions = 0
+    for seed in (42, 43, 44, 45, 46):
+        completed_conditions = 0
+        for regime, max_changes in conditions:
+            command_dir = (
+                campaign_dir
+                / "stages"
+                / "stage6_dsbm"
+                / f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+            )
+            completed_conditions += completed_attempt(command_dir) is not None
+        if completed_conditions == len(conditions):
+            if saw_incomplete:
+                raise RuntimeError(
+                    "completed DSBM seed appears after an incomplete fixed-prefix seed"
+                )
+            completed_seeds.append(seed)
+            continue
+        if next_seed is None:
+            next_seed = seed
+            next_seed_completed_conditions = completed_conditions
+        saw_incomplete = True
+    return completed_seeds, next_seed, next_seed_completed_conditions
 
 
 def next_attempt_dir(command_dir: Path) -> Path:
@@ -647,6 +698,8 @@ def run_command(
     spec: CommandSpec,
     *,
     deadline: float | None = None,
+    deadline_epoch: float | None = None,
+    measurement_window_id: str | None = None,
     stop_boundary_hours_left: float | None = None,
 ) -> None:
     command_dir = campaign_dir / "stages" / stage_id / spec.name
@@ -695,6 +748,9 @@ def run_command(
         "fingerprint_before": fingerprint_before,
         "runtime_identity_before": runtime_identity_before,
     }
+    if deadline_epoch is not None:
+        metadata["measurement_window_id"] = measurement_window_id
+        metadata["window_deadline_epoch"] = deadline_epoch
     if stop_boundary_hours_left is not None:
         metadata["stop_boundary_hours_left"] = stop_boundary_hours_left
     metadata_path = attempt_dir / "metadata.json"
@@ -876,6 +932,13 @@ def seal_dsbm_inputs(
             campaign_dir=campaign_dir,
             verify_content=True,
         )
+        registered_path = campaign_dir / registered["filename"]
+        registered_payload = read_json(registered_path)
+        current_payload = build_dsbm_input_manifest(dsbm_root)
+        if current_payload != registered_payload:
+            raise RuntimeError(
+                "DSBM root or sealed input content changed; start a new campaign"
+            )
         return
     payload = build_dsbm_input_manifest(dsbm_root)
     path = campaign_dir / "dsbm_input_manifest.json"
@@ -933,16 +996,32 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--measurement-window-id",
+        help=(
+            "Identifier of the append-only measurement window that owns "
+            "--deadline-epoch. Required whenever a deadline is supplied."
+        ),
+    )
+    parser.add_argument(
         "--stop-with-hours-left",
         type=float,
         default=0.0,
         help=(
             "Terminate the current measurement command at this campaign-time "
-            "boundary. Stage 5 always uses at least the registered DSBM handoff."
+            "reserve boundary."
         ),
     )
     parser.add_argument("--repetitions", type=int)
     parser.add_argument("--dsbm-root", type=Path)
+    parser.add_argument(
+        "--dsbm-seed",
+        type=int,
+        choices=(42, 43, 44, 45, 46),
+        help=(
+            "Run one fixed 3x2 paired DSBM seed block. Seeds 42..44 form the "
+            "primary design; seeds 45..46 are a budget-contingent precision extension."
+        ),
+    )
     action.add_argument("--preflight", action="store_true")
     parser.add_argument("--resume", action="store_true")
     action.add_argument("--list", action="store_true")
@@ -1036,7 +1115,13 @@ def main() -> None:
     if args.deadline_epoch is not None:
         if not math.isfinite(args.deadline_epoch):
             parser.error("--deadline-epoch must be finite")
+        if not args.measurement_window_id:
+            parser.error(
+                "--measurement-window-id is required with --deadline-epoch"
+            )
         args.hours_left = max(0.0, (args.deadline_epoch - time.time()) / 3600.0)
+    elif args.measurement_window_id:
+        parser.error("--measurement-window-id requires --deadline-epoch")
 
     if args.recover_interrupted_stage:
         if manifest.get("stage_status", {}).get(args.recover_interrupted_stage) == "running":
@@ -1122,22 +1207,24 @@ def main() -> None:
     if not math.isfinite(args.stop_with_hours_left) or args.stop_with_hours_left < 0:
         parser.error("--stop-with-hours-left must be a finite non-negative number")
     stop_boundary = float(args.stop_with_hours_left)
-    if stage["id"] == "stage5_topology_controls":
-        stop_boundary = max(
-            stop_boundary,
-            float(protocol["common"]["dsbm_operational_handoff_hours"]),
-        )
     dsbm_root = resolve_project_path(args.dsbm_root) if args.dsbm_root else None
     if dsbm_root is not None and not dsbm_root.exists():
         parser.error(f"DSBM root does not exist: {dsbm_root}")
     if stage["id"] == "stage6_dsbm" and dsbm_root is None:
         parser.error("--dsbm-root is required for stage6_dsbm")
+    if stage["id"] == "stage6_dsbm" and args.dsbm_seed is None:
+        parser.error(
+            "--dsbm-seed is required so Stage 6 advances one fixed-prefix seed at a time"
+        )
+    if args.dsbm_seed is not None and stage["id"] != "stage6_dsbm":
+        parser.error("--dsbm-seed is valid only for stage6_dsbm")
     commands = build_stage_commands(
         stage["id"],
         campaign_dir=campaign_dir,
         paths_config=paths_config,
         dsbm_root=dsbm_root,
         repetitions=args.repetitions,
+        dsbm_seed=args.dsbm_seed,
     )
     all_requested_commands_completed = all(
         completed_attempt(
@@ -1146,12 +1233,43 @@ def main() -> None:
         is not None
         for spec in commands
     )
+    stage_minimum_hours = float(stage["minimum_hours_remaining"])
+    if stage["id"] == "stage6_dsbm":
+        completed_seeds, next_seed, completed_conditions = dsbm_seed_progress(
+            campaign_dir
+        )
+        stage_minimum_hours = float(
+            stage[
+                "partial_seed_minimum_hours_remaining"
+                if completed_conditions
+                else "new_seed_minimum_hours_remaining"
+            ]
+        )
+        validation_path = campaign_dir / "stages" / "stage6_dsbm" / "validation.json"
+        validated_seeds = (
+            read_json(validation_path).get("completed_seeds", [])
+            if validation_path.is_file()
+            else []
+        )
+        if validated_seeds != completed_seeds[: len(validated_seeds)]:
+            parser.error("saved DSBM validation is not the completed fixed seed prefix")
+        if len(validated_seeds) < len(completed_seeds):
+            finalize_seed = completed_seeds[-1]
+            if args.dsbm_seed != finalize_seed or not all_requested_commands_completed:
+                parser.error(
+                    f"finalize already completed DSBM seed {finalize_seed} before "
+                    "starting another seed"
+                )
+        elif args.dsbm_seed != next_seed and not all_requested_commands_completed:
+            parser.error(
+                f"the next registered DSBM seed is {next_seed}, not {args.dsbm_seed}"
+            )
     if (
-        args.hours_left < float(stage["minimum_hours_remaining"])
+        args.hours_left < stage_minimum_hours
         and not all_requested_commands_completed
     ):
         parser.error(
-            f"{stage['id']} requires at least {stage['minimum_hours_remaining']}h remaining; "
+            f"{stage['id']} requires at least {stage_minimum_hours:g}h remaining; "
             "do not consume the reserve"
         )
     if stop_boundary >= args.hours_left and not all_requested_commands_completed:
@@ -1173,12 +1291,12 @@ def main() -> None:
     if args.deadline_epoch is not None:
         args.hours_left = max(0.0, (args.deadline_epoch - time.time()) / 3600.0)
         if (
-            args.hours_left < float(stage["minimum_hours_remaining"])
+            args.hours_left < stage_minimum_hours
             and not all_requested_commands_completed
         ):
             parser.error(
                 f"{stage['id']} fell below its "
-                f"{stage['minimum_hours_remaining']}h start gate during preconditions; "
+                f"{stage_minimum_hours:g}h start gate during preconditions; "
                 "re-run the launcher to record the registered budget outcome"
             )
         if stop_boundary >= args.hours_left and not all_requested_commands_completed:
@@ -1207,6 +1325,8 @@ def main() -> None:
                 stage["id"],
                 spec,
                 deadline=command_deadline,
+                deadline_epoch=args.deadline_epoch,
+                measurement_window_id=args.measurement_window_id,
                 stop_boundary_hours_left=stop_boundary,
             )
         validation = validate_stage(campaign_dir, stage["id"])
@@ -1216,6 +1336,8 @@ def main() -> None:
             "recorded_at_utc": utc_now(),
             "hours_left_at_launch": args.hours_left,
             "stop_boundary_hours_left": stop_boundary,
+            "measurement_window_id": args.measurement_window_id,
+            "window_deadline_epoch": args.deadline_epoch,
             "reason": str(exc),
         }
         manifest["updated_at_utc"] = utc_now()
@@ -1236,7 +1358,12 @@ def main() -> None:
         write_json(manifest_path, manifest)
         raise
     write_json(campaign_dir / "stages" / stage["id"] / "validation.json", validation)
-    manifest["stage_status"][stage["id"]] = "validated"
+    manifest["stage_status"][stage["id"]] = (
+        "partial"
+        if stage["id"] == "stage6_dsbm"
+        and validation.get("status") in {"valid_partial", "primary_validated"}
+        else "validated"
+    )
     manifest["updated_at_utc"] = utc_now()
     required = [item["id"] for item in protocol["stages"] if item["required"]]
     manifest["status"] = (

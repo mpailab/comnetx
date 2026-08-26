@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import hashlib
 import json
 import math
@@ -182,6 +183,294 @@ def assert_clock_creation_safe(repaired: Path, ld: Path) -> None:
             )
 
 
+def _numeric(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} is not numeric")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"{label} is not finite")
+    return result
+
+
+def _validate_launch_budget(
+    budget: dict[str, Any],
+    *,
+    repaired: Path,
+    ld: Path,
+    git_sha: str,
+    paths_config_sha256: str,
+) -> dict[str, dict[str, Any]]:
+    expected = {
+        "schema": "comnetx-ieee-access-launch-budget-v2",
+        "git_sha": git_sha,
+        "repaired_campaign_id": repaired.name,
+        "ld_campaign_id": ld.name,
+        "paths_config_sha256": paths_config_sha256,
+        "initial_window_hours": 24,
+        "max_total_hours": 72,
+    }
+    for key, value in expected.items():
+        if budget.get(key) != value:
+            raise ValueError(f"cross-pack launch budget differs for {key}")
+    windows = budget.get("windows")
+    if not isinstance(windows, list) or not windows:
+        raise ValueError("cross-pack launch budget has no measurement windows")
+    by_id: dict[str, dict[str, Any]] = {}
+    total = 0.0
+    previous_deadline: int | None = None
+    for index, window in enumerate(windows, start=1):
+        if not isinstance(window, dict):
+            raise ValueError("cross-pack launch budget contains a malformed window")
+        window_id = window.get("id")
+        if window_id != f"window-{index:03d}" or window_id in by_id:
+            raise ValueError("cross-pack launch budget has an invalid window id")
+        granted = _numeric(window.get("granted_hours"), f"{window_id} grant")
+        started = window.get("started_at_epoch")
+        deadline = window.get("deadline_epoch")
+        if (
+            granted <= 0
+            or not isinstance(started, int)
+            or not isinstance(deadline, int)
+            or deadline != started + int(round(granted * 3600))
+        ):
+            raise ValueError(f"cross-pack launch budget window is malformed: {window_id}")
+        if previous_deadline is not None and started < previous_deadline:
+            raise ValueError("cross-pack launch budget windows overlap")
+        if index == 1 and granted != 24:
+            raise ValueError("the first measurement window must be exactly 24 hours")
+        total += granted
+        previous_deadline = deadline
+        by_id[window_id] = window
+    if total > 72 + 1e-12:
+        raise ValueError("cross-pack launch budget exceeds its 72-hour cap")
+    return by_id
+
+
+def _validate_attempt_windows(
+    campaign: Path,
+    windows: dict[str, dict[str, Any]],
+) -> int:
+    checked = 0
+    for metadata_path in sorted(campaign.rglob("attempt-*/metadata.json")):
+        relative = metadata_path.relative_to(campaign)
+        if len(relative.parts) >= 2 and relative.parts[:2] == ("stages", "preflight"):
+            continue
+        metadata = _read(metadata_path)
+        window_id = metadata.get("measurement_window_id")
+        window = windows.get(window_id) if isinstance(window_id, str) else None
+        if window is None:
+            raise ValueError(f"attempt lacks a registered measurement window: {metadata_path}")
+        if metadata.get("window_deadline_epoch") != window["deadline_epoch"]:
+            raise ValueError(f"attempt has a mismatched window deadline: {metadata_path}")
+        started_at = metadata.get("started_at_utc")
+        if not isinstance(started_at, str):
+            raise ValueError(f"attempt lacks a UTC start timestamp: {metadata_path}")
+        try:
+            started_epoch = datetime.fromisoformat(
+                started_at.replace("Z", "+00:00")
+            ).timestamp()
+        except ValueError as exc:
+            raise ValueError(f"attempt has an invalid UTC start: {metadata_path}") from exc
+        if not window["started_at_epoch"] - 2 <= started_epoch <= window["deadline_epoch"]:
+            raise ValueError(f"attempt started outside its registered window: {metadata_path}")
+        if metadata.get("status") == "completed":
+            finished_at = metadata.get("finished_at_utc")
+            if not isinstance(finished_at, str):
+                raise ValueError(f"completed attempt lacks a UTC finish: {metadata_path}")
+            try:
+                finished_epoch = datetime.fromisoformat(
+                    finished_at.replace("Z", "+00:00")
+                ).timestamp()
+            except ValueError as exc:
+                raise ValueError(
+                    f"completed attempt has an invalid UTC finish: {metadata_path}"
+                ) from exc
+            effective_deadline = float(window["deadline_epoch"])
+            stop_reserve = metadata.get("stop_boundary_hours_left")
+            if stop_reserve is not None:
+                stop_reserve = _numeric(
+                    stop_reserve, f"{metadata_path} stop-boundary reserve"
+                )
+                if stop_reserve < 0:
+                    raise ValueError(
+                        f"attempt has a negative stop-boundary reserve: {metadata_path}"
+                    )
+                effective_deadline -= stop_reserve * 3600.0
+            if not started_epoch - 2 <= finished_epoch <= effective_deadline + 2:
+                raise ValueError(
+                    f"completed attempt finished outside its registered window: {metadata_path}"
+                )
+        checked += 1
+    return checked
+
+
+def _assert_ld_resumable_failure(
+    campaign: Path,
+    manifest: dict[str, Any],
+) -> None:
+    """Admit only a currently audited boundary/interruption failure."""
+
+    phase_status = manifest.get("phase_status")
+    if not isinstance(phase_status, dict):
+        raise ValueError("failed LD campaign lacks phase status")
+    allowed_statuses = {"pending", "completed", "failed"}
+    if any(status not in allowed_statuses for status in phase_status.values()):
+        raise ValueError("failed LD campaign has an unresolved phase status")
+    failed_phases = {
+        phase_id for phase_id, status in phase_status.items() if status == "failed"
+    }
+    current_failures = manifest.get("phase_failures")
+    if (
+        not failed_phases
+        or not isinstance(current_failures, dict)
+        or set(current_failures) != failed_phases
+    ):
+        raise ValueError("failed LD campaign lacks an exact current-failure audit")
+
+    allowed_failure_kinds = {
+        "campaign_time_boundary",
+        "launcher_interrupted",
+    }
+    for phase_id in sorted(failed_phases):
+        failure = current_failures.get(phase_id)
+        if not isinstance(failure, dict):
+            raise ValueError(f"failed LD phase lacks an audit: {phase_id}")
+        failure_kind = failure.get("failure_kind")
+        if failure_kind not in allowed_failure_kinds:
+            raise ValueError(
+                f"LD phase failed outside a resumable boundary: {phase_id}"
+            )
+
+        if failure_kind == "campaign_time_boundary":
+            registrations = manifest.get("time_boundary_stops")
+            registration = (
+                registrations.get(phase_id)
+                if isinstance(registrations, dict)
+                else None
+            )
+            if not isinstance(registration, dict):
+                raise ValueError(f"LD phase lacks its time-boundary audit: {phase_id}")
+            window_id = registration.get("measurement_window_id")
+            deadline = registration.get("deadline_epoch")
+            if (
+                not isinstance(window_id, str)
+                or not window_id
+                or isinstance(deadline, bool)
+                or not isinstance(deadline, (int, float))
+                or not math.isfinite(float(deadline))
+            ):
+                raise ValueError(f"LD phase has a malformed time-boundary audit: {phase_id}")
+        else:
+            registrations = manifest.get("interrupted_phases")
+            registration = (
+                registrations.get(phase_id)
+                if isinstance(registrations, dict)
+                else None
+            )
+            if not isinstance(registration, dict) or not isinstance(
+                registration.get("reason"), str
+            ):
+                raise ValueError(f"LD phase lacks its interruption audit: {phase_id}")
+
+        for metadata_path in sorted(
+            (campaign / phase_id).glob("repeat-*/attempt-*/metadata.json")
+        ):
+            metadata = _read(metadata_path)
+            status = metadata.get("status")
+            if status == "completed":
+                continue
+            if (
+                status != "failed"
+                or metadata.get("failure_kind") not in allowed_failure_kinds
+            ):
+                raise ValueError(
+                    "LD resumable phase contains an unaudited attempt failure: "
+                    f"{metadata_path}"
+                )
+
+
+def _assert_repaired_resumable_failures(
+    campaign: Path,
+    manifest: dict[str, Any],
+) -> None:
+    """Reject failed repaired stages without an exact resumable audit."""
+
+    stage_status = manifest.get("stage_status")
+    if not isinstance(stage_status, dict):
+        raise ValueError("repaired campaign lacks stage status")
+    failed_stages = {
+        stage_id for stage_id, status in stage_status.items() if status == "failed"
+    }
+    if not failed_stages:
+        return
+
+    boundary_stops = manifest.get("time_boundary_stops", {})
+    interruptions = manifest.get("interrupted_stages", {})
+    if not isinstance(boundary_stops, dict) or not isinstance(interruptions, dict):
+        raise ValueError("failed repaired campaign has malformed failure audits")
+
+    allowed_failure_kinds = {
+        "campaign_time_boundary",
+        "launcher_interrupted",
+    }
+    for stage_id in sorted(failed_stages):
+        has_boundary = stage_id in boundary_stops
+        has_interruption = stage_id in interruptions
+        if has_boundary == has_interruption:
+            raise ValueError(
+                "failed repaired stage lacks an exact resumable audit: "
+                f"{stage_id}"
+            )
+
+        if has_boundary:
+            boundary = boundary_stops[stage_id]
+            if not isinstance(boundary, dict):
+                raise ValueError(
+                    f"repaired stage has a malformed time-boundary audit: {stage_id}"
+                )
+            window_id = boundary.get("measurement_window_id")
+            deadline = boundary.get("window_deadline_epoch")
+            reserve = boundary.get("stop_boundary_hours_left")
+            if (
+                not isinstance(window_id, str)
+                or not window_id
+                or isinstance(deadline, bool)
+                or not isinstance(deadline, (int, float))
+                or not math.isfinite(float(deadline))
+                or isinstance(reserve, bool)
+                or not isinstance(reserve, (int, float))
+                or not math.isfinite(float(reserve))
+                or float(reserve) < 0
+            ):
+                raise ValueError(
+                    f"repaired stage has a malformed time-boundary audit: {stage_id}"
+                )
+        else:
+            interruption = interruptions[stage_id]
+            if not isinstance(interruption, dict) or not isinstance(
+                interruption.get("reason"), str
+            ):
+                raise ValueError(
+                    f"repaired stage has a malformed interruption audit: {stage_id}"
+                )
+
+        for metadata_path in sorted(
+            (campaign / "stages" / stage_id).glob("*/attempt-*/metadata.json")
+        ):
+            metadata = _read(metadata_path)
+            status = metadata.get("status")
+            if status == "completed":
+                continue
+            if (
+                status != "failed"
+                or metadata.get("failure_kind") not in allowed_failure_kinds
+            ):
+                raise ValueError(
+                    "repaired resumable stage contains an unaudited attempt failure: "
+                    f"{metadata_path}"
+                )
+
+
 def validate_pair(
     repaired: Path, ld: Path, *, preflight_only: bool
 ) -> dict[str, Any]:
@@ -213,7 +502,13 @@ def validate_pair(
             "preflight_validated",
             "running",
             "core_validated",
-        } or ld_manifest.get("status") not in {
+        }:
+            raise ValueError("campaign preflight status is invalid")
+        _assert_repaired_resumable_failures(repaired, repaired_manifest)
+        ld_status = ld_manifest.get("status")
+        if ld_status == "failed":
+            _assert_ld_resumable_failure(ld, ld_manifest)
+        elif ld_status not in {
             "preflight_complete",
             "partial",
             "completed",
@@ -262,30 +557,22 @@ def validate_pair(
             raise ValueError(f"cross-pack input identity differs: {path}")
 
     bootstrap_report: dict[str, Any] = {}
+    attempt_window_report: dict[str, int] = {}
     if not preflight_only:
         budget = _read(repaired / "launch_budget.json")
-        if (
-            budget.get("schema") != "comnetx-ieee-access-launch-budget-v1"
-            or budget.get("git_sha") != repaired_git.get("commit")
-            or budget.get("repaired_campaign_id") != repaired.name
-            or budget.get("ld_campaign_id") != ld.name
-            or budget.get("paths_config_sha256")
-            != repaired_manifest.get("paths_config", {}).get("sha256")
-        ):
-            raise ValueError("cross-pack launch budget identity differs")
-        budget_hours = budget.get("budget_hours")
-        started_epoch = budget.get("started_at_epoch")
-        deadline_epoch = budget.get("deadline_epoch")
-        if (
-            isinstance(budget_hours, bool)
-            or not isinstance(budget_hours, (int, float))
-            or not 0 < float(budget_hours) <= 72
-            or not isinstance(started_epoch, int)
-            or not isinstance(deadline_epoch, int)
-            or deadline_epoch
-            != started_epoch + int(round(float(budget_hours) * 3600))
-        ):
-            raise ValueError("cross-pack launch budget timing is malformed")
+        windows = _validate_launch_budget(
+            budget,
+            repaired=repaired,
+            ld=ld,
+            git_sha=str(repaired_git.get("commit")),
+            paths_config_sha256=str(
+                repaired_manifest.get("paths_config", {}).get("sha256")
+            ),
+        )
+        attempt_window_report = {
+            "repaired": _validate_attempt_windows(repaired, windows),
+            "ldleiden": _validate_attempt_windows(ld, windows),
+        }
         for dataset in ("dyn_pubmed", "arxivmath"):
             for initial_batch in (999, 9):
                 repaired_path = _bootstrap_path(
@@ -329,6 +616,7 @@ def validate_pair(
         "repaired_campaign": repaired.name,
         "ld_campaign": ld.name,
         "shared_input_files": len(ld_files),
+        "measurement_window_attempts": attempt_window_report,
         "bootstrap": bootstrap_report,
     }
 

@@ -515,6 +515,7 @@ def run_attempt(
     phase: dict[str, Any],
     repeat_index: int,
     deadline_epoch: float | None,
+    measurement_window_id: str | None = None,
 ) -> dict[str, Any]:
     if deadline_epoch is not None and time.time() >= deadline_epoch:
         raise CampaignTimeBoundary(
@@ -569,6 +570,9 @@ def run_attempt(
         "stdout_log": "stdout.log",
         "identity_before": identity_before,
     }
+    if deadline_epoch is not None:
+        metadata["measurement_window_id"] = measurement_window_id
+        metadata["window_deadline_epoch"] = deadline_epoch
     metadata_path = attempt_dir / "metadata.json"
     write_json(metadata_path, metadata)
 
@@ -736,10 +740,21 @@ def main() -> None:
         type=float,
         help="Absolute deadline of the shared repaired/LD measurement campaign.",
     )
+    parser.add_argument(
+        "--measurement-window-id",
+        help=(
+            "Identifier of the append-only measurement window that owns "
+            "--deadline-epoch. Required whenever a deadline is supplied."
+        ),
+    )
     args = parser.parse_args()
 
     if args.deadline_epoch is not None and not math.isfinite(args.deadline_epoch):
         parser.error("--deadline-epoch must be finite")
+    if args.deadline_epoch is not None and not args.measurement_window_id:
+        parser.error("--measurement-window-id is required with --deadline-epoch")
+    if args.deadline_epoch is None and args.measurement_window_id:
+        parser.error("--measurement-window-id requires --deadline-epoch")
 
     if not CAMPAIGN_RE.fullmatch(args.campaign_id):
         parser.error("--campaign-id may contain only letters, digits, dot, underscore, and dash")
@@ -853,6 +868,7 @@ def main() -> None:
                 f"Starting {phase['id']}: {phase['repetitions']} repetition(s), "
                 f"included_in_analysis={phase['included_in_analysis']}"
             )
+            manifest.setdefault("phase_failures", {}).pop(phase["id"], None)
             manifest["phase_status"][phase["id"]] = "running"
             active_phase_started = True
             manifest["updated_at_utc"] = utc_now()
@@ -871,6 +887,7 @@ def main() -> None:
                     phase,
                     repeat_index,
                     args.deadline_epoch,
+                    args.measurement_window_id,
                 )
             manifest["phase_status"][phase["id"]] = "completed"
             manifest["updated_at_utc"] = utc_now()
@@ -878,18 +895,31 @@ def main() -> None:
     except BaseException as exc:
         manifest["status"] = "failed"
         if active_phase is not None and active_phase_started:
-            manifest["phase_status"][active_phase["id"]] = "failed"
+            phase_id = active_phase["id"]
+            manifest["phase_status"][phase_id] = "failed"
+            if isinstance(exc, CampaignTimeBoundary):
+                failure_kind = "campaign_time_boundary"
+            elif isinstance(exc, (KeyboardInterrupt, LauncherSignalInterrupt)):
+                failure_kind = "launcher_interrupted"
+            else:
+                failure_kind = "runtime_failure"
+            manifest.setdefault("phase_failures", {})[phase_id] = {
+                "recorded_at_utc": utc_now(),
+                "failure_kind": failure_kind,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
             if isinstance(exc, CampaignTimeBoundary):
                 manifest.setdefault("time_boundary_stops", {})[
-                    active_phase["id"]
+                    phase_id
                 ] = {
                     "recorded_at_utc": utc_now(),
                     "deadline_epoch": args.deadline_epoch,
+                    "measurement_window_id": args.measurement_window_id,
                     "reason": str(exc),
                 }
             elif isinstance(exc, (KeyboardInterrupt, LauncherSignalInterrupt)):
                 manifest.setdefault("interrupted_phases", {})[
-                    active_phase["id"]
+                    phase_id
                 ] = {
                     "recorded_at_utc": utc_now(),
                     "reason": f"{type(exc).__name__}: {exc}",

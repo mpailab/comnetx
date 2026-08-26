@@ -1,7 +1,7 @@
 {
   "schema": "comnetx-ieee-access-ldleiden-protocol-v1",
   "protocol_id": "ieee-access-ldleiden-72h-v1",
-  "registered_date": "2026-08-25",
+  "registered_date": "2026-08-26",
   "purpose": "Measure the specialization gap between native LD-Leiden and the general ComNetX adapter under matched graph, stream, bootstrap, and principal-clock definitions.",
   "common": {
     "backend": "ldleiden",

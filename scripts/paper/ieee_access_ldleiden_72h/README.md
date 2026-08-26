@@ -47,8 +47,13 @@ campaign artifacts must remain internally exact.
 
 Run inside one fixed measurement container. Commit the measurement code first;
 a dirty tree is recorded, but a clean pinned commit is the reproducible launch
-condition. Preflight is mandatory campaign creation and writes only identity
-artifacts--it does not run a graph measurement.
+condition. For the actual 24-hour initial campaign and any append-only
+extension, use the eight wrappers in
+`scripts/paper/ieee_access_72h_launch/README.md`; they attach the shared window
+ID and exact deadline to every attempt. The commands below are low-level API
+references and are not a substitute for the bounded paper campaign. Preflight
+is mandatory campaign creation and writes only identity artifacts--it does not
+run a graph measurement.
 
 Preflight the inputs, source, runtime identity, installed wheel, and readable
 one-worker `AlgorithmOptions` default:
@@ -56,7 +61,7 @@ one-worker `AlgorithmOptions` default:
 ```bash
 python scripts/paper/ieee_access_ldleiden_72h/run_protocol.py \
   --paths-config datasets-info/paths/cn69.json \
-  --campaign-id ldleiden-cn69-20260825 \
+  --campaign-id ldleiden-cn69-20260826 \
   --preflight-only
 ```
 
@@ -65,11 +70,11 @@ Run the smoke gate first:
 ```bash
 python scripts/paper/ieee_access_ldleiden_72h/run_protocol.py \
   --paths-config datasets-info/paths/cn69.json \
-  --campaign-id ldleiden-cn69-20260825 \
+  --campaign-id ldleiden-cn69-20260826 \
   --phase smoke --resume
 
 python scripts/paper/ieee_access_ldleiden_72h/validate_results.py \
-  ldleiden-cn69-20260825 --allow-partial
+  ldleiden-cn69-20260826 --allow-partial
 ```
 
 Only after the smoke validator accepts the split clocks, run the measured
@@ -78,16 +83,16 @@ short and long phases. The same campaign id preserves the common bootstrap:
 ```bash
 python scripts/paper/ieee_access_ldleiden_72h/run_protocol.py \
   --paths-config datasets-info/paths/cn69.json \
-  --campaign-id ldleiden-cn69-20260825 \
+  --campaign-id ldleiden-cn69-20260826 \
   --phase short --resume
 
 python scripts/paper/ieee_access_ldleiden_72h/run_protocol.py \
   --paths-config datasets-info/paths/cn69.json \
-  --campaign-id ldleiden-cn69-20260825 \
+  --campaign-id ldleiden-cn69-20260826 \
   --phase long --resume
 
 python scripts/paper/ieee_access_ldleiden_72h/validate_results.py \
-  ldleiden-cn69-20260825
+  ldleiden-cn69-20260826
 ```
 
 After preflight, an uninterrupted queue may omit `--phase` and pass `--resume`;

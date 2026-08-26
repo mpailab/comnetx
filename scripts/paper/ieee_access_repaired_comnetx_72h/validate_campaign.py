@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import math
 import re
 from pathlib import Path
@@ -62,6 +63,123 @@ DSBM_RE = re.compile(
 )
 
 
+def _numeric(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValidationError(f"{label} is not numeric")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValidationError(f"{label} is not finite")
+    return result
+
+
+def validate_launch_budget(
+    campaign_dir: Path,
+    manifest: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    budget_path = campaign_dir / "launch_budget.json"
+    if not budget_path.is_file():
+        raise ValidationError("campaign launch budget is missing")
+    budget = read_json(budget_path)
+    expected = {
+        "schema": "comnetx-ieee-access-launch-budget-v2",
+        "git_sha": manifest.get("git", {}).get("commit"),
+        "repaired_campaign_id": manifest.get("campaign_id"),
+        "paths_config_sha256": manifest.get("paths_config", {}).get("sha256"),
+        "initial_window_hours": 24,
+        "max_total_hours": 72,
+    }
+    for key, value in expected.items():
+        if budget.get(key) != value:
+            raise ValidationError(f"campaign launch budget differs for {key}")
+    if not isinstance(budget.get("ld_campaign_id"), str):
+        raise ValidationError("campaign launch budget lacks the LD campaign id")
+    windows = budget.get("windows")
+    if not isinstance(windows, list) or not windows:
+        raise ValidationError("campaign launch budget has no measurement windows")
+    by_id: dict[str, dict[str, Any]] = {}
+    total = 0.0
+    previous_deadline: int | None = None
+    for index, window in enumerate(windows, start=1):
+        if not isinstance(window, dict):
+            raise ValidationError("campaign launch budget contains a malformed window")
+        window_id = window.get("id")
+        if window_id != f"window-{index:03d}" or window_id in by_id:
+            raise ValidationError("campaign launch budget has an invalid window id")
+        granted = _numeric(window.get("granted_hours"), f"{window_id} grant")
+        started = window.get("started_at_epoch")
+        deadline = window.get("deadline_epoch")
+        if (
+            granted <= 0
+            or not isinstance(started, int)
+            or not isinstance(deadline, int)
+            or deadline != started + int(round(granted * 3600))
+        ):
+            raise ValidationError(f"malformed measurement window: {window_id}")
+        if previous_deadline is not None and started < previous_deadline:
+            raise ValidationError("campaign measurement windows overlap")
+        if index == 1 and granted != 24:
+            raise ValidationError("the first measurement window must be exactly 24 hours")
+        total += granted
+        previous_deadline = deadline
+        by_id[window_id] = window
+    if total > 72 + 1e-12:
+        raise ValidationError("campaign launch budget exceeds its 72-hour cap")
+    return budget, by_id
+
+
+def validate_attempt_window(
+    metadata: dict[str, Any],
+    metadata_path: Path,
+    windows: dict[str, dict[str, Any]],
+) -> None:
+    window_id = metadata.get("measurement_window_id")
+    window = windows.get(window_id) if isinstance(window_id, str) else None
+    if window is None:
+        raise ValidationError(f"attempt lacks a registered window: {metadata_path}")
+    if metadata.get("window_deadline_epoch") != window["deadline_epoch"]:
+        raise ValidationError(f"attempt window deadline changed: {metadata_path}")
+    started_at = metadata.get("started_at_utc")
+    if not isinstance(started_at, str):
+        raise ValidationError(f"attempt lacks a UTC start timestamp: {metadata_path}")
+    try:
+        started_epoch = datetime.fromisoformat(
+            started_at.replace("Z", "+00:00")
+        ).timestamp()
+    except ValueError as exc:
+        raise ValidationError(f"attempt has an invalid UTC start: {metadata_path}") from exc
+    if not window["started_at_epoch"] - 2 <= started_epoch <= window["deadline_epoch"]:
+        raise ValidationError(f"attempt started outside its window: {metadata_path}")
+    if metadata.get("status") == "completed":
+        finished_at = metadata.get("finished_at_utc")
+        if not isinstance(finished_at, str):
+            raise ValidationError(
+                f"completed attempt lacks a UTC finish: {metadata_path}"
+            )
+        try:
+            finished_epoch = datetime.fromisoformat(
+                finished_at.replace("Z", "+00:00")
+            ).timestamp()
+        except ValueError as exc:
+            raise ValidationError(
+                f"completed attempt has an invalid UTC finish: {metadata_path}"
+            ) from exc
+        effective_deadline = float(window["deadline_epoch"])
+        stop_reserve = metadata.get("stop_boundary_hours_left")
+        if stop_reserve is not None:
+            stop_reserve = _numeric(
+                stop_reserve, f"{metadata_path} stop-boundary reserve"
+            )
+            if stop_reserve < 0:
+                raise ValidationError(
+                    f"attempt has a negative stop-boundary reserve: {metadata_path}"
+                )
+            effective_deadline -= stop_reserve * 3600.0
+        if not started_epoch - 2 <= finished_epoch <= effective_deadline + 2:
+            raise ValidationError(
+                f"completed attempt finished outside its window: {metadata_path}"
+            )
+
+
 def completed_attempt(campaign_dir: Path, stage_id: str, command_name: str) -> Path:
     command_dir = campaign_dir / "stages" / stage_id / command_name
     attempts = []
@@ -78,6 +196,9 @@ def completed_attempt(campaign_dir: Path, stage_id: str, command_name: str) -> P
     if metadata.get("stage_id") != stage_id or metadata.get("command_name") != command_name:
         raise ValidationError(f"{attempt}: command metadata identity mismatch")
     campaign_manifest = read_json(campaign_dir / "manifest.json")
+    if stage_id != "preflight" and (campaign_dir / "launch_budget.json").is_file():
+        _, windows = validate_launch_budget(campaign_dir, campaign_manifest)
+        validate_attempt_window(metadata, attempt / "metadata.json", windows)
     sealed = campaign_manifest.get("fingerprint")
     if (
         metadata.get("fingerprint_before") != sealed
@@ -1385,72 +1506,216 @@ def validate_stage6(campaign_dir: Path) -> dict[str, Any]:
         raise ValidationError("Stage 6 lacks a sealed DSBM input manifest")
     input_manifest = read_json(input_path)
     validate_input_manifest(input_manifest, verify_content=True)
-    attempt = completed_attempt(campaign_dir, "stage6_dsbm", "dsbm_30_smart")
-    manifest = read_json(attempt / "manifest_repaired_dsbm_30_smart.json")
-    if (
-        manifest.get("status") != "completed"
-        or manifest.get("selected_streams") != 30
-        or manifest.get("attempted_runs") != 30
-        or manifest.get("successful_runs") != 30
-        or manifest.get("errors") != 0
-    ):
-        raise ValidationError("DSBM manifest is incomplete or contains failures")
-    payload = read_json(attempt / "repaired_dsbm_30_smart.json")
-    if set(payload) != {SMART_LEIDEN}:
-        raise ValidationError("DSBM output contains unexpected algorithms")
-    datasets = payload[SMART_LEIDEN]
-    if len(datasets) != 30 or any(not DSBM_RE.match(name) for name in datasets):
-        raise ValidationError("DSBM output does not contain the registered 30 streams")
-    observed_design = {
-        (match.group(1), int(match.group(2)), int(match.group(3)))
-        for name in datasets
-        if (match := DSBM_RE.match(name)) is not None
-    }
-    expected_design = {
-        (regime, max_changes, seed)
-        for regime in ("random", "hubs", "community")
-        for max_changes in (290, 1450)
-        for seed in (42, 43, 44, 45, 46)
-    }
-    if observed_design != expected_design:
-        raise ValidationError("DSBM output is not the registered 3x2x5 factorial grid")
     sealed_datasets = {
         use
         for record in input_manifest["files"]
         if Path(record["path"]).name.startswith("out.")
         for use in record["uses"]
     }
-    if set(datasets) != sealed_datasets:
-        raise ValidationError("DSBM output datasets differ from sealed inputs")
-    for dataset, machine_map in datasets.items():
-        if len(machine_map) != 1:
-            raise ValidationError(f"{dataset}: expected one machine")
-        batch_map = next(iter(machine_map.values()))
-        if set(batch_map) != {"0:99"}:
-            raise ValidationError(f"{dataset}: unexpected DSBM batch keys")
-        series = batch_map["0:99"]
-        if not isinstance(series, list) or len(series) != 99:
-            raise ValidationError(f"{dataset}: expected 99 smart updates")
-        for index, row in enumerate(series, start=1):
-            for field in ("time", "modularity"):
-                value = row.get(field)
-                if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-                    raise ValidationError(f"{dataset}/update-{index}: invalid {field}")
-            if float(row["time"]) < 0 or not -1 <= float(row["modularity"]) <= 1:
-                raise ValidationError(f"{dataset}/update-{index}: metric out of range")
-        final = series[-1]
-        for field in ("Final modularity", "NMI"):
-            value = final.get(field)
-            if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-                raise ValidationError(f"{dataset}: invalid {field}")
-        if not -1 <= float(final["Final modularity"]) <= 1 or not 0 <= float(
-            final["NMI"]
-        ) <= 1:
-            raise ValidationError(f"{dataset}: final metric out of range")
+    seed_order = (42, 43, 44, 45, 46)
+    conditions = tuple(
+        (regime, max_changes)
+        for max_changes in (290, 1450)
+        for regime in ("random", "hubs", "community")
+    )
+    completed_seeds: list[int] = []
+    paired_cells: list[dict[str, Any]] = []
+    partial_seed: int | None = None
+    saw_seed_gap = False
+    for seed in seed_order:
+        completed_conditions = 0
+        for regime, max_changes in conditions:
+            command_name = (
+                f"dsbm_seed_{seed}_{regime}_mc{max_changes}_paired"
+            )
+            command_dir = campaign_dir / "stages" / "stage6_dsbm" / command_name
+            metadata_paths = sorted(command_dir.glob("attempt-*/metadata.json"))
+            completed_paths = [
+                path
+                for path in metadata_paths
+                if read_json(path).get("status") == "completed"
+            ]
+            if len(completed_paths) > 1:
+                raise ValidationError(f"{command_name}: multiple completed attempts")
+            if not completed_paths:
+                continue
+            if saw_seed_gap:
+                raise ValidationError(
+                    "DSBM conditions were completed after a gap in the fixed seed order"
+                )
+            completed_conditions += 1
+            attempt = completed_attempt(campaign_dir, "stage6_dsbm", command_name)
+            stem = (
+                f"repaired_dsbm_seed_{seed}_{regime}_"
+                f"mc{max_changes}_paired"
+            )
+            run_manifest = read_json(attempt / f"manifest_{stem}.json")
+            if (
+                run_manifest.get("status") != "completed"
+                or run_manifest.get("selected_streams") != 1
+                or run_manifest.get("attempted_runs") != 2
+                or run_manifest.get("successful_runs") != 2
+                or run_manifest.get("errors") != 0
+                or run_manifest.get("seeds") != [seed]
+                or run_manifest.get("regimes") != [regime]
+                or run_manifest.get("max_changes") != [max_changes]
+                or run_manifest.get("modes") != ["naive", "smart"]
+            ):
+                raise ValidationError(
+                    f"DSBM condition {seed}/{regime}/{max_changes} is incomplete"
+                )
+            payload = read_json(attempt / f"{stem}.json")
+            if set(payload) != {FULL_LEIDEN, SMART_LEIDEN}:
+                raise ValidationError(
+                    f"DSBM condition {seed}/{regime}/{max_changes} is not paired"
+                )
+            algorithm_datasets = {
+                algorithm: set(payload[algorithm])
+                for algorithm in (FULL_LEIDEN, SMART_LEIDEN)
+            }
+            if algorithm_datasets[FULL_LEIDEN] != algorithm_datasets[SMART_LEIDEN]:
+                raise ValidationError(f"{command_name}: full/smart datasets differ")
+            if len(algorithm_datasets[FULL_LEIDEN]) != 1:
+                raise ValidationError(f"{command_name}: expected exactly one dataset")
+            dataset = next(iter(algorithm_datasets[FULL_LEIDEN]))
+            match = DSBM_RE.match(dataset)
+            if match is None or (
+                match.group(1), int(match.group(2)), int(match.group(3))
+            ) != (regime, max_changes, seed):
+                raise ValidationError(f"{command_name}: dataset identity mismatch")
+            if dataset not in sealed_datasets:
+                raise ValidationError(f"{dataset}: dataset is absent from the input seal")
+
+            series_by_algorithm: dict[str, list[dict[str, Any]]] = {}
+            for algorithm in (FULL_LEIDEN, SMART_LEIDEN):
+                machine_map = payload[algorithm][dataset]
+                if len(machine_map) != 1:
+                    raise ValidationError(f"{dataset}/{algorithm}: expected one machine")
+                batch_map = next(iter(machine_map.values()))
+                if set(batch_map) != {"0:99"}:
+                    raise ValidationError(
+                        f"{dataset}/{algorithm}: unexpected DSBM batch keys"
+                    )
+                series = batch_map["0:99"]
+                if not isinstance(series, list) or len(series) != 99:
+                    raise ValidationError(
+                        f"{dataset}/{algorithm}: expected 99 measured updates"
+                    )
+                for index, row in enumerate(series, start=1):
+                    for field in ("time", "modularity"):
+                        value = row.get(field)
+                        if not isinstance(value, (int, float)) or not math.isfinite(
+                            float(value)
+                        ):
+                            raise ValidationError(
+                                f"{dataset}/{algorithm}/update-{index}: invalid {field}"
+                            )
+                    if float(row["time"]) < 0 or not -1 <= float(
+                        row["modularity"]
+                    ) <= 1:
+                        raise ValidationError(
+                            f"{dataset}/{algorithm}/update-{index}: metric out of range"
+                        )
+                final = series[-1]
+                for field in ("Final modularity", "NMI"):
+                    value = final.get(field)
+                    if not isinstance(value, (int, float)) or not math.isfinite(
+                        float(value)
+                    ):
+                        raise ValidationError(
+                            f"{dataset}/{algorithm}: invalid {field}"
+                        )
+                if not -1 <= float(final["Final modularity"]) <= 1 or not 0 <= float(
+                    final["NMI"]
+                ) <= 1:
+                    raise ValidationError(
+                        f"{dataset}/{algorithm}: final metric out of range"
+                    )
+                series_by_algorithm[algorithm] = series
+
+            bootstrap = validate_paired_bootstrap(
+                campaign_dir,
+                attempt,
+                dataset=dataset,
+                initial_batch=0,
+            )
+            full_series = series_by_algorithm[FULL_LEIDEN]
+            smart_series = series_by_algorithm[SMART_LEIDEN]
+            full_time = sum(float(row["time"]) for row in full_series)
+            smart_time = sum(float(row["time"]) for row in smart_series)
+            if full_time <= 0 or smart_time <= 0:
+                raise ValidationError(f"{dataset}: paired cumulative time must be positive")
+            paired_cells.append(
+                {
+                    "seed": seed,
+                    "update_type": regime,
+                    "changed_edges_per_update": max_changes,
+                    "dataset": dataset,
+                    "full_total_time": full_time,
+                    "smart_total_time": smart_time,
+                    "speedup": full_time / smart_time,
+                    "delta_q": float(smart_series[-1]["Final modularity"])
+                    - float(full_series[-1]["Final modularity"]),
+                    "delta_nmi": float(smart_series[-1]["NMI"])
+                    - float(full_series[-1]["NMI"]),
+                    "bootstrap_sha256": bootstrap,
+                }
+            )
+        if completed_conditions == len(conditions):
+            completed_seeds.append(seed)
+        elif completed_conditions:
+            if partial_seed is not None:
+                raise ValidationError("more than one DSBM seed is partially complete")
+            partial_seed = seed
+            saw_seed_gap = True
+        else:
+            saw_seed_gap = True
+    if not completed_seeds:
+        raise ValidationError("DSBM stage has no completed seed block")
+    expected_prefix = list(seed_order[: len(completed_seeds)])
+    if completed_seeds != expected_prefix:
+        raise ValidationError(
+            "DSBM seeds must be accumulated without outcome-based selection in "
+            f"the fixed order {list(seed_order)}"
+        )
+    publishable_cells = [
+        cell for cell in paired_cells if cell["seed"] in completed_seeds
+    ]
+    if len(publishable_cells) != 6 * len(completed_seeds):
+        raise ValidationError("complete DSBM seeds do not contribute exactly six pairs")
+    partial_cell_count = len(paired_cells) - len(publishable_cells)
     return {
-        "status": "validated",
-        "smart_runs": 30,
-        "estimated_gpu_hours_registered": 26.95,
+        "status": (
+            "validated"
+            if len(completed_seeds) == 5
+            else "primary_validated"
+            if len(completed_seeds) >= 3
+            else "valid_partial"
+        ),
+        "completed_seeds": completed_seeds,
+        "completed_seed_count": len(completed_seeds),
+        "primary_analysis_seeds": [42, 43, 44],
+        "primary_design_complete": len(completed_seeds) >= 3,
+        "minimum_publishable_seed_count": 3,
+        "minimum_publishable_seed_count_met": len(completed_seeds) >= 3,
+        "precision_extension_seeds": [45, 46],
+        "precision_target_seed_count": 5,
+        "precision_extension_complete": len(completed_seeds) == 5,
+        "paired_condition_count": len(publishable_cells),
+        "fresh_full_runs": len(publishable_cells),
+        "fresh_smart_runs": len(publishable_cells),
+        "paired_cells": publishable_cells,
+        "partial_seed_progress": (
+            {
+                "seed": partial_seed,
+                "completed_condition_pairs": partial_cell_count,
+                "eligible_for_analysis": False,
+            }
+            if partial_seed is not None
+            else None
+        ),
+        "historical_total_algorithm_hours_registered": 63.73,
+        "historical_total_wall_hours_registered": 76.06,
     }
 
 
@@ -1615,28 +1880,11 @@ def validate_campaign(campaign_dir: Path) -> dict[str, Any]:
     ):
         raise ValidationError("real-input manifest is missing or changed")
     validate_input_manifest(read_json(real_path), verify_content=True)
-    budget_path = campaign_dir / "launch_budget.json"
-    if not budget_path.is_file():
-        raise ValidationError("campaign launch budget is missing")
-    launch_budget = read_json(budget_path)
-    if launch_budget.get("schema") != "comnetx-ieee-access-launch-budget-v1":
-        raise ValidationError("unexpected campaign launch-budget schema")
-    if launch_budget.get("git_sha") != manifest.get("git", {}).get("commit"):
-        raise ValidationError("campaign launch budget uses another git commit")
-    if launch_budget.get("repaired_campaign_id") != manifest.get("campaign_id"):
-        raise ValidationError("campaign launch budget uses another campaign id")
-    budget_hours = launch_budget.get("budget_hours")
-    started_epoch = launch_budget.get("started_at_epoch")
-    deadline_epoch = launch_budget.get("deadline_epoch")
-    if (
-        isinstance(budget_hours, bool)
-        or not isinstance(budget_hours, (int, float))
-        or not 0 < float(budget_hours) <= 72
-        or not isinstance(started_epoch, int)
-        or not isinstance(deadline_epoch, int)
-        or deadline_epoch != started_epoch + int(round(float(budget_hours) * 3600))
-    ):
-        raise ValidationError("campaign launch budget is malformed")
+    launch_budget, windows = validate_launch_budget(campaign_dir, manifest)
+    for metadata_path in sorted(campaign_dir.glob("stages/*/*/attempt-*/metadata.json")):
+        if metadata_path.parts[-4] == "preflight":
+            continue
+        validate_attempt_window(read_json(metadata_path), metadata_path, windows)
     dsbm_registration = manifest.get("dsbm_input_manifest")
     if dsbm_registration is not None:
         dsbm_path = campaign_dir / dsbm_registration.get("filename", "")
@@ -1667,8 +1915,15 @@ def validate_campaign(campaign_dir: Path) -> dict[str, Any]:
             "purpose": stage["purpose"],
         }
         validation_path = campaign_dir / "stages" / stage["id"] / "validation.json"
-        if status == "validated":
+        if status in {"validated", "partial"}:
             validation = validate_stage(campaign_dir, stage["id"])
+            if status == "partial" and validation.get("status") not in {
+                "valid_partial",
+                "primary_validated",
+            }:
+                raise ValidationError(
+                    f"partial stage does not have partial evidence: {stage['id']}"
+                )
             if validation_path.is_file() and read_json(validation_path) != validation:
                 raise ValidationError(f"saved validation report changed: {stage['id']}")
             report["stages"][stage["id"]]["validation"] = validation
@@ -1689,6 +1944,25 @@ def validate_campaign(campaign_dir: Path) -> dict[str, Any]:
             report["stages"][stage["id"]]["scientific_no_go_skip"] = manifest.get(
                 "scientific_no_go_skips", {}
             ).get(stage["id"])
+        elif status == "failed":
+            boundary_stop = manifest.get("time_boundary_stops", {}).get(stage["id"])
+            interruption = manifest.get("interrupted_stages", {}).get(stage["id"])
+            if not isinstance(boundary_stop, dict) and not isinstance(
+                interruption, dict
+            ):
+                raise ValidationError(
+                    f"optional stage failed outside a registered resumable boundary: {stage['id']}"
+                )
+            if isinstance(boundary_stop, dict):
+                report["stages"][stage["id"]]["time_boundary_stop"] = boundary_stop
+            if isinstance(interruption, dict):
+                report["stages"][stage["id"]]["interruption"] = interruption
+        elif status == "running":
+            raise ValidationError(
+                f"stage still has an unresolved running marker: {stage['id']}"
+            )
+        elif status != "pending":
+            raise ValidationError(f"unexpected stage status: {stage['id']}={status!r}")
     return report
 
 

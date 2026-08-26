@@ -12,9 +12,17 @@ if [[ -f "$BUDGET_STATE_FILE" ]]; then
     --repaired-campaign "$REPAIRED_CAMPAIGN_ID" \
     --ld-campaign "$LD_CAMPAIGN_ID" --preflight-only
   initialize_budget_clock
-  note "Preflights and the shared clock already exist; nothing was reset"
+  if [[ -n "$CAMPAIGN_EXTENSION_HOURS" ]]; then
+    extend_budget_clock
+    note "Appended an explicit ${CAMPAIGN_EXTENSION_HOURS}-hour measurement window"
+  else
+    note "Preflights and the current measurement window already exist; nothing was reset"
+  fi
   exit 0
 fi
+
+[[ -z "$CAMPAIGN_EXTENSION_HOURS" ]] \
+  || die "Cannot extend a campaign before its fixed 24-hour initial window exists"
 
 "$PYTHON_BIN" "$PAIR_VALIDATOR" \
   --repaired-campaign "$REPAIRED_CAMPAIGN_ID" \
@@ -51,4 +59,4 @@ note "Preflighting LD-Leiden"
   --ld-campaign "$LD_CAMPAIGN_ID" --preflight-only
 
 initialize_budget_clock
-note "Both campaigns are sealed; no graph measurement was run"
+note "Both campaigns are sealed and the fixed 24-hour initial window is active; no graph measurement was run"

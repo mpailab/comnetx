@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
+import math
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +51,44 @@ def successful_attempts(repeat_dir: Path) -> tuple[list[Path], list[Path]]:
         else:
             unsuccessful.append(metadata_path.parent)
     return completed, unsuccessful
+
+
+def validate_window_attestation(metadata: dict[str, Any], metadata_path: Path) -> None:
+    window_id = metadata.get("measurement_window_id")
+    deadline = metadata.get("window_deadline_epoch")
+    if window_id is None and deadline is None:
+        return
+    if not isinstance(window_id, str) or not window_id:
+        raise ValidationError(f"invalid measurement window id: {metadata_path}")
+    if (
+        isinstance(deadline, bool)
+        or not isinstance(deadline, (int, float))
+        or not math.isfinite(float(deadline))
+    ):
+        raise ValidationError(f"invalid measurement window deadline: {metadata_path}")
+    timestamps = {}
+    for field in ("started_at_utc", "finished_at_utc"):
+        value = metadata.get(field)
+        if not isinstance(value, str):
+            raise ValidationError(
+                f"window-attested attempt lacks {field}: {metadata_path}"
+            )
+        try:
+            timestamps[field] = datetime.fromisoformat(
+                value.replace("Z", "+00:00")
+            ).timestamp()
+        except ValueError as exc:
+            raise ValidationError(
+                f"window-attested attempt has invalid {field}: {metadata_path}"
+            ) from exc
+    if not (
+        timestamps["started_at_utc"] - 2
+        <= timestamps["finished_at_utc"]
+        <= float(deadline) + 2
+    ):
+        raise ValidationError(
+            f"completed attempt finished outside its measurement window: {metadata_path}"
+        )
 
 
 def registered_artifact(
@@ -226,6 +266,7 @@ def validate_campaign(campaign_dir: Path, allow_partial: bool = False) -> dict[s
                 continue
             attempt_dir = completed[0]
             metadata = read_json(attempt_dir / "metadata.json")
+            validate_window_attestation(metadata, attempt_dir / "metadata.json")
             expected_metadata = {
                 "phase_id": phase["id"],
                 "role": phase["role"],

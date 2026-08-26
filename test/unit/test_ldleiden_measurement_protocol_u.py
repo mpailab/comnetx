@@ -28,6 +28,7 @@ from scripts.paper.ieee_access_ldleiden_72h.input_manifest import (
 from scripts.paper.ieee_access_ldleiden_72h.validate_results import (
     bootstrap_hash_for_dataset,
     validate_campaign,
+    validate_window_attestation,
 )
 
 
@@ -59,6 +60,22 @@ def _payload(phase):
             "test-machine": {phase["batch_strategy"]: series}
         }
     return {"ldleiden-dynamic": datasets}
+
+
+def test_window_attestation_rejects_completed_attempt_after_deadline(tmp_path):
+    metadata_path = tmp_path / "metadata.json"
+    metadata = {
+        "status": "completed",
+        "measurement_window_id": "window-001",
+        "window_deadline_epoch": 1100,
+        "started_at_utc": "1970-01-01T00:16:40Z",
+        "finished_at_utc": "1970-01-01T00:18:18Z",
+    }
+    validate_window_attestation(metadata, metadata_path)
+
+    metadata["finished_at_utc"] = "1970-01-01T00:18:23Z"
+    with pytest.raises(ValidationError, match="finished outside"):
+        validate_window_attestation(metadata, metadata_path)
 
 
 def test_protocol_preregisters_disjoint_smoke_and_measured_repetitions():
