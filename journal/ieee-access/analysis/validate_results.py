@@ -17,14 +17,18 @@ Chart map
     Question: how do hierarchy depth and radius trade quality for speed?
     Three faceted scatter plots with all 12 measured configurations.
 ``method_pipeline.pdf``
-    Non-quantitative implementation-traceable flow diagram.
+    Non-quantitative reader-oriented overview of the update workflow.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean, stdev
@@ -43,7 +47,6 @@ JOURNAL = ROOT / "journal" / "ieee-access"
 ANALYSIS = JOURNAL / "analysis"
 FIGURES = JOURNAL / "figures"
 GENERATED = JOURNAL / "generated"
-
 REPORTLAB_FONTS = Path(reportlab.__file__).resolve().parent / "fonts"
 FIGURE_FONT = "ComNetXFigureSans"
 FIGURE_FONT_BOLD = "ComNetXFigureSans-Bold"
@@ -815,8 +818,8 @@ def emit_rows(
     workload_rows = []
     variant_names = {
         "full": "Full ComNetX",
-        "no_closure": "No closure",
-        "no_contraction": "No contraction",
+        "no_closure": "Radius-only scope",
+        "no_contraction": "Vertex-level graphs",
     }
     for dataset in ("dyn_cora", "dyn_pubmed", "arxivmath"):
         for variant in ("full", "no_closure", "no_contraction"):
@@ -952,9 +955,15 @@ def emit_rows(
     write_text(GENERATED / "metrics_macros.tex", macros)
 
 
-def new_canvas(name: str, width_in: float, height_in: float) -> tuple[canvas.Canvas, float, float]:
+def new_canvas(
+    name: str,
+    width_in: float,
+    height_in: float,
+    *,
+    output_path: Path | None = None,
+) -> tuple[canvas.Canvas, float, float]:
     """Create a deterministic vector PDF canvas in the article figure folder."""
-    path = FIGURES / name
+    path = output_path if output_path is not None else FIGURES / name
     path.parent.mkdir(parents=True, exist_ok=True)
     width = width_in * 72.0
     height = height_in * 72.0
@@ -989,6 +998,43 @@ def draw_text(
         pdf.drawRightString(x, y, value)
     else:
         pdf.drawString(x, y, value)
+
+
+def draw_backed_text(
+    pdf: canvas.Canvas,
+    x: float,
+    y: float,
+    value: str,
+    size: float,
+    *,
+    font: str = FIGURE_FONT,
+    align: str = "left",
+    color: str = INK,
+    pad_x: float = 1.2,
+    pad_y: float = 0.7,
+) -> None:
+    """Draw a small opaque text halo so annotations stay clear of marks."""
+    width = stringWidth(value, font, size)
+    if align == "center":
+        left = x - width / 2
+    elif align == "right":
+        left = x - width
+    else:
+        left = x
+    pdf.saveState()
+    pdf.setFillColor(HexColor("#FFFFFF"))
+    pdf.setStrokeColor(HexColor("#FFFFFF"))
+    pdf.roundRect(
+        left - pad_x,
+        y - size * 0.24 - pad_y,
+        width + 2 * pad_x,
+        size * 1.02 + 2 * pad_y,
+        1.1,
+        stroke=0,
+        fill=1,
+    )
+    pdf.restoreState()
+    draw_text(pdf, x, y, value, size, font, align, color)
 
 
 def draw_vertical_text(
@@ -1094,6 +1140,7 @@ def draw_panel_axes(
     xlog: bool = False,
     xformat: str = "{:.0f}",
     yformat: str = "{:.2f}",
+    tick_size: float = 5.7,
 ) -> tuple[Any, Any]:
     def tx(value: float) -> float:
         if xlog:
@@ -1114,7 +1161,14 @@ def draw_panel_axes(
         pdf.setStrokeColor(HexColor(LIGHT))
         pdf.setLineWidth(0.45)
         pdf.line(x0, y, x0 + width, y)
-        draw_text(pdf, x0 - 3, y - 2.2, yformat.format(value), 5.7, align="right")
+        draw_text(
+            pdf,
+            x0 - 3,
+            y - tick_size * 0.38,
+            yformat.format(value),
+            tick_size,
+            align="right",
+        )
     for value in xticks:
         if value < xmin or value > xmax:
             continue
@@ -1122,7 +1176,7 @@ def draw_panel_axes(
         pdf.setStrokeColor(HexColor(INK))
         pdf.setLineWidth(0.45)
         pdf.line(x, y0, x, y0 - 2.5)
-        draw_text(pdf, x, y0 - 10, xformat.format(value), 5.7, align="center")
+        draw_text(pdf, x, y0 - 10.5, xformat.format(value), tick_size, align="center")
     return tx, ty
 
 
@@ -1255,7 +1309,6 @@ def plot_long_horizon(long_horizon: dict[str, Any]) -> None:
     pdf.showPage()
     pdf.save()
 
-
 def plot_dsbm(dsbm: dict[str, Any]) -> None:
     pdf, page_width, page_height = new_canvas("dsbm_speedup.pdf", 3.5, 2.65)
     categories = [
@@ -1323,633 +1376,2199 @@ def plot_dsbm(dsbm: dict[str, Any]) -> None:
 
 
 def plot_topology(topology: dict[str, Any]) -> None:
-    pdf, page_width, page_height = new_canvas("topology_ablation.pdf", 7.16, 2.45)
+    """Plot the measured radius/depth surface and its Pareto frontier."""
+    pdf, page_width, page_height = new_canvas("topology_ablation.pdf", 7.16, 2.62)
     datasets = ("dyn_cora", "dyn_pubmed", "arxivmath")
-    left = 32.0
-    right = 10.0
-    gap = 22.0
-    bottom = 35.0
-    top = 18.0
+    radius_style = {
+        0: ("circle", "#1F77B4"),
+        1: ("square", "#D95F02"),
+        2: ("triangle", "#2CA02C"),
+    }
+    x_axes = {
+        "dyn_cora": (0.0, 26.0, [1, 5, 10, 15, 20, 25], False),
+        "dyn_pubmed": (0.85, 220.0, [1, 10, 100], True),
+        "arxivmath": (0.85, 900.0, [1, 10, 100], True),
+    }
+    badge_offsets = {
+        "dyn_cora": {(0, 3): (0.0, -10.0), (2, 4): (0.0, -10.0)},
+        "dyn_pubmed": {
+            (2, 1): (0.0, -10.0),
+            (0, 3): (-10.0, 0.0),
+            (2, 3): (0.0, 10.0),
+        },
+        "arxivmath": {
+            (1, 2): (0.0, 10.0),
+            (2, 3): (0.0, -10.0),
+            (0, 4): (0.0, 10.0),
+            (1, 4): (0.0, -10.0),
+            (2, 4): (0.0, 10.0),
+        },
+    }
+
+    def pareto_front(data: dict[str, Any]) -> list[tuple[float, float]]:
+        candidates = [(1.0, float(data["full"]["q"]))]
+        candidates.extend(
+            (float(point["speedup"]), float(point["q"]))
+            for point in data["points"]
+        )
+        front = []
+        for speedup, quality in candidates:
+            dominated = any(
+                other_speedup >= speedup
+                and other_quality >= quality
+                and (other_speedup > speedup or other_quality > quality)
+                for other_speedup, other_quality in candidates
+            )
+            if not dominated:
+                front.append((speedup, quality))
+        return sorted(front)
+
+    left = 36.0
+    right = 8.0
+    gap = 30.0
+    bottom = 36.0
+    top = 27.0
     panel_width = (page_width - left - right - 2 * gap) / 3
     panel_height = page_height - bottom - top
-    marker_names = {0: "circle", 1: "square", 2: "triangle"}
+
     for panel, dataset in enumerate(datasets):
         data = topology[dataset]
         x0 = left + panel * (panel_width + gap)
         all_q = [data["full"]["q"]] + [point["q"] for point in data["points"]]
         qmin, qmax = min(all_q), max(all_q)
-        qpad = max((qmax - qmin) * 0.10, 0.001)
+        qpad = max((qmax - qmin) * 0.11, 0.0007)
         ymin, ymax = qmin - qpad, qmax + qpad
-        max_speed = max(point["speedup"] for point in data["points"])
-        xmax = 10 ** math.ceil(math.log10(max_speed * 1.05))
-        yticks = [ymin + i * (ymax - ymin) / 4 for i in range(5)]
+        xmin, xmax, xticks, xlog = x_axes[dataset]
+        yticks = [ymin + index * (ymax - ymin) / 4 for index in range(5)]
         tx, ty = draw_panel_axes(
             pdf,
             x0,
             bottom,
             panel_width,
             panel_height,
-            1,
+            xmin,
             xmax,
             ymin,
             ymax,
-            [1, 10, 100, 1000],
+            xticks,
             yticks,
-            xlog=True,
-            xformat="{:.0f}",
+            xlog=xlog,
+            xformat="{:.0f}x",
             yformat="{:.3f}",
+            tick_size=6.3,
         )
-        draw_text(pdf, x0 + panel_width / 2, page_height - 11, dataset, 7.3, FIGURE_FONT_BOLD, "center")
-        draw_marker(pdf, tx(1.0), ty(data["full"]["q"]), "star", 4.0, INK, INK)
+        draw_text(
+            pdf,
+            x0 + panel_width / 2,
+            page_height - 9.0,
+            dataset,
+            8.0,
+            FIGURE_FONT_BOLD,
+            "center",
+        )
+
+        frontier = pareto_front(data)
+        polyline(
+            pdf,
+            [(tx(speedup), ty(quality)) for speedup, quality in frontier],
+            INK,
+            width=1.0,
+        )
+
+        full_x = tx(1.0)
+        full_y = ty(data["full"]["q"])
+        draw_marker(pdf, full_x, full_y, "star", 5.2, "#FFFFFF", INK)
+
+        badges: list[tuple[float, float, str, str, float, str]] = []
         for point in data["points"]:
-            default = point["level"] == 3 and point["radius"] == 1
-            color = BLUE if default else MID
+            shape, color = radius_style[point["radius"]]
+            is_default = point["level"] == 3 and point["radius"] == 1
+            px = tx(point["speedup"])
+            py = ty(point["q"])
+            dx, dy = badge_offsets[dataset].get(
+                (int(point["radius"]), int(point["level"])),
+                (0.0, 0.0),
+            )
+            bx, by = px + dx, py + dy
+            if dx or dy:
+                pdf.setStrokeColor(HexColor(color))
+                pdf.setLineWidth(0.55)
+                pdf.line(px, py, bx, by)
+                draw_marker(pdf, px, py, "circle", 1.25, "#FFFFFF", color)
+            radius = 5.4 if is_default else 5.5 if shape == "triangle" else 4.8
+            badges.append((bx, by, shape, color, radius, str(point["level"])))
+
+        # Draw all badges after anchors and leaders so no line can erase a digit.
+        for bx, by, shape, color, radius, _ in badges:
             draw_marker(
                 pdf,
-                tx(point["speedup"]),
-                ty(point["q"]),
-                marker_names[point["radius"]],
-                3.1 if default else 2.7,
+                bx,
+                by,
+                shape,
+                radius,
+                INK if shape == "square" and radius > 5.0 else "#FFFFFF",
                 color,
-                color if default else None,
             )
+        for bx, by, _, _, _, label in badges:
             draw_text(
                 pdf,
-                tx(point["speedup"]) + 3.0,
-                ty(point["q"]) + 1.8,
-                str(point["level"]),
-                5.2,
+                bx,
+                by - 2.8,
+                label,
+                7.6,
+                FIGURE_FONT_BOLD,
+                "center",
+                "#FFFFFF",
             )
-        draw_text(pdf, x0 + panel_width / 2, 12, "Full/Local time", 6.1, align="center")
-    draw_vertical_text(pdf, 6, bottom + panel_height / 2, "Final modularity", 6.2)
-    legend_y = 5.0
-    legend_x = 106.0
-    entries = [
-        ("star", INK, INK, "Full"),
-        ("circle", MID, None, "r=0"),
-        ("square", MID, None, "r=1"),
-        ("triangle", MID, None, "r=2"),
-        ("square", BLUE, BLUE, "default L=3,r=1"),
-    ]
-    for shape, stroke, fill, label in entries:
-        draw_marker(pdf, legend_x, legend_y + 1.5, shape, 2.5, stroke, fill)
-        draw_text(pdf, legend_x + 6, legend_y - 1, label, 5.6)
-        legend_x += stringWidth(label, FIGURE_FONT, 5.6) + 24
+        draw_backed_text(
+            pdf,
+            full_x + 7.0,
+            full_y + 3.5,
+            "Full",
+            6.4,
+            color=INK,
+        )
+        draw_text(pdf, x0 + panel_width / 2, 10, "Full/ComNetX time", 6.8, align="center")
+
+        if dataset == "arxivmath":
+            legend_w = 40.0
+            legend_h = 47.0
+            legend_x = x0 + panel_width - legend_w - 2.0
+            legend_y = bottom + panel_height - legend_h - 2.0
+            pdf.setFillColor(HexColor("#FFFFFF"))
+            pdf.setStrokeColor(HexColor("#C7CDD2"))
+            pdf.setLineWidth(0.55)
+            pdf.roundRect(legend_x, legend_y, legend_w, legend_h, 2.5, stroke=1, fill=1)
+            legend_entries = [
+                ("circle", "#1F77B4", "r=0"),
+                ("square", "#D95F02", "r=1"),
+                ("triangle", "#2CA02C", "r=2"),
+            ]
+            for index, (shape, color, label) in enumerate(legend_entries):
+                row_y = legend_y + legend_h - 10.0 - index * 10.0
+                draw_marker(pdf, legend_x + 8.0, row_y + 1.0, shape, 2.8, "#FFFFFF", color)
+                draw_text(pdf, legend_x + 15.0, row_y - 1.2, label, 6.2)
+            pareto_y = legend_y + 6.0
+            pdf.setStrokeColor(HexColor(INK))
+            pdf.setLineWidth(1.0)
+            pdf.line(legend_x + 4.5, pareto_y + 1.5, legend_x + 11.5, pareto_y + 1.5)
+            draw_text(pdf, legend_x + 15.0, pareto_y - 0.8, "Pareto", 6.2)
+
+    draw_vertical_text(pdf, 7, bottom + panel_height / 2, "Final modularity", 6.8)
     pdf.showPage()
     pdf.save()
 
 
-def draw_box(
-    pdf: canvas.Canvas,
-    x: float,
-    y: float,
-    width: float,
-    height: float,
-    title: str,
-    body: str,
-    edge: str = BLUE,
-    fill: str = "#F6F8FA",
-) -> None:
-    pdf.setStrokeColor(HexColor(edge))
-    pdf.setFillColor(HexColor(fill))
-    pdf.setLineWidth(0.8)
-    pdf.roundRect(x, y, width, height, 5, stroke=1, fill=1)
-    draw_text(pdf, x + 6, y + height - 13, title, 7.0, FIGURE_FONT_BOLD)
-    draw_wrapped(pdf, x + 6, y + height - 25, body, width - 12, 6.1, 7.2)
-
-
-def draw_arrow(pdf: canvas.Canvas, x1: float, y1: float, x2: float, y2: float) -> None:
-    pdf.setStrokeColor(HexColor(INK))
-    pdf.setFillColor(HexColor(INK))
-    pdf.setLineWidth(0.7)
-    pdf.line(x1, y1, x2, y2)
-    angle = math.atan2(y2 - y1, x2 - x1)
-    size = 4.0
-    path = pdf.beginPath()
-    path.moveTo(x2, y2)
-    path.lineTo(x2 - size * math.cos(angle - 0.45), y2 - size * math.sin(angle - 0.45))
-    path.lineTo(x2 - size * math.cos(angle + 0.45), y2 - size * math.sin(angle + 0.45))
-    path.close()
-    pdf.drawPath(path, stroke=0, fill=1)
-
-
 def plot_method_pipeline() -> None:
-    pdf, page_width, page_height = new_canvas("method_pipeline.pdf", 7.16, 3.34)
+    """Draw a source-faithful, fully vector overview of one ComNetX update."""
+    temporary = tempfile.TemporaryDirectory(prefix="comnetx-method-pipeline-")
+    temporary_path = Path(temporary.name)
+    base_path = temporary_path / "method_pipeline_base.pdf"
+    pdf, page_width, page_height = new_canvas(
+        "method_pipeline_base.pdf",
+        7.16,
+        4.56,
+        output_path=base_path,
+    )
+    formula_nodes: list[dict[str, Any]] = []
+    pdf.setLineCap(1)
+    pdf.setLineJoin(1)
 
-    # This figure deliberately uses only vector primitives.  Its compact visual
-    # vocabulary (label strips, membership matrices, and small graphs) mirrors
-    # the actual data transformations more faithfully than prose-only boxes.
-    blue = BLUE
-    blue_fill = "#EDF4F9"
-    orange = ORANGE
-    orange_fill = "#FCEFE7"
-    teal = "#397C72"
-    teal_fill = "#EAF5F2"
-    purple = "#6B5A91"
-    purple_fill = "#F1EEF7"
-    green = "#5D7D55"
-    green_fill = "#EEF5EB"
-    red = "#B94B48"
-    border = "#B8C2C9"
-    pale = "#F8FAFB"
-    node_colors = ("#E98A70", "#76A9D3", "#9EBB86", "#B69AD0")
+    indigo = "#2B2085"
+    indigo_light = "#51479B"
+    ink = "#1E2028"
+    muted = "#5B5D69"
+    hairline = "#B9B8CC"
+    faint = "#F8F7FC"
+    coral = "#F36F60"
+    coral_light = "#FFF0EC"
+    coral_neighbor = "#F8B3A9"
+    cut_red = "#DF4F49"
+    purple = "#8975BA"
+    purple_light = "#F1EDF8"
+    blue = "#63A3D4"
+    blue_light = "#EDF5FA"
+    teal = "#4DA6A0"
+    teal_light = "#ECF7F5"
+    olive = "#A7BA70"
+    olive_light = "#F3F6EA"
+    amber = "#DEB45E"
+    amber_light = "#FBF5E9"
+    slate = "#8191AA"
+    slate_light = "#F0F2F6"
+    mauve = "#A96F99"
+    mauve_light = "#F7EDF4"
+    community_colors = (purple, blue, teal, olive, amber, slate)
+    community_styles = {
+        "c1": (purple, purple_light),
+        "c2": (blue, blue_light),
+        "c3": (olive, olive_light),
+        "c4": (teal, teal_light),
+        "c5": (amber, amber_light),
+        "c6": (slate, slate_light),
+        "c7": (mauve, mauve_light),
+    }
+    # Three illustrative levels are enough to show the recursive structure.
+    # Each level-1 child owns its own palette at level 2: purple descendants
+    # remain purple, blue descendants remain blue, and so on.  Keeping this
+    # relationship explicit prevents the visually plausible but semantically
+    # wrong palette cycling that obscured ancestry in the previous drawing.
+    hierarchy_families = (
+        {
+            "name": "cool",
+            "span": (0.05, 0.31),
+            "level_colors": (
+                ("#7064A8",),
+                ("#7653A7", "#4F86BE"),
+                ("#5D3E91", "#9A72BF", "#2F6EA7", "#73A9D1"),
+            ),
+        },
+        {
+            "name": "warm",
+            "span": (0.37, 0.64),
+            "level_colors": (
+                ("#D48E3F",),
+                ("#DDA842", "#C86E38"),
+                ("#F0C55B", "#CC902B", "#E0843F", "#AC5434"),
+            ),
+            # The local recomputation splits the warm community already at
+            # level 0.  Every later row then refines each of those two roots
+            # within its own inherited colour family (2 -> 4 -> 8).
+            "updated_level_colors": (
+                ("#DDA842", "#B85C49"),
+                ("#F0C55B", "#CC902B", "#E0843F", "#AC5434"),
+                (
+                    "#F7D97B",
+                    "#E8B944",
+                    "#D8A13A",
+                    "#B97A28",
+                    "#F0A05A",
+                    "#D97838",
+                    "#C56857",
+                    "#91403F",
+                ),
+            ),
+        },
+        {
+            "name": "green",
+            "span": (0.70, 0.96),
+            "level_colors": (
+                ("#52957F",),
+                ("#369A96", "#72A457"),
+                ("#287E8E", "#63B7AC", "#568B43", "#9AB968"),
+            ),
+        },
+    )
 
-    def panel(
+    def frame(
         x: float,
         y: float,
         width: float,
         height: float,
-        step: str,
-        title: str,
-        accent: str = blue,
+        *,
         fill: str = "#FFFFFF",
+        stroke: str = indigo,
+        radius: float = 2.4,
+        line_width: float = 0.65,
     ) -> None:
-        pdf.setStrokeColor(HexColor(border))
         pdf.setFillColor(HexColor(fill))
-        pdf.setLineWidth(0.7)
-        pdf.roundRect(x, y, width, height, 4.0, stroke=1, fill=1)
-        pdf.setStrokeColor(HexColor("#DCE2E6"))
-        pdf.line(x, y + height - 15.5, x + width, y + height - 15.5)
-        pdf.setFillColor(HexColor(accent))
-        pdf.circle(x + 10.0, y + height - 8.0, 6.0, stroke=0, fill=1)
-        draw_text(
-            pdf,
-            x + 10.0,
-            y + height - 10.4,
-            step,
-            7.0,
-            FIGURE_FONT_BOLD,
-            "center",
-            "#FFFFFF",
-        )
-        draw_text(
-            pdf,
-            x + 20.0,
-            y + height - 10.5,
-            title,
-            7.4,
-            FIGURE_FONT_BOLD,
-            color=INK,
-        )
+        pdf.setStrokeColor(HexColor(stroke))
+        pdf.setLineWidth(line_width)
+        pdf.roundRect(x, y, width, height, radius, stroke=1, fill=1)
 
-    def flow_arrow(
+    def rule(
         x1: float,
         y1: float,
         x2: float,
         y2: float,
-        color: str = blue,
+        *,
+        color: str = hairline,
+        width: float = 0.45,
+        dash: tuple[float, float] | None = None,
+    ) -> None:
+        pdf.setStrokeColor(HexColor(color))
+        pdf.setLineWidth(width)
+        if dash:
+            pdf.setDash(list(dash), 0)
+        else:
+            pdf.setDash()
+        pdf.line(x1, y1, x2, y2)
+        pdf.setDash()
+
+    def arrow(
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        *,
+        color: str = indigo,
+        width: float = 0.9,
+        head: float = 3.7,
     ) -> None:
         pdf.setStrokeColor(HexColor(color))
         pdf.setFillColor(HexColor(color))
-        pdf.setLineWidth(0.9)
+        pdf.setLineWidth(width)
+        pdf.setDash()
         pdf.line(x1, y1, x2, y2)
         angle = math.atan2(y2 - y1, x2 - x1)
-        size = 3.3
         path = pdf.beginPath()
         path.moveTo(x2, y2)
         path.lineTo(
-            x2 - size * math.cos(angle - 0.48),
-            y2 - size * math.sin(angle - 0.48),
+            x2 - head * math.cos(angle - 0.5),
+            y2 - head * math.sin(angle - 0.5),
         )
         path.lineTo(
-            x2 - size * math.cos(angle + 0.48),
-            y2 - size * math.sin(angle + 0.48),
+            x2 - head * math.cos(angle + 0.5),
+            y2 - head * math.sin(angle + 0.5),
         )
         path.close()
         pdf.drawPath(path, stroke=0, fill=1)
 
-    def pill(
+    def smooth_closed_path(
+        points: tuple[tuple[float, float], ...],
+        tension: float = 0.75,
+    ) -> Any:
+        """Convert a closed Catmull-Rom contour to deterministic cubic Beziers."""
+        path = pdf.beginPath()
+        path.moveTo(*points[0])
+        count = len(points)
+        for index in range(count):
+            p0 = points[(index - 1) % count]
+            p1 = points[index]
+            p2 = points[(index + 1) % count]
+            p3 = points[(index + 2) % count]
+            c1 = (
+                p1[0] + tension * (p2[0] - p0[0]) / 6.0,
+                p1[1] + tension * (p2[1] - p0[1]) / 6.0,
+            )
+            c2 = (
+                p2[0] - tension * (p3[0] - p1[0]) / 6.0,
+                p2[1] - tension * (p3[1] - p1[1]) / 6.0,
+            )
+            path.curveTo(c1[0], c1[1], c2[0], c2[1], p2[0], p2[1])
+        path.close()
+        return path
+
+    def blob_anchors(
+        cx: float,
+        cy: float,
+        rx: float,
+        ry: float,
+        *,
+        angle: float = 0.0,
+        variant: int = 0,
+    ) -> tuple[tuple[float, float], ...]:
+        patterns = (
+            ((1.00, 0.02), (0.72, 0.78), (0.02, 1.00), (-0.73, 0.76),
+             (-1.00, -0.03), (-0.70, -0.78), (-0.02, -0.98), (0.72, -0.75)),
+            ((1.00, -0.02), (0.68, 0.82), (-0.03, 0.96), (-0.76, 0.73),
+             (-0.98, 0.04), (-0.66, -0.82), (0.04, -1.00), (0.76, -0.70)),
+            ((0.98, 0.04), (0.75, 0.73), (0.00, 1.00), (-0.69, 0.81),
+             (-1.00, -0.02), (-0.74, -0.74), (0.02, -0.96), (0.68, -0.82)),
+        )
+        local = patterns[variant % len(patterns)]
+        cosine, sine = math.cos(angle), math.sin(angle)
+        result = []
+        for px, py in local:
+            dx, dy = px * rx, py * ry
+            result.append((cx + dx * cosine - dy * sine, cy + dx * sine + dy * cosine))
+        return tuple(result)
+
+    def community_contour(
+        anchors: tuple[tuple[float, float], ...],
+        *,
+        stroke: str,
+        fill: str,
+        fill_alpha: float = 0.74,
+        stroke_alpha: float = 0.82,
+        width: float = 0.38,
+        dash: tuple[float, float] | None = (1.25, 0.95),
+    ) -> None:
+        pdf.saveState()
+        pdf.setFillColor(HexColor(fill))
+        pdf.setStrokeColor(HexColor(stroke))
+        pdf.setFillAlpha(fill_alpha)
+        pdf.setStrokeAlpha(stroke_alpha)
+        pdf.setLineWidth(width)
+        if dash:
+            pdf.setDash(list(dash), 0)
+        pdf.drawPath(smooth_closed_path(anchors, tension=0.84), stroke=1, fill=1)
+        pdf.restoreState()
+
+    def rounded_hull_contour(
+        points: tuple[tuple[float, float], ...],
+        *,
+        radius: float,
+        stroke: str,
+        fill: str,
+        fill_alpha: float,
+    ) -> None:
+        """Draw the exact circular offset of a convex hull of node centers."""
+
+        def cross(
+            origin: tuple[float, float],
+            first: tuple[float, float],
+            second: tuple[float, float],
+        ) -> float:
+            return (
+                (first[0] - origin[0]) * (second[1] - origin[1])
+                - (first[1] - origin[1]) * (second[0] - origin[0])
+            )
+
+        unique = sorted(set(points))
+        if len(unique) < 3:
+            contour_around(
+                tuple(unique),
+                stroke=stroke,
+                fill=fill,
+                padding_x=radius,
+                padding_y=radius,
+            )
+            return
+        lower: list[tuple[float, float]] = []
+        for point in unique:
+            while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0:
+                lower.pop()
+            lower.append(point)
+        upper: list[tuple[float, float]] = []
+        for point in reversed(unique):
+            while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0:
+                upper.pop()
+            upper.append(point)
+        hull = lower[:-1] + upper[:-1]
+
+        corners: list[
+            tuple[
+                tuple[float, float],
+                tuple[float, float],
+                float,
+                float,
+            ]
+        ] = []
+        for index, point in enumerate(hull):
+            previous = hull[(index - 1) % len(hull)]
+            following = hull[(index + 1) % len(hull)]
+            incoming = (point[0] - previous[0], point[1] - previous[1])
+            outgoing = (following[0] - point[0], following[1] - point[1])
+            incoming_length = math.hypot(*incoming)
+            outgoing_length = math.hypot(*outgoing)
+            incoming_normal = (
+                incoming[1] / incoming_length,
+                -incoming[0] / incoming_length,
+            )
+            outgoing_normal = (
+                outgoing[1] / outgoing_length,
+                -outgoing[0] / outgoing_length,
+            )
+            start_angle = math.atan2(incoming_normal[1], incoming_normal[0])
+            end_angle = math.atan2(outgoing_normal[1], outgoing_normal[0])
+            while end_angle <= start_angle:
+                end_angle += 2.0 * math.pi
+            start = (
+                point[0] + incoming_normal[0] * radius,
+                point[1] + incoming_normal[1] * radius,
+            )
+            end = (
+                point[0] + outgoing_normal[0] * radius,
+                point[1] + outgoing_normal[1] * radius,
+            )
+            corners.append((start, end, start_angle, end_angle))
+
+        path = pdf.beginPath()
+        path.moveTo(*corners[0][0])
+        for index, (start, end, start_angle, end_angle) in enumerate(corners):
+            if index:
+                path.lineTo(*start)
+            sweep = end_angle - start_angle
+            segments = max(1, math.ceil(sweep / (math.pi / 2.0)))
+            segment_angle = sweep / segments
+            angle = start_angle
+            current = start
+            center = hull[index]
+            for _ in range(segments):
+                next_angle = angle + segment_angle
+                target = (
+                    center[0] + math.cos(next_angle) * radius,
+                    center[1] + math.sin(next_angle) * radius,
+                )
+                factor = 4.0 / 3.0 * math.tan(segment_angle / 4.0)
+                control_1 = (
+                    current[0] - math.sin(angle) * radius * factor,
+                    current[1] + math.cos(angle) * radius * factor,
+                )
+                control_2 = (
+                    target[0] + math.sin(next_angle) * radius * factor,
+                    target[1] - math.cos(next_angle) * radius * factor,
+                )
+                path.curveTo(*control_1, *control_2, *target)
+                current = target
+                angle = next_angle
+            next_start = corners[(index + 1) % len(corners)][0]
+            path.lineTo(*next_start)
+        path.close()
+
+        pdf.saveState()
+        pdf.setFillColor(HexColor(fill))
+        pdf.setStrokeColor(HexColor(stroke))
+        pdf.setFillAlpha(fill_alpha)
+        pdf.setStrokeAlpha(0.80)
+        pdf.setLineWidth(0.29)
+        pdf.setDash([1.15, 1.35], 0)
+        pdf.drawPath(path, stroke=1, fill=1)
+        pdf.restoreState()
+
+    def concave_neighborhood_contour(cx: float, cy: float, scale: float) -> None:
+        """Draw the source-style lobed envelope around the expanded region."""
+        relative = (
+            (-1.20, 1.08), (-0.84, 1.15), (-0.42, 1.01),
+            (0.18, 1.03), (0.62, 1.07), (0.86, 1.15),
+            (1.04, 0.88), (0.98, 0.52), (1.05, 0.15),
+            (0.92, -0.10), (0.66, -0.13), (0.50, -0.36),
+            (0.35, -0.60), (0.15, -0.90), (-0.18, -1.00),
+            (-0.52, -0.88), (-0.90, -1.00), (-1.16, -0.85),
+            (-1.22, -0.50), (-1.45, -0.25), (-1.45, 0.12),
+            (-1.28, 0.40), (-1.22, 0.75),
+        )
+        anchors = tuple(
+            (cx + x_offset * scale, cy + y_offset * scale)
+            for x_offset, y_offset in relative
+        )
+        pdf.saveState()
+        pdf.setFillColor(HexColor(coral_light))
+        pdf.setStrokeColor(HexColor("#EE9B91"))
+        pdf.setFillAlpha(0.21)
+        pdf.setStrokeAlpha(0.80)
+        pdf.setLineWidth(0.29)
+        pdf.setDash([1.15, 1.35], 0)
+        pdf.drawPath(
+            smooth_closed_path(anchors, tension=0.86),
+            stroke=1,
+            fill=1,
+        )
+        pdf.restoreState()
+
+    def contour_around(
+        members: tuple[tuple[float, float], ...],
+        *,
+        stroke: str,
+        fill: str,
+        padding_x: float = 5.0,
+        padding_y: float = 4.2,
+        variant: int = 0,
+    ) -> None:
+        """Draw a smooth peanut envelope that enters the inter-node gap."""
+        del variant
+        pdf.saveState()
+        pdf.setFillColor(HexColor(fill))
+        pdf.setStrokeColor(HexColor(stroke))
+        pdf.setFillAlpha(0.14)
+        pdf.setStrokeAlpha(0.93)
+        pdf.setLineWidth(0.31)
+        pdf.setDash([1.15, 1.35], 0)
+        if len(members) == 1:
+            cx, cy = members[0]
+            pdf.ellipse(
+                cx - padding_x,
+                cy - padding_y,
+                cx + padding_x,
+                cy + padding_y,
+                stroke=1,
+                fill=1,
+            )
+        else:
+            first, second = members[0], members[-1]
+            cx = (first[0] + second[0]) / 2.0
+            cy = (first[1] + second[1]) / 2.0
+            angle = math.atan2(second[1] - first[1], second[0] - first[0])
+            length = math.hypot(second[0] - first[0], second[1] - first[1])
+            half_span = length / 2.0
+            waist = 0.68 * padding_y
+            local = (
+                (-half_span - padding_x, 0.0),
+                (-half_span - 0.75 * padding_x, 0.68 * padding_y),
+                (-half_span, padding_y),
+                (-0.36 * half_span, 0.84 * padding_y),
+                (0.0, waist),
+                (0.36 * half_span, 0.84 * padding_y),
+                (half_span, padding_y),
+                (half_span + 0.75 * padding_x, 0.68 * padding_y),
+                (half_span + padding_x, 0.0),
+                (half_span + 0.75 * padding_x, -0.68 * padding_y),
+                (half_span, -padding_y),
+                (0.36 * half_span, -0.84 * padding_y),
+                (0.0, -waist),
+                (-0.36 * half_span, -0.84 * padding_y),
+                (-half_span, -padding_y),
+                (-half_span - 0.75 * padding_x, -0.68 * padding_y),
+            )
+            cosine, sine = math.cos(angle), math.sin(angle)
+            anchors = tuple(
+                (
+                    cx + local_x * cosine - local_y * sine,
+                    cy + local_x * sine + local_y * cosine,
+                )
+                for local_x, local_y in local
+            )
+            pdf.drawPath(
+                smooth_closed_path(anchors, tension=0.86),
+                stroke=1,
+                fill=1,
+            )
+        pdf.restoreState()
+
+    def soft_circle(
+        x: float,
+        y: float,
+        radius: float,
+        *,
+        fill: str,
+        stroke: str,
+        line_width: float = 0.48,
+    ) -> None:
+        pdf.saveState()
+        pdf.setFillColor(HexColor("#514B70"))
+        pdf.setFillAlpha(0.10)
+        pdf.circle(x + 0.55, y - 0.55, radius + 0.25, stroke=0, fill=1)
+        pdf.restoreState()
+        pdf.setFillColor(HexColor(fill))
+        pdf.setStrokeColor(HexColor(stroke))
+        pdf.setLineWidth(line_width)
+        pdf.circle(x, y, radius, stroke=1, fill=1)
+        pdf.saveState()
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.setFillAlpha(0.24)
+        pdf.ellipse(
+            x - radius * 0.52,
+            y + radius * 0.10,
+            x + radius * 0.18,
+            y + radius * 0.62,
+            stroke=0,
+            fill=1,
+        )
+        pdf.restoreState()
+
+    def formula(
+        x: float,
+        y: float,
+        tex: str,
+        size: float = 5.1,
+        *,
+        align: str = "left",
+        color: str = ink,
+    ) -> None:
+        """Queue native TeX math for composition after the vector base is drawn."""
+        if size <= 0:
+            raise ValueError("Formula size must be positive")
+        formula_nodes.append(
+            {
+                "x": x,
+                "y": y,
+                "tex": tex,
+                "scale": size / 10.0,
+                "align": align,
+                "color": color,
+            }
+        )
+
+    def step_header(number: int, title: str, x: float, y: float) -> None:
+        pdf.setFillColor(HexColor(indigo))
+        pdf.setStrokeColor(HexColor(indigo))
+        pdf.circle(x + 6.3, y + 0.8, 5.8, stroke=0, fill=1)
+        draw_text(
+            pdf,
+            x + 6.3,
+            y - 1.6,
+            str(number),
+            6.7,
+            FIGURE_FONT_BOLD,
+            "center",
+            "#FFFFFF",
+        )
+        draw_text(pdf, x + 16.0, y - 1.1, title, 7.4, FIGURE_FONT_BOLD, color=indigo)
+
+    def sparse_matrix(x: float, y: float, size: float) -> None:
+        cells = 8
+        cell = size / cells
+        entries = {
+            (0, 2), (0, 6),
+            (1, 0), (1, 3),
+            (2, 4), (2, 7),
+            (3, 2), (3, 5),
+            (4, 1), (4, 6),
+            (5, 0), (5, 4), (5, 7),
+            (6, 2), (6, 5),
+            (7, 1), (7, 3),
+        }
+        pdf.setStrokeColor(HexColor("#D4D2E4"))
+        pdf.setLineWidth(0.28)
+        for row in range(cells):
+            for column in range(cells):
+                pdf.setFillColor(HexColor(indigo if (row, column) in entries else "#FFFFFF"))
+                pdf.rect(
+                    x + column * cell,
+                    y + (cells - row - 1) * cell,
+                    cell,
+                    cell,
+                    stroke=1,
+                    fill=1,
+                )
+
+    def feature_matrix(x: float, y: float, width: float, height: float) -> None:
+        rows, columns = 6, 5
+        cell_w, cell_h = width / columns, height / rows
+        values = (
+            (0, 2, 1, 3, 1),
+            (2, 1, 3, 0, 2),
+            (1, 3, 0, 2, 3),
+            (3, 0, 2, 1, 0),
+            (0, 1, 3, 2, 1),
+            (2, 3, 1, 0, 3),
+        )
+        shades = ("#F4F1FA", "#DCD5ED", "#BBAEDB", indigo)
+        pdf.setStrokeColor(HexColor("#D4D2E4"))
+        pdf.setLineWidth(0.28)
+        for row in range(rows):
+            for column in range(columns):
+                pdf.setFillColor(HexColor(shades[values[row][column]]))
+                pdf.rect(
+                    x + column * cell_w,
+                    y + (rows - row - 1) * cell_h,
+                    cell_w,
+                    cell_h,
+                    stroke=1,
+                    fill=1,
+                )
+
+    HierarchyGroup = tuple[str, str, float, float]
+
+    def family_level_groups(
+        family: dict[str, Any],
+        level: int,
+        *,
+        updated: bool,
+    ) -> list[HierarchyGroup]:
+        """Return one level of an explicit recursive refinement tree."""
+        start, end = family["span"]
+        color_levels = (
+            family.get("updated_level_colors", family["level_colors"])
+            if updated
+            else family["level_colors"]
+        )
+        colors = color_levels[level]
+        parts = len(colors)
+        local_boundaries = tuple(index / parts for index in range(parts + 1))
+        boundaries = tuple(start + value * (end - start) for value in local_boundaries)
+
+        groups: list[HierarchyGroup] = []
+        for index, (left, right, color) in enumerate(
+            zip(boundaries[:-1], boundaries[1:], colors)
+        ):
+            inset = 0.0025 if level else 0.0
+            identity = f"{family['name']}:{level}:{index}"
+            groups.append((identity, color, left + inset, right - inset))
+        return groups
+
+    def build_hierarchy_levels(*, updated: bool = False) -> list[list[HierarchyGroup]]:
+        return [
+            [
+                group
+                for family in hierarchy_families
+                for group in family_level_groups(family, level, updated=updated)
+            ]
+            for level in range(3)
+        ]
+
+    current_hierarchy = build_hierarchy_levels()
+    updated_hierarchy = build_hierarchy_levels(updated=True)
+
+    def stored_hierarchy_tensor(x: float, y: float, width: float) -> None:
+        """Draw one contiguous level-by-vertex matrix with stored IDs."""
+        label_width = 20.5
+        data_width = width - label_width
+        columns = 12
+        cell_width = data_width / columns
+        level_height = 9.0
+        omitted_height = 5.0
+        header_height = 8.0
+        total_height = 3 * level_height + 2 * omitted_height + header_height
+        grid_x = x + label_width
+        level_text_size = 4.7
+        cell_text_size = 3.55
+        tick_text_size = 3.8
+
+        rows = (
+            (
+                0.0,
+                r"0",
+                ["#7064A8"] * 4 + ["#D48E3F"] * 4 + ["#52957F"] * 4,
+                ["1"] * 4 + ["2"] * 4 + ["3"] * 4,
+            ),
+            (
+                level_height + omitted_height,
+                r"i",
+                ["#7653A7"] * 2
+                + ["#4F86BE"] * 2
+                + ["#DDA842"] * 2
+                + ["#C86E38"] * 2
+                + ["#369A96"] * 2
+                + ["#72A457"] * 2,
+                [str(value) for value in range(1, 7) for _ in range(2)],
+            ),
+            (
+                2 * (level_height + omitted_height),
+                r"L\!-\!1",
+                [
+                    "#5D3E91",
+                    "#9A72BF",
+                    "#2F6EA7",
+                    "#73A9D1",
+                    "#F0C55B",
+                    "#CC902B",
+                    "#E0843F",
+                    "#AC5434",
+                    "#287E8E",
+                    "#63B7AC",
+                    "#568B43",
+                    "#9AB968",
+                ],
+                [str(value) for value in range(1, 13)],
+            ),
+        )
+        light_cells = {"#F0C55B", "#73A9D1", "#63B7AC", "#9AB968"}
+
+        # Header and omitted rows are part of the same rectangular grid.
+        header_y = y + 3 * level_height + 2 * omitted_height
+        for band_y, band_height in (
+            (y + level_height, omitted_height),
+            (y + 2 * level_height + omitted_height, omitted_height),
+            (header_y, header_height),
+        ):
+            pdf.setFillColor(HexColor(faint))
+            pdf.rect(x, band_y, width, band_height, stroke=0, fill=1)
+
+        for row_offset, label, colors, values in rows:
+            row_y = y + row_offset
+            for column, (fill_color, value) in enumerate(zip(colors, values)):
+                cell_x = grid_x + column * cell_width
+                pdf.setFillColor(HexColor(fill_color))
+                pdf.setStrokeColor(HexColor("#FFFFFF"))
+                pdf.setLineWidth(0.42)
+                pdf.rect(cell_x, row_y, cell_width, level_height, stroke=1, fill=1)
+                value_size = (
+                    cell_text_size
+                    if len(value) == 1
+                    else 1.95
+                )
+                formula(
+                    cell_x + cell_width / 2.0,
+                    row_y + (2.55 if len(value) == 1 else 2.85),
+                    value,
+                    value_size,
+                    align="center",
+                    color=ink if fill_color in light_cells else "#FFFFFF",
+                )
+            formula(
+                x + label_width / 2.0,
+                row_y + 2.25,
+                label,
+                level_text_size,
+                align="center",
+                color=ink,
+            )
+
+        # Continuous column grid in the non-coloured header and omitted rows.
+        for column in range(columns + 1):
+            column_x = grid_x + column * cell_width
+            for band_y, band_height in (
+                (y + level_height, omitted_height),
+                (y + 2 * level_height + omitted_height, omitted_height),
+                (header_y, header_height),
+            ):
+                rule(
+                    column_x,
+                    band_y,
+                    column_x,
+                    band_y + band_height,
+                    color="#D4D2E4",
+                    width=0.28,
+                )
+
+        # Row separators, label/data divider, and one shared outer contour.
+        row_boundaries = (
+            level_height,
+            level_height + omitted_height,
+            2 * level_height + omitted_height,
+            2 * (level_height + omitted_height),
+            3 * level_height + 2 * omitted_height,
+        )
+        for boundary in row_boundaries:
+            rule(x, y + boundary, x + width, y + boundary, color="#928DAA", width=0.38)
+        rule(grid_x, y, grid_x, y + total_height, color="#928DAA", width=0.55)
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.setStrokeColor(HexColor("#928DAA"))
+        pdf.setLineWidth(0.55)
+        pdf.rect(x, y, width, total_height, stroke=1, fill=0)
+
+        # Header and omitted-level notation are also native TeX objects.
+        formula(
+            x + label_width / 2.0,
+            header_y + 2.0,
+            r"\ell\backslash v",
+            tick_text_size,
+            align="center",
+            color=muted,
+        )
+        for label, column in ((r"1", 0), (r"2", 1), (r"\cdots", 5), (r"n", 11)):
+            formula(
+                grid_x + (column + 0.5) * cell_width,
+                header_y + 2.0,
+                label,
+                tick_text_size,
+                align="center",
+                color=muted,
+            )
+        for band_y in (y + level_height, y + 2 * level_height + omitted_height):
+            for center_x in (
+                x + label_width / 2.0,
+                grid_x + 0.5 * cell_width,
+                grid_x + 5.5 * cell_width,
+                grid_x + 11.5 * cell_width,
+            ):
+                pdf.setFillColor(HexColor(muted))
+                for offset in (0.8, 2.5, 4.2):
+                    pdf.circle(center_x, band_y + offset, 0.24, stroke=0, fill=1)
+
+    def labeled_node(
+        x: float,
+        y: float,
+        label: str,
+        *,
+        fill: str = "#FFFFFF",
+        radius: float = 3.4,
+        stroke: str = ink,
+        accent: bool = False,
+    ) -> None:
+        if fill != "#FFFFFF":
+            pdf.saveState()
+            pdf.setFillColor(HexColor("#514B70"))
+            pdf.setFillAlpha(0.08)
+            pdf.circle(x + 0.35, y - 0.35, radius + 0.18, stroke=0, fill=1)
+            pdf.restoreState()
+        pdf.setFillColor(HexColor(fill))
+        pdf.setStrokeColor(HexColor(stroke))
+        pdf.setLineWidth(0.55)
+        pdf.circle(x, y, radius, stroke=1, fill=1)
+        if accent:
+            pdf.setFillColor(HexColor("#FFFFFF"))
+            pdf.setStrokeColor(HexColor(coral))
+            pdf.setLineWidth(0.54)
+            pdf.circle(x, y, radius + 0.75, stroke=1, fill=0)
+        formula(
+            x,
+            y - 1.35,
+            label,
+            4.1,
+            align="center",
+            color=ink,
+        )
+
+    graph_coords = (
+        (-0.90, 0.78),
+        (0.82, 0.78),
+        (-1.18, 0.04),
+        (-0.18, 0.08),
+        (0.82, 0.04),
+        (-0.86, -0.70),
+        (-0.08, -0.72),
+        (0.78, -0.68),
+        (1.30, -0.27),
+    )
+    graph_labels = ("1", "6", "4", "3", "7", "2", "9", "8", "n")
+    graph_edges = (
+        (0, 2), (0, 3), (2, 3), (2, 5), (3, 5), (3, 6),
+        (3, 4), (4, 1), (4, 6), (4, 7), (4, 8), (6, 7),
+        (7, 8), (5, 6),
+    )
+    update_edges = ((0, 1), (1, 5))
+    endpoint_nodes = {0, 1, 5}
+    neighborhood_nodes = {0, 1, 2, 3, 4, 5, 6}
+    edge_bends = {
+        (0, 2): 0.55,
+        (0, 3): -0.70,
+        (2, 3): 0.45,
+        (2, 5): -0.50,
+        (3, 5): 0.75,
+        (3, 6): -0.65,
+        (4, 1): 0.55,
+        (4, 6): -0.65,
+        (4, 7): 0.70,
+        (4, 8): -0.75,
+        (6, 7): 0.45,
+        (7, 8): -0.55,
+    }
+    changed_bends = {(0, 1): 0.45, (1, 5): -0.70}
+
+    def curved_graph_edge(
+        first: tuple[float, float],
+        second: tuple[float, float],
+        bend: float,
+        *,
+        color: str,
+        width: float,
+        dash: tuple[float, float] | None = None,
+    ) -> None:
+        dx, dy = second[0] - first[0], second[1] - first[1]
+        length = math.hypot(dx, dy)
+        normal_x, normal_y = (-dy / length, dx / length) if length else (0.0, 0.0)
+        control_1 = (
+            first[0] + dx / 3.0 + normal_x * bend,
+            first[1] + dy / 3.0 + normal_y * bend,
+        )
+        control_2 = (
+            first[0] + 2.0 * dx / 3.0 + normal_x * bend,
+            first[1] + 2.0 * dy / 3.0 + normal_y * bend,
+        )
+        path = pdf.beginPath()
+        path.moveTo(*first)
+        path.curveTo(*control_1, *control_2, *second)
+        pdf.setStrokeColor(HexColor(color))
+        pdf.setLineWidth(width)
+        if dash:
+            pdf.setDash(list(dash), 0)
+        else:
+            pdf.setDash()
+        pdf.drawPath(path, stroke=1, fill=0)
+        pdf.setDash()
+
+    def update_graph(
+        cx: float,
+        cy: float,
+        scale: float,
+        *,
+        affected: set[int] | None = None,
+        neighborhood: bool = False,
+    ) -> None:
+        affected = affected or set()
+        points = [(cx + px * scale, cy + py * scale) for px, py in graph_coords]
+        if neighborhood:
+            concave_neighborhood_contour(cx, cy, scale)
+        for first, second in graph_edges:
+            if (first, second) in update_edges:
+                continue
+            curved_graph_edge(
+                points[first],
+                points[second],
+                edge_bends.get((first, second), 0.0),
+                color=ink,
+                width=0.47,
+            )
+        for first, second in update_edges:
+            curved_graph_edge(
+                points[first],
+                points[second],
+                changed_bends[(first, second)],
+                color=cut_red,
+                width=0.43,
+                dash=(1.8, 1.45),
+            )
+        for index, (px, py) in enumerate(points):
+            if index in affected:
+                fill = coral
+            elif neighborhood and index in neighborhood_nodes:
+                fill = coral_neighbor
+            else:
+                fill = "#FFFFFF"
+            labeled_node(px, py, graph_labels[index], fill=fill, radius=3.35)
+
+    def update_batch(cx: float, cy: float) -> None:
+        frame(cx - 18.0, cy - 23.0, 36.0, 46.0, fill="#FFFFFF", stroke=indigo_light, radius=2.2)
+        for row, (left_label, right_label) in enumerate((("1", "6"), ("6", "2"))):
+            row_y = cy + 7.0 - row * 14.0
+            labeled_node(cx - 10.5, row_y, left_label, radius=2.8, stroke=indigo)
+            labeled_node(cx + 10.5, row_y, right_label, radius=2.8, stroke=indigo)
+            rule(
+                cx - 7.4,
+                row_y,
+                cx + 7.4,
+                row_y,
+                color=cut_red,
+                width=0.43,
+                dash=(1.8, 1.45),
+            )
+
+    def nested_group_contour(
+        members: tuple[tuple[float, float], ...],
+        *,
+        stroke: str,
+        fill: str,
+    ) -> None:
+        """Draw a solid inner contour for one stored subcommunity."""
+        if len(members) == 1:
+            center_x, center_y = members[0]
+            radius_x, radius_y, angle = 4.25, 4.25, 0.0
+        else:
+            first, last = members[0], members[-1]
+            center_x = (first[0] + last[0]) / 2.0
+            center_y = (first[1] + last[1]) / 2.0
+            distance = math.hypot(last[0] - first[0], last[1] - first[1])
+            radius_x = distance / 2.0 + 3.8
+            radius_y = 4.15
+            angle = math.atan2(last[1] - first[1], last[0] - first[0])
+        community_contour(
+            blob_anchors(center_x, center_y, radius_x, radius_y, angle=angle),
+            stroke=stroke,
+            fill=fill,
+            fill_alpha=0.28,
+            stroke_alpha=0.72,
+            width=0.28,
+            dash=None,
+        )
+
+    def parent_community_contour(
+        members: tuple[tuple[float, float], ...],
+        *,
+        stroke: str,
+        fill: str,
+        radius: float = 5.0,
+    ) -> None:
+        rounded_hull_contour(
+            members,
+            radius=radius,
+            stroke=stroke,
+            fill=fill,
+            fill_alpha=0.08,
+        )
+
+    def stage_edges(
+        points: dict[str, tuple[float, float]],
+        edges: tuple[tuple[str, str], ...],
+        *,
+        width: float = 0.48,
+    ) -> None:
+        for first, second in edges:
+            rule(*points[first], *points[second], color=ink, width=width)
+
+    def contracted_pill(
+        x: float,
+        y: float,
+        label: str,
+        *,
+        fill: str,
+    ) -> None:
+        pdf.saveState()
+        pdf.setFillColor(HexColor(fill))
+        pdf.setStrokeColor(HexColor(ink))
+        pdf.setLineWidth(0.48)
+        pdf.roundRect(x - 5.5, y - 3.65, 11.0, 7.3, 3.1, stroke=1, fill=1)
+        pdf.restoreState()
+        formula(x, y - 1.25, label, 3.35, align="center", color="#FFFFFF")
+
+    def affected_community_halo(
+        members: tuple[tuple[float, float], ...],
+    ) -> None:
+        if len(members) == 1:
+            center_x, center_y = members[0]
+            radius_x, radius_y, angle = 6.1, 6.0, 0.0
+        else:
+            first, last = members[0], members[-1]
+            center_x = (first[0] + last[0]) / 2.0
+            center_y = (first[1] + last[1]) / 2.0
+            distance = math.hypot(last[0] - first[0], last[1] - first[1])
+            radius_x = distance / 2.0 + 5.7
+            radius_y = 5.9
+            angle = math.atan2(last[1] - first[1], last[0] - first[0])
+        community_contour(
+            blob_anchors(center_x, center_y, radius_x, radius_y, angle=angle),
+            stroke=coral,
+            fill=coral_light,
+            fill_alpha=0.035,
+            stroke_alpha=0.96,
+            width=0.52,
+            dash=(1.45, 1.0),
+        )
+
+    # Reader-oriented schematic of the grouping rule: updated-edge endpoints
+    # are kept as singleton inputs, while each unaffected stored subcommunity
+    # is represented by one contracted vertex.  The drawing intentionally
+    # omits redundant induced edges so the grouping transformation stays clear.
+    def closure_stage(cx: float, cy: float) -> None:
+        points = {
+            "1": (cx - 22.0, cy + 13.0),
+            "3": (cx - 13.0, cy + 14.0),
+            "4": (cx - 13.0, cy + 5.0),
+            "6": (cx + 2.0, cy + 12.0),
+            "2": (cx + 12.0, cy + 11.0),
+            "7": (cx + 3.0, cy - 1.0),
+            "9": (cx + 13.0, cy - 3.0),
+            "8": (cx - 14.0, cy - 15.0),
+            "n": (cx - 4.0, cy - 16.0),
+        }
+        purple_parent = (points["1"], points["3"], points["4"])
+        teal_parent = (points["6"], points["2"], points["7"], points["9"])
+        untouched_parent = (points["8"], points["n"])
+        parent_community_contour(
+            purple_parent,
+            stroke=purple,
+            fill=purple_light,
+            radius=5.0,
+        )
+        parent_community_contour(
+            teal_parent,
+            stroke=teal,
+            fill=teal_light,
+            radius=5.0,
+        )
+        parent_community_contour(
+            untouched_parent,
+            stroke=slate,
+            fill=slate_light,
+            radius=4.7,
+        )
+        nested_group_contour((points["1"],), stroke=purple, fill=purple_light)
+        nested_group_contour((points["3"], points["4"]), stroke=blue, fill=blue_light)
+        nested_group_contour((points["6"],), stroke=teal, fill=teal_light)
+        nested_group_contour((points["2"],), stroke=olive, fill=olive_light)
+        nested_group_contour((points["7"], points["9"]), stroke="#72A457", fill=olive_light)
+        node_styles = {
+            "1": purple,
+            "3": blue,
+            "4": blue,
+            "6": teal,
+            "2": olive,
+            "7": "#72A457",
+            "9": "#72A457",
+            "8": slate,
+            "n": "#FFFFFF",
+        }
+        for label, (px, py) in points.items():
+            labeled_node(
+                px,
+                py,
+                label,
+                fill=node_styles[label],
+                radius=2.35,
+                stroke=slate if label == "n" else ink,
+                accent=label in {"1", "2", "6"},
+            )
+
+    def working_graph(cx: float, cy: float) -> None:
+        points = {
+            "1": (cx - 18.0, cy + 11.0),
+            "3": (cx - 8.0, cy + 13.0),
+            "4": (cx - 7.0, cy + 3.0),
+            "6": (cx + 7.0, cy + 11.0),
+            "2": (cx + 18.0, cy + 10.0),
+            "7": (cx + 8.0, cy - 3.0),
+            "9": (cx + 18.0, cy - 5.0),
+        }
+        parent_community_contour(
+            (points["1"], points["3"], points["4"]),
+            stroke=purple,
+            fill=purple_light,
+            radius=5.0,
+        )
+        parent_community_contour(
+            (points["6"], points["2"], points["7"], points["9"]),
+            stroke=teal,
+            fill=teal_light,
+            radius=5.0,
+        )
+        nested_group_contour((points["1"],), stroke=purple, fill=purple_light)
+        nested_group_contour((points["3"], points["4"]), stroke=blue, fill=blue_light)
+        nested_group_contour((points["6"],), stroke=teal, fill=teal_light)
+        nested_group_contour((points["2"],), stroke=olive, fill=olive_light)
+        nested_group_contour((points["7"], points["9"]), stroke="#72A457", fill=olive_light)
+        stage_edges(
+            points,
+            (
+                ("1", "3"),
+                ("1", "4"),
+                ("3", "4"),
+                ("1", "6"),
+                ("6", "2"),
+                ("6", "7"),
+                ("2", "9"),
+                ("7", "9"),
+                ("3", "7"),
+            ),
+        )
+        node_styles = {
+            "1": purple,
+            "3": blue,
+            "4": blue,
+            "6": teal,
+            "2": olive,
+            "7": "#72A457",
+            "9": "#72A457",
+        }
+        for label, (px, py) in points.items():
+            labeled_node(
+                px,
+                py,
+                label,
+                fill=node_styles[label],
+                radius=2.55,
+                accent=label in {"1", "2", "6"},
+            )
+
+    def contracted_graph(cx: float, cy: float) -> None:
+        points = {
+            "1": (cx - 17.0, cy + 10.0),
+            "34": (cx - 5.0, cy + 8.0),
+            "6": (cx + 7.0, cy + 11.0),
+            "2": (cx + 18.0, cy + 8.0),
+            "79": (cx + 12.0, cy - 7.0),
+        }
+        parent_community_contour(
+            (points["1"], points["34"]),
+            stroke=purple,
+            fill=purple_light,
+            radius=5.0,
+        )
+        parent_community_contour(
+            (points["6"], points["2"], points["79"]),
+            stroke=teal,
+            fill=teal_light,
+            radius=5.0,
+        )
+        stage_edges(
+            points,
+            (
+                ("1", "34"),
+                ("1", "6"),
+                ("34", "79"),
+                ("6", "2"),
+                ("6", "79"),
+                ("2", "79"),
+            ),
+            width=0.55,
+        )
+        labeled_node(*points["1"], "1", fill=purple, radius=3.0, accent=True)
+        contracted_pill(*points["34"], r"3,4", fill=blue)
+        labeled_node(*points["6"], "6", fill=teal, radius=3.0, accent=True)
+        labeled_node(*points["2"], "2", fill=olive, radius=3.0, accent=True)
+        contracted_pill(*points["79"], r"7,9", fill="#72A457")
+
+    def gear(cx: float, cy: float, radius: float) -> None:
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.setStrokeColor(HexColor(indigo))
+        pdf.setLineWidth(0.55)
+        tooth_width = max(0.75, radius * 0.22)
+        for angle in range(0, 360, 45):
+            pdf.saveState()
+            pdf.translate(cx, cy)
+            pdf.rotate(angle)
+            pdf.roundRect(
+                -tooth_width / 2,
+                radius * 0.72,
+                tooth_width,
+                radius * 0.56,
+                tooth_width * 0.25,
+                stroke=1,
+                fill=1,
+            )
+            pdf.restoreState()
+        pdf.circle(cx, cy, radius * 0.82, stroke=1, fill=1)
+        pdf.circle(cx, cy, radius * 0.30, stroke=1, fill=0)
+
+    def backend_stage(cx: float, cy: float) -> None:
+        gear(cx - 4.0, cy + 18.0, 3.6)
+        gear(cx + 5.0, cy + 14.5, 2.7)
+        points = {
+            "1": (cx - 18.0, cy + 1.0),
+            "6": (cx - 9.0, cy - 8.0),
+            "34": (cx + 1.0, cy + 3.0),
+            "79": (cx + 10.0, cy - 7.0),
+            "2": (cx + 18.0, cy + 5.0),
+        }
+        parent_community_contour(
+            (points["1"], points["6"]),
+            stroke=mauve,
+            fill=mauve_light,
+            radius=5.1,
+        )
+        parent_community_contour(
+            (points["34"], points["79"]),
+            stroke=amber,
+            fill=amber_light,
+            radius=5.1,
+        )
+        parent_community_contour(
+            (points["2"],),
+            stroke=teal,
+            fill=teal_light,
+            radius=5.0,
+        )
+        stage_edges(
+            points,
+            (
+                ("1", "34"),
+                ("1", "6"),
+                ("34", "79"),
+                ("6", "2"),
+                ("6", "79"),
+                ("2", "79"),
+            ),
+            width=0.52,
+        )
+        labeled_node(*points["1"], "1", fill=purple, radius=2.8, accent=True)
+        labeled_node(*points["6"], "6", fill=teal, radius=2.8, accent=True)
+        contracted_pill(*points["34"], r"3,4", fill=blue)
+        contracted_pill(*points["79"], r"7,9", fill="#72A457")
+        labeled_node(*points["2"], "2", fill=olive, radius=2.8, accent=True)
+
+    def updated_communities_stage(cx: float, cy: float) -> None:
+        points = {
+            "1": (cx - 19.0, cy + 11.0),
+            "6": (cx - 8.0, cy + 10.0),
+            "3": (cx - 16.0, cy - 6.0),
+            "4": (cx - 7.0, cy - 10.0),
+            "7": (cx + 4.0, cy - 9.0),
+            "9": (cx + 12.0, cy - 4.0),
+            "2": (cx + 18.0, cy + 10.0),
+        }
+        purple_output = (points["1"], points["6"])
+        amber_output = (points["3"], points["4"], points["7"], points["9"])
+        teal_output = (points["2"],)
+        parent_community_contour(
+            purple_output,
+            stroke=mauve,
+            fill=mauve_light,
+            radius=4.8,
+        )
+        parent_community_contour(
+            amber_output,
+            stroke=amber,
+            fill=amber_light,
+            radius=4.6,
+        )
+        nested_group_contour(
+            (points["3"], points["4"]),
+            stroke="#DDA842",
+            fill=amber_light,
+        )
+        nested_group_contour(
+            (points["7"], points["9"]),
+            stroke="#C86E38",
+            fill=amber_light,
+        )
+        parent_community_contour(
+            teal_output,
+            stroke=teal,
+            fill=teal_light,
+            radius=4.8,
+        )
+        affected_community_halo(purple_output)
+        affected_community_halo(teal_output)
+        # Restore the complete induced working graph after expanding the
+        # backend labels.  Earlier drafts retained only intra-community edges,
+        # which made this frame look like a different source graph.  Because
+        # this is the completed state, every edge uses the same solid style.
+        project_edges = (
+            ("1", "4"),
+            ("1", "3"),
+            ("3", "4"),
+            ("4", "2"),
+            ("3", "2"),
+            ("3", "9"),
+            ("3", "7"),
+            ("6", "7"),
+            ("7", "9"),
+            ("2", "9"),
+            ("1", "6"),
+            ("6", "2"),
+        )
+        project_edge_bends = {
+            ("1", "4"): 0.9,
+            ("1", "3"): -0.8,
+            ("4", "2"): -2.0,
+            ("3", "2"): 2.4,
+            ("6", "7"): 0.9,
+        }
+        for first, second in project_edges:
+            curved_graph_edge(
+                points[first],
+                points[second],
+                project_edge_bends.get((first, second), 0.0),
+                color=ink,
+                width=0.38,
+            )
+        node_colors = {
+            "1": mauve,
+            "6": mauve,
+            "3": "#DDA842",
+            "4": "#DDA842",
+            "7": "#C86E38",
+            "9": "#C86E38",
+            "2": teal,
+        }
+        for label, (px, py) in points.items():
+            labeled_node(px, py, label, fill=node_colors[label], radius=2.45, accent=False)
+
+    def hierarchy_stack(
         x: float,
         y: float,
         width: float,
-        height: float,
-        value: str,
-        edge: str,
-        fill: str,
-        font: str = FIGURE_FONT,
+        *,
+        levels: list[list[HierarchyGroup]],
+        highlight: bool = False,
     ) -> None:
-        pdf.setStrokeColor(HexColor(edge))
-        pdf.setFillColor(HexColor(fill))
-        pdf.setLineWidth(0.65)
-        pdf.roundRect(x, y, width, height, height / 2, stroke=1, fill=1)
-        draw_text(
-            pdf,
-            x + width / 2,
-            y + (height - 6.5) / 2 + 0.7,
-            value,
-            6.5,
-            font,
-            "center",
-        )
+        """Draw a restrained three-level stack, following the source figure."""
+        layer_height = 11.8
+        vertical_step = 13.2
+        slant = 6.5
+        level_offset = 0.8
+        depth = 1.1
+        blob_shift = slant * 0.42
 
-    def matrix_icon(
-        x: float,
-        y: float,
-        cols: int,
-        rows: int,
-        cell: float,
-        accent: str,
-        diagonal: bool = False,
-    ) -> None:
-        pdf.setStrokeColor(HexColor("#9DA9B1"))
-        pdf.setLineWidth(0.35)
-        for col in range(cols + 1):
-            pdf.line(x + col * cell, y, x + col * cell, y + rows * cell)
-        for row in range(rows + 1):
-            pdf.line(x, y + row * cell, x + cols * cell, y + row * cell)
-        pdf.setFillColor(HexColor(accent))
-        if diagonal:
-            for index in range(min(cols, rows)):
-                pdf.rect(
-                    x + index * cell + 0.5,
-                    y + (rows - index - 1) * cell + 0.5,
-                    cell - 1.0,
-                    cell - 1.0,
-                    stroke=0,
-                    fill=1,
-                )
-        else:
-            for col, row in ((0, 0), (1, 2), (2, 1), (3, 3)):
-                if col < cols and row < rows:
-                    pdf.rect(
-                        x + col * cell + 0.5,
-                        y + row * cell + 0.5,
-                        cell - 1.0,
-                        cell - 1.0,
-                        stroke=0,
-                        fill=1,
-                    )
+        def quad_path(points: tuple[tuple[float, float], ...]) -> Any:
+            path = pdf.beginPath()
+            path.moveTo(*points[0])
+            for point in points[1:]:
+                path.lineTo(*point)
+            path.close()
+            return path
 
-    def label_strip(
-        x: float,
-        y: float,
-        widths: tuple[float, ...],
-        colors: tuple[str, ...],
-        height: float = 9.0,
-    ) -> None:
-        cursor = x
-        for width, color in zip(widths, colors):
-            pdf.setStrokeColor(HexColor("#FFFFFF"))
-            pdf.setFillColor(HexColor(color))
-            pdf.setLineWidth(0.7)
-            pdf.roundRect(cursor, y, width, height, 2.2, stroke=1, fill=1)
-            cursor += width
-
-    def tiny_graph(
-        cx: float,
-        cy: float,
-        colors: tuple[str, ...],
-        cut: bool = False,
-    ) -> None:
-        points = (
-            (cx - 12.0, cy + 6.5),
-            (cx + 10.5, cy + 7.0),
-            (cx - 8.0, cy - 7.0),
-            (cx + 12.5, cy - 6.0),
-        )
-        edges = ((0, 1), (0, 2), (1, 3), (2, 3), (0, 3))
-        pdf.setLineWidth(0.65)
-        for index, (left, right) in enumerate(edges):
-            if cut and index == 4:
-                pdf.setStrokeColor(HexColor(red))
-                pdf.setDash(2.2, 1.5)
+        def layer_capsule(
+            center_x: float,
+            center_y: float,
+            half_width: float,
+            color: str,
+            refinement_level: int,
+        ) -> None:
+            if refinement_level == 2:
+                half_height = min(2.62, 1.75 + 0.35 * half_width)
             else:
-                pdf.setStrokeColor(HexColor("#657078"))
-                pdf.setDash()
-            pdf.line(
-                points[left][0],
-                points[left][1],
-                points[right][0],
-                points[right][1],
+                half_height = 2.45
+            pdf.saveState()
+            pdf.setFillColor(HexColor("#514B70"))
+            pdf.setFillAlpha(0.07)
+            pdf.ellipse(
+                center_x - half_width + 0.45,
+                center_y - half_height - 0.45,
+                center_x + half_width + 0.45,
+                center_y + half_height - 0.45,
+                stroke=0,
+                fill=1,
             )
-        pdf.setDash()
-        for (px, py), color in zip(points, colors):
-            pdf.setStrokeColor(HexColor("#58636A"))
+            pdf.restoreState()
             pdf.setFillColor(HexColor(color))
-            pdf.circle(px, py, 3.8, stroke=1, fill=1)
-        if cut:
-            draw_text(pdf, cx + 1.0, cy - 1.8, "x", 7.0, FIGURE_FONT_BOLD, color=red)
+            pdf.setStrokeColor(HexColor(color))
+            pdf.setLineWidth(0.32)
+            pdf.ellipse(
+                center_x - half_width,
+                center_y - half_height,
+                center_x + half_width,
+                center_y + half_height,
+                stroke=1,
+                fill=1,
+            )
+            pdf.saveState()
+            pdf.setFillColor(HexColor("#FFFFFF"))
+            pdf.setFillAlpha(0.16)
+            pdf.ellipse(
+                center_x - half_width * 0.66,
+                center_y + 0.35,
+                center_x + half_width * 0.30,
+                center_y + 1.25,
+                stroke=0,
+                fill=1,
+            )
+            pdf.restoreState()
 
-    def closed_level(
-        x: float,
-        y: float,
-        groups: tuple[tuple[int, ...], ...],
-        touched: int,
-    ) -> None:
-        centers = tuple(x + index * 12.0 for index in range(6))
-        for group_index, group in enumerate(groups):
-            left = centers[min(group)] - 5.0
-            right = centers[max(group)] + 5.0
-            pdf.setStrokeColor(HexColor(orange if touched in group else "#98A5AD"))
-            pdf.setFillColor(HexColor(orange_fill if touched in group else "#F5F7F8"))
-            pdf.setLineWidth(0.65)
-            if touched in group:
-                pdf.setDash(2.0, 1.3)
-            pdf.roundRect(left, y - 4.5, right - left, 9.0, 4.5, stroke=1, fill=1)
-            pdf.setDash()
-            for node in group:
-                pdf.setStrokeColor(HexColor("#6E797F"))
-                pdf.setFillColor(HexColor(orange if node == touched else "#FFFFFF"))
-                pdf.circle(centers[node], y, 2.25, stroke=1, fill=1)
+        affected_box: tuple[float, float, float, float] | None = None
+        if highlight:
+            warm_start, warm_end = hierarchy_families[1]["span"]
+            box_left = x + blob_shift + warm_start * width - 2.2
+            box_right = (
+                x
+                + (len(levels) - 1) * level_offset
+                + blob_shift
+                + warm_end * width
+                + 2.2
+            )
+            box_bottom = y - 1.8
+            box_top = y + (len(levels) - 1) * vertical_step + layer_height + 1.8
+            affected_box = (box_left, box_bottom, box_right, box_top)
+            pdf.saveState()
+            pdf.setFillColor(HexColor(coral))
+            pdf.setFillAlpha(0.045)
+            pdf.rect(
+                box_left,
+                box_bottom,
+                box_right - box_left,
+                box_top - box_bottom,
+                stroke=0,
+                fill=1,
+            )
+            pdf.restoreState()
 
-    margin = 5.5
-    gap = 4.0
-    footer_y, footer_h = 5.5, 19.0
-    calls_y, calls_h = footer_y + footer_h + gap, 81.0
-    middle_y, middle_h = calls_y + calls_h + gap, 66.0
-    bootstrap_y = middle_y + middle_h + gap
-    bootstrap_h = page_height - margin - bootstrap_y
+        for level, groups in enumerate(levels):
+            layer_y = y + level * vertical_step
+            offset = level * level_offset
+            top_face = (
+                (x + offset, layer_y),
+                (x + width + offset, layer_y),
+                (x + width + slant + offset, layer_y + layer_height),
+                (x + slant + offset, layer_y + layer_height),
+            )
+            shadow_face = tuple((px + 0.9, py - 1.0) for px, py in top_face)
+            pdf.saveState()
+            pdf.setFillColor(HexColor("#514B70"))
+            pdf.setFillAlpha(0.09)
+            pdf.drawPath(quad_path(shadow_face), stroke=0, fill=1)
+            pdf.restoreState()
+            front_face = (
+                (x + offset, layer_y),
+                (x + width + offset, layer_y),
+                (x + width + offset, layer_y - depth),
+                (x + offset, layer_y - depth),
+            )
+            pdf.setFillColor(HexColor("#E8E8F0"))
+            pdf.setStrokeColor(HexColor("#A3A2B5"))
+            pdf.setLineWidth(0.30)
+            pdf.drawPath(quad_path(front_face), stroke=1, fill=1)
+            pdf.setFillColor(HexColor("#FDFDFE"))
+            pdf.setStrokeColor(HexColor("#A3A2B5"))
+            pdf.setLineWidth(0.42)
+            pdf.drawPath(quad_path(top_face), stroke=1, fill=1)
+            pdf.setStrokeColor(HexColor("#D9D8E2"))
+            pdf.setLineWidth(0.28)
+            pdf.line(x + slant + offset, layer_y + layer_height,
+                     x + width + slant + offset, layer_y + layer_height)
 
-    # 0. Fixed Leiden bootstrap: the only point at which nesting is guaranteed.
-    panel(
-        margin,
-        bootstrap_y,
-        page_width - 2 * margin,
-        bootstrap_h,
-        "0",
-        "Bootstrap A_0 and optional X with Leiden",
-        accent=INK,
-        fill="#FCFCFD",
-    )
+            blob_y = layer_y + 4.8
+            for _, color, left, right in groups:
+                center = (left + right) / 2.0
+                center_x = x + offset + blob_shift + center * width
+                minimum_width = 1.70 if level == 2 else 2.35
+                half_width = max(
+                    minimum_width,
+                    (right - left) * width / 2.0 - 0.55,
+                )
+                layer_capsule(center_x, blob_y, half_width, color, level)
+
+        if affected_box is not None:
+            box_left, box_bottom, box_right, box_top = affected_box
+            pdf.saveState()
+            pdf.setStrokeColor(HexColor(cut_red))
+            pdf.setStrokeAlpha(0.86)
+            pdf.setLineWidth(0.48)
+            pdf.setDash([1.35, 1.0], 0)
+            pdf.rect(
+                box_left,
+                box_bottom,
+                box_right - box_left,
+                box_top - box_bottom,
+                stroke=1,
+                fill=0,
+            )
+            pdf.restoreState()
+
+    # Source-faithful outer structure: a state rail and one continuous workflow.
+    rail_x, rail_y, rail_w, rail_h = 4.0, 18.0, 112.0, 307.0
+    flow_x, flow_y, flow_w, flow_h = 120.0, 18.0, 391.5, 307.0
+    frame(rail_x, rail_y, rail_w, rail_h, fill="#FFFFFF", radius=2.2)
+    frame(flow_x, flow_y, flow_w, flow_h, fill="#FFFFFF", radius=2.2)
+    for separator_y in (304.0, 232.0, 169.0):
+        rule(rail_x, separator_y, rail_x + rail_w, separator_y, color=indigo_light, width=0.5)
+    for separator_y in (225.0, 104.0):
+        rule(flow_x, separator_y, flow_x + flow_w, separator_y, color=indigo_light, width=0.62)
+
     draw_text(
         pdf,
-        page_width - margin - 7.0,
-        bootstrap_y + bootstrap_h - 10.5,
-        "level 0 -> level L-1 | initially nested; adjacent levels may coincide",
-        6.5,
-        FIGURE_FONT_BOLD,
-        "right",
-        blue,
-    )
-    top_starts = (13.0, 66.0, 123.0, 190.0, 278.0, 342.0, 366.0, 454.0)
-    top_widths = (40.0, 43.0, 53.0, 74.0, 50.0, 10.0, 74.0, 49.0)
-    top_labels = (
-        "A_0 | X",
-        "Leiden",
-        "C_0^0 (fine)",
-        "quotient + Leiden",
-        "C_0^1",
-        "...",
-        "repeat quotient",
-        "C_0^(L-1)",
-    )
-    for start, width, value in zip(top_starts, top_widths, top_labels):
-        draw_text(
-            pdf,
-            start + width / 2,
-            bootstrap_y + 22.0,
-            value,
-            6.5,
-            FIGURE_FONT_BOLD if "C_0" in value or value == "Leiden" else FIGURE_FONT,
-            "center",
-        )
-    matrix_icon(top_starts[0] + 3.0, bootstrap_y + 3.5, 4, 4, 3.1, blue, diagonal=True)
-    matrix_icon(top_starts[0] + 24.0, bootstrap_y + 3.5, 3, 4, 3.1, teal)
-    pill(top_starts[1], bootstrap_y + 4.0, top_widths[1], 13.0, "Leiden", blue, blue_fill, FIGURE_FONT_BOLD)
-    label_strip(
-        top_starts[2] + 1.0,
-        bootstrap_y + 5.0,
-        (8.0, 8.0, 8.0, 8.0, 8.0, 8.0),
-        (node_colors[0], node_colors[0], node_colors[1], node_colors[1], node_colors[2], node_colors[3]),
-    )
-    tiny_graph(
-        top_starts[3] + 19.0,
-        bootstrap_y + 9.5,
-        (node_colors[0], node_colors[1], node_colors[2], node_colors[3]),
-    )
-    pill(top_starts[3] + 40.0, bootstrap_y + 3.0, 32.0, 13.0, "Leiden", blue, blue_fill, FIGURE_FONT_BOLD)
-    label_strip(
-        top_starts[4] + 2.0,
-        bootstrap_y + 5.0,
-        (16.0, 16.0, 16.0),
-        (node_colors[0], node_colors[1], node_colors[2]),
-    )
-    draw_text(pdf, top_starts[5] + 5.0, bootstrap_y + 6.0, "...", 7.0, FIGURE_FONT_BOLD, "center", MID)
-    tiny_graph(
-        top_starts[6] + 19.0,
-        bootstrap_y + 9.5,
-        (node_colors[0], node_colors[0], node_colors[2], node_colors[2]),
-    )
-    pill(top_starts[6] + 40.0, bootstrap_y + 3.0, 32.0, 13.0, "Leiden", blue, blue_fill, FIGURE_FONT_BOLD)
-    label_strip(
-        top_starts[7] + 4.0,
-        bootstrap_y + 5.0,
-        (20.0, 20.0),
-        (node_colors[0], node_colors[2]),
-    )
-    for index in range(len(top_starts) - 1):
-        flow_arrow(
-            top_starts[index] + top_widths[index] + 2.0,
-            bootstrap_y + 9.5,
-            top_starts[index + 1] - 3.0,
-            bootstrap_y + 9.5,
-        )
-
-    # 1-3. Localize, freeze every mask from the old state, then prepare labels.
-    update_x, update_w = margin, 108.0
-    freeze_x, freeze_w = update_x + update_w + gap, 204.0
-    prepare_x = freeze_x + freeze_w + gap
-    prepare_w = page_width - margin - prepare_x
-    panel(update_x, middle_y, update_w, middle_h, "1", "Update and localize", orange, "#FFFFFF")
-    panel(freeze_x, middle_y, freeze_w, middle_h, "2", "Freeze all masks before writes", blue, "#FFFFFF")
-    panel(prepare_x, middle_y, prepare_w, middle_h, "3", "Prepare labels L-1 to 0", purple, "#FFFFFF")
-
-    # Update endpoints S_t and their radius-r neighborhood B_t.
-    left_nodes = ((update_x + 17.0, middle_y + 31.0), (update_x + 31.0, middle_y + 42.0), (update_x + 32.0, middle_y + 21.0))
-    right_nodes = ((update_x + 70.0, middle_y + 31.0), (update_x + 84.0, middle_y + 42.0), (update_x + 85.0, middle_y + 21.0))
-    for nodes, expanded in ((left_nodes, False), (right_nodes, True)):
-        if expanded:
-            pdf.setStrokeColor(HexColor(orange))
-            pdf.setFillColor(HexColor(orange_fill))
-            pdf.setDash(2.0, 1.4)
-            pdf.ellipse(update_x + 60.0, middle_y + 15.0, update_x + 96.0, middle_y + 48.0, stroke=1, fill=1)
-            pdf.setDash()
-        pdf.setStrokeColor(HexColor("#6A747B"))
-        pdf.setLineWidth(0.65)
-        pdf.line(*nodes[0], *nodes[1])
-        pdf.line(*nodes[0], *nodes[2])
-        pdf.line(*nodes[1], *nodes[2])
-        for node_index, (nx, ny) in enumerate(nodes):
-            affected = node_index < 2
-            pdf.setStrokeColor(HexColor(orange if affected else "#657078"))
-            pdf.setFillColor(HexColor(orange if affected or expanded else "#FFFFFF"))
-            pdf.circle(nx, ny, 3.5, stroke=1, fill=1)
-    pdf.setStrokeColor(HexColor(red))
-    pdf.setDash(2.0, 1.4)
-    pdf.line(*left_nodes[0], *left_nodes[1])
-    pdf.setDash()
-    flow_arrow(update_x + 39.0, middle_y + 31.0, update_x + 55.0, middle_y + 31.0, orange)
-    draw_text(pdf, update_x + 24.0, middle_y + 7.0, "S_t endpoints", 6.5, FIGURE_FONT_BOLD, "center", orange)
-    draw_text(pdf, update_x + 79.0, middle_y + 7.0, "radius-r B_t", 6.5, FIGURE_FONT_BOLD, "center", orange)
-
-    # Frozen closures at several levels; the orange node represents B_t.
-    level_x = freeze_x + 39.0
-    for label, y, groups in (
-        ("l=0", middle_y + 43.0, ((0, 1), (2, 3), (4, 5))),
-        ("l=1", middle_y + 31.0, ((0, 1, 2), (3, 4, 5))),
-        ("l=L-1", middle_y + 19.0, ((0, 1, 2, 3), (4, 5))),
-    ):
-        draw_text(pdf, freeze_x + 7.0, y - 2.3, label, 6.5, FIGURE_FONT_BOLD)
-        closed_level(level_x, y, groups, touched=1)
-    draw_text(pdf, freeze_x + 151.0, middle_y + 43.0, "close each pre-update", 6.5, align="center")
-    draw_text(pdf, freeze_x + 151.0, middle_y + 32.0, "community touching B_t", 6.5, FIGURE_FONT_BOLD, "center", blue)
-    draw_text(pdf, freeze_x + 153.0, middle_y + 21.0, "from C_{t-1}; masks fixed", 6.5, align="center")
-    draw_text(
-        pdf,
-        freeze_x + freeze_w / 2,
-        middle_y + 6.5,
-        "U_t^l = {v : C_{t-1}^l(v) is in C_{t-1}^l(B_t)}",
-        6.5,
+        rail_x + rail_w / 2,
+        311.5,
+        "Data stored",
+        6.3,
         FIGURE_FONT_BOLD,
         "center",
-        blue,
+        indigo,
     )
 
-    # Opposite-direction preparation: coarse-to-fine copies inside frozen masks.
-    prep_label_x = prepare_x + 8.0
-    prep_strip_x = prepare_x + 36.0
-    prep_rows = (
-        ("L-1", middle_y + 42.5, ("v2", "v7", "v9")),
-        ("...", middle_y + 30.0, ("a", "b", "c")),
-        ("0", middle_y + 17.5, ("a", "a", "c")),
-    )
-    for row_index, (level, y, values) in enumerate(prep_rows):
-        draw_text(pdf, prep_label_x, y - 2.3, level, 6.5, FIGURE_FONT_BOLD)
-        for value_index, value in enumerate(values):
-            bx = prep_strip_x + value_index * 20.0
-            pdf.setStrokeColor(HexColor(purple))
-            pdf.setFillColor(HexColor(purple_fill if row_index else "#E5DDF1"))
-            pdf.roundRect(bx, y - 5.0, 17.0, 10.0, 2.0, stroke=1, fill=1)
-            draw_text(pdf, bx + 8.5, y - 2.3, value, 6.5, FIGURE_FONT_BOLD, "center", purple)
-    flow_arrow(prepare_x + 103.0, middle_y + 43.5, prepare_x + 103.0, middle_y + 17.0, purple)
-    draw_text(pdf, prepare_x + 143.0, middle_y + 43.5, "on B_t: provisional IDs", 6.5, FIGURE_FONT_BOLD, "center", purple)
-    draw_text(pdf, prepare_x + 143.0, middle_y + 32.0, "not a guaranteed", 6.5, align="center")
-    draw_text(pdf, prepare_x + 143.0, middle_y + 23.0, "singleton namespace", 6.5, align="center")
-    draw_text(pdf, prepare_x + 140.0, middle_y + 8.0, "copy down in U_t^l", 6.5, FIGURE_FONT_BOLD, "center", purple)
+    # State rail: one accumulated adjacency, optional features, the hierarchy,
+    # and the level loop used by Steps 2--3.  All content follows a common
+    # six-point inset so the text and graphics share balanced outer margins.
+    rail_content_x = 10.0
+    rail_content_w = 100.0
+    state_math_size = 5.6
+    entry_math_size = 5.0
+    type_text_size = 3.75
+    meaning_text_size = 3.65
 
-    # 4. One wide, implementation-ordered backend-call trace.
-    panel(
-        margin,
-        calls_y,
-        page_width - 2 * margin,
-        calls_h,
-        "4",
-        "Local backend calls run in the opposite direction: l=0 to L-1",
-        teal,
-        "#FFFFFF",
-    )
-    pill(
-        page_width - margin - 213.0,
-        calls_y + calls_h - 13.0,
-        207.0,
-        10.0,
-        "A_work = A_t[U_t^0,U_t^0] once | boundary omitted",
-        orange,
-        orange_fill,
+    draw_text(
+        pdf,
+        rail_content_x,
+        290.5,
+        "1) Accumulated adjacency",
+        5.8,
         FIGURE_FONT_BOLD,
+        color=indigo,
     )
-    stage_starts = (12.0, 87.0, 151.0, 243.0, 322.0, 402.0)
-    stage_widths = (64.0, 54.0, 81.0, 68.0, 70.0, 101.0)
-    stage_titles = (
-        "current groups",
-        "membership P_l",
-        "contract graph",
-        "backend B",
-        "project labels",
-        "cut working edges",
+    formula(
+        rail_content_x,
+        274.0,
+        r"\bm{A}_{t}\in\mathbb{R}^{n\times n}",
+        state_math_size,
     )
-    for index, (x, width, title) in enumerate(zip(stage_starts, stage_widths, stage_titles)):
-        pdf.setStrokeColor(HexColor("#DCE3E6"))
-        pdf.setFillColor(HexColor(pale if index % 2 == 0 else "#FFFFFF"))
-        pdf.setLineWidth(0.55)
-        pdf.roundRect(x, calls_y + 5.0, width, 56.0, 3.0, stroke=1, fill=1)
-        draw_text(
-            pdf,
-            x + width / 2,
-            calls_y + 50.0,
-            title,
-            6.5,
-            FIGURE_FONT_BOLD,
-            "center",
-            teal if index < 5 else red,
+    draw_text(
+        pdf,
+        rail_content_x,
+        263.0,
+        "sparse floating-point tensor",
+        type_text_size,
+        color=muted,
+    )
+    formula(
+        rail_content_x,
+        249.0,
+        r"[\bm{A}_{t}]_{ij}",
+        entry_math_size,
+    )
+    draw_text(
+        pdf,
+        rail_content_x,
+        238.0,
+        "edge weight for the indexed vertex pair",
+        meaning_text_size,
+        color=muted,
+    )
+    matrix_x, matrix_y, matrix_size = 76.0, 248.0, 28.0
+    sparse_matrix(matrix_x, matrix_y, matrix_size)
+    matrix_cell = matrix_size / 8.0
+    matrix_index_size = 3.8
+    for label, column in ((r"1", 0.5), (r"2", 1.5), (r"\cdots", 4.5), (r"n", 7.5)):
+        formula(
+            matrix_x + column * matrix_cell,
+            matrix_y + matrix_size + 1.3,
+            label,
+            matrix_index_size,
+            align="center",
+            color=muted,
         )
-    for index in range(len(stage_starts) - 1):
-        flow_arrow(
-            stage_starts[index] + stage_widths[index] + 2.0,
-            calls_y + 33.0,
-            stage_starts[index + 1] - 3.0,
-            calls_y + 33.0,
-            teal,
+    for label, row in ((r"1", 0.5), (r"2", 1.5), (r"\vdots", 4.5), (r"n", 7.5)):
+        formula(
+            matrix_x - 2.4,
+            matrix_y + matrix_size - row * matrix_cell - 1.4,
+            label,
+            matrix_index_size,
+            align="right",
+            color=muted,
         )
 
-    # Groups within U_t^l.
-    group_x = stage_starts[0] + 8.0
-    for group_index, (count, color) in enumerate(((2, node_colors[0]), (3, node_colors[1]), (1, node_colors[2]))):
-        gx = group_x + group_index * 17.0
-        pdf.setStrokeColor(HexColor(color))
-        pdf.setFillColor(HexColor("#FFFFFF"))
-        pdf.roundRect(gx - 2.0, calls_y + 25.0, 12.0, 16.0, 5.0, stroke=1, fill=1)
-        for node_index in range(count):
-            pdf.setFillColor(HexColor(color))
-            pdf.circle(gx + 4.0, calls_y + 37.5 - node_index * 4.4, 1.55, stroke=0, fill=1)
-    draw_text(pdf, stage_starts[0] + 32.0, calls_y + 10.0, "labels in U_t^l", 6.5, align="center")
-
-    # Sparse one-hot membership matrix P_l.
-    matrix_icon(stage_starts[1] + 17.0, calls_y + 22.0, 5, 4, 4.0, teal)
-    draw_text(pdf, stage_starts[1] + 27.0, calls_y + 10.0, "one 1 / vertex", 6.5, align="center")
-
-    # Contracted graph and optional mean features.
-    tiny_graph(
-        stage_starts[2] + stage_widths[2] / 2,
-        calls_y + 34.0,
-        (node_colors[0], node_colors[1], node_colors[2], node_colors[3]),
+    draw_text(
+        pdf,
+        rail_content_x,
+        218.5,
+        "2) Optional vertex features",
+        5.8,
+        FIGURE_FONT_BOLD,
+        color=indigo,
     )
-    draw_text(pdf, stage_starts[2] + stage_widths[2] / 2, calls_y + 15.5, "Abar=P A_work P^T", 6.5, align="center")
-    draw_text(pdf, stage_starts[2] + stage_widths[2] / 2, calls_y + 7.0, "Xbar=group mean", 6.5, FIGURE_FONT_BOLD, "center", teal)
+    formula(
+        rail_content_x,
+        203.0,
+        r"\bm{X}\in\mathbb{R}^{n\times d}",
+        state_math_size,
+    )
+    draw_text(
+        pdf,
+        rail_content_x,
+        192.0,
+        "dense/sparse floating-point tensor",
+        type_text_size,
+        color=muted,
+    )
+    formula(
+        rail_content_x,
+        180.5,
+        r"[\bm{X}]_{ik}",
+        entry_math_size,
+    )
+    draw_text(
+        pdf,
+        25.0,
+        181.2,
+        "indexed feature value",
+        meaning_text_size,
+        color=muted,
+    )
+    feature_matrix(80.0, 182.5, 30.0, 30.0)
 
-    # No local warm start is passed to the backend.
-    backend_cx = stage_starts[3] + stage_widths[3] / 2
-    pdf.setStrokeColor(HexColor(teal))
-    pdf.setFillColor(HexColor(teal_fill))
-    pdf.setLineWidth(1.0)
-    pdf.circle(backend_cx, calls_y + 34.0, 10.0, stroke=1, fill=1)
-    draw_text(pdf, backend_cx, calls_y + 31.5, "B", 7.4, FIGURE_FONT_BOLD, "center", teal)
-    draw_text(pdf, backend_cx, calls_y + 10.0, "warm start = none", 6.5, FIGURE_FONT_BOLD, "center", red)
+    draw_text(
+        pdf,
+        rail_content_x,
+        155.5,
+        "3) Stored label hierarchy",
+        5.8,
+        FIGURE_FONT_BOLD,
+        color=indigo,
+    )
+    formula(
+        rail_content_x,
+        139.5,
+        r"\bm{C}_{t}\in\mathbb{Z}^{L\times n}",
+        state_math_size,
+    )
+    draw_text(
+        pdf,
+        rail_content_x,
+        128.5,
+        "dense integer label tensor",
+        type_text_size,
+        color=muted,
+    )
+    stored_hierarchy_tensor(rail_content_x, 74.0, rail_content_w)
 
-    # Projection expands contracted labels back through P_l.
-    project_x = stage_starts[4] + 11.0
-    for column, color in enumerate((node_colors[0], node_colors[0], node_colors[1], node_colors[1], node_colors[2])):
-        pdf.setStrokeColor(HexColor("#657078"))
+    # Backend choice is configuration rather than stored state.  A balanced
+    # separator gives it a distinct visual band without breaking the rail.
+    rule(rail_x, 67.0, rail_x + rail_w, 67.0, color=indigo_light, width=0.5)
+
+    frame(
+        rail_content_x,
+        24.0,
+        rail_content_w,
+        36.0,
+        fill=faint,
+        stroke="#C4C2D2",
+        radius=1.5,
+        line_width=0.42,
+    )
+    draw_text(
+        pdf,
+        60.0,
+        52.5,
+        "Backend configuration",
+        4.8,
+        FIGURE_FONT_BOLD,
+        "center",
+        indigo,
+    )
+    rule(60.0, 28.0, 60.0, 47.5, color="#D8D6E4", width=0.4)
+    draw_text(
+        pdf,
+        35.0,
+        41.5,
+        "feature-aware",
+        3.45,
+        FIGURE_FONT_BOLD,
+        "center",
+        ink,
+    )
+    draw_text(pdf, 35.0, 35.5, "group sum or mean", 3.15, align="center", color=muted)
+    formula(
+        35.0,
+        28.0,
+        r"(\bar{\bm{A}}_\ell,\bar{\bm{X}}_\ell)",
+        4.2,
+        align="center",
+        color=indigo,
+    )
+    draw_text(
+        pdf,
+        85.0,
+        41.5,
+        "topology-only",
+        3.45,
+        FIGURE_FONT_BOLD,
+        "center",
+        ink,
+    )
+    draw_text(pdf, 85.0, 35.5, "adjacency only", 3.15, align="center", color=muted)
+    formula(
+        85.0,
+        28.0,
+        r"\bar{\bm{A}}_\ell",
+        4.45,
+        align="center",
+        color=indigo,
+    )
+
+    # Step 1 follows the original four-frame narrative.
+    step_header(1, "Update and affected-region detection", 126.0, 310.0)
+    top_centers = (148.0, 239.0, 343.0, 458.0)
+    top_titles = ("New batch", "Graph after update", "Affected endpoints", "Expanded neighborhood")
+    for center, title in zip(top_centers, top_titles):
+        draw_text(pdf, center, 291.0, title, 5.5, FIGURE_FONT_BOLD, "center", indigo)
+    update_batch(top_centers[0], 259.0)
+    update_graph(top_centers[1], 259.0, 16.5)
+    update_graph(top_centers[2], 259.0, 16.5, affected=endpoint_nodes)
+    update_graph(top_centers[3], 259.0, 16.5, affected=endpoint_nodes, neighborhood=True)
+    arrow(168.0, 260.0, 205.0, 260.0)
+    arrow(273.0, 260.0, 305.0, 260.0)
+    arrow(378.0, 260.0, 420.0, 260.0)
+    draw_text(pdf, 186.5, 270.0, "insert into", 4.4, FIGURE_FONT_BOLD, "center", ink)
+    draw_text(pdf, 186.5, 264.0, "adjacency", 4.4, FIGURE_FONT_BOLD, "center", ink)
+    draw_text(pdf, 289.0, 270.0, "mark endpoints", 4.4, FIGURE_FONT_BOLD, "center", ink)
+    draw_text(pdf, 289.0, 264.0, "as affected", 4.4, FIGURE_FONT_BOLD, "center", ink)
+    draw_text(pdf, 399.0, 270.0, "expand", 4.4, FIGURE_FONT_BOLD, "center", ink)
+    draw_text(pdf, 399.0, 264.0, "neighborhood", 4.4, FIGURE_FONT_BOLD, "center", ink)
+    diagram_formula_size = 5.55
+    formula(
+        top_centers[0],
+        230.0,
+        r"\bm{\Delta}_t",
+        diagram_formula_size,
+        align="center",
+    )
+    formula(
+        top_centers[1],
+        230.0,
+        r"\bm{A}_t\gets\bm{A}_{t-1}+\bm{\Delta}_t",
+        diagram_formula_size,
+        align="center",
+    )
+    formula(
+        top_centers[2],
+        230.0,
+        r"S_t",
+        diagram_formula_size,
+        align="center",
+    )
+    formula(
+        top_centers[3],
+        230.0,
+        r"B_t=N_r(S_t)",
+        diagram_formula_size,
+        align="center",
+    )
+
+    # Step 2 uses the full workflow width to show filtering, contraction,
+    # repartitioning, and projection without collapsing distinct semantics.
+    step_header(2, "Hierarchical local recomputation", 126.0, 210.0)
+    pipeline_centers = (158.0, 237.0, 316.0, 395.0, 474.0)
+    pipeline_titles = (
+        "Community closure",
+        "Working graph",
+        "Contract groups",
+        "Run backend",
+        "Updated communities",
+    )
+    for center, title in zip(pipeline_centers, pipeline_titles):
+        draw_text(pdf, center, 190.0, title, 5.2, FIGURE_FONT_BOLD, "center", indigo)
+    for divider_x in (197.5, 276.5, 355.5, 434.5):
+        rule(divider_x, 128.0, divider_x, 151.0, color=hairline, width=0.38, dash=(1.6, 1.6))
+        rule(divider_x, 163.0, divider_x, 194.0, color=hairline, width=0.38, dash=(1.6, 1.6))
+    closure_stage(pipeline_centers[0], 158.0)
+    working_graph(pipeline_centers[1], 158.0)
+    contracted_graph(pipeline_centers[2], 158.0)
+    backend_stage(pipeline_centers[3], 158.0)
+    updated_communities_stage(pipeline_centers[4], 158.0)
+    for left, right in zip(pipeline_centers[:-1], pipeline_centers[1:]):
+        arrow(left + 26.0, 157.0, right - 26.0, 157.0, head=3.2)
+    draw_backed_text(
+        pdf,
+        197.5,
+        162.0,
+        "retain touched",
+        3.2,
+        font=FIGURE_FONT_BOLD,
+        align="center",
+        color=muted,
+        pad_x=0.8,
+        pad_y=0.35,
+    )
+    formula(
+        pipeline_centers[0],
+        126.0,
+        r"S_t=\{1,2,6\},\ B_t\subseteq U_t^\ell",
+        4.45,
+        align="center",
+    )
+    formula(
+        pipeline_centers[1],
+        126.0,
+        r"\bm{A}^{\mathrm{work}}_\ell",
+        diagram_formula_size,
+        align="center",
+    )
+    formula(
+        pipeline_centers[2],
+        126.0,
+        r"\bar{\bm{A}}_\ell=\bm{P}_\ell\bm{A}^{\mathrm{work}}_\ell\bm{P}_\ell^{\mathsf T}",
+        diagram_formula_size,
+        align="center",
+    )
+    formula(
+        pipeline_centers[3],
+        126.0,
+        r"\bar{\bm{y}}_\ell=\mathcal{B}(\cdot)",
+        diagram_formula_size,
+        align="center",
+    )
+    formula(
+        pipeline_centers[4],
+        126.0,
+        r"C_t^\ell",
+        diagram_formula_size,
+        align="center",
+    )
+
+    frame(126.0, 109.5, 379.0, 12.0, fill="#FFFFFF", stroke=hairline, radius=1.6, line_width=0.45)
+    legend_y = 115.5
+    pdf.setFillColor(HexColor(purple))
+    pdf.setStrokeColor(HexColor(ink))
+    pdf.setLineWidth(0.42)
+    pdf.circle(139.0, legend_y, 2.25, stroke=1, fill=1)
+    pdf.setStrokeColor(HexColor(coral))
+    pdf.setLineWidth(0.54)
+    pdf.circle(139.0, legend_y, 3.0, stroke=1, fill=0)
+    draw_text(pdf, 145.0, legend_y - 1.8, "affected input vertex", 4.15)
+    pdf.setFillColor(HexColor("#FFFFFF"))
+    pdf.setStrokeColor(HexColor(ink))
+    pdf.setLineWidth(0.42)
+    pdf.circle(215.0, legend_y, 2.5, stroke=1, fill=1)
+    draw_text(pdf, 221.0, legend_y - 1.8, "other vertex", 4.15)
+    for index, color in enumerate((purple, blue, olive)):
+        anchors = blob_anchors(279.0 + index * 3.3, legend_y, 2.7, 2.2, variant=index)
         pdf.setFillColor(HexColor(color))
-        pdf.circle(project_x + column * 10.0, calls_y + 34.0, 3.4, stroke=1, fill=1)
-    draw_text(pdf, stage_starts[4] + stage_widths[4] / 2, calls_y + 15.5, "through P_l", 6.5, align="center")
-    draw_text(pdf, stage_starts[4] + stage_widths[4] / 2, calls_y + 7.0, "prior group IDs", 6.5, FIGURE_FONT_BOLD, "center", purple)
-
-    # Cutting removes structural context for the next level call.
-    tiny_graph(
-        stage_starts[5] + stage_widths[5] / 2,
-        calls_y + 34.0,
-        (node_colors[0], node_colors[0], node_colors[2], node_colors[2]),
-        cut=True,
+        pdf.setStrokeColor(HexColor(color))
+        pdf.setLineWidth(0.28)
+        pdf.drawPath(smooth_closed_path(anchors), stroke=1, fill=1)
+    draw_text(pdf, 292.0, legend_y - 1.8, "contracted group", 4.15)
+    community_contour(
+        blob_anchors(404.0, legend_y, 6.2, 2.8),
+        stroke=coral,
+        fill=coral_light,
+        fill_alpha=0.035,
+        stroke_alpha=0.96,
+        width=0.50,
+        dash=(1.35, 0.95),
     )
-    draw_text(pdf, stage_starts[5] + stage_widths[5] / 2, calls_y + 15.5, "outside U_t^l or", 6.5, align="center")
-    draw_text(pdf, stage_starts[5] + stage_widths[5] / 2, calls_y + 7.0, "cross-label edges", 6.5, FIGURE_FONT_BOLD, "center", red)
+    draw_text(pdf, 413.0, legend_y - 1.8, "affected output community", 4.05)
 
-    # 5. The maintained output contract and the two invariants/limitations.
-    pdf.setStrokeColor(HexColor(border))
-    pdf.setFillColor(HexColor(green_fill))
-    pdf.setLineWidth(0.7)
-    pdf.roundRect(margin, footer_y, page_width - 2 * margin, footer_h, 4.0, stroke=1, fill=1)
-    pdf.setFillColor(HexColor(green))
-    pdf.circle(margin + 10.0, footer_y + footer_h / 2, 6.0, stroke=0, fill=1)
-    draw_text(pdf, margin + 10.0, footer_y + 7.1, "5", 7.0, FIGURE_FONT_BOLD, "center", "#FFFFFF")
-    draw_text(pdf, margin + 21.0, footer_y + 7.0, "Return C_t^0", 7.2, FIGURE_FONT_BOLD, color=INK)
-    draw_text(pdf, margin + 126.0, footer_y + 7.0, "+", 7.2, FIGURE_FONT_BOLD, "center", green)
-    draw_text(pdf, margin + 136.0, footer_y + 7.0, "outside every U_t^l: labels unchanged", 6.5, FIGURE_FONT_BOLD)
-    draw_text(pdf, margin + 353.0, footer_y + 7.0, "!", 7.2, FIGURE_FONT_BOLD, "center", orange)
-    draw_text(pdf, margin + 364.0, footer_y + 7.0, "post-update nesting not enforced", 6.5, FIGURE_FONT_BOLD)
+    # Give the hierarchy comparison a taller band and a more generous lower
+    # margin so neither stack appears pinned to the workflow boundary.
+    step_header(3, "Repeat backend calls across stored levels", 126.0, 88.4)
+    for label, baseline in ((r"0", 31.9), (r"i", 45.1), (r"L\!-\!1", 58.3)):
+        formula(144.0, baseline, label, 5.1, align="right", color=muted)
+
+    hierarchy_stack(149.0, 28.9, 120.0, levels=current_hierarchy, highlight=True)
+    draw_text(
+        pdf,
+        213.1,
+        75.4,
+        "local recomputation scope",
+        4.0,
+        FIGURE_FONT_BOLD,
+        "center",
+        cut_red,
+    )
+
+    arrow(286.0, 50.9, 363.0, 50.9, head=3.4)
+    draw_text(pdf, 324.5, 59.9, "level-wise update", 4.7, FIGURE_FONT_BOLD, "center", indigo)
+
+    hierarchy_stack(372.0, 28.9, 124.0, levels=updated_hierarchy)
+    draw_text(pdf, 436.0, 77.4, "Recomputed hierarchy", 5.2, FIGURE_FONT_BOLD, "center", indigo)
+
+    # Thin source-style edge legend below the workflow.
+    frame(120.0, 3.0, 391.5, 12.0, fill="#FFFFFF", stroke=indigo_light, radius=1.8, line_width=0.5)
+    draw_text(pdf, 129.0, 6.2, "Legend:", 4.7, FIGURE_FONT_BOLD, color=indigo)
+    rule(202.0, 9.0, 219.0, 9.0, color=ink, width=0.55)
+    draw_text(pdf, 224.0, 6.2, "edge", 4.4)
+    rule(324.0, 9.0, 341.0, 9.0, color=cut_red, width=0.54, dash=(1.55, 1.10))
+    draw_text(pdf, 346.0, 6.2, "new / changed edge", 4.4)
+
     pdf.showPage()
     pdf.save()
+
+    color_names: dict[str, str] = {}
+    for node in formula_nodes:
+        color_names.setdefault(node["color"], f"FormulaColor{len(color_names)}")
+
+    tex_lines = [
+        r"\let\TeXprimitiveyear\year",
+        r"\documentclass[class=ieeeaccess,crop,border=0pt]{standalone}",
+        r"\let\year\TeXprimitiveyear",
+        r"\ifdefined\pdfinfoomitdate\pdfinfoomitdate=1\fi",
+        r"\ifdefined\pdfsuppressptexinfo\pdfsuppressptexinfo=-1\fi",
+        r"\ifdefined\pdftrailerid\pdftrailerid{}\fi",
+        r"\usepackage{amsmath,amssymb,amsfonts,bm,tikz,graphicx}",
+        r"\makeatletter",
+        r"\AtBeginDocument{\DeclareMathVersion{bold}",
+        r"\SetSymbolFont{operators}{bold}{T1}{times}{b}{n}",
+        r"\SetSymbolFont{NewLetters}{bold}{T1}{times}{b}{it}",
+        r"\SetMathAlphabet{\mathrm}{bold}{T1}{times}{b}{n}",
+        r"\SetMathAlphabet{\mathit}{bold}{T1}{times}{b}{it}",
+        r"\SetMathAlphabet{\mathbf}{bold}{T1}{times}{b}{n}",
+        r"\SetMathAlphabet{\mathtt}{bold}{OT1}{pcr}{b}{n}",
+        r"\SetSymbolFont{symbols}{bold}{OMS}{cmsy}{b}{n}",
+        r"\renewcommand\boldmath{\@nomath\boldmath\mathversion{bold}}}",
+        r"\makeatother",
+    ]
+    for color, name in color_names.items():
+        tex_lines.append(f"\\definecolor{{{name}}}{{HTML}}{{{color.lstrip('#')}}}")
+    tex_lines.extend(
+        [
+            r"\begin{document}",
+            r"\global\eoddefinedtrue",
+            r"\begin{tikzpicture}[x=1bp,y=1bp]",
+            f"\\path[use as bounding box] (0,0) rectangle ({page_width:.2f},{page_height:.2f});",
+            (
+                r"\node[anchor=south west,inner sep=0bp,outer sep=0bp] at (0,0) "
+                + "{\\includegraphics[width="
+                + f"{page_width:.2f}bp,height={page_height:.2f}bp]"
+                + "{"
+                + base_path.as_posix()
+                + "}};"
+            ),
+        ]
+    )
+    anchors = {"left": "base west", "center": "base", "right": "base east"}
+    for node in formula_nodes:
+        content = "{$" + node["tex"] + "$}"
+        tex_lines.append(
+            "\\node[anchor="
+            + anchors[node["align"]]
+            + ",inner sep=0bp,outer sep=0bp,transform shape,scale="
+            + f"{node['scale']:.3f},text="
+            + color_names[node["color"]]
+            + f"] at ({node['x']:.2f},{node['y']:.2f}) "
+            + content
+            + ";"
+        )
+    tex_lines.extend([r"\end{tikzpicture}", r"\end{document}"])
+
+    overlay_source = temporary_path / "method_pipeline_overlay.tex"
+    write_text(overlay_source, "\n".join(tex_lines))
+    compiler = shutil.which("pdflatex")
+    if compiler:
+        command = [
+            compiler,
+            "-interaction=nonstopmode",
+            "-halt-on-error",
+            f"-output-directory={temporary_path}",
+            str(overlay_source),
+        ]
+    else:
+        compiler = shutil.which("tectonic")
+        if compiler is None:
+            raise RuntimeError("pdflatex or tectonic is required to compose method_pipeline.pdf")
+        command = [
+            compiler,
+            "--only-cached",
+            "--outdir",
+            str(temporary_path),
+            str(overlay_source),
+        ]
+    environment = os.environ.copy()
+    environment.setdefault("SOURCE_DATE_EPOCH", "946684800")
+    result = subprocess.run(
+        command,
+        cwd=JOURNAL,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        diagnostic = (result.stdout + "\n" + result.stderr)[-5000:]
+        raise RuntimeError(f"TeX composition of method_pipeline.pdf failed:\n{diagnostic}")
+    composed_path = temporary_path / "method_pipeline_overlay.pdf"
+    if not composed_path.exists():
+        raise RuntimeError("TeX composition did not create method_pipeline_overlay.pdf")
+    shutil.copyfile(composed_path, FIGURES / "method_pipeline.pdf")
+    temporary.cleanup()
 
 
 def main() -> None:

@@ -50,6 +50,47 @@ was Introduction; Related Work; Problem or Preliminaries; Method; Experimental
 Methodology; Results and Discussion; Limitations or Threats to Validity; and
 Conclusion.
 
+## Q1 scientific-contribution calibration
+
+The contribution structure was separately compared with full primary texts of
+closely related Q1-journal papers; journal prestige is not inferred from the
+writing style of the IEEE Access sample.
+
+- [DynaMo](https://doi.org/10.1109/TKDE.2019.2951419) in IEEE TKDE couples
+  event-specific propositions and explicit complexity with six real networks,
+  10,000 synthetic networks, five dynamic baselines, and quality/runtime
+  metrics. It is the appropriate bar for a theory-led algorithmic claim.
+- [CL-OND](https://doi.org/10.1016/j.neucom.2025.129548) in Neurocomputing is
+  organized around four explicit questions that test feasibility, comparative
+  performance, mechanism, and generality. It shows that a Q1 contribution can
+  be RQ-led rather than theorem-heavy when every experiment tests a concrete
+  premise.
+- [Fusion3M](https://doi.org/10.1016/j.inffus.2025.103308) in Information
+  Fusion uses five RQs, seven real datasets, nine baselines, component studies,
+  and cross-model transfer. Only RQ1--RQ3 and the RQ4/RQ5 section titles are
+  visible without subscription, so inaccessible question wording is not
+  quoted or reconstructed.
+- [Evolutionary NMF](https://doi.org/10.1109/TKDE.2017.2657752) in IEEE TKDE
+  makes equivalences between temporal-smoothness formulations a headline
+  result because they enable the proposed algorithm. This confirms that basic
+  closure and quotient identities should support ComNetX rather than be sold
+  as novelty by themselves.
+- [CoD\AE N](https://doi.org/10.1145/3718988) in ACM TWEB makes a controlled,
+  reproducible evaluation framework the main contribution. TWEB is Q1 in JCR
+  Software Engineering and Q2 in Information Systems; it is used with that
+  category qualification. Its independent generated streams, diagnostic
+  metrics, and uncertainty intervals provide the relevant empirical standard.
+
+The five original ComNetX questions are therefore retained as a scientific
+program, ordered as effect, backend generality, localization mechanism,
+component controls, and operating envelope. Their value depends on matched
+metrics, nonredundant evidence, and explicit failure/break-even regimes—not on
+the number of questions. The formal section is complementary: the main text
+keeps one hierarchy-correctness proposition and explicit worst-case time and memory
+bounds. Elementary closure and quotient facts support those results, while the
+full boundary-objective and tensor-primitive derivations remain in appendices
+rather than being advertised as independent novelty.
+
 ## Style decisions applied to ComNetX
 
 - The abstract follows context--gap--method--protocol--numeric-result order.
@@ -64,10 +105,11 @@ Conclusion.
 - Results use claim--evidence--implication paragraphs. Runtime repeatability is
   not presented as statistical robustness, and exploratory parameter sweeps
   are not presented as a validated selection policy.
-- A dedicated limitations section separates what the implementation does from
-  proposed future safeguards. In particular, the article does not claim an
-  implemented fallback, post-update hierarchy nesting, local warm starts,
-  objective preservation, or deletion-stream validation.
+- Reproducibility and experimental scope are consolidated after the discussion
+  instead of being repeated as defensive caveats throughout the article. The
+  manuscript still avoids unsupported claims about an implemented fallback,
+  post-update hierarchy nesting, local warm starts, objective preservation, or
+  deletion-stream validation.
 
 ## Evidence policy
 
@@ -76,4 +118,3 @@ from a narrow, asserted record selection by `analysis/validate_results.py`.
 The invalid conference-wide aggregate that mixed graph-direction settings,
 feature modes, and unequal update counts is deliberately excluded. Absence of
 a measurement record is not interpreted as an out-of-memory event.
-

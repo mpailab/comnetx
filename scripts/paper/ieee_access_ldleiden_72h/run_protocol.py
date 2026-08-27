@@ -516,6 +516,7 @@ def run_attempt(
     repeat_index: int,
     deadline_epoch: float | None,
     measurement_window_id: str | None = None,
+    additional_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if deadline_epoch is not None and time.time() >= deadline_epoch:
         raise CampaignTimeBoundary(
@@ -573,6 +574,16 @@ def run_attempt(
     if deadline_epoch is not None:
         metadata["measurement_window_id"] = measurement_window_id
         metadata["window_deadline_epoch"] = deadline_epoch
+    if additional_metadata is not None:
+        if not isinstance(additional_metadata, dict) or not additional_metadata:
+            raise ValueError("additional attempt metadata must be a non-empty object")
+        overlap = set(metadata).intersection(additional_metadata)
+        if overlap:
+            raise ValueError(
+                "additional attempt metadata overrides registered fields: "
+                + ", ".join(sorted(overlap))
+            )
+        metadata.update(additional_metadata)
     metadata_path = attempt_dir / "metadata.json"
     write_json(metadata_path, metadata)
 

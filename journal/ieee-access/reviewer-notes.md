@@ -5,8 +5,12 @@ correctness, evidential support, reproducibility, or positioning of the journal
 article. Conference routing, ranking, presentation format, and workshop-specific
 comments are intentionally omitted.
 
-Status: incorporated where the archived implementation and measurements permit;
-unresolved items are stated as limitations or future measurement requirements.
+Status: every comment is filtered through the article-level scientific
+argument. A comment is incorporated only when it improves correctness,
+explanation, or evidence relative to comparable Q1 work. The hierarchy and
+label-namespace audit exposed genuine implementation defects; these have been
+repaired, and every historical multilevel smart-mode result remains
+provisional until the registered rerun is validated.
 
 ## Incorporated in the Manuscript
 
@@ -14,33 +18,39 @@ unresolved items are stated as limitations or future measurement requirements.
 
 Source: Reviewer 1, detailed comment 1.
 
-The method section now follows the code rather than an intended invariant. It
-defines the Leiden-built initial hierarchy, frozen pre-update masks, provisional
-labels, descending label propagation, ascending backend calls, one-time
-restriction to the finest affected set, feature averaging, and absence of a
-post-update nesting repair. The article does not claim that provisional labels
-are globally unique or that updated levels remain nested.
+The repaired method constructs the initial hierarchy from exact parent
+quotients of the original adjacency, canonicalizes every block by its minimum
+original vertex, and rejects a deep cache whose rows are not nested. For each
+update it freezes all closures from the pre-update hierarchy, rebuilds every
+level from the resident induced adjacency, uses the already updated finer
+blocks as parent-quotient atoms, and projects backend blocks through a
+collision-free canonical namespace. The accompanying argument now establishes
+non-strict fine-to-coarse refinement and scope isolation. Strictly distinct
+levels are not claimed because an admissible backend can return the identity
+partition.
 
 ### 2. Narrow backend-independence and quality claims
 
 Sources: Reviewers 1 and 3; Reviewer 2, weak point 2.
 
-ComNetX is presented as a backend-independent interface for a local hierarchical
-approximation, not as a semantics-preserving wrapper. The text explains that
-boundary removal, contraction, and feature averaging can alter the backend
-input and objective. Quality claims are restricted to the measured backends,
-datasets, and operating regimes. Short- and long-horizon results are reported
-separately.
+ComNetX is presented as a backend-neutral input transformation, not as a
+semantics-preserving wrapper for arbitrary objectives. Quotient contraction is
+exact for block flows and modularity on the group-constant candidate family;
+boundary localization, indivisible atoms, heuristic optimization, and
+feature aggregation remain separate approximation sources. The boundary term
+is quantified by an exact mismatch decomposition and a restricted
+global-objective loss/ranking certificate. Quality claims remain restricted to
+the measured backends, datasets, and regimes.
 
 ### 3. Report temporal evidence without overstating robustness
 
 Sources: Reviewer 1, detailed comments 4 and 5; Reviewers 2 and 3.
 
-The revision includes the archived 500-update PubMed and arxivmath series and
-the five-seed DSBM stress test. It distinguishes fixed-stream runtime
-repeatability from generalization. Because the archive contains only one real
-window per graph and no long-horizon per-batch NMI or agreement series, the
-article does not claim robustness across independent temporal windows.
+RQ5 retains the 500-update PubMed and arxivmath trajectories and the five-seed
+DSBM stress design. Fixed-stream execution repeats are described only as timing
+repeatability; independent DSBM seeds support stream-level uncertainty. The
+article does not infer robustness across independent real temporal windows
+that were not measured.
 
 ### 4. Treat fallback as an unimplemented policy
 
@@ -80,6 +90,15 @@ the cut-based partition summaries. These controls are included because they
 test the scope of the central empirical claim; they are explicitly identified
 as single-run or fixed-budget evidence where appropriate.
 
+The five original experimental questions are preserved as a second scientific
+pillar rather than compressed into a generic benchmark section: RQ1 tests the
+paired quality--time consequence, RQ2 backend generality and the
+specialization--reuse gap, RQ3 the radius--closure--quotient mechanism, RQ4
+the causal controls, and RQ5 robustness and the operating envelope. This
+structure matches accepted Q1 evidence patterns in DynaMo, CL-OND, Fusion3M,
+and CoD\AE N; it is not retained merely because it appeared in the conference
+submission.
+
 ### 7. Strengthen novelty and related-work positioning
 
 Source: Reviewer 2, weak points 1 and 4.
@@ -92,21 +111,31 @@ article contains no anonymous-conference artifact language.
 
 ## Explicitly Unresolved Without New Measurements
 
-The following additions would materially strengthen a later revision, but the
-current archive cannot support them and no result is fabricated:
+The following additions remain outside the registered 72-hour campaign and no
+result is fabricated:
 
 - non-overlapping or independently sampled real temporal windows;
 - long-horizon per-batch NMI or Local-versus-Full partition agreement;
-- deletion, vertex-arrival, evolving-feature, and directed-stream tests;
+- deletion, vertex-arrival, and evolving-feature tests;
 - a predeclared adaptive Local/Full policy selected on pilot data and evaluated
   on held-out windows or seeds;
 - repeated radius/depth sweeps with a held-out selection protocol;
 - tuned multi-seed feature-aware baselines with valid cluster-count and budget
-  selection;
-- portable timing experiments with recorded hardware, software versions,
-  timestamps, and repeat identifiers.
+  selection.
+
+The registered campaign does add split-clock LD-Leiden, corrected multilevel
+ComNetX reruns, invariant audits, boundary-certificate quantities, phase/work
+profiles, and exact environment/input/source hashes. These results will replace
+rather than be silently pooled with the affected historical smart-mode rows.
 
 ## Evidence Used
+
+Historical artifacts below remain useful context, but every multilevel
+smart-mode row is provisional after the repair. Claim-bearing replacement
+artifacts are registered under
+`results/ieee-access-2026-1/raw/repaired-comnetx/` and
+`results/ieee-access-2026-1/raw/ldleiden/`; they enter the manuscript only
+after the campaign validators accept them.
 
 - `results/icdm-2026-1/measurements/experiment_measurements.json`: short,
   repeatability, topology, long-horizon, and DSBM records;

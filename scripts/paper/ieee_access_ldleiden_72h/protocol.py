@@ -22,11 +22,29 @@ ALGORITHM_KEY = "ldleiden-dynamic"
 def measurement_source_files() -> tuple[Path, ...]:
     """Discover the complete runtime source set on every identity check."""
 
+    parallel_package = (
+        PROJECT_ROOT
+        / "scripts"
+        / "paper"
+        / "ieee_access_ldleiden_24h_parallel"
+    )
+    bootstrap_helper = (
+        PROJECT_ROOT
+        / "scripts"
+        / "paper"
+        / "ieee_access_72h_launch"
+        / "sync_bootstrap.py"
+    )
     return tuple(sorted({
         *(PROJECT_ROOT / "src").rglob("*.py"),
         PROJECT_ROOT / "scripts" / "launch.py",
         PROJECT_ROOT / "scripts" / "paper" / "collect_hardware_info.py",
+        *(PROJECT_ROOT / "datasets-info" / "json").glob("*.json"),
+        bootstrap_helper,
         *(PACKAGE_DIR.glob("*.py")),
+        *(parallel_package.glob("*.py")),
+        *(parallel_package.glob("*.bash")),
+        *(parallel_package.glob("*.sh")),
     }))
 
 
