@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import fcntl
-import hashlib
 import math
 import os
 import re
@@ -17,21 +16,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_DIR.parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.paper.ieee_access_72h_launch.sync_bootstrap import (  # noqa: E402
-    _canonical,
-    _load_source,
-    _partition_sha256,
-    _sha256,
-    _source_candidate,
-)
+BOOTSTRAP_THREAD_ENVIRONMENT = {
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+}
+os.environ.update(BOOTSTRAP_THREAD_ENVIRONMENT)
+
 from scripts.paper.ieee_access_ldleiden_72h.protocol import (  # noqa: E402
     cli_phase_map,
     load_protocol,
@@ -47,13 +45,6 @@ from scripts.paper.ieee_access_ldleiden_72h.process_control import (  # noqa: E4
 RESULTS_ROOT = (
     PROJECT_ROOT / "results" / "ieee-access-2026-1" / "raw" / "ldleiden"
 )
-REPAIRED_ROOT = (
-    PROJECT_ROOT
-    / "results"
-    / "ieee-access-2026-1"
-    / "raw"
-    / "repaired-comnetx"
-)
 BASE_RUNNER = (
     PROJECT_ROOT
     / "scripts"
@@ -65,10 +56,52 @@ SCHEMA = "comnetx-ieee-access-ldleiden-parallel-v1"
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 LONG_TIMEOUT_SECONDS = 3600.0
+BOOTSTRAP_HEARTBEAT_STALE_SECONDS = 1800.0
 PARALLEL_REGISTRATION_SCHEMA = (
     "comnetx-ieee-access-ldleiden-parallel-manifest-registration-v1"
 )
 PARALLEL_PENDING_MANIFEST = "parallel_manifest.initializing.json"
+SHARED_BOOTSTRAP_DIRNAME = "shared-bootstrap"
+SHARED_BOOTSTRAP_PENDING_DIRNAME = "shared-bootstrap.initializing"
+SHARED_BOOTSTRAP_SCHEMA = "comnetx-ieee-access-ldleiden-shared-bootstrap-v1"
+SHARED_BOOTSTRAP_REGISTRATION_SCHEMA = (
+    "comnetx-ieee-access-ldleiden-shared-bootstrap-registration-v1"
+)
+SHARED_BOOTSTRAP_POLICY_SCHEMA = (
+    "comnetx-ieee-access-ldleiden-shared-bootstrap-policy-v1"
+)
+SHARED_BOOTSTRAP_MARKER_SCHEMA = (
+    "comnetx-ieee-access-ldleiden-shared-bootstrap-marker-v1"
+)
+BOOTSTRAP_SOURCE_SCHEMA = "comnetx-ieee-access-ldleiden-bootstrap-source-v1"
+
+SHARED_BOOTSTRAP_POLICY: dict[str, Any] = {
+    "schema": SHARED_BOOTSTRAP_POLICY_SCHEMA,
+    "kind": "campaign-local-generated",
+    "producer_shard": "01",
+    "relative_path": SHARED_BOOTSTRAP_DIRNAME,
+}
+
+EVIDENCE_SCOPE: dict[str, Any] = {
+    "mode": "standalone-native-ldleiden",
+    "paired_comnetx_validated": False,
+    "matched_speedup_claim_allowed": False,
+    "allowed_claims": [
+        "native LD-Leiden timing and quality under the sealed protocol",
+        "within-LD-Leiden repeatability across the registered shards",
+    ],
+}
+
+BOOTSTRAP_REQUIREMENTS: tuple[tuple[str, str], ...] = (
+    ("dyn_cora", "999:10"),
+    ("dyn_acm", "999:10"),
+    ("dyn_citeseer", "999:10"),
+    ("patent", "999:10"),
+    ("dyn_pubmed", "999:10"),
+    ("arxivmath", "999:10"),
+    ("dyn_pubmed", "9:500"),
+    ("arxivmath", "9:500"),
+)
 
 
 SHARDS: dict[str, dict[str, Any]] = {
@@ -91,18 +124,77 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _failure_markers(root: Path) -> list[Path]:
+    marker_dir = root / "markers"
+    return sorted(
+        {
+            *marker_dir.glob("failure-*.json"),
+            *marker_dir.glob("failure-*.shell"),
+        }
+    )
+
+
+def _write_bootstrap_heartbeat(
+    root: Path,
+    parallel_manifest_sha256: str,
+    *,
+    state: str,
+    key: str | None = None,
+) -> None:
+    write_json(
+        root / "markers" / "bootstrap-producer-heartbeat.json",
+        {
+            "schema": SHARED_BOOTSTRAP_MARKER_SCHEMA,
+            "stage": "bootstrap-heartbeat",
+            "producer_shard": "01",
+            "parallel_manifest_sha256": parallel_manifest_sha256,
+            "state": state,
+            "key": key,
+            "recorded_epoch": time.time(),
+            "recorded_at_utc": utc_now(),
+        },
+    )
+
+
+def _validate_bootstrap_heartbeat(
+    root: Path,
+    parallel_manifest_sha256: str,
+    *,
+    campaign_started_epoch: float,
+) -> None:
+    path = root / "markers" / "bootstrap-producer-heartbeat.json"
+    if not path.is_file():
+        age = time.time() - campaign_started_epoch
+        if age > BOOTSTRAP_HEARTBEAT_STALE_SECONDS:
+            raise RuntimeError(
+                "shared bootstrap producer did not publish a heartbeat within "
+                f"{BOOTSTRAP_HEARTBEAT_STALE_SECONDS:.0f} seconds"
+            )
+        return
+    heartbeat = read_json(path)
+    recorded_epoch = heartbeat.get("recorded_epoch") if isinstance(heartbeat, dict) else None
+    if (
+        not isinstance(heartbeat, dict)
+        or heartbeat.get("schema") != SHARED_BOOTSTRAP_MARKER_SCHEMA
+        or heartbeat.get("stage") != "bootstrap-heartbeat"
+        or heartbeat.get("producer_shard") != "01"
+        or heartbeat.get("parallel_manifest_sha256") != parallel_manifest_sha256
+        or isinstance(recorded_epoch, bool)
+        or not isinstance(recorded_epoch, (int, float))
+        or not math.isfinite(float(recorded_epoch))
+    ):
+        raise RuntimeError("shared bootstrap producer heartbeat is malformed")
+    age = time.time() - float(recorded_epoch)
+    if age > BOOTSTRAP_HEARTBEAT_STALE_SECONDS:
+        raise RuntimeError(
+            "shared bootstrap producer heartbeat is stale by "
+            f"{age:.0f} seconds"
+        )
+
+
 def resolve_project_path(value: Path) -> Path:
     value = value.expanduser()
     return value.resolve() if value.is_absolute() else (PROJECT_ROOT / value).resolve()
-
-
-def resolve_repaired_campaign(value: Path) -> Path:
-    value = value.expanduser()
-    if value.is_absolute():
-        return value.resolve()
-    if len(value.parts) == 1:
-        return (REPAIRED_ROOT / value).resolve()
-    return (PROJECT_ROOT / value).resolve()
 
 
 def run_root(run_id: str) -> Path:
@@ -173,193 +265,6 @@ def require_clean_commit(expected_sha: str) -> None:
     status = git_output("status", "--porcelain=v1", "--untracked-files=all")
     if status:
         raise RuntimeError("parallel measurements require a clean checkout:\n" + status)
-
-
-def registered_artifact(
-    campaign: Path,
-    manifest: dict[str, Any],
-    key: str,
-) -> tuple[dict[str, str], dict[str, Any]]:
-    registration = manifest.get(key)
-    if not isinstance(registration, dict):
-        raise RuntimeError(f"repaired campaign lacks {key} registration")
-    filename = registration.get("filename")
-    digest = registration.get("sha256")
-    if not isinstance(filename, str) or not isinstance(digest, str):
-        raise RuntimeError(f"repaired campaign has malformed {key} registration")
-    path = campaign / filename
-    if not path.is_file() or sha256_file(path) != digest:
-        raise RuntimeError(f"repaired campaign {key} artifact changed: {path}")
-    payload = read_json(path)
-    if not isinstance(payload, dict):
-        raise RuntimeError(f"repaired campaign {key} artifact is not an object")
-    return {"filename": filename, "sha256": digest}, payload
-
-
-def repaired_source_equivalence(manifest: dict[str, Any]) -> dict[str, Any]:
-    fingerprint = manifest.get("fingerprint")
-    if not isinstance(fingerprint, dict):
-        raise RuntimeError("repaired campaign lacks a source fingerprint")
-    sources = fingerprint.get("source_sha256")
-    if not isinstance(sources, dict) or not sources:
-        raise RuntimeError("repaired campaign source fingerprint is empty")
-    required = {
-        "src/optimizer.py",
-        "scripts/launch.py",
-        "scripts/paper/collect_hardware_info.py",
-    }
-    if not required <= set(sources):
-        raise RuntimeError("repaired campaign source fingerprint is incomplete")
-    for relative, expected_digest in sources.items():
-        if (
-            not isinstance(relative, str)
-            or not isinstance(expected_digest, str)
-            or len(expected_digest) != 64
-        ):
-            raise RuntimeError("repaired campaign contains a malformed source identity")
-        relative_path = Path(relative)
-        path = (PROJECT_ROOT / relative_path).resolve()
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or relative_path.as_posix() != relative
-            or PROJECT_ROOT not in path.parents
-            or not path.is_file()
-            or sha256_file(path) != expected_digest
-        ):
-            raise RuntimeError(
-                "current checkout is not source-equivalent to repaired ComNetX: "
-                + relative
-            )
-    git = manifest.get("git")
-    repaired_commit = git.get("commit") if isinstance(git, dict) else None
-    if not isinstance(repaired_commit, str) or SHA_RE.fullmatch(repaired_commit) is None:
-        raise RuntimeError("repaired campaign commit is malformed")
-    metadata_prefix = "datasets-info/json"
-    repaired_names = {
-        line
-        for line in git_output(
-            "ls-tree", "-r", "--name-only", repaired_commit, "--", metadata_prefix
-        ).splitlines()
-        if line
-    }
-    current_names = {
-        line
-        for line in git_output(
-            "ls-tree", "-r", "--name-only", "HEAD", "--", metadata_prefix
-        ).splitlines()
-        if line
-    }
-    if not repaired_names or repaired_names != current_names:
-        raise RuntimeError(
-            "current dataset metadata tree differs from repaired ComNetX"
-        )
-    metadata_hashes: dict[str, str] = {}
-    for relative in sorted(repaired_names):
-        old = subprocess.run(
-            ["git", "show", f"{repaired_commit}:{relative}"],
-            cwd=PROJECT_ROOT,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ).stdout
-        old_digest = hashlib.sha256(old).hexdigest()
-        current_path = (PROJECT_ROOT / relative).resolve()
-        if (
-            PROJECT_ROOT not in current_path.parents
-            or not current_path.is_file()
-            or sha256_file(current_path) != old_digest
-        ):
-            raise RuntimeError(
-                "current dataset metadata is not source-equivalent to repaired "
-                "ComNetX: " + relative
-            )
-        metadata_hashes[relative] = old_digest
-    return {
-        "policy": (
-            "all repaired measurement-source and dataset-metadata files "
-            "byte-identical"
-        ),
-        "files": len(sources),
-        "source_map_sha256": sha256_json(sources),
-        "runtime_metadata_files": len(metadata_hashes),
-        "runtime_metadata_map_sha256": sha256_json(metadata_hashes),
-    }
-
-
-def repaired_campaign_identity(
-    campaign: Path,
-    *,
-    expected_git_sha: str,
-    paths_config: Path,
-) -> dict[str, Any]:
-    manifest_path = campaign / "manifest.json"
-    if not manifest_path.is_file():
-        raise RuntimeError(f"repaired ComNetX manifest is missing: {manifest_path}")
-    manifest = read_json(manifest_path)
-    if not isinstance(manifest, dict):
-        raise RuntimeError("repaired ComNetX manifest is not a JSON object")
-    expected_manifest = {
-        "schema": "comnetx-ieee-access-repaired-campaign-v1",
-        "campaign_id": campaign.name,
-        "protocol_id": "ieee-access-repaired-comnetx-72h-v1",
-        "production_api_acknowledged": True,
-    }
-    for key, expected in expected_manifest.items():
-        if manifest.get(key) != expected:
-            raise RuntimeError(
-                f"repaired ComNetX campaign {key} differs: "
-                f"{manifest.get(key)!r} != {expected!r}"
-            )
-    git = manifest.get("git")
-    if not isinstance(git, dict) or git.get("dirty") is not False:
-        raise RuntimeError("repaired ComNetX campaign did not seal a clean checkout")
-    source_equivalence = repaired_source_equivalence(manifest)
-    paths_sha256 = sha256_file(paths_config)
-    if manifest.get("paths_config", {}).get("sha256") != paths_sha256:
-        raise RuntimeError("repaired ComNetX and LD-Leiden paths maps differ")
-    required_stages = (
-        "stage1_correctness_smoke",
-        "stage2_core_short",
-        "stage4_long_core",
-    )
-    status = manifest.get("stage_status")
-    if not isinstance(status, dict):
-        raise RuntimeError("repaired ComNetX campaign lacks stage status")
-    incomplete = [stage for stage in required_stages if status.get(stage) != "validated"]
-    if incomplete:
-        raise RuntimeError(
-            "paired repaired-ComNetX evidence is not validated for: "
-            + ", ".join(incomplete)
-        )
-    preflight = campaign / "preflight" / "validation.json"
-    if not preflight.is_file() or read_json(preflight).get("status") != "validated":
-        raise RuntimeError("repaired ComNetX preflight is not validated")
-    hardware_registration, _ = registered_artifact(campaign, manifest, "hardware")
-    input_registration, _ = registered_artifact(
-        campaign, manifest, "real_input_manifest"
-    )
-    environment_registration, _ = registered_artifact(
-        campaign, manifest, "environment"
-    )
-    cache = campaign / str(manifest.get("bootstrap_cache", "bootstrap-cache"))
-    if not cache.is_dir():
-        raise RuntimeError(f"repaired ComNetX bootstrap cache is missing: {cache}")
-    return {
-        "path": str(campaign),
-        "campaign_id": campaign.name,
-        "schema": manifest["schema"],
-        "protocol_id": manifest["protocol_id"],
-        "git_commit": git["commit"],
-        "ld_git_commit": expected_git_sha,
-        "source_equivalence": source_equivalence,
-        "paths_config_sha256": paths_sha256,
-        "hardware": hardware_registration,
-        "real_input_manifest": input_registration,
-        "environment": environment_registration,
-        "required_stage_status": {stage: status[stage] for stage in required_stages},
-        "bootstrap_cache": str(cache),
-    }
 
 
 def cpu_topology(cpu_affinity: list[int]) -> dict[str, Any]:
@@ -435,7 +340,6 @@ def initialize_parallel_manifest(
     run_id: str,
     expected_git_sha: str,
     paths_config: Path,
-    repaired_campaign: dict[str, Any],
     budget_hours: float,
 ) -> dict[str, Any]:
     if not math.isfinite(budget_hours) or budget_hours <= 0 or budget_hours > 24:
@@ -474,7 +378,8 @@ def initialize_parallel_manifest(
                         "path": str(paths_config),
                         "sha256": sha256_file(paths_config),
                     },
-                    "repaired_campaign": repaired_campaign,
+                    "bootstrap_authority": SHARED_BOOTSTRAP_POLICY,
+                    "evidence_scope": EVIDENCE_SCOPE,
                     "window": {
                         "budget_hours": budget_hours,
                         "started_epoch": now,
@@ -512,7 +417,8 @@ def initialize_parallel_manifest(
             "run_id": run_id,
             "expected_git_sha": expected_git_sha,
             "protocol_id": load_protocol()["protocol_id"],
-            "repaired_campaign": repaired_campaign,
+            "bootstrap_authority": SHARED_BOOTSTRAP_POLICY,
+            "evidence_scope": EVIDENCE_SCOPE,
         }
         for key, value in expected.items():
             if manifest.get(key) != value:
@@ -531,10 +437,9 @@ def initialize_parallel_manifest(
         return manifest
 
 
-def source_bootstrap_entries(
-    source_dir: Path,
-    shard_id: str,
-) -> list[tuple[str, int]]:
+def shard_bootstrap_entries(shard_id: str) -> list[tuple[str, int]]:
+    """Return the exact shared-cache entries needed by one fixed shard."""
+
     assignment = SHARDS[shard_id]
     initial_batch = 999 if assignment["phase_cli"] == "short" else 9
     entries = [("dyn_pubmed", initial_batch), ("arxivmath", initial_batch)]
@@ -550,64 +455,473 @@ def source_bootstrap_entries(
                 "arxivmath",
             )
         ]
-    if not source_dir.is_dir():
-        raise FileNotFoundError(f"bootstrap source directory not found: {source_dir}")
     return entries
 
 
+def _bootstrap_requirements() -> dict[str, str]:
+    """Bind the authority to the eight inputs registered by the LD protocol."""
+
+    expected = {
+        f"{dataset}/{batch_strategy.split(':', 1)[0]}": batch_strategy
+        for dataset, batch_strategy in BOOTSTRAP_REQUIREMENTS
+    }
+    observed: dict[str, str] = {}
+    for phase in load_protocol()["phases"]:
+        batch_strategy = str(phase["batch_strategy"])
+        initial_batch = batch_strategy.split(":", 1)[0]
+        for dataset in phase["datasets"]:
+            key = f"{dataset}/{initial_batch}"
+            previous = observed.setdefault(key, batch_strategy)
+            if previous != batch_strategy:
+                raise RuntimeError(
+                    f"registered phases disagree on bootstrap strategy for {key}"
+                )
+    if observed != expected:
+        raise RuntimeError(
+            "registered LD-Leiden protocol no longer has the fixed eight "
+            "bootstrap inputs"
+        )
+    return expected
+
+
+def _shared_bootstrap_identity(
+    package: Path,
+    *,
+    run_id: str,
+    parallel_manifest_sha256: str,
+) -> dict[str, Any]:
+    """Validate one immutable shared authority and return its compact identity."""
+
+    manifest_path = package / "manifest.json"
+    registration_path = package / "manifest_registration.json"
+    if not manifest_path.is_file() or not registration_path.is_file():
+        raise RuntimeError(f"shared bootstrap authority is incomplete: {package}")
+    manifest = read_json(manifest_path)
+    registration = read_json(registration_path)
+    manifest_sha256 = sha256_file(manifest_path)
+    expected_registration = {
+        "schema": SHARED_BOOTSTRAP_REGISTRATION_SCHEMA,
+        "filename": manifest_path.name,
+        "sha256": manifest_sha256,
+    }
+    if registration != expected_registration:
+        raise RuntimeError("shared bootstrap manifest registration changed")
+    expected_manifest = {
+        "schema": SHARED_BOOTSTRAP_SCHEMA,
+        "run_id": run_id,
+        "parallel_manifest_sha256": parallel_manifest_sha256,
+        "bootstrap_policy": SHARED_BOOTSTRAP_POLICY,
+        "evidence_scope": EVIDENCE_SCOPE,
+    }
+    for key, expected in expected_manifest.items():
+        if not isinstance(manifest, dict) or manifest.get(key) != expected:
+            raise RuntimeError(f"shared bootstrap {key} differs from the campaign")
+    generation = manifest.get("generation")
+    if not isinstance(generation, dict):
+        raise RuntimeError("shared bootstrap generation provenance is missing")
+    plan_filename = generation.get("plan_filename")
+    plan_sha256 = generation.get("plan_sha256")
+    if (
+        not isinstance(plan_filename, str)
+        or Path(plan_filename).name != plan_filename
+        or not isinstance(plan_sha256, str)
+    ):
+        raise RuntimeError("shared bootstrap generation plan registration is malformed")
+    plan_path = package / plan_filename
+    if not plan_path.is_file() or sha256_file(plan_path) != plan_sha256:
+        raise RuntimeError("shared bootstrap generation plan changed")
+    if {path.name for path in package.iterdir()} != {
+        "cache",
+        plan_filename,
+        manifest_path.name,
+        registration_path.name,
+    }:
+        raise RuntimeError("shared bootstrap authority contains unregistered artifacts")
+    entries = manifest.get("entries")
+    requirements = _bootstrap_requirements()
+    if not isinstance(entries, dict) or set(entries) != set(requirements):
+        raise RuntimeError("shared bootstrap authority does not contain eight fixed keys")
+    cache_dir = package / "cache"
+    if not cache_dir.is_dir():
+        raise RuntimeError("shared bootstrap cache directory is missing")
+    expected_filenames: set[str] = set()
+    for key, batch_strategy in requirements.items():
+        record = entries.get(key)
+        if not isinstance(record, dict):
+            raise RuntimeError(f"shared bootstrap entry is malformed: {key}")
+        filename = record.get("filename")
+        if (
+            not isinstance(filename, str)
+            or not filename
+            or Path(filename).name != filename
+        ):
+            raise RuntimeError(f"shared bootstrap filename is unsafe: {key}")
+        expected_filenames.add(filename)
+        dataset, initial_batch = key.rsplit("/", 1)
+        if record.get("dataset") != dataset:
+            raise RuntimeError(f"shared bootstrap dataset identity changed: {key}")
+        if record.get("batch_strategy") != batch_strategy:
+            raise RuntimeError(f"shared bootstrap strategy changed: {key}")
+        allowed_filenames = {
+            f"{dataset}_b:{initial_batch}_by_leidenalg.npz",
+            f"{dataset}-sym_b:{initial_batch}_by_leidenalg.npz",
+        }
+        if filename not in allowed_filenames:
+            raise RuntimeError(f"shared bootstrap graph identity changed: {key}")
+        semantics = validate_bootstrap_cache_file(cache_dir / filename)
+        expected_semantics = {
+            "file_sha256": semantics["file_sha256"],
+            "level_zero_sha256": semantics["level_zero_sha256"],
+            "modularity": semantics["modularity"],
+            "vertices": semantics["vertices"],
+        }
+        for field, expected in expected_semantics.items():
+            recorded = record.get(field)
+            if field == "modularity":
+                if (
+                    isinstance(recorded, bool)
+                    or not isinstance(recorded, (int, float))
+                    or not math.isclose(
+                        float(recorded), float(expected), rel_tol=0.0, abs_tol=1e-12
+                    )
+                ):
+                    raise RuntimeError(f"shared bootstrap modularity changed: {key}")
+            elif recorded != expected:
+                raise RuntimeError(
+                    f"shared bootstrap {field} changed after registration: {key}"
+                )
+    live_filenames = {
+        path.name for path in cache_dir.iterdir() if path.is_file()
+    }
+    if live_filenames != expected_filenames:
+        raise RuntimeError("shared bootstrap cache contains unregistered files")
+    return {
+        "schema": SHARED_BOOTSTRAP_SCHEMA,
+        "relative_path": SHARED_BOOTSTRAP_DIRNAME,
+        "manifest": {"filename": manifest_path.name, "sha256": manifest_sha256},
+        "registration": {
+            "filename": registration_path.name,
+            "sha256": sha256_file(registration_path),
+        },
+        "entries_sha256": sha256_json(entries),
+        "parallel_manifest_sha256": parallel_manifest_sha256,
+    }
+
+
+def _generate_shared_bootstrap_entry(
+    cache_dir: Path,
+    paths_config: Path,
+    dataset: str,
+    batch_strategy: str,
+) -> dict[str, Any]:
+    """Create or resume one canonical flat bootstrap through the launch API."""
+
+    src_root = PROJECT_ROOT / "src"
+    if str(src_root) not in sys.path:
+        sys.path.insert(0, str(src_root))
+    from datasets import Dataset  # type: ignore  # noqa: PLC0415
+    from launcher import (  # type: ignore  # noqa: PLC0415
+        _compute_launch_initial_partition,
+        _first_snapshot,
+    )
+
+    protocol = load_protocol()
+    common = protocol["common"]
+    graph = Dataset(dataset, str(paths_config))
+    graph.load(
+        batches_strategy=batch_strategy,
+        feature_mode=str(common["feature_mode"]),
+    )
+    if common["force_undirected"] and graph.is_directed:
+        graph._force_undirected()
+        graph.name = f"{dataset}-sym"
+    initial_batch = batch_strategy.split(":", 1)[0]
+    filename = f"{graph.name}_b:{initial_batch}_by_leidenalg.npz"
+    path = cache_dir / filename
+    if path.is_file():
+        try:
+            semantics = validate_bootstrap_cache_file(path)
+        except Exception:
+            # The authority is not published yet; an interrupted cache write is
+            # safe to discard and regenerate under the same sealed plan.
+            path.unlink()
+        else:
+            return {
+                "dataset": dataset,
+                "batch_strategy": batch_strategy,
+                "filename": filename,
+                "file_sha256": semantics["file_sha256"],
+                "level_zero_sha256": semantics["level_zero_sha256"],
+                "modularity": semantics["modularity"],
+                "vertices": semantics["vertices"],
+            }
+    _compute_launch_initial_partition(
+        adj_matrix=_first_snapshot(graph.adj),
+        dataset_name=graph.name,
+        init_batch_number=initial_batch,
+        cache_dir=cache_dir,
+        subcoms_depth=1,
+        device="cpu",
+        verbose=1,
+        resolution=float(common["resolution"]),
+    )
+    semantics = validate_bootstrap_cache_file(path)
+    return {
+        "dataset": dataset,
+        "batch_strategy": batch_strategy,
+        "filename": filename,
+        "file_sha256": semantics["file_sha256"],
+        "level_zero_sha256": semantics["level_zero_sha256"],
+        "modularity": semantics["modularity"],
+        "vertices": semantics["vertices"],
+    }
+
+
+def seal_shared_bootstrap(
+    root: Path,
+    target_campaign: Path,
+    paths_config: Path,
+    parallel: dict[str, Any],
+) -> dict[str, Any]:
+    """Generate and atomically publish shard 01's campaign-local authority."""
+
+    parallel_manifest_sha256 = sha256_file(root / "parallel_manifest.json")
+    package = root / SHARED_BOOTSTRAP_DIRNAME
+    pending = root / SHARED_BOOTSTRAP_PENDING_DIRNAME
+    lock_path = root / ".shared-bootstrap.lock"
+    with lock_path.open("a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if package.is_dir():
+            if pending.exists():
+                raise RuntimeError(
+                    "shared bootstrap authority and its initialization directory "
+                    "both exist"
+                )
+            return _shared_bootstrap_identity(
+                package,
+                run_id=str(parallel["run_id"]),
+                parallel_manifest_sha256=parallel_manifest_sha256,
+            )
+        if package.exists():
+            raise RuntimeError("shared bootstrap authority path is not a directory")
+        pending.mkdir(parents=False, exist_ok=True)
+        for temporary in pending.glob("*.tmp"):
+            if temporary.is_file():
+                temporary.unlink()
+        campaign_manifest = read_json(target_campaign / "manifest.json")
+        producer_affinity = sorted(os.sched_getaffinity(0))
+        plan = {
+            "schema": "comnetx-ieee-access-ldleiden-shared-bootstrap-plan-v1",
+            "run_id": parallel["run_id"],
+            "parallel_manifest_sha256": parallel_manifest_sha256,
+            "producer_shard": "01",
+            "producer_campaign": target_campaign.name,
+            "producer_cpu_affinity": producer_affinity,
+            "producer_cpu_topology": cpu_topology(producer_affinity),
+            "expected_git_sha": parallel["expected_git_sha"],
+            "protocol_id": parallel["protocol_id"],
+            "protocol_fingerprint_sha256": sha256_json(
+                campaign_manifest["fingerprint"]
+            ),
+            "paths_config": parallel["paths_config"],
+            "backend_sha256": sha256_json(campaign_manifest["backend"]),
+            "hardware": campaign_manifest["hardware"],
+            "runtime_identity": campaign_manifest["runtime_identity"],
+            "real_input_manifest": campaign_manifest["real_input_manifest"],
+            "requirements": _bootstrap_requirements(),
+        }
+        plan_path = pending / "initialization.json"
+        if plan_path.is_file():
+            if read_json(plan_path) != plan:
+                raise RuntimeError("shared bootstrap initialization identity changed")
+        else:
+            write_json(plan_path, plan)
+        cache_dir = pending / "cache"
+        cache_dir.mkdir(exist_ok=True)
+        deadline = float(parallel["window"]["deadline_epoch"])
+        entries: dict[str, dict[str, Any]] = {}
+        _write_bootstrap_heartbeat(
+            root, parallel_manifest_sha256, state="starting"
+        )
+        for key, batch_strategy in plan["requirements"].items():
+            failures = _failure_markers(root)
+            if failures:
+                raise RuntimeError(
+                    "parallel shard failed during shared bootstrap generation: "
+                    + ", ".join(path.name for path in failures)
+                )
+            if time.time() >= deadline:
+                raise CampaignTimeBoundary(
+                    "parallel window expired while generating shared bootstrap"
+                )
+            _write_bootstrap_heartbeat(
+                root,
+                parallel_manifest_sha256,
+                state="generating",
+                key=key,
+            )
+            print(f"Generating or validating shared bootstrap {key}")
+            entries[key] = _generate_shared_bootstrap_entry(
+                cache_dir,
+                paths_config,
+                key.rsplit("/", 1)[0],
+                batch_strategy,
+            )
+            _write_bootstrap_heartbeat(
+                root,
+                parallel_manifest_sha256,
+                state="entry-complete",
+                key=key,
+            )
+        expected_filenames = {record["filename"] for record in entries.values()}
+        live_filenames = {
+            path.name for path in cache_dir.iterdir() if path.is_file()
+        }
+        if live_filenames != expected_filenames:
+            raise RuntimeError(
+                "shared bootstrap initialization contains unexpected cache files"
+            )
+        manifest = {
+            "schema": SHARED_BOOTSTRAP_SCHEMA,
+            "run_id": parallel["run_id"],
+            "created_at_utc": utc_now(),
+            "parallel_manifest_sha256": parallel_manifest_sha256,
+            "bootstrap_policy": SHARED_BOOTSTRAP_POLICY,
+            "evidence_scope": EVIDENCE_SCOPE,
+            "generation": {
+                "producer_shard": "01",
+                "producer_campaign": target_campaign.name,
+                "method": "leidenalg",
+                "api": "launcher._compute_launch_initial_partition",
+                "resolution": float(load_protocol()["common"]["resolution"]),
+                "force_undirected": bool(
+                    load_protocol()["common"]["force_undirected"]
+                ),
+                "thread_environment": BOOTSTRAP_THREAD_ENVIRONMENT,
+                "rng_control": "backend-default; no explicit seed is exposed",
+                "reproducibility_policy": (
+                    "archive and reuse the sealed NPZ bytes; regeneration is not "
+                    "claimed to reproduce the same partition"
+                ),
+                "plan_filename": plan_path.name,
+                "plan_sha256": sha256_file(plan_path),
+            },
+            "entries": entries,
+        }
+        manifest_path = pending / "manifest.json"
+        write_json(manifest_path, manifest)
+        write_json(
+            pending / "manifest_registration.json",
+            {
+                "schema": SHARED_BOOTSTRAP_REGISTRATION_SCHEMA,
+                "filename": manifest_path.name,
+                "sha256": sha256_file(manifest_path),
+            },
+        )
+        _shared_bootstrap_identity(
+            pending,
+            run_id=str(parallel["run_id"]),
+            parallel_manifest_sha256=parallel_manifest_sha256,
+        )
+        pending.replace(package)
+        _write_bootstrap_heartbeat(
+            root, parallel_manifest_sha256, state="sealed"
+        )
+        return _shared_bootstrap_identity(
+            package,
+            run_id=str(parallel["run_id"]),
+            parallel_manifest_sha256=parallel_manifest_sha256,
+        )
+
+
+def wait_for_shared_bootstrap(
+    root: Path,
+    parallel: dict[str, Any],
+) -> dict[str, Any]:
+    """Wait for shard 01's atomic authority while honoring failures/deadline."""
+
+    deadline = float(parallel["window"]["deadline_epoch"])
+    campaign_started = float(parallel["window"]["started_epoch"])
+    parallel_manifest_sha256 = sha256_file(root / "parallel_manifest.json")
+    package = root / SHARED_BOOTSTRAP_DIRNAME
+    while True:
+        if package.is_dir():
+            return _shared_bootstrap_identity(
+                package,
+                run_id=str(parallel["run_id"]),
+                parallel_manifest_sha256=parallel_manifest_sha256,
+            )
+        failures = _failure_markers(root)
+        if failures:
+            raise RuntimeError(
+                "parallel shard failed while waiting for shared bootstrap: "
+                + ", ".join(path.name for path in failures)
+            )
+        _validate_bootstrap_heartbeat(
+            root,
+            parallel_manifest_sha256,
+            campaign_started_epoch=campaign_started,
+        )
+        if time.time() >= deadline:
+            raise CampaignTimeBoundary(
+                "parallel window expired while waiting for shared bootstrap authority"
+            )
+        time.sleep(min(5.0, max(0.1, deadline - time.time())))
+
+
 def seed_bootstrap_cache(
-    repaired_campaign: dict[str, Any],
+    root: Path,
+    authority: dict[str, Any],
     target_campaign: Path,
     shard_id: str,
 ) -> dict[str, Any]:
-    source_dir = Path(repaired_campaign["bootstrap_cache"])
+    """Copy exact authority bytes into one private, resumable shard cache."""
+
+    source_dir = root / SHARED_BOOTSTRAP_DIRNAME / "cache"
+    package_manifest = read_json(
+        root / SHARED_BOOTSTRAP_DIRNAME / authority["manifest"]["filename"]
+    )
     target_dir = target_campaign / "bootstrap-cache"
     target_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
-        "schema": "comnetx-ieee-access-ldleiden-bootstrap-source-v1",
-        "repaired_campaign": repaired_campaign,
+        "schema": BOOTSTRAP_SOURCE_SCHEMA,
+        "authority": authority,
         "source_directory": str(source_dir),
         "entries": {},
     }
-    for dataset, initial_batch in source_bootstrap_entries(source_dir, shard_id):
-        source = _source_candidate(source_dir, dataset, initial_batch)
-        labels, modularity = _load_source(source)
-        labels = _canonical(labels)
-        prefix = source.name.split(f"_b:{initial_batch}_by_leidenalg", 1)[0]
-        target = target_dir / f"{prefix}_b:{initial_batch}_by_leidenalg.npz"
+    for dataset, initial_batch in shard_bootstrap_entries(shard_id):
+        key = f"{dataset}/{initial_batch}"
+        source_record = package_manifest["entries"].get(key)
+        if not isinstance(source_record, dict):
+            raise RuntimeError(f"shared bootstrap authority lacks {key}")
+        source = source_dir / str(source_record["filename"])
+        if not source.is_file() or sha256_file(source) != source_record["file_sha256"]:
+            raise RuntimeError(f"shared bootstrap authority changed: {source}")
+        target = target_dir / source.name
         if target.is_file():
             semantics = validate_bootstrap_cache_file(target)
-            if (
-                semantics["level_zero_sha256"] != _partition_sha256(labels)
-                or not math.isclose(
-                    float(semantics["modularity"]),
-                    modularity,
-                    rel_tol=0.0,
-                    abs_tol=1e-12,
-                )
-            ):
+            if semantics["file_sha256"] != source_record["file_sha256"]:
                 raise RuntimeError(f"existing shard bootstrap differs from source: {target}")
         else:
             temporary = target.with_suffix(target.suffix + ".tmp")
-            with temporary.open("wb") as stream:
-                np.savez_compressed(
-                    stream,
-                    partition=labels.astype(np.int64, copy=False),
-                    mod=np.asarray(modularity),
-                )
-            shutil.copymode(source, temporary)
+            shutil.copy2(source, temporary)
+            if sha256_file(temporary) != source_record["file_sha256"]:
+                temporary.unlink(missing_ok=True)
+                raise RuntimeError(f"shared bootstrap copy changed bytes: {source}")
             temporary.replace(target)
             semantics = validate_bootstrap_cache_file(target)
-        key = f"{dataset}/{initial_batch}"
         report["entries"][key] = {
             "source": source.name,
-            "source_sha256": _sha256(source),
+            "source_sha256": source_record["file_sha256"],
             "target": target.name,
             "target_sha256": semantics["file_sha256"],
             "level_zero_sha256": semantics["level_zero_sha256"],
-            "modularity": modularity,
+            "modularity": semantics["modularity"],
         }
-    write_json(target_campaign / "bootstrap_source.json", report)
+    report_path = target_campaign / "bootstrap_source.json"
+    if report_path.is_file() and read_json(report_path) != report:
+        raise RuntimeError("sealed shard bootstrap-source identity changed")
+    write_json(report_path, report)
     return report
 
 
@@ -639,27 +953,39 @@ def invoke_base_preflight(
 def prepare_shard(args: argparse.Namespace) -> None:
     root = run_root(args.run_id)
     paths_config = resolve_project_path(args.paths_config)
-    repaired_campaign = resolve_repaired_campaign(args.repaired_campaign)
     cpu_affinity = parse_cpu_set(args.cpu_set)
     require_affinity(cpu_affinity)
     require_clean_commit(args.expected_git_sha)
-    source_identity = repaired_campaign_identity(
-        repaired_campaign,
-        expected_git_sha=args.expected_git_sha,
-        paths_config=paths_config,
-    )
     parallel = initialize_parallel_manifest(
         root,
         run_id=args.run_id,
         expected_git_sha=args.expected_git_sha,
         paths_config=paths_config,
-        repaired_campaign=source_identity,
         budget_hours=args.budget_hours,
     )
     if time.time() >= float(parallel["window"]["deadline_epoch"]):
         raise CampaignTimeBoundary("parallel measurement window expired before preflight")
     target = invoke_base_preflight(root, args.shard, paths_config)
-    bootstrap_report = seed_bootstrap_cache(source_identity, target, args.shard)
+    if args.shard == "01":
+        authority = seal_shared_bootstrap(root, target, paths_config, parallel)
+        write_json(
+            root / "markers" / "bootstrap-ready.json",
+            {
+                "schema": SHARED_BOOTSTRAP_MARKER_SCHEMA,
+                "stage": "bootstrap",
+                "run_id": args.run_id,
+                "parallel_manifest_sha256": sha256_file(
+                    root / "parallel_manifest.json"
+                ),
+                "authority": authority,
+                "recorded_at_utc": utc_now(),
+            },
+        )
+    else:
+        authority = wait_for_shared_bootstrap(root, parallel)
+    bootstrap_report = seed_bootstrap_cache(
+        root, authority, target, args.shard
+    )
     manifest_path = target / "manifest.json"
     manifest = read_json(manifest_path)
     topology = cpu_topology(cpu_affinity)
@@ -669,7 +995,7 @@ def prepare_shard(args: argparse.Namespace) -> None:
         "cpu_affinity": cpu_affinity,
         "cpu_topology": topology,
         "parallel_manifest_sha256": sha256_file(root / "parallel_manifest.json"),
-        "repaired_campaign": source_identity,
+        "bootstrap_authority": authority,
         "bootstrap_source": bootstrap_report,
     }
     recorded = manifest.get("parallel_shard")
@@ -973,7 +1299,6 @@ def main() -> None:
     parser.add_argument("--list", action="store_true", help="List the eight fixed shards.")
     subparsers = parser.add_subparsers(dest="command")
     prepare = common_parser(subparsers, "prepare")
-    prepare.add_argument("--repaired-campaign", type=Path, required=True)
     prepare.add_argument("--expected-git-sha", required=True)
     prepare.add_argument("--budget-hours", type=float, default=24.0)
     common_parser(subparsers, "smoke")

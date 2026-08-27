@@ -1,8 +1,8 @@
 {
   "schema": "comnetx-ieee-access-ldleiden-protocol-v1",
-  "protocol_id": "ieee-access-ldleiden-72h-v1",
-  "registered_date": "2026-08-26",
-  "purpose": "Measure the specialization gap between native LD-Leiden and the general ComNetX adapter under matched graph, stream, bootstrap, and principal-clock definitions.",
+  "protocol_id": "ieee-access-ldleiden-24h-standalone-v1",
+  "registered_date": "2026-08-27",
+  "purpose": "Measure native LD-Leiden timing, quality, and repeatability on the registered ComNetX graph streams under a sealed standalone bootstrap.",
   "common": {
     "backend": "ldleiden",
     "mode": "dynamic",
@@ -39,7 +39,7 @@
       "Final modularity",
       "NMI"
     ],
-    "interpretation": "Report native LD-Leiden as a specialized implementation reference. Use optimization_time for the matched principal-clock comparison and report update_time plus end_to_end_time as implementation diagnostics. Do not pool the smoke run with measured repetitions."
+    "interpretation": "Report native LD-Leiden as a specialized implementation reference. Use optimization_time as the principal backend clock and report update_time plus end_to_end_time as implementation diagnostics. Do not pool the smoke run with measured repetitions. Cross-era comparisons with historical ComNetX rows are descriptive unless both methods are rerun from the same sealed bootstrap."
   },
   "phases": [
     {

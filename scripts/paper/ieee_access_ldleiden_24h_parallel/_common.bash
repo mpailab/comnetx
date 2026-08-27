@@ -6,18 +6,16 @@ cd "$PROJECT_ROOT"
 
 PYTHON_BIN="${PYTHON_BIN:-python}"
 PATHS_CONFIG="${PATHS_CONFIG:-datasets-info/paths/cn69.json}"
-REPAIRED_CAMPAIGN_ID="${REPAIRED_CAMPAIGN_ID:-}"
-LD_PARALLEL_RUN_ID="${LD_PARALLEL_RUN_ID:-ldleiden-cn69-20260827}"
+LD_PARALLEL_RUN_ID="${LD_PARALLEL_RUN_ID:-ldleiden-cn69-20260827-v2}"
 LD_PARALLEL_BUDGET_HOURS="${LD_PARALLEL_BUDGET_HOURS:-24}"
 EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-}"
 PARENT_HOSTNAME="${PARENT_HOSTNAME:-cn69}"
 
-readonly PYTHON_BIN PATHS_CONFIG REPAIRED_CAMPAIGN_ID LD_PARALLEL_RUN_ID
+readonly PYTHON_BIN PATHS_CONFIG LD_PARALLEL_RUN_ID
 readonly LD_PARALLEL_BUDGET_HOURS EXPECTED_GIT_SHA PARENT_HOSTNAME
 readonly RUNNER="scripts/paper/ieee_access_ldleiden_24h_parallel/run_shard.py"
 readonly VALIDATOR="scripts/paper/ieee_access_ldleiden_24h_parallel/validate_parallel.py"
 readonly RESULTS_ROOT="results/ieee-access-2026-1/raw/ldleiden/$LD_PARALLEL_RUN_ID"
-readonly REPAIRED_ROOT="results/ieee-access-2026-1/raw/repaired-comnetx"
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -37,12 +35,6 @@ require_environment() {
     || die "flock is required for duplicate-launch protection"
   command -v git >/dev/null 2>&1 || die "git is required"
   [[ -f "$PATHS_CONFIG" ]] || die "Dataset path map not found: $PATHS_CONFIG"
-  [[ -n "$REPAIRED_CAMPAIGN_ID" ]] \
-    || die "Set REPAIRED_CAMPAIGN_ID to the exact paired ComNetX campaign"
-  [[ "$REPAIRED_CAMPAIGN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
-    || die "Invalid repaired-ComNetX campaign id: $REPAIRED_CAMPAIGN_ID"
-  [[ -f "$REPAIRED_ROOT/$REPAIRED_CAMPAIGN_ID/manifest.json" ]] \
-    || die "Paired repaired-ComNetX campaign not found: $REPAIRED_CAMPAIGN_ID"
   [[ -f "$RUNNER" ]] || die "Shard runner not found: $RUNNER"
   [[ -f "$VALIDATOR" ]] || die "Parallel validator not found: $VALIDATOR"
   [[ -n "$EXPECTED_GIT_SHA" ]] \
@@ -189,7 +181,6 @@ run_shard() {
     --run-id "$LD_PARALLEL_RUN_ID" \
     --shard "$shard_id" \
     --paths-config "$PATHS_CONFIG" \
-    --repaired-campaign "$REPAIRED_CAMPAIGN_ID" \
     --expected-git-sha "$EXPECTED_GIT_SHA" \
     --budget-hours "$LD_PARALLEL_BUDGET_HOURS" \
     --cpu-set "$LD_CPU_SET"

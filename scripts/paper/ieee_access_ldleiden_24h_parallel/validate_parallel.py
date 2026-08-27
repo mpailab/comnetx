@@ -3,9 +3,10 @@
 
 The parallel campaign deliberately uses one sealed LD-Leiden campaign per
 measured repetition.  This validator compares the sealed identities without
-requiring the container namespace to be shared, checks that the configured CPU
-affinities are disjoint, validates the single smoke gate, and aggregates the
-five short and three long repetitions.
+requiring the container namespace to be shared, validates the campaign-local
+bootstrap authority, checks that the configured CPU affinities are disjoint,
+validates the single smoke gate, and aggregates the five short and three long
+repetitions.
 """
 
 from __future__ import annotations
@@ -14,10 +15,8 @@ import argparse
 import copy
 from dataclasses import dataclass
 from datetime import datetime
-import hashlib
 import math
 from pathlib import Path
-import subprocess
 import sys
 from typing import Any, Iterable
 
@@ -43,13 +42,6 @@ from scripts.paper.ieee_access_ldleiden_72h.protocol import (  # noqa: E402
 from scripts.paper.ieee_access_ldleiden_72h.validate_results import (  # noqa: E402
     validate_window_attestation,
 )
-from scripts.paper.ieee_access_72h_launch.sync_bootstrap import (  # noqa: E402
-    _load_source,
-    _partition_sha256,
-    _source_candidate,
-)
-
-
 PARALLEL_SCHEMA = "comnetx-ieee-access-ldleiden-parallel-v1"
 PARALLEL_REGISTRATION_SCHEMA = (
     "comnetx-ieee-access-ldleiden-parallel-manifest-registration-v1"
@@ -57,15 +49,36 @@ PARALLEL_REGISTRATION_SCHEMA = (
 PARALLEL_REPORT_SCHEMA = "comnetx-ieee-access-ldleiden-parallel-validation-v1"
 CAMPAIGN_SCHEMA = "comnetx-ieee-access-ldleiden-campaign-v1"
 INPUT_SCHEMA = "comnetx-ieee-access-ldleiden-real-inputs-v1"
-REPAIRED_SCHEMA = "comnetx-ieee-access-repaired-campaign-v1"
-REPAIRED_PROTOCOL_ID = "ieee-access-repaired-comnetx-72h-v1"
-REPAIRED_INPUT_SCHEMA = "comnetx-ieee-access-real-inputs-v1"
 BOOTSTRAP_SOURCE_SCHEMA = "comnetx-ieee-access-ldleiden-bootstrap-source-v1"
+SHARED_BOOTSTRAP_SCHEMA = "comnetx-ieee-access-ldleiden-shared-bootstrap-v1"
+SHARED_BOOTSTRAP_REGISTRATION_SCHEMA = (
+    "comnetx-ieee-access-ldleiden-shared-bootstrap-registration-v1"
+)
+SHARED_BOOTSTRAP_POLICY = {
+    "schema": "comnetx-ieee-access-ldleiden-shared-bootstrap-policy-v1",
+    "kind": "campaign-local-generated",
+    "producer_shard": "01",
+    "relative_path": "shared-bootstrap",
+}
+EVIDENCE_SCOPE = {
+    "mode": "standalone-native-ldleiden",
+    "paired_comnetx_validated": False,
+    "matched_speedup_claim_allowed": False,
+    "allowed_claims": [
+        "native LD-Leiden timing and quality under the sealed protocol",
+        "within-LD-Leiden repeatability across the registered shards",
+    ],
+}
 LONG_TIMEOUT_SECONDS = 3600.0
-REQUIRED_REPAIRED_STAGES = (
-    "stage1_correctness_smoke",
-    "stage2_core_short",
-    "stage4_long_core",
+BOOTSTRAP_REQUIREMENTS = (
+    ("dyn_cora", "999:10"),
+    ("dyn_acm", "999:10"),
+    ("dyn_citeseer", "999:10"),
+    ("patent", "999:10"),
+    ("dyn_pubmed", "999:10"),
+    ("arxivmath", "999:10"),
+    ("dyn_pubmed", "9:500"),
+    ("arxivmath", "9:500"),
 )
 
 
@@ -115,14 +128,13 @@ class ShardRecord:
 
 
 @dataclass
-class RepairedRecord:
+class BootstrapAuthorityRecord:
     directory: Path
     identity: dict[str, Any]
     manifest: dict[str, Any]
-    hardware: dict[str, Any]
-    input_manifest: dict[str, Any]
-    bootstrap_cache: Path
-    attempt_provenance: dict[str, Any]
+    plan: dict[str, Any]
+    cache: Path
+    entries: dict[str, dict[str, Any]]
 
 
 def _require_object(value: Any, label: str) -> dict[str, Any]:
@@ -257,7 +269,7 @@ def _validate_assignment(
     spec: ShardSpec,
     *,
     parallel_manifest_sha256: str,
-    repaired_identity: dict[str, Any],
+    bootstrap_authority_identity: dict[str, Any],
 ) -> tuple[dict[str, Any], tuple[int, ...], dict[str, Any]]:
     assignment = _require_object(
         manifest.get("parallel_shard"),
@@ -304,10 +316,10 @@ def _validate_assignment(
         raise ValidationError(
             f"{campaign_dir}: parallel manifest hash differs from registration"
         )
-    if assignment.get("repaired_campaign") != repaired_identity:
+    if assignment.get("bootstrap_authority") != bootstrap_authority_identity:
         raise ValidationError(
-            f"{campaign_dir}: repaired-campaign identity differs from the "
-            "parallel manifest"
+            f"{campaign_dir}: shared-bootstrap authority identity differs from "
+            "the campaign authority"
         )
     return assignment, affinity, topology
 
@@ -449,662 +461,353 @@ def _validate_parallel_assignments(payload: dict[str, Any]) -> None:
         raise ValidationError("parallel_manifest.assignments differs from the fixed 5+3 design")
 
 
-def _completed_repaired_attempt(
-    campaign: Path,
-    stage_id: str,
-    command_name: str,
-) -> tuple[Path, dict[str, Any]]:
-    command_dir = campaign / "stages" / stage_id / command_name
-    completed: list[tuple[Path, dict[str, Any]]] = []
-    for metadata_path in sorted(command_dir.glob("attempt-*/metadata.json")):
-        metadata = _require_object(read_json(metadata_path), str(metadata_path))
-        if metadata.get("status") == "completed":
-            completed.append((metadata_path.parent, metadata))
-    if len(completed) != 1:
-        raise ValidationError(
-            f"repaired {stage_id}/{command_name}: expected exactly one completed "
-            f"attempt, got {len(completed)}"
-        )
-    attempt, metadata = completed[0]
-    if (
-        metadata.get("stage_id") != stage_id
-        or metadata.get("command_name") != command_name
-    ):
-        raise ValidationError(
-            f"{attempt}: repaired attempt metadata identity differs"
-        )
-    hashes = metadata.get("bootstrap_cache_sha256")
-    if not isinstance(hashes, dict):
-        raise ValidationError(
-            f"{attempt}/metadata.json: bootstrap-cache hashes are missing"
-        )
-    for filename, digest in hashes.items():
-        if (
-            not isinstance(filename, str)
-            or Path(filename).name != filename
-            or not isinstance(digest, str)
-            or len(digest) != 64
-        ):
-            raise ValidationError(
-                f"{attempt}/metadata.json: malformed bootstrap-cache identity"
-            )
-    return attempt, metadata
-
-
-def _selected_repaired_sources(
-    cache: Path,
-    pairs: Iterable[tuple[str, int]],
-) -> dict[str, str]:
-    selected: dict[str, str] = {}
-    for dataset, initial_batch in pairs:
-        source = _source_candidate(cache, dataset, initial_batch).resolve()
-        if cache not in source.parents:
-            raise ValidationError("selected repaired bootstrap escaped its cache")
-        selected[source.name] = sha256_file(source)
-    return selected
-
-
-def _require_attempt_bootstraps(
-    attempt: Path,
-    metadata: dict[str, Any],
-    required: dict[str, str],
-) -> None:
-    recorded = metadata["bootstrap_cache_sha256"]
-    mismatched = {
-        filename: {
-            "expected": digest,
-            "recorded": recorded.get(filename),
-        }
-        for filename, digest in required.items()
-        if recorded.get(filename) != digest
-    }
-    if mismatched:
-        raise ValidationError(
-            f"{attempt}/metadata.json: selected LD-Leiden bootstrap files were "
-            f"not recorded with matching digests: {sorted(mismatched)}"
-        )
-
-
-def _validate_repaired_bootstrap_attempt_provenance(
-    campaign: Path,
-    cache: Path,
-) -> dict[str, Any]:
-    """Bind each LD source to the repaired command that supplied its comparison.
-
-    The four smoke-only streams come from the all-six stage-1 command.  The two
-    core b:999 sources must occur in every paired short repetition, while their
-    b:9 sources must occur in the fresh paired long command.
-    """
-
-    validation_sha256: dict[str, str] = {}
-    for stage_id in REQUIRED_REPAIRED_STAGES:
-        validation_path = campaign / "stages" / stage_id / "validation.json"
-        if not validation_path.is_file():
-            raise ValidationError(
-                f"repaired {stage_id} validation report is missing"
-            )
-        validation = _require_object(
-            read_json(validation_path), str(validation_path)
-        )
-        if validation.get("status") != "validated":
-            raise ValidationError(
-                f"repaired {stage_id} validation report is no longer validated"
-            )
-        validation_sha256[stage_id] = sha256_file(validation_path)
-
-    core = ("dyn_pubmed", "arxivmath")
-    smoke_only = ("dyn_cora", "dyn_acm", "dyn_citeseer", "patent")
-    stage1_required = _selected_repaired_sources(
-        cache, ((dataset, 999) for dataset in smoke_only)
-    )
-    stage2_required = _selected_repaired_sources(
-        cache, ((dataset, 999) for dataset in core)
-    )
-    stage4_required = _selected_repaired_sources(
-        cache, ((dataset, 9) for dataset in core)
-    )
-
-    stage1_attempt, stage1_metadata = _completed_repaired_attempt(
-        campaign,
-        "stage1_correctness_smoke",
-        "all_six_smart_smoke",
-    )
-    _require_attempt_bootstraps(
-        stage1_attempt, stage1_metadata, stage1_required
-    )
-
-    stage2_attempts: list[Path] = []
-    for repeat in range(1, 6):
-        attempt, metadata = _completed_repaired_attempt(
-            campaign,
-            "stage2_core_short",
-            f"paired_repeat_{repeat:02d}",
-        )
-        _require_attempt_bootstraps(attempt, metadata, stage2_required)
-        stage2_attempts.append(attempt)
-
-    stage4_attempt, stage4_metadata = _completed_repaired_attempt(
-        campaign,
-        "stage4_long_core",
-        "fresh_paired_long",
-    )
-    _require_attempt_bootstraps(
-        stage4_attempt, stage4_metadata, stage4_required
-    )
-
+def _bootstrap_requirements() -> dict[str, str]:
     return {
-        "completed_attempts": 7,
-        "stage_validation_sha256": validation_sha256,
-        "stage1_correctness_smoke": {
-            "command": "all_six_smart_smoke",
-            "attempt": str(stage1_attempt.relative_to(campaign)),
-            "matched_source_files": sorted(stage1_required),
-        },
-        "stage2_core_short": {
-            "commands": [f"paired_repeat_{repeat:02d}" for repeat in range(1, 6)],
-            "attempts": [
-                str(attempt.relative_to(campaign)) for attempt in stage2_attempts
-            ],
-            "matched_source_files_per_attempt": sorted(stage2_required),
-        },
-        "stage4_long_core": {
-            "command": "fresh_paired_long",
-            "attempt": str(stage4_attempt.relative_to(campaign)),
-            "matched_source_files": sorted(stage4_required),
-        },
+        f"{dataset}/{batch_strategy.split(':', 1)[0]}": batch_strategy
+        for dataset, batch_strategy in BOOTSTRAP_REQUIREMENTS
     }
 
 
-def _recompute_repaired_source_equivalence(
-    manifest: dict[str, Any],
-) -> dict[str, Any]:
-    fingerprint = _require_object(
-        manifest.get("fingerprint"), "repaired manifest fingerprint"
-    )
-    sources = _require_object(
-        fingerprint.get("source_sha256"),
-        "repaired manifest fingerprint.source_sha256",
-    )
-    if not sources:
-        raise ValidationError("repaired campaign source fingerprint is empty")
-    required = {
-        "src/optimizer.py",
-        "scripts/launch.py",
-        "scripts/paper/collect_hardware_info.py",
-    }
-    if not required <= set(sources):
-        missing = sorted(required - set(sources))
-        raise ValidationError(
-            f"repaired source fingerprint lacks core measurement files: {missing}"
-        )
-    for relative, expected_digest in sources.items():
-        if not isinstance(relative, str) or not relative:
-            raise ValidationError("repaired source fingerprint has a malformed path")
-        relative_path = Path(relative)
-        if (
-            relative_path.is_absolute()
-            or relative_path.as_posix() != relative
-            or any(part in {"", ".", ".."} for part in relative_path.parts)
-        ):
-            raise ValidationError(
-                f"repaired source path is not safe project-relative: {relative!r}"
-            )
-        if (
-            not isinstance(expected_digest, str)
-            or len(expected_digest) != 64
-            or any(character not in "0123456789abcdef" for character in expected_digest)
-        ):
-            raise ValidationError(
-                f"repaired source digest is malformed: {relative}"
-            )
-        live_path = (PROJECT_ROOT / relative_path).resolve()
-        if PROJECT_ROOT not in live_path.parents or not live_path.is_file():
-            raise ValidationError(
-                f"repaired source path is missing or escaped the project: {relative}"
-            )
-        if sha256_file(live_path) != expected_digest:
-            raise ValidationError(
-                "current checkout is not source-equivalent to repaired ComNetX: "
-                + relative
-            )
-    git = _require_object(manifest.get("git"), "repaired manifest git")
-    repaired_commit = git.get("commit")
+def _safe_direct_filename(value: Any, label: str) -> str:
     if (
-        not isinstance(repaired_commit, str)
-        or len(repaired_commit) != 40
-        or any(character not in "0123456789abcdef" for character in repaired_commit)
+        not isinstance(value, str)
+        or not value
+        or Path(value).name != value
     ):
-        raise ValidationError("repaired campaign commit is malformed")
-
-    def git_text(*arguments: str) -> str:
-        try:
-            completed = subprocess.run(
-                ["git", *arguments],
-                cwd=PROJECT_ROOT,
-                check=True,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except (OSError, subprocess.CalledProcessError) as exc:
-            raise ValidationError(
-                f"cannot inspect repaired dataset metadata with Git: {' '.join(arguments)}"
-            ) from exc
-        return completed.stdout.strip()
-
-    metadata_prefix = "datasets-info/json"
-    repaired_names = {
-        line
-        for line in git_text(
-            "ls-tree", "-r", "--name-only", repaired_commit, "--", metadata_prefix
-        ).splitlines()
-        if line
-    }
-    current_names = {
-        line
-        for line in git_text(
-            "ls-tree", "-r", "--name-only", "HEAD", "--", metadata_prefix
-        ).splitlines()
-        if line
-    }
-    if not repaired_names or repaired_names != current_names:
-        raise ValidationError(
-            "current dataset metadata tree differs from repaired ComNetX"
-        )
-
-    metadata_hashes: dict[str, str] = {}
-    for relative in sorted(repaired_names):
-        relative_path = Path(relative)
-        if (
-            relative_path.is_absolute()
-            or relative_path.as_posix() != relative
-            or any(part in {"", ".", ".."} for part in relative_path.parts)
-        ):
-            raise ValidationError(
-                f"repaired dataset-metadata path is unsafe: {relative!r}"
-            )
-        try:
-            old_content = subprocess.run(
-                ["git", "show", f"{repaired_commit}:{relative}"],
-                cwd=PROJECT_ROOT,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            ).stdout
-        except (OSError, subprocess.CalledProcessError) as exc:
-            raise ValidationError(
-                f"cannot read repaired dataset metadata from Git: {relative}"
-            ) from exc
-        old_digest = hashlib.sha256(old_content).hexdigest()
-        current_path = (PROJECT_ROOT / relative_path).resolve()
-        if (
-            PROJECT_ROOT not in current_path.parents
-            or not current_path.is_file()
-            or sha256_file(current_path) != old_digest
-        ):
-            raise ValidationError(
-                "current dataset metadata is not source-equivalent to repaired "
-                "ComNetX: "
-                + relative
-            )
-        metadata_hashes[relative] = old_digest
-
-    return {
-        "policy": (
-            "all repaired measurement-source and dataset-metadata files "
-            "byte-identical"
-        ),
-        "files": len(sources),
-        "source_map_sha256": sha256_json(sources),
-        "runtime_metadata_files": len(metadata_hashes),
-        "runtime_metadata_map_sha256": sha256_json(metadata_hashes),
-    }
+        raise ValidationError(f"{label} must be a non-empty direct filename")
+    return value
 
 
-def _load_repaired_campaign(
+def _load_bootstrap_authority(
+    root: Path,
     parallel_manifest: dict[str, Any],
-) -> RepairedRecord:
-    identity = _require_object(
-        parallel_manifest.get("repaired_campaign"),
-        "parallel_manifest.repaired_campaign",
+    parallel_manifest_sha256: str,
+) -> BootstrapAuthorityRecord:
+    policy = _require_object(
+        parallel_manifest.get("bootstrap_authority"),
+        "parallel_manifest.bootstrap_authority",
     )
-    raw_path = identity.get("path")
-    if not isinstance(raw_path, str) or not raw_path:
-        raise ValidationError("repaired campaign identity lacks an absolute path")
-    recorded_path = Path(raw_path).expanduser()
-    if not recorded_path.is_absolute():
-        raise ValidationError("repaired campaign path must be absolute")
-    directory = recorded_path.resolve()
-    if str(directory) != raw_path:
-        raise ValidationError("repaired campaign path is not canonical")
+    if policy != SHARED_BOOTSTRAP_POLICY:
+        raise ValidationError("parallel bootstrap-authority policy changed")
+    evidence_scope = _require_object(
+        parallel_manifest.get("evidence_scope"),
+        "parallel_manifest.evidence_scope",
+    )
+    if evidence_scope != EVIDENCE_SCOPE:
+        raise ValidationError("parallel evidence scope changed")
+
+    relative_path = _safe_direct_filename(
+        policy.get("relative_path"), "parallel bootstrap authority relative_path"
+    )
+    directory = (root / relative_path).resolve()
+    if directory.parent != root or not directory.is_dir():
+        raise ValidationError(
+            f"shared-bootstrap authority is missing or outside the campaign: {directory}"
+        )
     manifest_path = directory / "manifest.json"
-    if not manifest_path.is_file():
-        raise ValidationError(f"live repaired campaign is missing: {manifest_path}")
+    registration_path = directory / "manifest_registration.json"
+    if not manifest_path.is_file() or not registration_path.is_file():
+        raise ValidationError(f"shared-bootstrap authority is incomplete: {directory}")
     manifest = _require_object(read_json(manifest_path), str(manifest_path))
-    expected_manifest = {
-        "schema": REPAIRED_SCHEMA,
-        "campaign_id": directory.name,
-        "protocol_id": REPAIRED_PROTOCOL_ID,
-        "production_api_acknowledged": True,
+    registration = _require_object(
+        read_json(registration_path), str(registration_path)
+    )
+    manifest_sha256 = sha256_file(manifest_path)
+    expected_registration = {
+        "schema": SHARED_BOOTSTRAP_REGISTRATION_SCHEMA,
+        "filename": manifest_path.name,
+        "sha256": manifest_sha256,
     }
-    for key, expected in expected_manifest.items():
+    if registration != expected_registration:
+        raise ValidationError(
+            "shared-bootstrap registration does not seal its live manifest"
+        )
+
+    expected_manifest_fields = {
+        "schema": SHARED_BOOTSTRAP_SCHEMA,
+        "run_id": root.name,
+        "parallel_manifest_sha256": parallel_manifest_sha256,
+        "bootstrap_policy": SHARED_BOOTSTRAP_POLICY,
+        "evidence_scope": EVIDENCE_SCOPE,
+    }
+    for key, expected in expected_manifest_fields.items():
         if manifest.get(key) != expected:
             raise ValidationError(
-                f"live repaired campaign {key} differs: "
-                f"{manifest.get(key)!r} != {expected!r}"
+                f"shared-bootstrap manifest {key} differs from the campaign"
             )
-    git = _require_object(manifest.get("git"), f"{directory}/manifest.git")
-    repaired_git = git.get("commit")
-    if (
-        git.get("dirty") is not False
-        or not isinstance(repaired_git, str)
-        or len(repaired_git) != 40
-        or any(character not in "0123456789abcdef" for character in repaired_git)
-    ):
-        raise ValidationError("live repaired campaign did not seal a clean commit")
-    expected_git = parallel_manifest.get("expected_git_sha")
-    if (
-        not isinstance(expected_git, str)
-        or len(expected_git) != 40
-        or any(character not in "0123456789abcdef" for character in expected_git)
-    ):
-        raise ValidationError("parallel expected Git commit is malformed")
-    source_equivalence = _recompute_repaired_source_equivalence(manifest)
-    parallel_paths = _require_object(
-        parallel_manifest.get("paths_config"), "parallel_manifest.paths_config"
-    )
-    paths_digest = parallel_paths.get("sha256")
-    if not isinstance(paths_digest, str) or len(paths_digest) != 64:
-        raise ValidationError("parallel paths-config digest is malformed")
-    if manifest.get("paths_config", {}).get("sha256") != paths_digest:
-        raise ValidationError(
-            "parallel and repaired-ComNetX campaigns use different paths maps"
-        )
-    paths_path = parallel_paths.get("path")
-    if not isinstance(paths_path, str) or not Path(paths_path).is_absolute():
-        raise ValidationError("parallel paths-config path must be absolute")
-    live_paths = Path(paths_path).expanduser().resolve()
-    if str(live_paths) != paths_path or not live_paths.is_file():
-        raise ValidationError("parallel paths-config path is not a live canonical file")
-    if sha256_file(live_paths) != paths_digest:
-        raise ValidationError("live paths-config changed after registration")
+    created_at = manifest.get("created_at_utc")
+    if not isinstance(created_at, str) or not created_at:
+        raise ValidationError("shared-bootstrap creation timestamp is missing")
 
-    stage_status = _require_object(
-        manifest.get("stage_status"), f"{directory}/manifest.stage_status"
+    generation = _require_object(
+        manifest.get("generation"), "shared-bootstrap manifest generation"
     )
-    required_status = {stage: "validated" for stage in REQUIRED_REPAIRED_STAGES}
-    if any(stage_status.get(stage) != value for stage, value in required_status.items()):
-        raise ValidationError(
-            "paired repaired-ComNetX evidence is no longer validated for all "
-            "required stages"
-        )
-    preflight_path = directory / "preflight" / "validation.json"
-    if not preflight_path.is_file():
-        raise ValidationError("repaired-ComNetX preflight validation is missing")
-    preflight = _require_object(read_json(preflight_path), str(preflight_path))
-    if preflight.get("status") != "validated":
-        raise ValidationError("repaired-ComNetX preflight is no longer validated")
-
-    _, hardware = _registered_artifact(directory, manifest, "hardware")
-    _, input_manifest = _registered_artifact(
-        directory, manifest, "real_input_manifest"
-    )
-    _registered_artifact(directory, manifest, "environment")
-    if input_manifest.get("schema") != REPAIRED_INPUT_SCHEMA:
-        raise ValidationError("repaired campaign has an invalid real-input manifest")
-    if not isinstance(input_manifest.get("files"), list) or not input_manifest["files"]:
-        raise ValidationError("repaired campaign real-input manifest has no files")
-    if input_manifest.get("paths_config_sha256") != paths_digest:
-        raise ValidationError("repaired real inputs use another paths map")
-
-    cache_name = manifest.get("bootstrap_cache", "bootstrap-cache")
-    if not isinstance(cache_name, str) or not cache_name:
-        raise ValidationError("repaired bootstrap-cache registration is malformed")
-    bootstrap_cache = (directory / cache_name).resolve()
-    if directory not in bootstrap_cache.parents or not bootstrap_cache.is_dir():
-        raise ValidationError(
-            f"live repaired bootstrap cache is missing or outside campaign: "
-            f"{bootstrap_cache}"
-        )
-    attempt_provenance = _validate_repaired_bootstrap_attempt_provenance(
-        directory, bootstrap_cache
-    )
-    expected_identity = {
-        "path": str(directory),
-        "campaign_id": directory.name,
-        "schema": REPAIRED_SCHEMA,
-        "protocol_id": REPAIRED_PROTOCOL_ID,
-        "git_commit": repaired_git,
-        "ld_git_commit": expected_git,
-        "source_equivalence": source_equivalence,
-        "paths_config_sha256": paths_digest,
-        "hardware": manifest["hardware"],
-        "real_input_manifest": manifest["real_input_manifest"],
-        "environment": manifest["environment"],
-        "required_stage_status": required_status,
-        "bootstrap_cache": str(bootstrap_cache),
+    protocol = load_protocol()
+    expected_generation = {
+        "producer_shard": "01",
+        "producer_campaign": EXPECTED_SHARDS[0].directory,
+        "method": "leidenalg",
+        "api": "launcher._compute_launch_initial_partition",
+        "resolution": float(protocol["common"]["resolution"]),
+        "force_undirected": bool(protocol["common"]["force_undirected"]),
+        "thread_environment": {
+            "OMP_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "OPENBLAS_NUM_THREADS": "1",
+            "NUMEXPR_NUM_THREADS": "1",
+        },
+        "rng_control": "backend-default; no explicit seed is exposed",
+        "reproducibility_policy": (
+            "archive and reuse the sealed NPZ bytes; regeneration is not "
+            "claimed to reproduce the same partition"
+        ),
     }
-    if identity != expected_identity:
+    for key, expected in expected_generation.items():
+        if generation.get(key) != expected:
+            raise ValidationError(
+                f"shared-bootstrap generation {key} differs: "
+                f"{generation.get(key)!r} != {expected!r}"
+            )
+    plan_name = _safe_direct_filename(
+        generation.get("plan_filename"),
+        "shared-bootstrap generation plan_filename",
+    )
+    plan_path = directory / plan_name
+    plan_sha256 = generation.get("plan_sha256")
+    if (
+        not isinstance(plan_sha256, str)
+        or len(plan_sha256) != 64
+        or not plan_path.is_file()
+        or sha256_file(plan_path) != plan_sha256
+    ):
+        raise ValidationError("shared-bootstrap generation plan changed")
+    plan = _require_object(read_json(plan_path), str(plan_path))
+    requirements = _bootstrap_requirements()
+    expected_plan_fields = {
+        "schema": "comnetx-ieee-access-ldleiden-shared-bootstrap-plan-v1",
+        "run_id": root.name,
+        "parallel_manifest_sha256": parallel_manifest_sha256,
+        "producer_shard": "01",
+        "producer_campaign": EXPECTED_SHARDS[0].directory,
+        "expected_git_sha": parallel_manifest.get("expected_git_sha"),
+        "protocol_id": parallel_manifest.get("protocol_id"),
+        "paths_config": parallel_manifest.get("paths_config"),
+        "requirements": requirements,
+    }
+    for key, expected in expected_plan_fields.items():
+        if plan.get(key) != expected:
+            raise ValidationError(
+                f"shared-bootstrap initialization plan {key} differs from "
+                "the parallel campaign"
+            )
+
+    raw_entries = _require_object(
+        manifest.get("entries"), "shared-bootstrap manifest entries"
+    )
+    if set(raw_entries) != set(requirements):
         raise ValidationError(
-            "parallel repaired-campaign identity differs from the live repaired "
-            "campaign"
+            "shared-bootstrap authority must contain exactly the eight fixed keys"
         )
-    return RepairedRecord(
+    cache = (directory / "cache").resolve()
+    if cache.parent != directory or not cache.is_dir():
+        raise ValidationError("shared-bootstrap cache directory is missing")
+    entries: dict[str, dict[str, Any]] = {}
+    filenames: set[str] = set()
+    for key, batch_strategy in requirements.items():
+        record = _require_object(
+            raw_entries.get(key), f"shared-bootstrap entry {key}"
+        )
+        expected_dataset = key.rsplit("/", 1)[0]
+        if record.get("dataset") != expected_dataset:
+            raise ValidationError(
+                f"shared-bootstrap dataset identity differs for {key}"
+            )
+        if record.get("batch_strategy") != batch_strategy:
+            raise ValidationError(
+                f"shared-bootstrap batch strategy differs for {key}"
+            )
+        filename = _safe_direct_filename(
+            record.get("filename"), f"shared-bootstrap entry {key} filename"
+        )
+        if filename in filenames:
+            raise ValidationError(
+                f"shared-bootstrap filename is reused by multiple keys: {filename}"
+            )
+        filenames.add(filename)
+        semantics = validate_bootstrap_cache_file(cache / filename)
+        expected_semantics = {
+            "file_sha256": semantics["file_sha256"],
+            "level_zero_sha256": semantics["level_zero_sha256"],
+            "vertices": semantics["vertices"],
+        }
+        for field, expected in expected_semantics.items():
+            if record.get(field) != expected:
+                raise ValidationError(
+                    f"shared-bootstrap {field} changed for {key}"
+                )
+        modularity = record.get("modularity")
+        if (
+            isinstance(modularity, bool)
+            or not isinstance(modularity, (int, float))
+            or not math.isclose(
+                float(modularity),
+                float(semantics["modularity"]),
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+        ):
+            raise ValidationError(
+                f"shared-bootstrap modularity changed for {key}"
+            )
+        entries[key] = record
+    live_filenames = {
+        path.name for path in cache.iterdir() if path.is_file()
+    }
+    if live_filenames != filenames:
+        raise ValidationError(
+            "shared-bootstrap cache contains missing or unregistered files"
+        )
+
+    identity = {
+        "schema": SHARED_BOOTSTRAP_SCHEMA,
+        "relative_path": relative_path,
+        "manifest": {
+            "filename": manifest_path.name,
+            "sha256": manifest_sha256,
+        },
+        "registration": {
+            "filename": registration_path.name,
+            "sha256": sha256_file(registration_path),
+        },
+        "entries_sha256": sha256_json(raw_entries),
+        "parallel_manifest_sha256": parallel_manifest_sha256,
+    }
+    return BootstrapAuthorityRecord(
         directory=directory,
         identity=identity,
         manifest=manifest,
-        hardware=hardware,
-        input_manifest=input_manifest,
-        bootstrap_cache=bootstrap_cache,
-        attempt_provenance=attempt_provenance,
+        plan=plan,
+        cache=cache,
+        entries=entries,
     )
 
 
-def _file_identity(record: Any, label: str) -> tuple[int, int, str]:
-    item = _require_object(record, label)
-    size = item.get("size")
-    mtime_ns = item.get("mtime_ns")
-    digest = item.get("sha256")
-    if (
-        isinstance(size, bool)
-        or not isinstance(size, int)
-        or size < 0
-        or isinstance(mtime_ns, bool)
-        or not isinstance(mtime_ns, int)
-        or mtime_ns < 0
-        or not isinstance(digest, str)
-        or len(digest) != 64
-    ):
-        raise ValidationError(f"{label} has a malformed file identity")
-    return size, mtime_ns, digest
+def _expected_shard_bootstrap_keys(spec: ShardSpec) -> set[str]:
+    initial_batch = "999" if spec.phase_cli == "short" else "9"
+    required = {f"dyn_pubmed/{initial_batch}", f"arxivmath/{initial_batch}"}
+    if spec.ordinal == 1:
+        required |= {
+            "dyn_cora/999",
+            "dyn_acm/999",
+            "dyn_citeseer/999",
+            "patent/999",
+        }
+    return required
 
 
-def _validate_repaired_compatibility(
-    repaired: RepairedRecord,
-    shards: list[ShardRecord],
-) -> dict[str, Any]:
-    repaired_hardware = _comparable_hardware(repaired.hardware)
-    ld_hardware = _comparable_hardware(shards[0].hardware)
-    if repaired_hardware != ld_hardware:
-        raise ValidationError(
-            "LD-Leiden and repaired-ComNetX have different comparable CPU hardware"
-        )
-
-    repaired_files: dict[str, tuple[int, int, str]] = {}
-    for index, record in enumerate(repaired.input_manifest["files"]):
-        item = _require_object(record, f"repaired real input {index}")
-        path = item.get("path")
-        if not isinstance(path, str) or not Path(path).is_absolute():
-            raise ValidationError("repaired real-input path is not absolute")
-        identity = _file_identity(item, f"repaired real input {path}")
-        previous = repaired_files.setdefault(path, identity)
-        if previous != identity:
-            raise ValidationError(f"conflicting repaired input identity: {path}")
-
-    matched: list[str] = []
-    for index, record in enumerate(shards[0].input_manifest["files"]):
-        item = _require_object(record, f"LD-Leiden real input {index}")
-        path = item.get("path")
-        if not isinstance(path, str) or not Path(path).is_absolute():
-            raise ValidationError("LD-Leiden real-input path is not absolute")
-        identity = _file_identity(item, f"LD-Leiden real input {path}")
-        if repaired_files.get(path) != identity:
-            raise ValidationError(
-                f"LD-Leiden input is absent from or differs in the repaired "
-                f"real-input manifest: {path}"
-            )
-        matched.append(path)
-    return {
-        "campaign": str(repaired.directory),
-        "git_commit": repaired.identity["git_commit"],
-        "ld_git_commit": repaired.identity["ld_git_commit"],
-        "source_equivalence": repaired.identity["source_equivalence"],
-        "paths_config_sha256": repaired.identity["paths_config_sha256"],
-        "hardware_sha256": sha256_json(repaired_hardware),
-        "matched_ld_input_files": len(matched),
-        "required_stage_status": repaired.identity["required_stage_status"],
-        "bootstrap_cache": str(repaired.bootstrap_cache),
-        "bootstrap_attempt_provenance": repaired.attempt_provenance,
-    }
-
-
-def _bootstrap_source_report(
+def _bootstrap_authority_source_report(
     shards: Iterable[ShardRecord],
-    repaired: RepairedRecord,
+    authority: BootstrapAuthorityRecord,
 ) -> dict[str, Any]:
     observations: dict[str, list[dict[str, Any]]] = {}
     for shard in shards:
-        source = shard.manifest["parallel_shard"]["bootstrap_source"]
         source = _require_object(
-            source, f"{shard.directory}/parallel_shard.bootstrap_source"
+            shard.manifest["parallel_shard"].get("bootstrap_source"),
+            f"{shard.directory}/parallel_shard.bootstrap_source",
         )
         if source.get("schema") != BOOTSTRAP_SOURCE_SCHEMA:
-            raise ValidationError(f"{shard.directory}: invalid bootstrap-source schema")
-        if source.get("repaired_campaign") != repaired.identity:
             raise ValidationError(
-                f"{shard.directory}: bootstrap source belongs to another repaired "
-                "campaign"
+                f"{shard.directory}: invalid bootstrap-source schema"
             )
-        if source.get("source_directory") != str(repaired.bootstrap_cache):
+        if source.get("authority") != authority.identity:
             raise ValidationError(
-                f"{shard.directory}: bootstrap source directory is not the live "
-                "repaired cache"
+                f"{shard.directory}: bootstrap source belongs to another "
+                "shared authority"
+            )
+        if source.get("source_directory") != str(authority.cache):
+            raise ValidationError(
+                f"{shard.directory}: bootstrap source directory is not the "
+                "sealed campaign authority"
             )
         entries = _require_object(
-            source.get("entries"), f"{shard.directory}/bootstrap_source.entries"
+            source.get("entries"),
+            f"{shard.directory}/bootstrap_source.entries",
         )
-        initial_batch = "999" if shard.spec.phase_cli == "short" else "9"
-        required = {f"dyn_pubmed/{initial_batch}", f"arxivmath/{initial_batch}"}
-        if shard.spec.ordinal == 1:
-            required |= {
-                "dyn_cora/999",
-                "dyn_acm/999",
-                "dyn_citeseer/999",
-                "patent/999",
-            }
+        required = _expected_shard_bootstrap_keys(shard.spec)
         if set(entries) != required:
             raise ValidationError(
                 f"{shard.directory}: bootstrap-source entries differ; "
                 f"expected {sorted(required)}, got {sorted(entries)}"
             )
-        for key, entry in entries.items():
-            entry = _require_object(entry, f"{shard.directory}/bootstrap_source/{key}")
-            dataset, batch_text = key.rsplit("/", 1)
-            try:
-                batch = int(batch_text)
-            except ValueError as exc:
-                raise ValidationError(
-                    f"{shard.directory}: invalid bootstrap batch in {key}"
-                ) from exc
-            expected_source = _source_candidate(
-                repaired.bootstrap_cache, dataset, batch
-            ).resolve()
-            if repaired.bootstrap_cache not in expected_source.parents:
-                raise ValidationError(
-                    f"{shard.directory}: bootstrap source escaped repaired cache"
-                )
-            source_name = entry.get("source")
-            if (
-                not isinstance(source_name, str)
-                or Path(source_name).name != source_name
-                or source_name != expected_source.name
-            ):
-                raise ValidationError(
-                    f"{shard.directory}: bootstrap source selection differs for {key}"
-                )
-            labels, source_modularity = _load_source(expected_source)
-            source_digest = sha256_file(expected_source)
-            level_zero_digest = _partition_sha256(labels)
-            identity = {
-                "source_sha256": entry.get("source_sha256"),
-                "level_zero_sha256": entry.get("level_zero_sha256"),
-                "modularity": entry.get("modularity"),
+        for key, raw_entry in entries.items():
+            entry = _require_object(
+                raw_entry, f"{shard.directory}/bootstrap_source/{key}"
+            )
+            authority_entry = authority.entries[key]
+            filename = authority_entry["filename"]
+            expected_entry = {
+                "source": filename,
+                "source_sha256": authority_entry["file_sha256"],
+                "target": filename,
+                "target_sha256": authority_entry["file_sha256"],
+                "level_zero_sha256": authority_entry["level_zero_sha256"],
             }
-            if any(
-                not isinstance(identity[field], str)
-                or len(identity[field]) != 64
-                for field in ("source_sha256", "level_zero_sha256")
+            for field, expected in expected_entry.items():
+                if entry.get(field) != expected:
+                    raise ValidationError(
+                        f"{shard.directory}: bootstrap {field} differs for {key}"
+                    )
+            modularity = entry.get("modularity")
+            if (
+                isinstance(modularity, bool)
+                or not isinstance(modularity, (int, float))
+                or not math.isclose(
+                    float(modularity),
+                    float(authority_entry["modularity"]),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                )
             ):
                 raise ValidationError(
-                    f"{shard.directory}: malformed bootstrap digest for {key}"
+                    f"{shard.directory}: bootstrap modularity differs for {key}"
                 )
-            if isinstance(identity["modularity"], bool) or not isinstance(
-                identity["modularity"], (int, float)
-            ):
-                raise ValidationError(
-                    f"{shard.directory}: malformed bootstrap modularity for {key}"
-                )
-            if not math.isfinite(float(identity["modularity"])):
-                raise ValidationError(
-                    f"{shard.directory}: non-finite bootstrap modularity for {key}"
-                )
-            if identity["source_sha256"] != source_digest:
-                raise ValidationError(
-                    f"{shard.directory}: live repaired bootstrap hash differs for {key}"
-                )
-            if identity["level_zero_sha256"] != level_zero_digest:
-                raise ValidationError(
-                    f"{shard.directory}: repaired bootstrap level zero differs for {key}"
-                )
-            if not math.isclose(
-                float(identity["modularity"]),
-                float(source_modularity),
-                rel_tol=0.0,
-                abs_tol=1e-12,
-            ):
-                raise ValidationError(
-                    f"{shard.directory}: repaired bootstrap modularity differs for {key}"
-                )
-
-            prefix = expected_source.name.split(
-                f"_b:{batch}_by_leidenalg", 1
-            )[0]
-            expected_target_name = f"{prefix}_b:{batch}_by_leidenalg.npz"
-            target_name = entry.get("target")
-            if target_name != expected_target_name or Path(str(target_name)).name != target_name:
-                raise ValidationError(
-                    f"{shard.directory}: bootstrap target name differs for {key}"
-                )
-            target_path = shard.directory / "bootstrap-cache" / target_name
+            target_path = shard.directory / "bootstrap-cache" / filename
             target_semantics = validate_bootstrap_cache_file(target_path)
-            if entry.get("target_sha256") != target_semantics["file_sha256"]:
+            if target_semantics["file_sha256"] != authority_entry["file_sha256"]:
                 raise ValidationError(
-                    f"{shard.directory}: bootstrap target hash differs for {key}"
+                    f"{shard.directory}: copied bootstrap bytes differ for {key}"
                 )
-            if target_semantics["level_zero_sha256"] != level_zero_digest:
+            if (
+                target_semantics["level_zero_sha256"]
+                != authority_entry["level_zero_sha256"]
+            ):
                 raise ValidationError(
-                    f"{shard.directory}: bootstrap target partition differs for {key}"
+                    f"{shard.directory}: copied bootstrap partition differs for {key}"
                 )
             if not math.isclose(
                 float(target_semantics["modularity"]),
-                float(source_modularity),
+                float(authority_entry["modularity"]),
                 rel_tol=0.0,
                 abs_tol=1e-12,
             ):
                 raise ValidationError(
-                    f"{shard.directory}: bootstrap target modularity differs for {key}"
+                    f"{shard.directory}: copied bootstrap modularity differs for {key}"
                 )
-            observations.setdefault(key, []).append(identity)
+            observations.setdefault(key, []).append(
+                {
+                    "source_sha256": entry["source_sha256"],
+                    "target_sha256": entry["target_sha256"],
+                    "level_zero_sha256": entry["level_zero_sha256"],
+                    "modularity": float(entry["modularity"]),
+                    "vertices": int(authority_entry["vertices"]),
+                    "filename": filename,
+                }
+            )
+
+    if set(observations) != set(authority.entries):
+        raise ValidationError(
+            "the shard bootstrap copies do not cover all eight authority keys"
+        )
     result: dict[str, Any] = {}
     for key, values in sorted(observations.items()):
         digests = {sha256_json(value) for value in values}
@@ -1112,6 +815,31 @@ def _bootstrap_source_report(
             raise ValidationError(f"bootstrap source differs across shards: {key}")
         result[key] = {"observations": len(values), **values[0]}
     return result
+
+
+def _validate_bootstrap_producer(
+    authority: BootstrapAuthorityRecord,
+    producer: ShardRecord,
+) -> None:
+    if producer.spec.ordinal != 1:
+        raise ValidationError("shared-bootstrap producer must be shard 01")
+    plan = authority.plan
+    expected = {
+        "producer_cpu_affinity": list(producer.cpu_affinity),
+        "producer_cpu_topology": producer.cpu_topology,
+        "protocol_fingerprint_sha256": sha256_json(
+            producer.manifest["fingerprint"]
+        ),
+        "backend_sha256": sha256_json(producer.manifest["backend"]),
+        "hardware": producer.manifest["hardware"],
+        "runtime_identity": producer.manifest["runtime_identity"],
+        "real_input_manifest": producer.manifest["real_input_manifest"],
+    }
+    for key, value in expected.items():
+        if plan.get(key) != value:
+            raise ValidationError(
+                f"shared-bootstrap producer identity differs for {key}"
+            )
 
 
 def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict[str, Any]]:
@@ -1132,7 +860,9 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
     run_id = parallel_manifest.get("run_id")
     if not isinstance(run_id, str) or run_id != root.name:
         raise ValidationError("parallel manifest run_id differs from its root directory")
-    repaired = _load_repaired_campaign(parallel_manifest)
+    authority = _load_bootstrap_authority(
+        root, parallel_manifest, parallel_manifest_sha256
+    )
     recorded_names = _parallel_manifest_shard_names(parallel_manifest)
     _validate_parallel_assignments(parallel_manifest)
     expected_names = {spec.directory for spec in EXPECTED_SHARDS}
@@ -1166,7 +896,12 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
         if manifest.get("protocol_id") != protocol["protocol_id"]:
             raise ValidationError(f"{campaign_dir}: protocol id differs")
         git = _require_object(manifest.get("git"), f"{campaign_dir}/git")
-        if not isinstance(git.get("commit"), str) or not git["commit"]:
+        commit = git.get("commit")
+        if (
+            not isinstance(commit, str)
+            or len(commit) != 40
+            or any(character not in "0123456789abcdef" for character in commit)
+        ):
             raise ValidationError(f"{campaign_dir}: missing Git commit")
         if git.get("dirty") is not False:
             raise ValidationError(f"{campaign_dir}: measurement checkout was dirty")
@@ -1184,7 +919,7 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
             manifest,
             spec,
             parallel_manifest_sha256=parallel_manifest_sha256,
-            repaired_identity=repaired.identity,
+            bootstrap_authority_identity=authority.identity,
         )
         _, hardware = _registered_artifact(campaign_dir, manifest, "hardware")
         _, runtime_identity = _registered_artifact(
@@ -1221,7 +956,8 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
         )
 
     _validate_disjoint_affinity(shards)
-    bootstrap_sources = _bootstrap_source_report(shards, repaired)
+    _validate_bootstrap_producer(authority, shards[0])
+    bootstrap_sources = _bootstrap_authority_source_report(shards, authority)
     git_commit, git_digest = _cross_shard_value(
         shards, "Git commit", lambda shard: {"commit": shard.manifest["git"]["commit"]}
     )
@@ -1247,7 +983,15 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
     del backend, hardware, input_manifest, runtime_common
 
     expected_commit = parallel_manifest.get("expected_git_sha")
-    if not isinstance(expected_commit, str) or expected_commit != git_commit["commit"]:
+    if (
+        not isinstance(expected_commit, str)
+        or len(expected_commit) != 40
+        or any(
+            character not in "0123456789abcdef"
+            for character in expected_commit
+        )
+        or expected_commit != git_commit["commit"]
+    ):
         raise ValidationError("parallel manifest and shard Git commits differ")
     parallel_paths_digest = parallel_manifest.get("paths_config", {}).get("sha256")
     shard_paths_digest = shards[0].manifest.get("paths_config", {}).get("sha256")
@@ -1262,7 +1006,6 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
         raise ValidationError(
             "the parallel campaign must contain eight unique container identities"
         )
-    repaired_compatibility = _validate_repaired_compatibility(repaired, shards)
     preflight = {
         "parallel_manifest_sha256": parallel_manifest_sha256,
         "parallel_manifest_registration_sha256": sha256_file(
@@ -1285,7 +1028,13 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
         },
         "container_identity_policy": "eight distinct container identities required",
         "unique_container_identities": len(set(container_digests.values())),
-        "repaired_campaign": repaired_compatibility,
+        "evidence_scope": EVIDENCE_SCOPE,
+        "bootstrap_authority": {
+            "directory": str(authority.directory),
+            "identity": authority.identity,
+            "generation": authority.manifest["generation"],
+            "entries": authority.entries,
+        },
         "bootstrap_source": bootstrap_sources,
         "shards": {
             shard.spec.directory: {
@@ -1300,6 +1049,9 @@ def _load_preflight(root: Path) -> tuple[dict[str, Any], list[ShardRecord], dict
                     shard.cpu_topology["core_id"],
                 ],
                 "container_identity_sha256": container_digests[shard.spec.directory],
+                "bootstrap_authority": shard.manifest["parallel_shard"][
+                    "bootstrap_authority"
+                ],
                 "bootstrap_source": shard.manifest["parallel_shard"][
                     "bootstrap_source"
                 ],
@@ -1510,6 +1262,7 @@ def _finalize_bootstraps(
         modularities = {record.get("modularity") for record in records}
         if (
             None in file_digests
+            or len(file_digests) != 1
             or len(partition_digests) != 1
             or None in partition_digests
             or len(vertices) != 1
@@ -1538,6 +1291,8 @@ def _compare_bootstrap_source_and_attempts(
     for key in source:
         expected = source[key]
         actual = observed[key]
+        if actual["file_sha256"] != [expected["target_sha256"]]:
+            raise ValidationError(f"attempt bootstrap bytes differ from source: {key}")
         if expected["level_zero_sha256"] != actual["level_zero_sha256"]:
             raise ValidationError(f"attempt bootstrap differs from source: {key}")
         if float(expected["modularity"]) != float(actual["modularity"]):
@@ -1725,6 +1480,7 @@ def validate_parallel(root: Path, stage: str) -> dict[str, Any]:
         "campaign_id": parallel_manifest["run_id"],
         "stage": stage,
         "status": "valid_preflight",
+        "evidence_scope": EVIDENCE_SCOPE,
         "preflight": preflight,
     }
     if stage == "preflight":
