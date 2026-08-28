@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_common.bash"
-run_shard long 2
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/run_ldleiden_repeat.sh" long 2

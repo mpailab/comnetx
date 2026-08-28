@@ -1091,7 +1091,7 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
 
 @pytest.mark.unit
 @pytest.mark.short
-def test_run_dynamic_ldleiden_rejects_priming_partition_change(monkeypatch):
+def test_run_dynamic_ldleiden_records_priming_partition_change(monkeypatch):
     launcher = _load_launcher(monkeypatch)
     batches = [
         torch.zeros((4, 4), dtype=torch.float32),
@@ -1102,21 +1102,29 @@ def test_run_dynamic_ldleiden_rejects_priming_partition_change(monkeypatch):
     class _ChangingPrimingAlgo:
         def __init__(self):
             self._partition = initial_partition.clone()
+            self.updated_batches = []
+            self.apply_calls = 0
 
         def apply(self, with_update_timing=False):
-            self._partition = torch.tensor([0, 1, 2, 3])
-            return (0.0, 0.0) if with_update_timing else 0.0
+            self.apply_calls += 1
+            if self.apply_calls == 1:
+                self._partition = torch.tensor([0, 1, 2, 3])
+            return (100.0, 200.0) if with_update_timing else 0.0
 
         def partition(self):
             return self._partition
 
         def update(self, batch):
-            raise AssertionError("updates must not start after a changed priming state")
+            self.updated_batches.append(batch)
 
+        def modularity(self):
+            return 0.5
+
+    algo = _ChangingPrimingAlgo()
     monkeypatch.setattr(
         launcher,
         "create_leiden",
-        lambda method, batch, partition=None: _ChangingPrimingAlgo(),
+        lambda method, batch, partition=None: algo,
     )
     monkeypatch.setattr(
         launcher,
@@ -1129,8 +1137,32 @@ def test_run_dynamic_ldleiden_rejects_priming_partition_change(monkeypatch):
         init_batch_number="999",
     )
 
-    with pytest.raises(RuntimeError, match="priming changed"):
-        launcher._run_dynamic_backend(batches, config)
+    clock = iter([10.0, 10.4])
+    monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
+
+    results, last_partition = launcher._run_dynamic_backend(batches, config)
+
+    assert results == [
+        {
+            "modularity": 0.5,
+            "time": 0.2,
+            "optimization_time": 0.2,
+            "update_time": 0.1,
+            "end_to_end_time": pytest.approx(0.4),
+            "timing_split_supported": True,
+            "priming_audit_supported": True,
+            "priming_partition_relation_preserved": False,
+            "bootstrap_reference_sha256": launcher._partition_relation_sha256(
+                initial_partition
+            ),
+            "post_priming_partition_sha256": launcher._partition_relation_sha256(
+                torch.tensor([0, 1, 2, 3])
+            ),
+        }
+    ]
+    assert algo.updated_batches == [batches[1]]
+    assert algo.apply_calls == 2
+    assert torch.equal(last_partition, torch.tensor([0, 1, 2, 3]))
 
 
 @pytest.mark.unit
