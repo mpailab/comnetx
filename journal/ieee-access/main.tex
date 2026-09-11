@@ -851,6 +851,12 @@ the implemented cluster-count rules rather than a tuned cross-backend ranking.
 All reported pairs are matched by dataset, update protocol, and graph
 representation.
 
+LD-Leiden is discussed as the closest Leiden-specific alternative but is not
+included in the quantitative benchmark. The available implementation cannot be
+distributed with the accompanying artifact, and its native initialization and
+timing interfaces do not match the paired protocol used here; we therefore
+avoid a cross-protocol performance ranking.
+
 The main Leiden, long-horizon, resolution, and cut-metric comparisons use
 paired undirected representations. A separate direction-preserving Leiden
 control is reported for dyn\_pubmed and arxivmath. In the S$^2$CAG feature
