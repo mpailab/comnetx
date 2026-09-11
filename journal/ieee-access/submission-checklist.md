@@ -17,9 +17,10 @@
 - Complete and validate the repaired-ComNetX campaign under
   `results/ieee-access-2026-1/raw/repaired-comnetx/`; do not reuse historical
   multilevel smart-mode values as repaired results.
-- Complete the split-clock LD-Leiden specialization comparison or document a
-  genuine environment blocker; retain the valid outcome regardless of which
-  method is faster.
+- Keep LD-Leiden as a cited methodological comparison, not a quantitative row,
+  unless an independently executable artifact and a genuinely matched
+  initialization/timing protocol become available. Do not compute a speedup
+  from the completed standalone diagnostic campaign.
 - Require zero hierarchy, scope-collision, cache-nesting, and outside-write
   failures for the closure-enabled method. Validate the radius-only control by
   outside partition equivalence rather than numeric label equality.

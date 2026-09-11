@@ -27,6 +27,8 @@ ComNetX. It uses the official IEEE Access LaTeX template dated May 13, 2026.
   manuscript.
 - `literature-and-style-review.md`: journal requirements and style survey.
 - `reviewer-notes.md`: curated reviewer-response record.
+- `reviewer-audit-and-revision-plan.md`: status audit of the ICDM reviews and
+  prioritized IEEE Access revision plan.
 - `submission-checklist.md`: remaining author confirmations and upload checks.
 
 The bibliography preserves all 67 works cited in the ICDM manuscript under

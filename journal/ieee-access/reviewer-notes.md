@@ -123,19 +123,24 @@ result is fabricated:
 - tuned multi-seed feature-aware baselines with valid cluster-count and budget
   selection.
 
-The registered campaign does add split-clock LD-Leiden, corrected multilevel
-ComNetX reruns, invariant audits, boundary-certificate quantities, phase/work
-profiles, and exact environment/input/source hashes. These results will replace
-rather than be silently pooled with the affected historical smart-mode rows.
+The registered campaign adds corrected multilevel ComNetX reruns, invariant
+audits, boundary-certificate quantities, phase/work profiles, and exact
+environment/input/source hashes. The completed standalone LD-Leiden diagnostic
+is retained as internal evidence but is not admitted to the manuscript: its
+implementation is not publicly redistributable, its initialization and timing
+interfaces do not match the paired ComNetX protocol, and its internal and
+common-evaluator modularity values require further diagnosis. These results
+must not be silently pooled with the affected historical smart-mode rows.
 
 ## Evidence Used
 
 Historical artifacts below remain useful context, but every multilevel
 smart-mode row is provisional after the repair. Claim-bearing replacement
 artifacts are registered under
-`results/ieee-access-2026-1/raw/repaired-comnetx/` and
-`results/ieee-access-2026-1/raw/ldleiden/`; they enter the manuscript only
-after the campaign validators accept them.
+`results/ieee-access-2026-1/raw/repaired-comnetx/`. Candidate LD-Leiden records
+remain separate and do not enter the manuscript under the present evidence
+policy. Repaired ComNetX results enter only after the campaign validators
+accept them.
 
 - `results/icdm-2026-1/measurements/experiment_measurements.json`: short,
   repeatability, topology, long-horizon, and DSBM records;
