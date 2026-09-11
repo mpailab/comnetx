@@ -7,14 +7,13 @@
   "USE_GPU": true,
   "RESOLUTION": 1.0,
   "FEATURE_MODE": "dataset",
-  "DATASETS": ["dyn_pubmed", "arxivmath"],
+  "DATASETS": ["dyn_cora", "dyn_pubmed", "arxivmath"],
   "BATCHES": ["999:10"],
   "BASELINES": ["leidenalg"],
   "MODES": ["naive", "smart"],
   "SMART_PARAMS_GRID": {
-    "smart_subcoms_depth": [3],
-    "smart_neighborhood_step": [1],
+    "smart_subcoms_depth": [1, 2, 3, 4],
+    "smart_neighborhood_step": [0, 1, 2],
     "aggregation_mode": ["sum"]
   }
 }
-

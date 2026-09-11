@@ -8,10 +8,8 @@ workloads rather than hidden full-graph work. This script calls the production
 * directly affected and radius-expanded vertices;
 * post-closure vertices at every hierarchy level;
 * contracted backend nodes and edges;
-* per-level restricted boundary-objective certificates;
-* identity-atom ranking-certificate comparisons;
 * time spent in update, radius expansion, closure, restriction, aggregation,
-  backend, projection, and certificate phases;
+  backend, and projection phases;
 * CPU RSS and CUDA peak memory.
 
 It writes a custom JSON format understood by ``collect_results_registry.py``.
@@ -180,7 +178,6 @@ def profile_smart_update(
         row["total_profiled_time"] - backend_conversion,
     )
     row["timing_accounting"] = (
-        "certificate_time is excluded once from total_profiled_time; "
         "backend_conversion_time is a diagnostic subcomponent of backend_time, "
         "included once in total_profiled_time, and subtracted once only for "
         "principal_profiled_time"
@@ -194,12 +191,6 @@ def profile_smart_update(
     ]
     row["contracted_edges_by_level"] = [
         int(item.get("contracted_edges", 0)) for item in level_rows
-    ]
-    row["boundary_certificates_by_level"] = [
-        item.get("boundary_certificate") for item in level_rows
-    ]
-    row["identity_ranking_certificates_by_level"] = [
-        item.get("ranking_certificate") for item in level_rows
     ]
     row["modularity"] = Metrics.modularity(opt.adj, opt.coms[0], directed=directed)
     row.update(cuda_memory(device))

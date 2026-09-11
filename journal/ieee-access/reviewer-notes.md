@@ -9,8 +9,11 @@ Status: every comment is filtered through the article-level scientific
 argument. A comment is incorporated only when it improves correctness,
 explanation, or evidence relative to comparable Q1 work. The hierarchy and
 label-namespace audit exposed genuine implementation defects; these have been
-repaired, and every historical multilevel smart-mode result remains
-provisional until the registered rerun is validated.
+repaired, and historical smart-mode measurements cannot be relabeled as
+measurements of the changed implementation. The namespace defect can also
+affect depth one. See `code-change-audit-20260911.md` for exact counterexamples,
+their limitations, and the distinction between a bug fix and a changed
+algorithmic policy.
 
 ## Incorporated in the Manuscript
 
@@ -111,8 +114,7 @@ article contains no anonymous-conference artifact language.
 
 ## Explicitly Unresolved Without New Measurements
 
-The following additions remain outside the registered 72-hour campaign and no
-result is fabricated:
+The following additions have not been measured:
 
 - non-overlapping or independently sampled real temporal windows;
 - long-horizon per-batch NMI or Local-versus-Full partition agreement;
@@ -123,9 +125,10 @@ result is fabricated:
 - tuned multi-seed feature-aware baselines with valid cluster-count and budget
   selection.
 
-The registered campaign adds corrected multilevel ComNetX reruns, invariant
-audits, boundary-certificate quantities, phase/work profiles, and exact
-environment/input/source hashes. The completed standalone LD-Leiden diagnostic
+The former 24/72-hour campaign frameworks and runtime certificates were
+removed in the code audit. Future runs use the existing launch tools, retained
+JSON configurations, invariant checks, and phase/work profiles; source, inputs,
+environment and shared initialization still need to be recorded. The completed standalone LD-Leiden diagnostic
 is retained as internal evidence but is not admitted to the manuscript: its
 implementation is not publicly redistributable, its initialization and timing
 interfaces do not match the paired ComNetX protocol, and its internal and
@@ -134,13 +137,12 @@ must not be silently pooled with the affected historical smart-mode rows.
 
 ## Evidence Used
 
-Historical artifacts below remain useful context, but every multilevel
-smart-mode row is provisional after the repair. Claim-bearing replacement
-artifacts are registered under
+Historical artifacts below remain observations of the earlier implementation;
+they do not measure the changed update procedure. New measurements belong under
 `results/ieee-access-2026-1/raw/repaired-comnetx/`. Candidate LD-Leiden records
 remain separate and do not enter the manuscript under the present evidence
-policy. Repaired ComNetX results enter only after the campaign validators
-accept them.
+policy. New ComNetX results enter only after checking source/input identity,
+paired initialization and timing, structural correctness, and result values.
 
 - `results/icdm-2026-1/measurements/experiment_measurements.json`: short,
   repeatability, topology, long-horizon, and DSBM records;

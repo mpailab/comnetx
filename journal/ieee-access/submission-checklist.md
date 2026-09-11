@@ -14,9 +14,10 @@
 
 ## Scientific and measurement gates before submission
 
-- Complete and validate the repaired-ComNetX campaign under
-  `results/ieee-access-2026-1/raw/repaired-comnetx/`; do not reuse historical
-  multilevel smart-mode values as repaired results.
+- Measure and validate the retained comparisons for the selected implementation
+  under `results/ieee-access-2026-1/raw/repaired-comnetx/`; do not describe
+  historical smart-mode values as results of the changed update procedure.
+  Use the direct launch tools in `scripts/paper/ieee_access_measurements/`.
 - Keep LD-Leiden as a cited methodological comparison, not a quantitative row,
   unless an independently executable artifact and a genuinely matched
   initialization/timing protocol become available. Do not compute a speedup
@@ -24,9 +25,8 @@
 - Require zero hierarchy, scope-collision, cache-nesting, and outside-write
   failures for the closure-enabled method. Validate the radius-only control by
   outside partition equivalence rather than numeric label equality.
-- Report the boundary-certificate quantities and establish whether the bound
-  is informative on the measured streams before promoting it as a headline
-  result.
+- Keep the boundary bound as analytical context. It is not an experimentally
+  validated quality guard and does not require a runtime certificate campaign.
 - Regenerate every numeric macro, table, and figure from the accepted campaign
   records, then re-audit all prose values against the generated artifacts.
 - Preserve all 67 verified conference references and verify every additional

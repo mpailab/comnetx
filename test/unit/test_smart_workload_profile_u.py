@@ -80,41 +80,19 @@ def test_profile_uses_production_run_semantics(
         row["total_profiled_time"]
     )
     assert row["instrumented_wall_time"] == pytest.approx(
-        row["optimizer_time"] + row["certificate_time"]
+        row["optimizer_time"]
     )
     assert row["total_profiled_time"] == pytest.approx(
         row["radius_time"] + row["optimizer_time"]
     )
-    assert "certificate_time is excluded once" in row["timing_accounting"]
     assert "diagnostic subcomponent" in row["timing_accounting"]
     assert len(row["levels"]) == 3
-    assert len(row["boundary_certificates_by_level"]) == 3
-    assert len(row["identity_ranking_certificates_by_level"]) == 3
-    assert all(
-        ranking["reference"] == "identity atom partition"
-        for ranking in row["identity_ranking_certificates_by_level"]
-    )
-    if variant == "no_closure":
-        # Radius zero leaves one loop-free vertex in scope, so W_U = 0 and the
-        # modularity certificate is intentionally marked undefined.
-        assert all(
-            certificate["finite"] is False
-            for certificate in row["boundary_certificates_by_level"]
-        )
-        assert all(
-            ranking["status"] == "undefined_zero_weight_scope"
-            for ranking in row["identity_ranking_certificates_by_level"]
-        )
-    else:
-        assert all(
-            certificate["finite"] is True
-            for certificate in row["boundary_certificates_by_level"]
-        )
-        assert all(
-            ranking["finite"] is True
-            for ranking in row["identity_ranking_certificates_by_level"]
-        )
-    assert row["certificate_time"] >= 0.0
+    assert "certificate_time" not in row
+    assert "boundary_certificates_by_level" not in row
+    assert "identity_ranking_certificates_by_level" not in row
+    assert all("certificate_time" not in level for level in row["levels"])
+    assert all("boundary_certificate" not in level for level in row["levels"])
+    assert all("ranking_certificate" not in level for level in row["levels"])
     if variant == "no_closure":
         assert row["closure_vertices_by_level"] == [1, 1, 1]
     if variant == "no_contraction":

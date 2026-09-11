@@ -193,12 +193,9 @@ test/graphs/small_konect/
 test/*.json
 results/mfc/*.pkl
 
-# Generated IEEE Access measurement campaigns.  Keep the tracked README files
-# in each namespace while preventing one sealed preflight from making the next
-# campaign appear to come from a dirty checkout.
+# Generated IEEE Access measurements; tracked README files remain visible.
 results/ieee-access-2026-1/raw/repaired-comnetx/*/
 results/ieee-access-2026-1/raw/ldleiden/*/
-results/ieee-access-2026-1/raw/.ieee-access-launch.lock
 
 neighborhood_analysis
 

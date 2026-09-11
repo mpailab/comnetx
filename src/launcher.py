@@ -1,5 +1,3 @@
-import hashlib
-
 import torch
 import os
 import time
@@ -16,22 +14,6 @@ from our_utils import print_zone
 
 
 INITIAL_HIERARCHY_CACHE_SCHEMA = "parent_quotient_v1"
-
-
-def _partition_relation_sha256(partition) -> str:
-    """Hash one partition relation after canonical min-vertex relabeling."""
-
-    labels = torch.as_tensor(partition, dtype=torch.long)
-    if labels.dim() != 1 or labels.numel() == 0:
-        raise RuntimeError(
-            "LD-Leiden priming state must expose one non-empty flat partition"
-        )
-    canonical = Optimizer.canonicalize_partition(labels).cpu().contiguous()
-    array = canonical.numpy().astype("<i8", copy=False)
-    digest = hashlib.sha256()
-    digest.update(f"shape={array.shape};dtype=int64;".encode("ascii"))
-    digest.update(array.tobytes(order="C"))
-    return digest.hexdigest()
 
 
 def _initial_partition_cache_path(
@@ -898,11 +880,7 @@ def _run_dynamic_backend(
     Returns
     -------
     list[dict[str, float]]
-        Per-processed-batch modularity and runtime entries. Native LD-Leiden
-        entries additionally expose ``optimization_time``, ``update_time``,
-        ``end_to_end_time``, and ``timing_split_supported``. For a supported
-        split clock, the historical ``time`` field is the optimization time.
-        Other dynamic methods retain their historical result shape.
+        Per-processed-batch modularity and runtime entries.
 
     Raises
     ------
@@ -912,7 +890,6 @@ def _run_dynamic_backend(
     results = []
     algo = None
     seen_batch = False
-    ldleiden_priming_audit = None
 
     for batch_idx, batch in enumerate(batches_iter):
         seen_batch = True
@@ -938,114 +915,23 @@ def _run_dynamic_backend(
             algo = create_leiden(config.method, batch, partition=init_partition)
 
             if init_partition is not None:
-                # Some dynamic backends need a priming apply() after receiving
+                # FIXME: Some dynamic backends need a priming apply() after receiving
                 # an external partition. Without it, update()+apply() can enter
-                # an uninitialized C++ state on the next batch. For LD-Leiden,
-                # retain the pre/post partition digests as diagnostics. Priming
-                # is an optimization step and may legitimately update the
-                # supplied Leiden partition, so a changed relation is recorded
-                # rather than treated as a launcher failure.
-                bootstrap_digest = None
-                if config.method == "ldleiden":
-                    bootstrap_digest = _partition_relation_sha256(init_partition)
+                # an uninitialized C++ state on the next batch.
                 algo.apply()
-                if config.method == "ldleiden":
-                    ldleiden_priming_audit = {
-                        "priming_audit_supported": False,
-                        "priming_partition_relation_preserved": None,
-                        "bootstrap_reference_sha256": bootstrap_digest,
-                        "post_priming_partition_sha256": None,
-                    }
-                    try:
-                        post_priming_partition = algo.partition()
-                    except Exception as exc:
-                        ldleiden_priming_audit["priming_audit_error"] = (
-                            f"{type(exc).__name__}: {exc}"
-                        )
-                    else:
-                        if post_priming_partition is None:
-                            ldleiden_priming_audit["priming_audit_error"] = (
-                                "partition() returned None"
-                            )
-                        else:
-                            post_priming_digest = _partition_relation_sha256(
-                                post_priming_partition
-                            )
-                            preserved = post_priming_digest == bootstrap_digest
-                            ldleiden_priming_audit.update(
-                                {
-                                    "priming_audit_supported": True,
-                                    "priming_partition_relation_preserved": (
-                                        preserved
-                                    ),
-                                    "post_priming_partition_sha256": (
-                                        post_priming_digest
-                                    ),
-                                }
-                            )
-                            if not preserved:
-                                _print_verbose(
-                                    config.verbose,
-                                    1,
-                                    "LD-Leiden priming changed the supplied "
-                                    "bootstrap partition",
-                                )
                 continue
 
         # Keep the historical streaming protocol: every emitted batch,
         # including the first non-special snapshot, is passed through update().
-        # LD-Leiden applies a pending graph update inside apply().  Its split
-        # clock separates that work from optimization so ``time`` is comparable
-        # with the principal backend clock used by the adapter measurements.
-        if config.method == "ldleiden":
-            end_to_end_start = time.perf_counter()
-            algo.update(batch)
-            try:
-                update_ms, optimization_ms = algo.apply(with_update_timing=True)
-            except TypeError as exc:
-                if "with_update_timing" not in str(exc):
-                    raise
-                # Older wheels expose only the combined apply() clock. Keep
-                # that value in ``time`` for API compatibility, but mark the
-                # missing split explicitly so measurement validation can
-                # reject the entry as a principal-clock observation.
-                combined_ms = algo.apply()
-                end_to_end_time = time.perf_counter() - end_to_end_start
-                result = {
-                    "modularity": algo.modularity(),
-                    "time": combined_ms / 1000.0,
-                    "optimization_time": None,
-                    "update_time": None,
-                    "end_to_end_time": end_to_end_time,
-                    "timing_split_supported": False,
-                }
-            else:
-                end_to_end_time = time.perf_counter() - end_to_end_start
-                measured_time = optimization_ms / 1000.0
-                result = {
-                    "modularity": algo.modularity(),
-                    "time": measured_time,
-                    "optimization_time": measured_time,
-                    "update_time": update_ms / 1000.0,
-                    "end_to_end_time": end_to_end_time,
-                    "timing_split_supported": True,
-                }
-        else:
-            algo.update(batch)
-            elapsed_ms = algo.apply()
-            measured_time = elapsed_ms / 1000.0
-            result = {"modularity": algo.modularity(), "time": measured_time}
-
-        if config.method == "ldleiden" and ldleiden_priming_audit is not None:
-            result.update(ldleiden_priming_audit)
-
-        measured_time = result["time"]
-        mod = result["modularity"]
+        algo.update(batch)
+        elapsed_ms = algo.apply()
+        measured_time = elapsed_ms / 1000.0
+        mod = algo.modularity()
 
         _print_verbose(config.verbose, 2, f"Modularity: {mod:.2g}")
         _print_verbose(config.verbose, 2, f"Time: {measured_time:.2f}")
 
-        results.append(result)
+        results.append({"modularity": mod, "time": measured_time})
 
     if not seen_batch:
         raise ValueError("dynamic backend received no adjacency batches")

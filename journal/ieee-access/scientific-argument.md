@@ -1,8 +1,18 @@
 # Scientific Argument and 72-Hour Evidence Plan
 
-Status: working design record. This document fixes the scientific claims before
-the manuscript or experiment set is reduced. No existing result should be
-removed merely because it is not central to the first draft of this map.
+Status: historical working design record. The code audit of 11 September 2026
+supersedes its operational 72-hour plan and runtime-certificate requirements;
+see [the code audit](code-change-audit-20260911.md). The queue frameworks and
+one-off prototypes were removed, while the analytical derivations and old
+measurements remain available. Recorded local empirical diagnostics below
+were not rerun in that audit and should not be generalized to every archived
+server execution.
+
+The audit distinguishes a demonstrated namespace defect from the broader
+choice of parent-quotient updates. Precomputing scopes was already present in
+the legacy code. Parent quotients are one way to guarantee nesting; the old
+cut policy cannot be called universally incorrect merely because it differs
+from the chosen coarsening policy.
 
 ## Central thesis
 

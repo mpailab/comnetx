@@ -1,5 +1,4 @@
 # External imports
-import math
 import time
 import torch
 from typing import Optional, Callable
@@ -8,304 +7,6 @@ from typing import Optional, Callable
 # Internal imports
 import sparse
 from our_utils import print_zone
-
-
-def restricted_boundary_objective_certificate(
-    adjacency: torch.Tensor,
-    scope_mask: torch.Tensor,
-    assignments: torch.Tensor,
-    gamma: float = 1.0,
-) -> dict[str, float | bool | None]:
-    """Evaluate the restricted modularity boundary certificate.
-
-    The calculation follows the directed-matrix convention used by
-    :func:`metrics.Metrics.modularity`: every stored matrix entry contributes
-    once to the total weight.  Consequently, a symmetric representation of an
-    undirected edge contributes once in each direction, while a diagonal
-    self-loop contributes once.  ``assignments`` is the projected candidate on
-    the full vertex set; only its restriction to ``scope_mask`` affects the
-    realized mismatch ``D``.
-
-    All reductions use ``float64`` even when the resident graph uses
-    ``float32``.  The certificate requires nonnegative finite edge weights,
-    finite nonnegative ``gamma``, positive full weight ``W``, and positive
-    induced-scope weight ``W_U``.  Degenerate zero-weight scopes retain their
-    measured masses but return ``None`` for the undefined derived quantities
-    and set ``finite`` to ``False``.
-    """
-
-    if adjacency.dim() != 2 or adjacency.size(0) != adjacency.size(1):
-        raise ValueError("adjacency must be a square two-dimensional tensor")
-    nodes = adjacency.size(0)
-    if scope_mask.dim() != 1 or scope_mask.numel() != nodes:
-        raise ValueError("scope_mask must contain one entry per graph vertex")
-    if assignments.dim() != 1 or assignments.numel() != nodes:
-        raise ValueError("assignments must contain one label per graph vertex")
-    gamma = float(gamma)
-    if not math.isfinite(gamma) or gamma < 0.0:
-        raise ValueError("gamma must be finite and nonnegative")
-
-    if adjacency.layout == torch.strided:
-        row, col = torch.nonzero(adjacency, as_tuple=True)
-        weights = adjacency[row, col]
-    else:
-        coalesced = adjacency.to_sparse_coo().coalesce()
-        row, col = coalesced.indices()
-        weights = coalesced.values()
-
-    device = adjacency.device
-    row = row.to(device=device)
-    col = col.to(device=device)
-    weights = weights.to(device=device, dtype=torch.float64)
-    scope = scope_mask.to(device=device, dtype=torch.bool)
-    labels = assignments.to(device=device, dtype=torch.long)
-
-    if weights.numel() and not bool(torch.isfinite(weights).all().item()):
-        raise ValueError("certificate requires finite adjacency weights")
-    if weights.numel() and bool((weights < 0).any().item()):
-        raise ValueError("certificate requires nonnegative adjacency weights")
-
-    source_inside = scope.index_select(0, row)
-    target_inside = scope.index_select(0, col)
-    internal = source_inside & target_inside
-    outgoing_boundary = source_inside & ~target_inside
-    incoming_boundary = ~source_inside & target_inside
-
-    total_weight_t = weights.sum()
-    scope_weight_t = weights[internal].sum()
-    beta_out_t = weights[outgoing_boundary].sum()
-    beta_in_t = weights[incoming_boundary].sum()
-
-    total_weight = float(total_weight_t.item())
-    scope_weight = float(scope_weight_t.item())
-    beta_out = float(beta_out_t.item())
-    beta_in = float(beta_in_t.item())
-    result: dict[str, float | bool | None] = {
-        "gamma": gamma,
-        "W": total_weight,
-        "W_U": scope_weight,
-        "beta_out": beta_out,
-        "beta_in": beta_in,
-        "B_plus": None,
-        "B_minus": None,
-        "certificate_width": None,
-        "D": None,
-        "Q_U": None,
-        "finite": False,
-    }
-    if total_weight <= 0.0 or scope_weight <= 0.0:
-        return result
-
-    scope_vertices = torch.nonzero(scope, as_tuple=True)[0]
-    if scope_vertices.numel() == 0:
-        return result
-    outside_vertices = torch.nonzero(~scope, as_tuple=True)[0]
-    inside_labels = labels.index_select(0, scope_vertices)
-    if outside_vertices.numel() and bool(
-        torch.isin(
-            torch.unique(inside_labels),
-            torch.unique(labels.index_select(0, outside_vertices)),
-        ).any().item()
-    ):
-        raise ValueError(
-            "certificate requires scope and outside community labels to be disjoint"
-        )
-    _, inverse = torch.unique(
-        inside_labels,
-        sorted=True,
-        return_inverse=True,
-    )
-    group_by_vertex = torch.full(
-        (nodes,), -1, dtype=torch.long, device=device
-    )
-    group_by_vertex[scope_vertices] = inverse
-    groups = int(inverse.max().item()) + 1
-
-    x = torch.zeros(groups, dtype=torch.float64, device=device)
-    y = torch.zeros_like(x)
-    p = torch.zeros_like(x)
-    q = torch.zeros_like(x)
-    if bool(internal.any().item()):
-        x.scatter_add_(0, group_by_vertex[row[internal]], weights[internal])
-        y.scatter_add_(0, group_by_vertex[col[internal]], weights[internal])
-    if bool(outgoing_boundary.any().item()):
-        p.scatter_add_(
-            0,
-            group_by_vertex[row[outgoing_boundary]],
-            weights[outgoing_boundary],
-        )
-    if bool(incoming_boundary.any().item()):
-        q.scatter_add_(
-            0,
-            group_by_vertex[col[incoming_boundary]],
-            weights[incoming_boundary],
-        )
-
-    scale = gamma / (total_weight_t * total_weight_t)
-    normalization_term = (
-        (total_weight_t - scope_weight_t)
-        / scope_weight_t
-        * torch.sum(x * y)
-    )
-    boundary_term = torch.sum(x * q + y * p + p * q)
-    mismatch = scale * (normalization_term - boundary_term)
-    b_plus = scale * scope_weight_t * (total_weight_t - scope_weight_t)
-    b_minus = scale * (
-        scope_weight_t * (beta_out_t + beta_in_t) + beta_out_t * beta_in_t
-    )
-    width = b_plus + b_minus
-    internal_source_groups = group_by_vertex[row[internal]]
-    internal_target_groups = group_by_vertex[col[internal]]
-    same_inside_block = internal_source_groups == internal_target_groups
-    internal_block_weight = weights[internal][same_inside_block].sum()
-    local_modularity = (
-        internal_block_weight
-        - gamma * torch.sum(x * y) / scope_weight_t
-    ) / scope_weight_t
-
-    derived = {
-        "B_plus": float(b_plus.item()),
-        "B_minus": float(b_minus.item()),
-        "certificate_width": float(width.item()),
-        "D": float(mismatch.item()),
-        "Q_U": float(local_modularity.item()),
-    }
-    result.update(derived)
-    result["finite"] = all(math.isfinite(value) for value in derived.values())
-    return result
-
-
-def restricted_ranking_certificate(
-    adjacency: torch.Tensor,
-    scope_mask: torch.Tensor,
-    candidate_assignments: torch.Tensor,
-    reference_assignments: torch.Tensor,
-    gamma: float = 1.0,
-    *,
-    candidate_certificate: Optional[dict[str, float | bool | None]] = None,
-    reference: str = "identity atom partition",
-) -> dict[str, float | int | bool | str | None]:
-    """Compare a scoped candidate with a reference using the ranking bound.
-
-    ``candidate_assignments`` and ``reference_assignments`` must represent
-    partitions on the same scope and keep their inside labels disjoint from
-    the fixed outside partition. The caller is responsible for constructing
-    the declared reference from the same quotient atoms. A strict ranking is
-    considered numerically informative only when its margin above the
-    certificate width exceeds the recorded tolerance; local or full ties are
-    represented by sign zero.
-    """
-
-    candidate = candidate_certificate or restricted_boundary_objective_certificate(
-        adjacency,
-        scope_mask,
-        candidate_assignments,
-        gamma=gamma,
-    )
-    identity = restricted_boundary_objective_certificate(
-        adjacency,
-        scope_mask,
-        reference_assignments,
-        gamma=gamma,
-    )
-    base: dict[str, float | int | bool | str | None] = {
-        "reference": reference,
-        "candidate_family": "same scope and quotient atoms",
-        "scaled_local_gap": None,
-        "restricted_full_objective_gap": None,
-        "certificate_width": candidate.get("certificate_width"),
-        "output_D": candidate.get("D"),
-        "reference_D": identity.get("D"),
-        "output_Q_U": candidate.get("Q_U"),
-        "reference_Q_U": identity.get("Q_U"),
-        "W_U_over_W": None,
-        "comparison_tolerance": None,
-        "local_gap_sign": 0,
-        "full_gap_sign": 0,
-        "strict_threshold_passed": False,
-        "ranking_sign_certified": False,
-        "status": "undefined_zero_weight_scope",
-        "finite": False,
-    }
-    if candidate.get("finite") is not True or identity.get("finite") is not True:
-        return base
-
-    for field in ("gamma", "W", "W_U", "certificate_width"):
-        candidate_value = float(candidate[field])
-        identity_value = float(identity[field])
-        tolerance = 1e-10 * max(1.0, abs(candidate_value), abs(identity_value))
-        if not math.isclose(
-            candidate_value,
-            identity_value,
-            rel_tol=1e-12,
-            abs_tol=tolerance,
-        ):
-            raise ValueError(
-                f"candidate and reference certificates disagree on {field}"
-            )
-
-    w = float(candidate["W"])
-    w_u = float(candidate["W_U"])
-    width = float(candidate["certificate_width"])
-    output_d = float(candidate["D"])
-    reference_d = float(identity["D"])
-    scaled_local_gap = w_u / w * (
-        float(candidate["Q_U"]) - float(identity["Q_U"])
-    )
-    full_gap = scaled_local_gap + output_d - reference_d
-    comparison_tolerance = 1e-10 * max(
-        1.0,
-        abs(scaled_local_gap),
-        abs(full_gap),
-        abs(width),
-    )
-
-    def signed(value: float) -> int:
-        if abs(value) <= comparison_tolerance:
-            return 0
-        return 1 if value > 0.0 else -1
-
-    local_sign = signed(scaled_local_gap)
-    full_sign = signed(full_gap)
-    strict_threshold_passed = abs(scaled_local_gap) > width
-    informative = (
-        abs(scaled_local_gap) - width > comparison_tolerance
-        and local_sign != 0
-    )
-    same_nonzero_sign = local_sign != 0 and local_sign == full_sign
-    ranking_sign_certified = informative and same_nonzero_sign
-    if local_sign == 0:
-        status = "local_tie"
-    elif not informative:
-        status = "within_certificate_width"
-    elif ranking_sign_certified:
-        status = "certified_same_sign"
-    else:
-        status = "sign_mismatch"
-
-    derived = {
-        "scaled_local_gap": scaled_local_gap,
-        "restricted_full_objective_gap": full_gap,
-        "certificate_width": width,
-        "output_D": output_d,
-        "reference_D": reference_d,
-        "output_Q_U": float(candidate["Q_U"]),
-        "reference_Q_U": float(identity["Q_U"]),
-        "W_U_over_W": w_u / w,
-        "comparison_tolerance": comparison_tolerance,
-    }
-    base.update(derived)
-    base.update(
-        {
-            "local_gap_sign": local_sign,
-            "full_gap_sign": full_sign,
-            "strict_threshold_passed": strict_threshold_passed,
-            "ranking_sign_certified": ranking_sign_certified,
-            "status": status,
-            "finite": all(math.isfinite(value) for value in derived.values()),
-        }
-    )
-    return base
 
 
 class Optimizer:
@@ -1011,7 +712,6 @@ class Optimizer:
                 "backend_time": 0.0,
                 "backend_conversion_time": 0.0,
                 "projection_time": 0.0,
-                "certificate_time": 0.0,
                 # Parent quotients rebuild from A_t[U_l]; no destructive cut
                 # is part of the repaired production algorithm.
                 "cut_time": 0.0,
@@ -1100,9 +800,6 @@ class Optimizer:
                             "backend_time": 0.0,
                             "backend_conversion_time": 0.0,
                             "projection_time": 0.0,
-                            "certificate_time": 0.0,
-                            "boundary_certificate": None,
-                            "ranking_certificate": None,
                             "cut_time": 0.0,
                         }
                     )
@@ -1199,44 +896,6 @@ class Optimizer:
                 assert profile is not None
                 profile["projection_time"] += projection_time
 
-            certificate_time = 0.0
-            boundary_certificate = None
-            ranking_certificate = None
-            if collect_profile:
-                phase_start = profile_clock()
-                boundary_certificate = restricted_boundary_objective_certificate(
-                    adj_base,
-                    level_ext_mask,
-                    coms_work[l],
-                    gamma=self.resolution,
-                )
-                identity_assignments = coms_work[l].clone()
-                if closure_enabled:
-                    identity_assignments[level_ext_mask] = (
-                        self.canonicalize_partition(inverse, ext_nodes)
-                    )
-                else:
-                    # Preserve the same fixed outside partition while giving
-                    # every quotient atom a separate inside block.
-                    identity_assignments[level_ext_mask] = (
-                        self.nodes_num + inverse
-                    )
-                    identity_assignments = self.canonicalize_partition(
-                        identity_assignments
-                    )
-                ranking_certificate = restricted_ranking_certificate(
-                    adj_base,
-                    level_ext_mask,
-                    coms_work[l],
-                    identity_assignments,
-                    gamma=self.resolution,
-                    candidate_certificate=boundary_certificate,
-                    reference="identity atom partition",
-                )
-                certificate_time = profile_elapsed(phase_start)
-                assert profile is not None
-                profile["certificate_time"] += certificate_time
-
             if collect_profile:
                 contracted_edges = (
                     int(aggr_adj.coalesce()._nnz())
@@ -1259,9 +918,6 @@ class Optimizer:
                         "backend_time": backend_time,
                         "backend_conversion_time": backend_conversion_time,
                         "projection_time": projection_time,
-                        "certificate_time": certificate_time,
-                        "boundary_certificate": boundary_certificate,
-                        "ranking_certificate": ranking_certificate,
                         "cut_time": 0.0,
                     }
                 )
@@ -1270,10 +926,5 @@ class Optimizer:
             assert profile is not None
             wall_time = profile_elapsed(total_start)
             profile["instrumented_wall_time"] = wall_time
-            # The certificate is an article diagnostic, not part of the
-            # production update. Keep the observed wall clock, but remove its
-            # separately timed pass from the production-path total.
-            profile["total_profiled_time"] = max(
-                0.0, wall_time - profile["certificate_time"]
-            )
+            profile["total_profiled_time"] = wall_time
             self.last_run_profile = profile

@@ -1019,10 +1019,8 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         def update(self, batch):
             self.updated_batches.append(batch)
 
-        def apply(self, with_update_timing=False):
+        def apply(self):
             self.apply_calls += 1
-            if with_update_timing:
-                return 250.0, 1500.0
             return 1500.0
 
         def modularity(self):
@@ -1053,8 +1051,6 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         "_compute_launch_initial_partition",
         fake_compute_launch_initial_partition,
     )
-    clock = iter([10.0, 12.0])
-    monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
     config = _test_config(
         launcher,
         dataset_name="fake",
@@ -1066,188 +1062,13 @@ def test_run_dynamic_backend_primes_special_strategy_and_skips_initial_result(
         batches,
         config,
     )
-    bootstrap_digest = launcher._partition_relation_sha256(initial_partition)
 
-    assert results == [
-        {
-            "modularity": 0.66,
-            "time": 1.5,
-            "optimization_time": 1.5,
-            "update_time": 0.25,
-            "end_to_end_time": 2.0,
-            "timing_split_supported": True,
-            "priming_audit_supported": True,
-            "priming_partition_relation_preserved": True,
-            "bootstrap_reference_sha256": bootstrap_digest,
-            "post_priming_partition_sha256": bootstrap_digest,
-        }
-    ]
+    assert results == [{"modularity": 0.66, "time": 1.5}]
     assert captured["method"] == "ldleiden"
     assert captured["initial_args"] == (batches[0], "fake", "999")
     assert created_algos[0].partition() is initial_partition
     assert created_algos[0].apply_calls == 2
     assert created_algos[0].updated_batches == [batches[1]]
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_run_dynamic_ldleiden_records_priming_partition_change(monkeypatch):
-    launcher = _load_launcher(monkeypatch)
-    batches = [
-        torch.zeros((4, 4), dtype=torch.float32),
-        torch.ones((4, 4), dtype=torch.float32),
-    ]
-    initial_partition = torch.tensor([0, 0, 2, 2])
-
-    class _ChangingPrimingAlgo:
-        def __init__(self):
-            self._partition = initial_partition.clone()
-            self.updated_batches = []
-            self.apply_calls = 0
-
-        def apply(self, with_update_timing=False):
-            self.apply_calls += 1
-            if self.apply_calls == 1:
-                self._partition = torch.tensor([0, 1, 2, 3])
-            return (100.0, 200.0) if with_update_timing else 0.0
-
-        def partition(self):
-            return self._partition
-
-        def update(self, batch):
-            self.updated_batches.append(batch)
-
-        def modularity(self):
-            return 0.5
-
-    algo = _ChangingPrimingAlgo()
-    monkeypatch.setattr(
-        launcher,
-        "create_leiden",
-        lambda method, batch, partition=None: algo,
-    )
-    monkeypatch.setattr(
-        launcher,
-        "_compute_launch_initial_partition",
-        lambda *args, **kwargs: initial_partition,
-    )
-    config = _test_config(
-        launcher,
-        method="ldleiden",
-        init_batch_number="999",
-    )
-
-    clock = iter([10.0, 10.4])
-    monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
-
-    results, last_partition = launcher._run_dynamic_backend(batches, config)
-
-    assert results == [
-        {
-            "modularity": 0.5,
-            "time": 0.2,
-            "optimization_time": 0.2,
-            "update_time": 0.1,
-            "end_to_end_time": pytest.approx(0.4),
-            "timing_split_supported": True,
-            "priming_audit_supported": True,
-            "priming_partition_relation_preserved": False,
-            "bootstrap_reference_sha256": launcher._partition_relation_sha256(
-                initial_partition
-            ),
-            "post_priming_partition_sha256": launcher._partition_relation_sha256(
-                torch.tensor([0, 1, 2, 3])
-            ),
-        }
-    ]
-    assert algo.updated_batches == [batches[1]]
-    assert algo.apply_calls == 2
-    assert torch.equal(last_partition, torch.tensor([0, 1, 2, 3]))
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_run_dynamic_ldleiden_marks_unsupported_split_timing(monkeypatch):
-    launcher = _load_launcher(monkeypatch)
-    batch = torch.ones((2, 2), dtype=torch.float32)
-
-    class _NoSplitDynamicAlgo:
-        def __init__(self):
-            self.updated_batches = []
-            self.apply_calls = 0
-
-        def update(self, updated_batch):
-            self.updated_batches.append(updated_batch)
-
-        def apply(self):
-            self.apply_calls += 1
-            return 1750.0
-
-        def modularity(self):
-            return 0.55
-
-        def partition(self):
-            return torch.tensor([0, 1])
-
-    algo = _NoSplitDynamicAlgo()
-    monkeypatch.setattr(
-        launcher,
-        "create_leiden",
-        lambda method, initial_batch, partition=None: algo,
-    )
-    clock = iter([20.0, 20.4])
-    monkeypatch.setattr(launcher.time, "perf_counter", lambda: next(clock))
-    config = _test_config(launcher, method="ldleiden", mode="dynamic")
-
-    results, last_partition = launcher._run_dynamic_backend([batch], config)
-
-    assert results == [
-        {
-            "modularity": 0.55,
-            "time": 1.75,
-            "optimization_time": None,
-            "update_time": None,
-            "end_to_end_time": pytest.approx(0.4),
-            "timing_split_supported": False,
-        }
-    ]
-    assert algo.updated_batches == [batch]
-    assert algo.apply_calls == 1
-    assert torch.equal(last_partition, torch.tensor([0, 1]))
-
-
-@pytest.mark.unit
-@pytest.mark.short
-def test_run_dynamic_non_ld_backend_keeps_historical_result_shape(monkeypatch):
-    launcher = _load_launcher(monkeypatch)
-    batch = torch.ones((2, 2), dtype=torch.float32)
-
-    class _FakeDynamicAlgo:
-        def update(self, updated_batch):
-            self.updated_batch = updated_batch
-
-        def apply(self):
-            return 500.0
-
-        def modularity(self):
-            return 0.44
-
-        def partition(self):
-            return torch.tensor([1, 1])
-
-    algo = _FakeDynamicAlgo()
-    monkeypatch.setattr(
-        launcher,
-        "create_leiden",
-        lambda method, initial_batch, partition=None: algo,
-    )
-    config = _test_config(launcher, method="dfleiden", mode="dynamic")
-
-    results, last_partition = launcher._run_dynamic_backend([batch], config)
-
-    assert results == [{"modularity": 0.44, "time": 0.5}]
-    assert algo.updated_batch is batch
-    assert torch.equal(last_partition, torch.tensor([1, 1]))
 
 
 @pytest.mark.unit
