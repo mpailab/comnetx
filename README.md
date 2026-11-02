@@ -13,6 +13,16 @@ build scripts and the provenance of the existing measurements remain intact.
 Historical anonymous repository link from the ICDM submission:
 `https://anonymous.4open.science/r/comnetx-792B`
 
+## Current IEEE Access manuscript
+
+The 2 November 2026 revision is available as a
+[fixed PDF/source/evidence distribution](https://github.com/mpailab/comnetx/tree/ieee-access-r2-20261102/artifacts/ieee-access).
+Use the sources inside those ZIP files to reproduce that version; they include
+the current journal tables, figures, immutable records, and SHA-256 manifests.
+The working `journal/ieee-access/` directory in this research checkout is an
+earlier development snapshot. The ongoing paired S²CAG server campaign is not
+included in the versioned distribution.
+
 ## What Is Included
 
 - `article/`: submitted ICDM source, PDF, figures, and the baseline inclusion audit.

@@ -1,0 +1,3 @@
+# Small self-contained submission packages must be downloadable without LFS.
+*.zip -filter -diff -merge -text
+*.pdf -filter -diff -merge -text

@@ -1,0 +1,2 @@
+# Versioned submission ZIP files are intentional tracked artifacts.
+!*.zip
