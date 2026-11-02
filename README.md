@@ -88,3 +88,16 @@ python scripts/launch.py conf/paper_icdm/main_topology.json \
 The committed dev container covers daily checks, not the full GPU research
 stack. Full baseline reruns can require optional packages, GPU-specific wheels,
 and the external datasets listed in the article.
+
+## Paired S²CAG measurements
+
+Run the server campaign with one command (20 pairs / 40 processes):
+
+```bash
+bash scripts/paper/run_s2cag.sh --paths-config datasets-info/paths/cn69.json
+```
+
+The script creates its own Python environment on the first launch, runs the
+confirmatory series directly, and writes validated comparisons automatically.
+See [server instructions](docs/s2cag-paired-reruns-ru.md) for paths, background
+execution, and output files.

@@ -206,3 +206,8 @@ AGENTS.md
 *.tar.gz
 
 .DS_Store
+
+# Dedicated S2CAG server environment and newly generated measurements.
+.venv-s2cag/
+results/s2cag-paired/
+s2cag-run.log

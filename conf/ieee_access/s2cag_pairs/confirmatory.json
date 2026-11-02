@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "name": "s2cag_confirmatory_random_999_5_10",
+  "datasets": [
+    "dyn_pubmed",
+    "arxivmath"
+  ],
+  "protocols": [
+    "999:5",
+    "999:10"
+  ],
+  "feature_modes": [
+    "random"
+  ],
+  "repetitions": 5,
+  "random_features": {
+    "dimension": 64,
+    "seed": 42
+  },
+  "backend": {
+    "method": "sub",
+    "T": 10,
+    "alpha": 1.0,
+    "tau": 7,
+    "n_runs": 5,
+    "gamma": 1.0,
+    "fdim": 0,
+    "svd_seed": 0,
+    "oversampling": 10,
+    "rounding_iterations": 100
+  },
+  "comnetx": {
+    "depth": 3,
+    "radius": 1,
+    "aggregation": "normalized"
+  },
+  "initializer": {
+    "backend": "public_leidenalg",
+    "resolution": 1.0,
+    "seed": 1,
+    "n_iterations": 2
+  },
+  "runtime": {
+    "device": "cuda",
+    "cpu_threads": 8,
+    "seed": 0
+  },
+  "measurement": {
+    "comnetx_profile": false
+  }
+}

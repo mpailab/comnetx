@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from sklearn.metrics import adjusted_rand_score, f1_score, normalized_mutual_info_score, balanced_accuracy_score
-from torch_sparse import SparseTensor
 from scipy.optimize import linear_sum_assignment
 from our_utils import suppress_warnings_context
 

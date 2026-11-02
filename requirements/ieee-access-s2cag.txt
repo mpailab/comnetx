@@ -1,0 +1,13 @@
+# Separate Python 3.10/3.11 environment for the preserved S2CAG implementation.
+# Keep this environment separate from the daily development environment.
+# This is a new rerun environment, not a reconstruction of the old server.
+numpy==1.26.4
+scipy==1.10.1
+scikit-learn==1.5.2
+joblib==1.6.0
+torch==2.3.1
+tensorflow==2.16.2
+igraph==1.0.0
+leidenalg==0.12.0
+threadpoolctl==3.7.0
+pytest==9.2.0

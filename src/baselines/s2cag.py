@@ -9,7 +9,7 @@ if s2cag_root not in sys.path:
 import tensorflow as tf
 from tensorflow.python.util import deprecation
 deprecation._PRINT_DEPRECATION_WARNINGS = False
-from time import time
+from time import time, perf_counter
 from scipy import sparse
 from sklearn.cluster import KMeans
 from utils_s2cag import *
@@ -148,7 +148,20 @@ def s2cag(adj_torch: torch.Tensor,
           T = None, n_runs = None, 
           alpha= 1.0, fdim = 0, method = 'sub', 
           gamma = 1.0, tau = 7,
-          metrics_mod=None):
+          metrics_mod=None,
+          trace_info=None):
+    """Run the preserved adapter, optionally collecting per-call diagnostics.
+
+    ``trace_info`` is an optional mutable dictionary populated on success.
+    Stage durations use a monotonic clock and include all five solver calls
+    by default. The historical ``timing_info['conversion_time']`` boundary,
+    return value, solver defaults and last-call selection remain unchanged.
+    Trace summarization is performed after ``adapter_total_seconds`` ends;
+    its separate overhead is available to an outer benchmark timer.
+    """
+    trace_enabled = trace_info is not None
+    adapter_started = perf_counter() if trace_enabled else None
+    labels_supplied = labels is not None
     if T is None:
         T = 10
     if n_runs is None:
@@ -177,7 +190,9 @@ def s2cag(adj_torch: torch.Tensor,
     if timing_info is not None:
         timing_info['conversion_time'] = time_e - time_s
 
+    preprocessing_finished = perf_counter() if trace_enabled else None
     features = features.toarray()
+    densification_finished = perf_counter() if trace_enabled else None
     n, d = features.shape
     k = n_classes
 
@@ -191,15 +206,20 @@ def s2cag(adj_torch: torch.Tensor,
     
     x = features
 
+    solver_call_seconds = [] if trace_enabled else None
+    solver_started = perf_counter() if trace_enabled else None
     for run in range(n_runs):
         features = x
 
         t0 = time()
+        call_started = perf_counter() if trace_enabled else None
         # print(features, k, norm_adj, sep='\n')
         P, Q = run_SSCAG(features, k, norm_adj, T, alpha,method=method,dataset=dataset,gamma=gamma,tau=tau)
+        if trace_enabled:
+            solver_call_seconds.append(perf_counter() - call_started)
 
 
-
+    solver_finished = perf_counter() if trace_enabled else None
     metrics['time'].append(time()-t0)
     metrics['acc'].append(clustering_accuracy(labels, P)*100)
     # from sklearn.metrics import accuracy_score
@@ -224,10 +244,50 @@ def s2cag(adj_torch: torch.Tensor,
     means = results['mean']
     std = results['std']
 
+    internal_metrics_finished = perf_counter() if trace_enabled else None
 
     print(f"{dataset} {T} {alpha} {method} {tau}")
     print(f"acc: {means['acc']}±{std['acc']} & nmi: {means['nmi']}±{std['nmi']} & ari: {means['ari']}±{std['ari']} & time: {means['time']}±{std['time']}", sep=',')
     new_labels = torch.tensor(P)
+
+    if trace_enabled:
+        adapter_finished = perf_counter()
+        trace_started = perf_counter()
+        trace_info.update({
+            'input_vertices': int(n),
+            'input_feature_columns': int(d),
+            'labels_supplied': labels_supplied,
+            'normalized_adjacency_nnz': int(norm_adj.nnz),
+            'requested_k': int(k),
+            'embedding_width': int(Q.shape[1]),
+            'actual_nonempty_groups': int(np.unique(P).size),
+            'solver_calls_completed': len(solver_call_seconds),
+            'returned_solver_call': len(solver_call_seconds) - 1,
+            'return_policy': 'last_call',
+            'internal_metric_observations': len(metrics['acc']),
+            'settings': {
+                'T': T, 'n_runs': n_runs, 'alpha': alpha, 'method': method,
+                'gamma': gamma, 'tau': tau, 'fdim': fdim,
+                'gamma_used': method == 'mod',
+            },
+            'helper_defaults': {
+                'svd_random_state': 0 if method == 'sub' else None,
+                'svd_oversamples': 10 if method == 'sub' else None,
+                'rounding_iterations': 100,
+                'provenance': 'Preserved helper defaults; identify helpers by source hashes.',
+            },
+            'solver_call_seconds': solver_call_seconds,
+            'preprocessing_seconds': preprocessing_finished - adapter_started,
+            'legacy_conversion_seconds': time_e - time_s,
+            'densification_seconds': densification_finished - preprocessing_finished,
+            'solver_setup_seconds': solver_started - densification_finished,
+            'solver_loop_seconds': solver_finished - solver_started,
+            'internal_metrics_seconds': internal_metrics_finished - solver_finished,
+            'printing_and_output_seconds': adapter_finished - internal_metrics_finished,
+            'adapter_total_seconds': adapter_finished - adapter_started,
+            'clock': 'time.perf_counter',
+        })
+        trace_info['trace_overhead_seconds'] = perf_counter() - trace_started
 
     if metrics_mod==True:
         return new_labels, metrics
