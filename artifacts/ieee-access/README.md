@@ -1,13 +1,13 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Version: **ieee-access-r6-20261106**, revision of 6 November 2026 with a concise availability and limitations section.
+Version: **ieee-access-r7-20261106**, revision of 6 November 2026 restoring the five-scene local recomputation panel in Figure 1.
 
-Section VII now gives a short availability statement and the material limits
-of reproducibility and experimental coverage. Archive inventories, validation
-procedures, and historical exclusions remain in the artifact documentation.
-All 76 cited works and the detailed, corrected Figure 1 are retained from r5.
-Measurements, result tables and plots, mathematical conditions, and execution
-code are unchanged.
+The panel again separates community closure, restriction to the induced graph,
+contraction, the detector's partition of the quotient graph, and lifting to
+original vertices. The example preserves singleton atoms for every expanded-
+neighborhood vertex and shows the residual atom {8,10} explicitly. Its caption
+is updated accordingly. All 76 cited works, measurements, numerical tables,
+other figures, and the concise availability section are retained from r6.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
