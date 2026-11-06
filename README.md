@@ -1,10 +1,9 @@
-# ComNetX ICDM 2026 Reproducibility Bundle
+# ComNetX — IEEE Access manuscript and research repository
 
-This branch is a reduced reviewer-facing bundle for the ICDM 2026 ComNetX
-submission. It keeps the implementation, article source, figure scripts, and
-canonical measurement data needed to inspect and reproduce the reported results.
-Historical launch queues, legacy bundles, unrelated baselines, and heavy local
-datasets are intentionally not tracked here.
+The current IEEE Access manuscript and its complete source/evidence packages
+are available in the fixed distribution linked below. This research checkout
+also preserves the earlier conference sources and execution code; use the
+versioned packages to reproduce the journal article.
 
 The submitted ICDM manuscript remains frozen in `article/`. Journal revision
 work is staged separately in `journal/ieee-access/` so that conference-specific
@@ -15,13 +14,16 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-The 2 November 2026 revision is available as a
-[fixed PDF/source/evidence distribution](https://github.com/mpailab/comnetx/tree/ieee-access-r2-20261102/artifacts/ieee-access).
-Use the sources inside those ZIP files to reproduce that version; they include
-the current journal tables, figures, immutable records, and SHA-256 manifests.
+The 5 November 2026 revision, finalized on 6 November, is available as a
+[fixed PDF/source/evidence distribution](https://github.com/mpailab/comnetx/tree/ieee-access-r3-20261105/artifacts/ieee-access).
+It includes the completed, verified S²CAG campaign: 20 pairs, 40 method
+executions, per-update records and labels, initial hierarchies, configuration,
+environment, and source identities. Use the sources inside those ZIP files to
+reproduce the journal tables, figures, and PDF. SHA-256 manifests identify all
+packaged files.
 The working `journal/ieee-access/` directory in this research checkout is an
-earlier development snapshot. The ongoing paired S²CAG server campaign is not
-included in the versioned distribution.
+earlier development snapshot; the versioned source ZIP is authoritative for the
+journal article. The earlier r2 snapshot remains available under its own tag.
 
 ## What Is Included
 
