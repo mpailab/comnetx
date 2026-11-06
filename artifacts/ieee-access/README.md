@@ -1,18 +1,21 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Version: **ieee-access-r4-20261106**, editorial revision of 6 November 2026.
+Version: **ieee-access-r5-20261106**, revision of 6 November 2026 with restored literature coverage and method overview.
 
-This revision focuses the literature review, completes the update procedure
-before its analysis, and removes repeated interpretation and an unimplemented
-indexed alternative. Measurements, generated tables and figures, mathematical
-conditions, and reproducibility limits are unchanged from r3.
+This revision restores all 76 sources from the broader literature review and
+organizes them into connected discussions. Figure 1 again shows the stored
+state, batch and region selection, quotient construction, detector calls,
+lifting, and hierarchy updates. The corrected example retains every expanded-
+neighborhood vertex as a singleton on the first pass. Measurements, result
+tables and plots, mathematical conditions, and reproducibility limits remain
+unchanged.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
 sources when reproducing the journal article; other working files in the
 research repository may belong to an earlier revision.
 
-- [Manuscript PDF](comnetx-ieee-access.pdf): the revised 17-page article.
+- [Manuscript PDF](comnetx-ieee-access.pdf): the revised 19-page article.
 - [Manuscript source](comnetx-ieee-access-source.zip): LaTeX, bibliography,
   template resources, generated tables, and figures.
 - [Evidence and code](comnetx-ieee-access-evidence.zip): manuscript sources,

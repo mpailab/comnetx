@@ -14,17 +14,18 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-The 6 November 2026 editorial revision is available as a
-[fixed PDF/source/evidence distribution](https://github.com/mpailab/comnetx/tree/ieee-access-r4-20261106/artifacts/ieee-access).
-The 17-page manuscript streamlines the argument while retaining the completed,
-verified S²CAG campaign: 20 pairs, 40 method
+The 6 November 2026 revision with restored literature and method overview is
+available as a
+[fixed PDF/source/evidence distribution](https://github.com/mpailab/comnetx/tree/ieee-access-r5-20261106/artifacts/ieee-access).
+The 19-page manuscript restores 76 cited works and a detailed Figure 1 while
+retaining the completed, verified S²CAG campaign: 20 pairs, 40 method
 executions, per-update records and labels, initial hierarchies, configuration,
 environment, and source identities. Use the sources inside those ZIP files to
 reproduce the journal tables, figures, and PDF. SHA-256 manifests identify all
 packaged files.
 The working `journal/ieee-access/` directory in this research checkout is an
 earlier development snapshot; the versioned source ZIP is authoritative for the
-journal article. The earlier r3 and r2 snapshots remain available under their
+journal article. The earlier r4, r3, and r2 snapshots remain available under their
 own fixed tags.
 
 ## What Is Included
