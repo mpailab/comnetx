@@ -1,14 +1,13 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Version: **ieee-access-r5-20261106**, revision of 6 November 2026 with restored literature coverage and method overview.
+Version: **ieee-access-r6-20261106**, revision of 6 November 2026 with a concise availability and limitations section.
 
-This revision restores all 76 sources from the broader literature review and
-organizes them into connected discussions. Figure 1 again shows the stored
-state, batch and region selection, quotient construction, detector calls,
-lifting, and hierarchy updates. The corrected example retains every expanded-
-neighborhood vertex as a singleton on the first pass. Measurements, result
-tables and plots, mathematical conditions, and reproducibility limits remain
-unchanged.
+Section VII now gives a short availability statement and the material limits
+of reproducibility and experimental coverage. Archive inventories, validation
+procedures, and historical exclusions remain in the artifact documentation.
+All 76 cited works and the detailed, corrected Figure 1 are retained from r5.
+Measurements, result tables and plots, mathematical conditions, and execution
+code are unchanged.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
