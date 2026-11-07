@@ -14,19 +14,15 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-The 6 November 2026 revision restores the five-scene local recomputation
-panel in Figure 1. It is available as a
-[fixed PDF/source/evidence distribution](https://github.com/mpailab/comnetx/tree/ieee-access-r7-20261106/artifacts/ieee-access).
-The 19-page manuscript retains 76 cited works, the concise availability
-section, and the completed, verified S²CAG campaign: 20 pairs, 40 method
-executions, per-update records and labels, initial hierarchies, configuration,
-environment, and source identities. Use the sources inside those ZIP files to
-reproduce the journal tables, figures, and PDF. SHA-256 manifests identify all
-packaged files.
-The working `journal/ieee-access/` directory in this research checkout is an
-earlier development snapshot; the versioned source ZIP is authoritative for the
-journal article. The earlier r6, r5, r4, r3, and r2 snapshots remain available
-under their own fixed tags.
+The 7 November 2026 revision restores the October artwork in Figure 1.
+The example follows two groups of vertices from the finer partition to the
+quotient graph and back to the original graph.
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r8-20261107/artifacts/ieee-access).
+
+The versioned ZIP files provide the sources for the 18-page article and its
+76 references. The working `journal/ieee-access/` directory in this checkout
+contains an earlier development snapshot. The published archives for earlier
+revisions remain available at their respective Git tags.
 
 ## What Is Included
 

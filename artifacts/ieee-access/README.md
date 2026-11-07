@@ -1,20 +1,16 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Version: **ieee-access-r7-20261106**, revision of 6 November 2026 restoring the five-scene local recomputation panel in Figure 1.
-
-The panel again separates community closure, restriction to the induced graph,
-contraction, the detector's partition of the quotient graph, and lifting to
-original vertices. The example preserves singleton atoms for every expanded-
-neighborhood vertex and shows the residual atom {8,10} explicitly. Its caption
-is updated accordingly. All 76 cited works, measurements, numerical tables,
-other figures, and the concise availability section are retained from r6.
+The 7 November 2026 revision (`ieee-access-r8-20261107`) restores the October
+vector artwork for Figure 1. The central panel shows how communities formed
+by a finer pass become individual vertices on the quotient graph of the next
+pass. The caption identifies the two passes and the illustrative output.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
 sources when reproducing the journal article; other working files in the
 research repository may belong to an earlier revision.
 
-- [Manuscript PDF](comnetx-ieee-access.pdf): the revised 19-page article.
+- [Manuscript PDF](comnetx-ieee-access.pdf): the revised 18-page article.
 - [Manuscript source](comnetx-ieee-access-source.zip): LaTeX, bibliography,
   template resources, generated tables, and figures.
 - [Evidence and code](comnetx-ieee-access-evidence.zip): manuscript sources,
