@@ -1,9 +1,6 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Figure 1 illustrates local recomputation at a general coarser level.
-Nested outlines identify the stored communities in the closure diagram.
-The quotient graph represents each complete community of the updated finer
-partition as a single vertex.
+Figure 1 shows the expanded neighborhood and the recomputation steps at every level, starting at level zero.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged

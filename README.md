@@ -14,8 +14,8 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-Figure 1 illustrates local recomputation at a general coarser level.
-[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r10-20261107/artifacts/ieee-access).
+Figure 1 shows the expanded neighborhood and the recomputation steps at every level, starting at level zero.
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r11-20261107/artifacts/ieee-access).
 
 The versioned ZIP files provide the sources for the 18-page article and its
 76 references. The working `journal/ieee-access/` directory in this checkout
