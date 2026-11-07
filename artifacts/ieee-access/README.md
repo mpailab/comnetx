@@ -1,9 +1,9 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Figure 1 in this version follows the two branches of Algorithm 1. On the
-first pass the detector can reassign each vertex of the expanded neighborhood
-individually. Its complete communities then become quotient vertices for the
-second pass, which preserves the finer partition.
+Figure 1 illustrates local recomputation at a general coarser level.
+Nested outlines identify the stored communities in the closure diagram.
+The quotient graph represents each complete community of the updated finer
+partition as a single vertex.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
