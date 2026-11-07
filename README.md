@@ -14,10 +14,9 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-The 7 November 2026 revision restores the October artwork in Figure 1.
-The example follows two groups of vertices from the finer partition to the
-quotient graph and back to the original graph.
-[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r8-20261107/artifacts/ieee-access).
+Figure 1 follows the two passes of Algorithm 1 from individual vertices to
+communities in the finer partition and then to the quotient graph.
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r9-20261107/artifacts/ieee-access).
 
 The versioned ZIP files provide the sources for the 18-page article and its
 76 references. The working `journal/ieee-access/` directory in this checkout

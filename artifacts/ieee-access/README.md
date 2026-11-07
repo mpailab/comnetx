@@ -1,9 +1,9 @@
 # IEEE Access manuscript and reproducibility artifact
 
-The 7 November 2026 revision (`ieee-access-r8-20261107`) restores the October
-vector artwork for Figure 1. The central panel shows how communities formed
-by a finer pass become individual vertices on the quotient graph of the next
-pass. The caption identifies the two passes and the illustrative output.
+Figure 1 in this version follows the two branches of Algorithm 1. On the
+first pass the detector can reassign each vertex of the expanded neighborhood
+individually. Its complete communities then become quotient vertices for the
+second pass, which preserves the finer partition.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
