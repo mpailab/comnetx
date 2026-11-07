@@ -14,10 +14,10 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-Figure 1 shows the expanded neighborhood and the recomputation steps at every level, starting at level zero.
-[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r11-20261107/artifacts/ieee-access).
+This submission version reports the random-feature sensitivity analysis using seeds 2–5. Each of these seeds has one complete execution per graph.
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r12-20261107/artifacts/ieee-access).
 
-The versioned ZIP files provide the sources for the 18-page article and its
+The versioned ZIP files provide the sources for the 16-page article and its
 76 references. The working `journal/ieee-access/` directory in this checkout
 contains an earlier development snapshot. The published archives for earlier
 revisions remain available at their respective Git tags.
