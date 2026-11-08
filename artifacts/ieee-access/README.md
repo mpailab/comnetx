@@ -1,6 +1,6 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Table 11 reports all five random-feature seeds from the original series and its CiteSeer supplements. The evidence also reports the effect of substituting the separate six-graph run for seed 1.
+Table 11 reports one observation per graph and seed from the original five-seed series.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
@@ -40,3 +40,10 @@ ZIP directly from `journal/ieee-access/`: pdfLaTeX, BibTeX, then pdfLaTeX twice.
 These operations do not run community-detection experiments.
 
 This is a versioned research manuscript, not a claim of journal acceptance.
+
+
+## Table 11
+
+For each seed from 1 to 5, the October 1 output contains five completed graphs and the October 2 supplement supplies CiteSeer. This gives 30 observations. An additional run at 21:40 on October 1 covered all six graphs for seed 1. On Patent it returned a final modularity of 0.540977, compared with 0.657468 in the original series. Substituting that run changes the five-seed sample standard deviation from 0.000382 to 0.052158. The archive does not establish which execution setting caused the difference.
+
+The evidence ZIP includes the source records in `results/ieee-access-2026-2/`, the selection rule in `docs/s2cag-reproducibility.md`, and results for both choices on every graph under `stability` in `journal/ieee-access/analysis/validated_results.json`.
