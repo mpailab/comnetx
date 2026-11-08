@@ -1,6 +1,6 @@
 # IEEE Access manuscript and reproducibility artifact
 
-This submission version reports the random-feature sensitivity analysis using seeds 2–5. Each of these seeds has one complete execution per graph.
+Table 11 reports all five random-feature seeds from the original series and its CiteSeer supplements. The evidence also reports the effect of substituting the separate six-graph run for seed 1.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged

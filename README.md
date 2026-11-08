@@ -14,8 +14,8 @@ Historical anonymous repository link from the ICDM submission:
 
 ## Current IEEE Access manuscript
 
-This submission version reports the random-feature sensitivity analysis using seeds 2–5. Each of these seeds has one complete execution per graph.
-[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r12-20261107/artifacts/ieee-access).
+Table 11 reports all five random-feature seeds from the original series and its CiteSeer supplements. The evidence also reports the effect of substituting the separate six-graph run for seed 1.
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r13-20261108/artifacts/ieee-access).
 
 The versioned ZIP files provide the sources for the 16-page article and its
 76 references. The working `journal/ieee-access/` directory in this checkout
