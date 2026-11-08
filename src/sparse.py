@@ -2,6 +2,18 @@ import torch
 from typing import Any
 
 
+def nonzero_coo(matrix: torch.Tensor) -> torch.Tensor:
+    """Combine duplicate coordinates and discard entries whose net weight is zero."""
+    matrix = matrix.coalesce()
+    keep = matrix.values() != 0
+    if keep.all():
+        return matrix
+    return torch.sparse_coo_tensor(
+        matrix.indices()[:, keep], matrix.values()[keep], matrix.size(),
+        is_coalesced=True,
+    )
+
+
 def tensor(
     indices: torch.Tensor,
     size: torch.types._size,

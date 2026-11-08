@@ -154,7 +154,8 @@ def s2cag(adj_torch: torch.Tensor,
 
     ``trace_info`` is an optional mutable dictionary populated on success.
     Stage durations use a monotonic clock and include all five solver calls
-    by default. The historical ``timing_info['conversion_time']`` boundary,
+    by default. A single vertex has a unique partition and needs no solver.
+    The historical ``timing_info['conversion_time']`` boundary,
     return value, solver defaults and last-call selection remain unchanged.
     Trace summarization is performed after ``adapter_total_seconds`` ends;
     its separate overhead is available to an outer benchmark timer.
@@ -172,10 +173,14 @@ def s2cag(adj_torch: torch.Tensor,
         num_nodes = adj_torch.size(0)
         labels = torch.arange(num_nodes)
     elif len(labels.shape) == 2:
-        labels = labels.squeeze()
+        labels = labels.reshape(-1)
 
     if features_torch is None:
         features_torch = generate_graph_features(adj_torch, embedding_dim=8, alpha=0.9, power=10)
+    if method == 'sub' and adj_torch.size(0) > 1 and features_torch.shape[1] < 2:
+        raise ValueError("S²CAG's subspace solver requires at least two feature "
+                         "columns on a graph with more than one vertex: "
+                         "it discards the leading singular vector.")
 
     # print("features_torch =", features_torch)
 
@@ -208,19 +213,20 @@ def s2cag(adj_torch: torch.Tensor,
 
     solver_call_seconds = [] if trace_enabled else None
     solver_started = perf_counter() if trace_enabled else None
-    for run in range(n_runs):
-        features = x
-
-        t0 = time()
-        call_started = perf_counter() if trace_enabled else None
-        # print(features, k, norm_adj, sep='\n')
-        P, Q = run_SSCAG(features, k, norm_adj, T, alpha,method=method,dataset=dataset,gamma=gamma,tau=tau)
-        if trace_enabled:
-            solver_call_seconds.append(perf_counter() - call_started)
-
-
+    if n == 1:
+        P = np.zeros(1, dtype=np.int64)
+        embedding_width = 0
+    else:
+        for run in range(n_runs):
+            t0 = time()
+            call_started = perf_counter() if trace_enabled else None
+            P, Q = run_SSCAG(x, k, norm_adj, T, alpha, method=method,
+                             dataset=dataset, gamma=gamma, tau=tau)
+            if trace_enabled:
+                solver_call_seconds.append(perf_counter() - call_started)
+        embedding_width = Q.shape[1]
     solver_finished = perf_counter() if trace_enabled else None
-    metrics['time'].append(time()-t0)
+    metrics['time'].append(0.0 if n == 1 else time()-t0)
     metrics['acc'].append(clustering_accuracy(labels, P)*100)
     # from sklearn.metrics import accuracy_score
     # metrics['acc'].append(accuracy_score(labels, P) * 100)
@@ -259,11 +265,11 @@ def s2cag(adj_torch: torch.Tensor,
             'labels_supplied': labels_supplied,
             'normalized_adjacency_nnz': int(norm_adj.nnz),
             'requested_k': int(k),
-            'embedding_width': int(Q.shape[1]),
+            'embedding_width': int(embedding_width),
             'actual_nonempty_groups': int(np.unique(P).size),
             'solver_calls_completed': len(solver_call_seconds),
-            'returned_solver_call': len(solver_call_seconds) - 1,
-            'return_policy': 'last_call',
+            'returned_solver_call': None if n == 1 else len(solver_call_seconds) - 1,
+            'return_policy': 'single_vertex' if n == 1 else 'last_call',
             'internal_metric_observations': len(metrics['acc']),
             'settings': {
                 'T': T, 'n_runs': n_runs, 'alpha': alpha, 'method': method,

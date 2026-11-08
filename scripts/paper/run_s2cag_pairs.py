@@ -221,7 +221,8 @@ def adjacency_batches(adj):
 def active_nodes_mask(batch, nodes_num, device):
     import torch
     if batch.is_sparse:
-        active = batch.coalesce().indices().unique()
+        from sparse import nonzero_coo
+        active = nonzero_coo(batch).indices().unique()
         mask = torch.zeros(nodes_num, dtype=torch.bool, device=device)
         mask[active.to(device)] = True
         return mask
@@ -373,6 +374,23 @@ def prepare(spec):
                expected_updates=len(batches) - (p!="0")))
 
 
+def validate_solver_trace(call, n_runs):
+    if call["input_vertices"] == 1:
+        if not (call["return_policy"] == "single_vertex"
+                and call["requested_k"] == call["actual_nonempty_groups"] == 1
+                and call["embedding_width"] == call["solver_calls_completed"] == 0
+                and call["returned_solver_call"] is None
+                and not call["solver_call_seconds"]):
+            raise ValueError("Invalid trace for the unique single-vertex partition")
+        return
+    if call["solver_calls_completed"] != n_runs:
+        raise ValueError("Unexpected number of actual solver calls")
+    if not 1 <= call["actual_nonempty_groups"] <= call["embedding_width"] <= call["requested_k"]:
+        raise ValueError("Invalid requested/embedding/realized group counts")
+    if call["embedding_width"] > min(call["input_vertices"], call["input_feature_columns"]) - 1:
+        raise ValueError("Embedding exceeds retained nonleading singular vectors")
+
+
 def measure(spec):
     c, job, mode = spec["config"], spec["job"], spec["mode"]
     root = Path(spec["campaign"])
@@ -456,12 +474,7 @@ def measure(spec):
                 raise ValueError("Invalid conversion/outer timer accounting")
             trace_copy=list(calls)
             for call in trace_copy:
-                if call["solver_calls_completed"]!=c["backend"]["n_runs"]:
-                    raise ValueError("Unexpected number of actual solver calls")
-                if not 1 <= call["actual_nonempty_groups"] <= call["embedding_width"] <= call["requested_k"]:
-                    raise ValueError("Invalid requested/embedding/realized group counts")
-                if call["embedding_width"] > min(call["input_vertices"], call["input_feature_columns"])-1:
-                    raise ValueError("Embedding exceeds retained nonleading singular vectors")
+                validate_solver_trace(call, c["backend"]["n_runs"])
             metric_start=time.perf_counter()
             labels=opt.coms[0].detach().cpu()
             if labels.shape != (opt.nodes_num,) or not torch.isfinite(labels).all():

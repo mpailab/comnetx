@@ -10,6 +10,19 @@ from optimizer import Optimizer
 import sparse
 
 
+def test_net_zero_sparse_updates_do_not_touch_vertices_or_create_graph_edges():
+    opt = Optimizer(torch.eye(4).to_sparse())
+    # (0,2) cancels; (1,1) deletes an existing edge; (3,1) is a new edge.
+    delta = torch.sparse_coo_tensor([[0, 0, 1, 3], [2, 2, 1, 1]],
+                                    [1.0, -1.0, -1.0, 2.0], (4, 4))
+    assert opt.update_adj(delta).tolist() == [False, True, False, True]
+    assert opt.adj._nnz() == 4
+    expected = torch.eye(4)
+    expected[1, 1] = 0
+    expected[3, 1] = 2
+    assert torch.equal(opt.adj.to_dense(), expected)
+
+
 @pytest.mark.unit
 @pytest.mark.short
 def test_init_defaults():

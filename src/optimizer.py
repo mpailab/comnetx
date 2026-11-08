@@ -56,7 +56,7 @@ class Optimizer:
             # The linear restriction path relies on lexicographically ordered,
             # duplicate-free COO indices.  Keep this as a resident invariant
             # instead of paying an implicit coalesce at every hierarchy level.
-            self.adj = self.adj.coalesce()
+            self.adj = sparse.nonzero_coo(self.adj)
 
         if features is None:
             self.features = torch.zeros((self.nodes_num, 1), dtype=self.adj.dtype, device=self.device)
@@ -358,12 +358,16 @@ class Optimizer:
                 f"{self.size} is required."
             )
 
-        batch_dev = batch if batch.device == self.device else batch.to(self.device)
-        if batch_dev.is_sparse and not batch_dev.is_coalesced():
-            batch_dev = batch_dev.coalesce()
+        batch_dev = batch.to(device=self.device, dtype=self.adj.dtype)
+        if batch_dev.is_sparse:
+            batch_dev = sparse.nonzero_coo(batch_dev)
 
-        updated = self.adj + batch_dev.type(self.adj.dtype)
+        updated = self.adj + batch_dev
         self.adj = updated.coalesce() if updated.is_sparse else updated
+        # An actual deletion touches its endpoints even if the new edge weight
+        # is zero. Drop that entry from the graph supplied to later detectors.
+        if self.adj.is_sparse and (batch_dev.values() < 0).any():
+            self.adj = sparse.nonzero_coo(self.adj)
 
         if not return_mask:
             return None

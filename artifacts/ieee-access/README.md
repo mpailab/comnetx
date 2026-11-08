@@ -1,8 +1,8 @@
 # IEEE Access manuscript and reproducibility artifact
 
-Table 11 reports one observation per graph and seed from the original five-seed series.
+The paper reports how much contraction reduces the graph supplied to Leiden. The S²CAG comparison now includes the quality of keeping the initial Leiden partition fixed on each final graph; the evidence archive provides the calculation and the saved scores in `results/ieee-access-2026-4/s2cag-initial-partition-control.json`. The original timed runs and their execution provenance are unchanged.
 
-The experimental methods section cites the Leiden, DF-Leiden and S²CAG papers and public implementations. The evidence archive documents how each detector was initialized and timed.
+The server adapter in this research checkout also handles a one-vertex quotient directly. The current code ignores sparse updates with zero net weight when it identifies affected endpoints; the archived campaign used the source commit recorded in its metadata.
 
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged

@@ -781,6 +781,9 @@ def test_active_nodes_mask_handles_dense_and_sparse_batches(monkeypatch):
     )
     assert torch.equal(sparse_mask, torch.tensor([True, True, True, True]))
 
+    cancelled = torch.sparse_coo_tensor([[0, 0, 1], [2, 2, 3]], [1., -1., 0.], (4, 4))
+    assert not launcher._active_nodes_mask(cancelled, 4, torch.device("cpu")).any()
+
 
 class _BatchOptimizer:
     def __init__(self):

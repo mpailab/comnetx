@@ -685,9 +685,7 @@ def _active_nodes_mask(batch, nodes_num: int, device: torch.device) -> torch.Ten
     affected.
     """
     if batch.is_sparse:
-        # COO indices already contain both edge endpoints; coalesce first so
-        # duplicate entries do not produce unnecessary downstream work.
-        batch_coo = batch if batch.is_coalesced() else batch.coalesce()
+        batch_coo = sparse.nonzero_coo(batch)
         active_nodes = batch_coo.indices().unique()
         mask = torch.zeros(nodes_num, dtype=torch.bool, device=device)
         if active_nodes.numel() > 0:
