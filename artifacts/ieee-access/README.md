@@ -9,7 +9,7 @@ The ZIP files contain the exact sources for this version. Use these packaged
 sources when reproducing the journal article; other working files in the
 research repository may belong to an earlier revision.
 
-- [Manuscript PDF](comnetx-ieee-access.pdf): the revised 16-page article.
+- [Manuscript PDF](comnetx-ieee-access.pdf): the revised 15-page article.
 - [Manuscript source](comnetx-ieee-access-source.zip): LaTeX, bibliography,
   template resources, generated tables, and figures.
 - [Evidence and code](comnetx-ieee-access-evidence.zip): manuscript sources,
