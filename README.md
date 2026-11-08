@@ -15,7 +15,7 @@ Historical anonymous repository link from the ICDM submission:
 ## Current IEEE Access manuscript
 
 Table 11 reports all five random-feature seeds from the original series and its CiteSeer supplements. The evidence also reports the effect of substituting the separate six-graph run for seed 1.
-[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r14-20261108/artifacts/ieee-access).
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r15-20261108/artifacts/ieee-access).
 
 The versioned ZIP files provide the sources for the 16-page article and its
 76 references. The working `journal/ieee-access/` directory in this checkout

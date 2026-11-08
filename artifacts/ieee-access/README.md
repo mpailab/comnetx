@@ -2,6 +2,8 @@
 
 Table 11 reports one observation per graph and seed from the original five-seed series.
 
+The experimental methods section cites the Leiden, DF-Leiden and S²CAG papers and public implementations. The evidence archive documents how each detector was initialized and timed.
+
 This directory is the complete manuscript distribution cited in Section VII.
 The ZIP files contain the exact sources for this version. Use these packaged
 sources when reproducing the journal article; other working files in the
