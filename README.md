@@ -15,12 +15,11 @@ Historical anonymous repository link from the ICDM submission:
 ## Current IEEE Access manuscript
 
 The revised evaluation reports the size of the Leiden quotients and compares full and local S²CAG with retaining the same initial partition.
-[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r19-20261109/artifacts/ieee-access).
+[Manuscript PDF, source and reproducibility archive](https://github.com/mpailab/comnetx/tree/ieee-access-r0-20261109/artifacts/ieee-access).
 
 The versioned ZIP files provide the sources for the 15-page article and its
 77 references. The working `journal/ieee-access/` directory in this checkout
-contains an earlier development snapshot. The published archives for earlier
-revisions remain available at their respective Git tags.
+contains an earlier development snapshot. Use the linked source ZIP for the submission version.
 
 ## What Is Included
 
